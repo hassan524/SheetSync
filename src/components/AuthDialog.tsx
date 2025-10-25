@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation"; 
 
 export default function AuthDialog() {
   const [firstName, setFirstName] = useState("");
@@ -20,18 +21,30 @@ export default function AuthDialog() {
   const [isLogin, setIsLogin] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  const {isAuthDialogOpen, setIsAuthDialogOpen} = useAuth()
+  const { isAuthDialogOpen, setIsAuthDialogOpen, login, signup, signInWithGoogle } = useAuth()
+  const router = useRouter()
 
   const handleGoogleSignIn = () => {
-    console.log("Google sign in clicked");
+    signInWithGoogle()
   };
 
-  const handleSubmit = (e: any) => {
+ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLogin) {
-      console.log("Login", { email, password });
+
+    const res = isLogin
+      ? await login(email, password)
+      : await signup(email, password, firstName, lastName);
+
+    if (res.success) {
+      console.log(res.message);
+
+      setIsAuthDialogOpen(false);
+
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 800);
     } else {
-      console.log("Sign up", { firstName, lastName, email, password });
+      console.error(res.message);
     }
   };
 
