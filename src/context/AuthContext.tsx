@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { AuthError, Session } from "@supabase/supabase-js";
+import { cookies } from "js-cookie";
 
 // -----------------------
 // User type
@@ -39,7 +40,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-
   // -----------------------
   // Load session on mount
   // -----------------------
@@ -50,7 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } = await supabase.auth.getSession();
 
       if (session?.user) setUserFromSession(session);
-      console.log('Current User', session)
       setLoading(false);
     };
 
@@ -60,8 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) setUserFromSession(session);
       else {
-        setUser(null);
-        setAccessToken(null);
+        clearSession();
       }
     });
 
@@ -73,6 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // -----------------------
   const setUserFromSession = (session: Session) => {
     const u = session.user;
+    const token = session.access_token;
+
     setUser({
       id: u.id,
       name: u.user_metadata?.name || null,
@@ -80,7 +80,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       avatar_url: u.user_metadata?.avatar_url || null,
       last_sign_in_at: u.last_sign_in_at || null,
     });
-    setAccessToken(session.access_token);
+
+    setAccessToken(token);
+
+    // Store access token in cookie (expires in 1 day)
+    Cookies.set("my-supabase-session", token, {
+      expires: 1,
+      path: "/",
+      sameSite: "lax",
+    });
+  };
+
+  // -----------------------
+  // Clear session
+  // -----------------------
+  const clearSession = () => {
+    setUser(null);
+    setAccessToken(null);
+    Cookies.remove("my-supabase-session");
   };
 
   // -----------------------
@@ -101,17 +118,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error;
   };
 
-
   // -----------------------
   // Logout
   // -----------------------
   const logout = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setAccessToken(null);
-    setTimeout(() => {
-      router.push('/')
-    }, 550);
+    clearSession();
   };
 
   // -----------------------

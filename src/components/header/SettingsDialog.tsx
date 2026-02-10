@@ -15,16 +15,27 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Settings, LogOut, Bell } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 const SettingsDialog = () => {
+
   const [open, setOpen] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+  const { logout } = useAuth()
+  const router = useRouter()
 
-  const handleLogout = () => {
-    toast.success("Logged out successfully");
-    setOpen(false);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setTimeout(() => {
+        router.push('/')
+      }, 253);
+    } catch (error: any) {
+      toast.error("Logout failed: " + error.message || error);
+    }
   };
 
   return (
