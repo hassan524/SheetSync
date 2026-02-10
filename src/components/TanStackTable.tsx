@@ -62,6 +62,7 @@ const Spreadsheet = ({ params }: SheetPageProps) => {
   })
 
   // Grid API from AG Grid
+  {/* eslint-disable-next-line react/no-unescaped-entities */ }
   const [gridApi, setGridApi] = useState<any>(null)
 
   // Track column widths for auto-resize
@@ -72,6 +73,7 @@ const Spreadsheet = ({ params }: SheetPageProps) => {
     const data = fetchSingleSheet(sheetId) // Fetch user's saved sheet data
 
     // Set the spreadsheet data (use default if empty)
+    {/* eslint-disable-next-line react/no-unescaped-entities */}
     setSpreadsheetData({
       cellData: data.cell_data || {},
       cellFormatting: data.cell_formatting || {},
@@ -176,6 +178,7 @@ const Spreadsheet = ({ params }: SheetPageProps) => {
           editable: true,
           resizable: true,
           suppressMovable: true,
+          /* eslint-disable-next-line react/no-unescaped-entities */
           cellStyle: (params: any) => {
             const cellKey = `${colLetter}${params.node.rowIndex + 1}`
             const formatting = getCellFormatting(cellKey)

@@ -69,6 +69,7 @@ const recentSheets = [
 ];
 
 const Index = () => {
+
   const navigate = useRouter();
   const [newSheetOpen, setNewSheetOpen] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
@@ -90,8 +91,9 @@ const Index = () => {
             <div>
               <h1 className="text-2xl font-semibold">Welcome back, John</h1>
               <p className="text-muted-foreground mt-1">
-                Here's what's happening with your spreadsheets today
+                Here&apos;s what&apos;s happening with your spreadsheets today
               </p>
+
             </div>
             <Button onClick={() => setNewSheetOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -132,26 +134,26 @@ const Index = () => {
         {/* Templates Section */}
         <section className="animate-fade-in">
           <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold">Start with a template</h2>
-                <p className="text-sm text-muted-foreground">
-                  Get started quickly with pre-built spreadsheet templates
-                </p>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-primary"
-                onClick={() => navigate.push("/templates")}
-              >
-                View all templates
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
+            <div>
+              <h2 className="text-lg font-semibold">Start with a template</h2>
+              <p className="text-sm text-muted-foreground">
+                Get started quickly with pre-built spreadsheet templates
+              </p>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-primary"
+              onClick={() => navigate.push("/templates")}
+            >
+              View all templates
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {templates.map((template, index) => (
-              <div 
-                key={template.id} 
+              <div
+                key={template.id}
                 className={`stagger-${index + 1}`}
                 onClick={() => handleTemplateClick(template)}
               >
@@ -170,9 +172,9 @@ const Index = () => {
                 <Clock className="h-5 w-5 text-muted-foreground" />
                 <h2 className="text-lg font-semibold">Recent Sheets</h2>
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="text-primary"
                 onClick={() => navigate.push("/recent")}
               >
@@ -206,32 +208,32 @@ const Index = () => {
           <div className="bg-muted/30 rounded-xl p-6 border">
             <h3 className="font-semibold mb-4">Quick Actions</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-4 flex-col gap-2"
                 onClick={() => setNewSheetOpen(true)}
               >
                 <Plus className="h-5 w-5" />
                 <span className="text-sm">New Sheet</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-4 flex-col gap-2"
                 onClick={() => setInviteTeamOpen(true)}
               >
                 <Users className="h-5 w-5" />
                 <span className="text-sm">Invite Team</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-4 flex-col gap-2"
                 onClick={() => setCreateOrgOpen(true)}
               >
                 <Building2 className="h-5 w-5" />
                 <span className="text-sm">New Org</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-4 flex-col gap-2"
                 onClick={() => navigate.push("/import")}
               >
