@@ -5,13 +5,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { Menu, X, Table } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import AuthDialog from "./AuthDialog";
+import { supabase } from "@/lib/supabase/client";
 
 export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
-
-  const { user, setIsAuthDialogOpen } = useAuth();
+  const { user, loginWithGoogle } = useAuth();
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -21,15 +20,26 @@ export default function Navigation() {
     setMobileMenuOpen(false);
   };
 
-  const handleGetStarted = () => {
+  // -----------------------------
+  // Get Started button logic
+  // -----------------------------
+  const handleGetStarted = async () => {
     if (user) {
-      console.log("User already logged in — redirecting to dashboard...");
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 800); 
-    } else {
-      console.log("User not logged in — opening auth dialog...");
-      setIsAuthDialogOpen(true);
+      router.push("/dashboard");
+      return;
+    }
+
+    const error = await loginWithGoogle();
+    if (error) {
+      alert("Login failed: " + error.message); // show error modal/toast instead of redirect
+      return;
+    }
+
+    // After login succeeds, Supabase will trigger onAuthStateChange and update `user`.
+    // Optionally, you can manually redirect if you want:
+    const session = await supabase.auth.getSession();
+    if (session.data.session?.user) {
+      router.push("/dashboard");
     }
   };
 
@@ -50,28 +60,16 @@ export default function Navigation() {
           {/* ==== Desktop nav links ==== */}
           <div className="hidden lg:block">
             <div className="ml-10 flex items-baseline space-x-8">
-              <button
-                onClick={() => scrollToSection("features")}
-                className="nav-link text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium"
-              >
+              <button onClick={() => scrollToSection("features")} className="nav-link text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium">
                 Features
               </button>
-              <button
-                onClick={() => scrollToSection("why-teams")}
-                className="nav-link text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium"
-              >
+              <button onClick={() => scrollToSection("why-teams")} className="nav-link text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium">
                 Why Teams
               </button>
-              <button
-                onClick={() => scrollToSection("about")}
-                className="nav-link text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium"
-              >
+              <button onClick={() => scrollToSection("about")} className="nav-link text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium">
                 About
               </button>
-              <button
-                onClick={() => scrollToSection("contact")}
-                className="nav-link text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium"
-              >
+              <button onClick={() => scrollToSection("contact")} className="nav-link text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium">
                 Contact
               </button>
             </div>
@@ -86,17 +84,8 @@ export default function Navigation() {
 
           {/* ==== Mobile menu toggle ==== */}
           <div className="lg:hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-gray-700 hover:text-primary"
-            >
-              {mobileMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
+            <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-gray-700 hover:text-primary">
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>
           </div>
         </div>
@@ -106,49 +95,27 @@ export default function Navigation() {
       {mobileMenuOpen && (
         <div className="lg:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t border-gray-100">
-            <button
-              onClick={() => scrollToSection("features")}
-              className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary w-full text-left"
-            >
+            <button onClick={() => scrollToSection("features")} className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary w-full text-left">
               Features
             </button>
-            <button
-              onClick={() => scrollToSection("why-teams")}
-              className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary w-full text-left"
-            >
+            <button onClick={() => scrollToSection("why-teams")} className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary w-full text-left">
               Why Teams
             </button>
-            <button
-              onClick={() => scrollToSection("about")}
-              className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary w-full text-left"
-            >
+            <button onClick={() => scrollToSection("about")} className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary w-full text-left">
               About
             </button>
-            <button
-              onClick={() => scrollToSection("contact")}
-              className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary w-full text-left"
-            >
+            <button onClick={() => scrollToSection("contact")} className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary w-full text-left">
               Contact
             </button>
 
-            {/* ==== Mobile "Get Started" button ==== */}
             <div className="pt-4 pb-3 border-t border-gray-200">
-              <Button
-                className="block w-full text-left px-3 py-2 text-base font-medium text-white bg-primary rounded-lg mt-2"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleGetStarted();
-                }}
-              >
+              <Button className="block w-full text-left px-3 py-2 text-base font-medium text-white bg-primary rounded-lg mt-2" onClick={() => { setMobileMenuOpen(false); handleGetStarted(); }}>
                 Get Started
               </Button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Auth Dialog (login/signup) */}
-      <AuthDialog />
     </nav>
   );
 }

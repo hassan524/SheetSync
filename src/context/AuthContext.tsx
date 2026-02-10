@@ -1,98 +1,65 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { AuthError, Session } from "@supabase/supabase-js";
 
+// -----------------------
+// User type
+// -----------------------
 interface UserProfile {
   id: string;
   name: string | null;
   email: string | null;
-  role: string | null;
-  updated_at: string | null;
-  confirmed_at: string | null;
-  created_at: string | null;
   avatar_url: string | null;
   last_sign_in_at: string | null;
 }
 
+// -----------------------
+// Context type
+// -----------------------
 interface AuthContextType {
   user: UserProfile | null;
   accessToken: string | null;
   loading: boolean;
-  isAuthDialogOpen: boolean;
-  setIsAuthDialogOpen: (open: boolean) => void;
-  login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
-  signup: (
-    email: string,
-    password: string,
-    firstName?: string,
-    lastName?: string
-  ) => Promise<{ success: boolean; message: string }>;
-  signInWithGoogle: () => Promise<void>;
+  loginWithGoogle: () => Promise<AuthError | null>;
   logout: () => Promise<void>;
 }
 
+// -----------------------
+// Create context
+// -----------------------
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-
+// -----------------------
+// Provider
+// -----------------------
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState<boolean>(false);
 
-  // Load user session
+
+  // -----------------------
+  // Load session on mount
+  // -----------------------
   useEffect(() => {
-    const loadSession = async () => {
+    const initSession = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (session?.user) {
-        const u = session.user;
-        const newUser = {
-          id: u.id,
-          name: u.user_metadata?.name || null,
-          email: u.email || null,
-          role: u.role || null,
-          updated_at: u.updated_at || null,
-          confirmed_at: u.confirmed_at || null,
-          created_at: u.created_at || null,
-          avatar_url: u.user_metadata?.avatar_url || null,
-          last_sign_in_at: u.last_sign_in_at || null
-        };
-
-        setUser(newUser);
-        setAccessToken(session.access_token);
-        console.log("User", newUser);
-
-      } else {
-        setUser(null);
-        setAccessToken(null);
-      }
-
+      if (session?.user) setUserFromSession(session);
+      console.log('Current User', session)
       setLoading(false);
     };
 
-    loadSession();
+    initSession();
 
+    // Listen to auth changes (login / logout / token refresh)
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('CURRENT AUTH STATUS', _event)
-      if (session?.user) {
-        const u = session.user;
-        setAccessToken(session.access_token);
-        setUser({
-          id: u.id,
-          name: u.user_metadata?.name || null,
-          email: u.email || null,
-          role: u.role || null,
-          updated_at: u.updated_at || null,
-          confirmed_at: u.confirmed_at || null,
-          created_at: u.created_at || null,
-          avatar_url: u.user_metadata?.avatar_url || null,
-          last_sign_in_at: u.last_sign_in_at || null
-        });
-      } else {
+      if (session?.user) setUserFromSession(session);
+      else {
         setUser(null);
         setAccessToken(null);
       }
@@ -101,27 +68,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // Email login
-  const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { success: false, message: error.message };
-    return { success: true, message: "Login successful" };
-  };
-
-  // Email signup
-  const signup = async (email: string, password: string, firstName?: string, lastName?: string) => {
-    const fullName = `${firstName ?? ""} ${lastName ?? ""}`.trim();
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name: fullName || undefined } },
+  // -----------------------
+  // Helper: set user from session
+  // -----------------------
+  const setUserFromSession = (session: Session) => {
+    const u = session.user;
+    setUser({
+      id: u.id,
+      name: u.user_metadata?.name || null,
+      email: u.email || null,
+      avatar_url: u.user_metadata?.avatar_url || null,
+      last_sign_in_at: u.last_sign_in_at || null,
     });
-    if (error) return { success: false, message: error.message };
-    return { success: true, message: "Signup successful" };
+    setAccessToken(session.access_token);
   };
 
+  // -----------------------
   // Google login
-  const signInWithGoogle = async () => {
+  // -----------------------
+  const loginWithGoogle = async (): Promise<AuthError | null> => {
     const redirectUrl =
       process.env.NODE_ENV === "development"
         ? "http://localhost:3000/dashboard"
@@ -133,26 +98,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) console.error("Google sign-in error:", error.message);
+    return error;
   };
 
+
+  // -----------------------
   // Logout
+  // -----------------------
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
     setAccessToken(null);
+    setTimeout(() => {
+      router.push('/')
+    }, 550);
   };
 
+  // -----------------------
+  // Provide context
+  // -----------------------
   return (
     <AuthContext.Provider
       value={{
         user,
         accessToken,
         loading,
-        isAuthDialogOpen,
-        setIsAuthDialogOpen,
-        login,
-        signup,
-        signInWithGoogle,
+        loginWithGoogle,
         logout,
       }}
     >
@@ -161,6 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// -----------------------
+// Hook for convenience
+// -----------------------
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within AuthProvider");
