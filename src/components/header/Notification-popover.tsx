@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import {
   Popover,
@@ -70,7 +70,7 @@ const NotificationPopover = () => {
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
     );
   };
 
@@ -125,13 +125,17 @@ const NotificationPopover = () => {
               >
                 <div
                   className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-                    !notification.read ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    !notification.read
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {typeIcons[notification.type]}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm ${!notification.read ? "font-medium" : ""}`}>
+                  <p
+                    className={`text-sm ${!notification.read ? "font-medium" : ""}`}
+                  >
                     {notification.title}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">

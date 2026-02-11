@@ -18,9 +18,24 @@ interface JoinOrgModalProps {
 }
 
 const availableOrgs = [
-  { id: "1", name: "Product Team", members: 12, description: "Product development and roadmap" },
-  { id: "2", name: "Sales Division", members: 18, description: "Sales and business development" },
-  { id: "3", name: "Customer Success", members: 8, description: "Customer support and success" },
+  {
+    id: "1",
+    name: "Product Team",
+    members: 12,
+    description: "Product development and roadmap",
+  },
+  {
+    id: "2",
+    name: "Sales Division",
+    members: 18,
+    description: "Sales and business development",
+  },
+  {
+    id: "3",
+    name: "Customer Success",
+    members: 8,
+    description: "Customer support and success",
+  },
 ];
 
 const JoinOrgModal = ({ open, onOpenChange }: JoinOrgModalProps) => {
@@ -29,7 +44,7 @@ const JoinOrgModal = ({ open, onOpenChange }: JoinOrgModalProps) => {
   const [inviteCode, setInviteCode] = useState("");
 
   const filteredOrgs = availableOrgs.filter((org) =>
-    org.name.toLowerCase().includes(searchQuery.toLowerCase())
+    org.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleJoin = () => {
@@ -114,7 +129,9 @@ const JoinOrgModal = ({ open, onOpenChange }: JoinOrgModalProps) => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">{org.name}</p>
-                  <p className="text-xs text-muted-foreground">{org.description}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {org.description}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground flex items-center gap-1">

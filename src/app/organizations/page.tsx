@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
 import { useState } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
 import OrganizationCard from "@/components/organizations/OrganizationCard";
-import OrganizationsTable from "@/components/tables/OrganizationsTable";
+import OrganizationsTable from "@/components/tables/Organizations-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -71,9 +71,7 @@ const organizations = [
     role: "Viewer" as const,
     members: 6,
     sheets: 12,
-    recentMembers: [
-      { name: "Olivia", initials: "OP" },
-    ],
+    recentMembers: [{ name: "Olivia", initials: "OP" }],
   },
 ];
 
@@ -86,8 +84,16 @@ const tableData = organizations.map((org, index) => ({
   sheets: org.sheets,
   storageUsed: Math.random() * 4 + 1,
   storageLimit: 10,
-  lastModified: ["2 hours ago", "Yesterday", "3 days ago", "1 week ago", "2 weeks ago"][index],
-  createdAt: ["Jan 2023", "Mar 2023", "Jun 2023", "Aug 2023", "Nov 2023"][index],
+  lastModified: [
+    "2 hours ago",
+    "Yesterday",
+    "3 days ago",
+    "1 week ago",
+    "2 weeks ago",
+  ][index],
+  createdAt: ["Jan 2023", "Mar 2023", "Jun 2023", "Aug 2023", "Nov 2023"][
+    index
+  ],
 }));
 
 const OrganizationsPage = () => {
@@ -109,7 +115,9 @@ const OrganizationsPage = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-semibold animate-fade-in">Organizations</h1>
+            <h1 className="text-2xl font-semibold animate-fade-in">
+              Organizations
+            </h1>
             <p className="text-muted-foreground animate-fade-in">
               Manage and collaborate with your teams
             </p>
@@ -134,15 +142,21 @@ const OrganizationsPage = () => {
           </div>
           <div className="bg-card border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Total Members</p>
-            <p className="text-2xl font-semibold">{organizations.reduce((a, b) => a + b.members, 0)}</p>
+            <p className="text-2xl font-semibold">
+              {organizations.reduce((a, b) => a + b.members, 0)}
+            </p>
           </div>
           <div className="bg-card border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Total Sheets</p>
-            <p className="text-2xl font-semibold">{organizations.reduce((a, b) => a + b.sheets, 0)}</p>
+            <p className="text-2xl font-semibold">
+              {organizations.reduce((a, b) => a + b.sheets, 0)}
+            </p>
           </div>
           <div className="bg-card border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Admin Access</p>
-            <p className="text-2xl font-semibold">{organizations.filter(o => o.role === "Admin").length}</p>
+            <p className="text-2xl font-semibold">
+              {organizations.filter((o) => o.role === "Admin").length}
+            </p>
           </div>
         </div>
 
@@ -156,7 +170,10 @@ const OrganizationsPage = () => {
               className="pl-9"
             />
           </div>
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "table")}>
+          <Tabs
+            value={viewMode}
+            onValueChange={(v) => setViewMode(v as "grid" | "table")}
+          >
             <TabsList className="h-9">
               <TabsTrigger value="grid" className="px-3">
                 <Grid3X3 className="h-4 w-4" />

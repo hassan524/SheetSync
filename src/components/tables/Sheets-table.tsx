@@ -17,15 +17,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
-  MoreHorizontal, 
-  FileSpreadsheet, 
-  Star, 
-  Clock, 
+import {
+  MoreHorizontal,
+  FileSpreadsheet,
+  Star,
+  Clock,
   Users,
   Lock,
   Globe,
-  Circle
+  Circle,
 } from "lucide-react";
 
 interface Sheet {
@@ -151,7 +151,9 @@ const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
                 )}
               </TableCell>
               <TableCell>
-                <span className="text-sm text-muted-foreground">{sheet.size}</span>
+                <span className="text-sm text-muted-foreground">
+                  {sheet.size}
+                </span>
               </TableCell>
               <TableCell>
                 <DropdownMenu>

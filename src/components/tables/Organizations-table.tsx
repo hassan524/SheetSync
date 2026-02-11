@@ -17,13 +17,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
-  MoreHorizontal, 
-  Building2, 
-  Users, 
-  FileSpreadsheet, 
+import {
+  MoreHorizontal,
+  Building2,
+  Users,
+  FileSpreadsheet,
   Clock,
-  Circle
+  Circle,
 } from "lucide-react";
 
 interface Organization {

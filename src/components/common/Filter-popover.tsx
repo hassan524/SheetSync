@@ -26,10 +26,10 @@ interface FilterPopoverProps {
   onApply?: (filters: Record<string, boolean>) => void;
 }
 
-const FilterPopover = ({ 
-  title = "Filters", 
+const FilterPopover = ({
+  title = "Filters",
   filters = { visibility: true, starred: true, shared: true },
-  onApply 
+  onApply,
 }: FilterPopoverProps) => {
   const [open, setOpen] = useState(false);
   const [showPrivate, setShowPrivate] = useState(true);
@@ -57,7 +57,8 @@ const FilterPopover = ({
     setOpen(false);
   };
 
-  const hasActiveFilters = onlyStarred || onlyShared || !showPrivate || !showTeam || !showPublic;
+  const hasActiveFilters =
+    onlyStarred || onlyShared || !showPrivate || !showTeam || !showPublic;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -86,7 +87,9 @@ const FilterPopover = ({
         <div className="p-3 space-y-4">
           {filters.visibility && (
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground uppercase">Visibility</Label>
+              <Label className="text-xs text-muted-foreground uppercase">
+                Visibility
+              </Label>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Checkbox

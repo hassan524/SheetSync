@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
 import { useState } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
 import PersonCard from "@/components/people/PersonCard";
-import PeopleTable from "@/components/tables/PeopleTable";
+import PeopleTable from "@/components/tables/People-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,7 +23,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Search, Filter, Grid3X3, List, Mail, Users } from "lucide-react";
+import {
+  UserPlus,
+  Search,
+  Filter,
+  Grid3X3,
+  List,
+  Mail,
+  Users,
+} from "lucide-react";
 
 const people = [
   {
@@ -80,10 +88,22 @@ const tableData = people.map((person, index) => ({
   id: `person-${index}`,
   name: person.name,
   email: person.email,
-  initials: person.name.split(" ").map(n => n[0]).join(""),
+  initials: person.name
+    .split(" ")
+    .map((n) => n[0])
+    .join(""),
   role: (["Admin", "Editor", "Viewer"] as const)[index % 3],
   status: person.status,
-  lastActive: ["Just now", "5 min ago", "1 hour ago", "3 hours ago", "Yesterday", "2 days ago", "1 week ago", "Just now"][index],
+  lastActive: [
+    "Just now",
+    "5 min ago",
+    "1 hour ago",
+    "3 hours ago",
+    "Yesterday",
+    "2 days ago",
+    "1 week ago",
+    "Just now",
+  ][index],
   sheetsAccess: Math.floor(Math.random() * 20) + 5,
   organizations: person.organizations,
 }));
@@ -106,37 +126,43 @@ const PeoplePage = () => {
 
   // Filter people based on search, org, and status
   const filteredPeople = people.filter((person) => {
-    const matchesSearch = 
+    const matchesSearch =
       person.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       person.email.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesOrg = orgFilter === "all" || 
-      person.organizations.some((org) => 
-        org.toLowerCase().includes(orgFilter.toLowerCase())
+
+    const matchesOrg =
+      orgFilter === "all" ||
+      person.organizations.some((org) =>
+        org.toLowerCase().includes(orgFilter.toLowerCase()),
       );
-    
-    const matchesStatus = statusFilter === "all-status" || person.status === statusFilter;
-    
+
+    const matchesStatus =
+      statusFilter === "all-status" || person.status === statusFilter;
+
     return matchesSearch && matchesOrg && matchesStatus;
   });
 
   const filteredTableData = tableData.filter((person) => {
-    const matchesSearch = 
+    const matchesSearch =
       person.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       person.email.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesOrg = orgFilter === "all" || 
-      person.organizations.some((org) => 
-        org.toLowerCase().includes(orgFilter.toLowerCase())
+
+    const matchesOrg =
+      orgFilter === "all" ||
+      person.organizations.some((org) =>
+        org.toLowerCase().includes(orgFilter.toLowerCase()),
       );
-    
-    const matchesStatus = statusFilter === "all-status" || person.status === statusFilter;
-    
+
+    const matchesStatus =
+      statusFilter === "all-status" || person.status === statusFilter;
+
     return matchesSearch && matchesOrg && matchesStatus;
   });
 
-  const onlineCount = filteredPeople.filter(p => p.status === "online").length;
-  const awayCount = filteredPeople.filter(p => p.status === "away").length;
+  const onlineCount = filteredPeople.filter(
+    (p) => p.status === "online",
+  ).length;
+  const awayCount = filteredPeople.filter((p) => p.status === "away").length;
 
   return (
     <DashboardLayout breadcrumbItems={["SheetSync", "People"]}>
@@ -149,7 +175,10 @@ const PeoplePage = () => {
               View and manage collaborators across your organizations
             </p>
           </div>
-          <Button className="animate-fade-in" onClick={() => setInviteOpen(true)}>
+          <Button
+            className="animate-fade-in"
+            onClick={() => setInviteOpen(true)}
+          >
             <UserPlus className="h-4 w-4 mr-2" />
             Invite People
           </Button>
@@ -221,8 +250,8 @@ const PeoplePage = () => {
               </SelectContent>
             </Select>
 
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="icon"
               onClick={() => {
                 setOrgFilter("all");
@@ -234,7 +263,10 @@ const PeoplePage = () => {
               <Filter className="h-4 w-4" />
             </Button>
 
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "cards" | "table")}>
+            <Tabs
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as "cards" | "table")}
+            >
               <TabsList className="h-9">
                 <TabsTrigger value="table" className="px-3">
                   <List className="h-4 w-4" />
@@ -253,7 +285,10 @@ const PeoplePage = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredPeople.map((person, index) => (
-              <div key={person.email} style={{ animationDelay: `${index * 50}ms` }}>
+              <div
+                key={person.email}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
                 <PersonCard {...person} />
               </div>
             ))}
@@ -262,7 +297,9 @@ const PeoplePage = () => {
 
         {filteredPeople.length === 0 && (
           <div className="text-center py-12 animate-fade-in">
-            <p className="text-muted-foreground">No people found matching your filters.</p>
+            <p className="text-muted-foreground">
+              No people found matching your filters.
+            </p>
           </div>
         )}
       </div>
@@ -308,7 +345,9 @@ const PeoplePage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin - Full access</SelectItem>
-                  <SelectItem value="editor">Editor - Can edit sheets</SelectItem>
+                  <SelectItem value="editor">
+                    Editor - Can edit sheets
+                  </SelectItem>
                   <SelectItem value="viewer">Viewer - View only</SelectItem>
                 </SelectContent>
               </Select>
@@ -323,7 +362,9 @@ const PeoplePage = () => {
                 <SelectContent>
                   <SelectItem value="acme">Acme Corporation</SelectItem>
                   <SelectItem value="design">Design Team</SelectItem>
-                  <SelectItem value="marketing">Marketing Department</SelectItem>
+                  <SelectItem value="marketing">
+                    Marketing Department
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

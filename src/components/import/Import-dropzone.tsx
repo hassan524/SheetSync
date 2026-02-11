@@ -1,7 +1,13 @@
-'use client'
+"use client";
 
 import { useCallback, useState } from "react";
-import { Upload, FileSpreadsheet, X, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Upload,
+  FileSpreadsheet,
+  X,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
@@ -61,7 +67,7 @@ const ImportDropzone = () => {
               return { ...f, progress: newProgress };
             }
             return f;
-          })
+          }),
         );
       }, 500);
     });
@@ -92,7 +98,7 @@ const ImportDropzone = () => {
                 return { ...f, progress: newProgress };
               }
               return f;
-            })
+            }),
           );
         }, 500);
       });
@@ -168,7 +174,9 @@ const ImportDropzone = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-sm font-medium truncate">{file.name}</p>
-                  <span className="text-xs text-muted-foreground">{file.size}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {file.size}
+                  </span>
                 </div>
                 {file.status === "uploading" && (
                   <Progress value={file.progress} className="h-1" />

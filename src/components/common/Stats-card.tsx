@@ -38,7 +38,7 @@ const StatsCard = ({
     <div
       className={cn(
         "bg-card border border-border rounded-xl p-5 transition-all duration-300 hover:shadow-card animate-fade-in",
-        className
+        className,
       )}
     >
       <div className="flex items-start justify-between">

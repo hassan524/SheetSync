@@ -1,16 +1,16 @@
-'use client'
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import SheetCard from "@/components/sheets/SheetCard";
-import TemplateCard from "@/components/sheets/TemplateCard";
-import NewSheetModal from "@/components/sheets/NewSheetModal";
-import UseTemplateModal from "@/components/sheets/UseTemplateModal";
-import InviteTeamModal from "@/components/modals/InviteTeamModal";
-import CreateOrgModal from "@/components/modals/CreateOrgModal";
-import StatsCard from "@/components/common/StatsCard";
-import ActivityFeed from "@/components/common/ActivityFeed";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
+import SheetCard from "@/components/sheets/Sheet-card";
+import TemplateCard from "@/components/sheets/Template-card";
+import NewSheetModal from "@/components/sheets/New-sheet-modal";
+import UseTemplateModal from "@/components/sheets/Use-template-modal";
+import InviteTeamModal from "@/components/modals/Invite-team-modal";
+import CreateOrgModal from "@/components/modals/Create-org-modal";
+import StatsCard from "@/components/common/Stats-card";
+import ActivityFeed from "@/components/common/Activity-feed";
 import { Button } from "@/components/ui/button";
 import {
   FileSpreadsheet,
@@ -30,10 +30,16 @@ const templates = [
   {
     id: "budget",
     title: "Budget Tracker",
-    description: "Track income, expenses, and savings with automated calculations",
+    description:
+      "Track income, expenses, and savings with automated calculations",
     icon: <Calculator className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
-    features: ["Auto-sum formulas", "Monthly breakdown", "Expense categories", "Savings goals"],
+    features: [
+      "Auto-sum formulas",
+      "Monthly breakdown",
+      "Expense categories",
+      "Savings goals",
+    ],
   },
   {
     id: "timeline",
@@ -41,7 +47,12 @@ const templates = [
     description: "Plan and visualize project milestones and deadlines",
     icon: <Calendar className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
-    features: ["Gantt view", "Milestone tracking", "Team assignments", "Due date alerts"],
+    features: [
+      "Gantt view",
+      "Milestone tracking",
+      "Team assignments",
+      "Due date alerts",
+    ],
   },
   {
     id: "sales",
@@ -49,7 +60,12 @@ const templates = [
     description: "Monitor sales performance with charts and KPIs",
     icon: <BarChart3 className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
-    features: ["Real-time charts", "KPI widgets", "Pipeline tracking", "Revenue forecast"],
+    features: [
+      "Real-time charts",
+      "KPI widgets",
+      "Pipeline tracking",
+      "Revenue forecast",
+    ],
   },
   {
     id: "blank",
@@ -57,27 +73,43 @@ const templates = [
     description: "Start fresh with a clean spreadsheet",
     icon: <FileSpreadsheet className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
-    features: ["100+ columns", "10,000+ rows", "All formulas", "Custom styling"],
+    features: [
+      "100+ columns",
+      "10,000+ rows",
+      "All formulas",
+      "Custom styling",
+    ],
   },
 ];
 
 const recentSheets = [
-  { title: "Q4 Financial Report", lastEdited: "2 hours ago", isStarred: true, sharedWith: 5 },
-  { title: "Marketing Budget 2024", lastEdited: "Yesterday", isStarred: false, sharedWith: 3 },
+  {
+    title: "Q4 Financial Report",
+    lastEdited: "2 hours ago",
+    isStarred: true,
+    sharedWith: 5,
+  },
+  {
+    title: "Marketing Budget 2024",
+    lastEdited: "Yesterday",
+    isStarred: false,
+    sharedWith: 3,
+  },
   { title: "Team Roster", lastEdited: "3 days ago", isStarred: true },
   { title: "Product Roadmap", lastEdited: "1 week ago", sharedWith: 12 },
 ];
 
 const Index = () => {
-
   const navigate = useRouter();
   const [newSheetOpen, setNewSheetOpen] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [inviteTeamOpen, setInviteTeamOpen] = useState(false);
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<typeof templates[0] | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<
+    (typeof templates)[0] | null
+  >(null);
 
-  const handleTemplateClick = (template: typeof templates[0]) => {
+  const handleTemplateClick = (template: (typeof templates)[0]) => {
     setSelectedTemplate(template);
     setTemplateModalOpen(true);
   };
@@ -93,7 +125,6 @@ const Index = () => {
               <p className="text-muted-foreground mt-1">
                 Here&apos;s what&apos;s happening with your spreadsheets today
               </p>
-
             </div>
             <Button onClick={() => setNewSheetOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -184,7 +215,10 @@ const Index = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {recentSheets.map((sheet, index) => (
-                <div key={sheet.title} style={{ animationDelay: `${index * 50}ms` }}>
+                <div
+                  key={sheet.title}
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
                   <SheetCard {...sheet} />
                 </div>
               ))}

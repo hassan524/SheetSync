@@ -1,4 +1,10 @@
-import { Building2, Users, FileSpreadsheet, Shield, ChevronRight } from "lucide-react";
+import {
+  Building2,
+  Users,
+  FileSpreadsheet,
+  Shield,
+  ChevronRight,
+} from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
@@ -32,7 +38,10 @@ const OrganizationCard = ({
           </div>
           <div>
             <h3 className="font-semibold">{name}</h3>
-            <Badge variant="outline" className={`text-xs mt-1 ${roleColors[role]}`}>
+            <Badge
+              variant="outline"
+              className={`text-xs mt-1 ${roleColors[role]}`}
+            >
               <Shield className="h-3 w-3 mr-1" />
               {role}
             </Badge>

@@ -1,20 +1,20 @@
-'use client'
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import SheetsTable from "@/components/tables/SheetsTable";
-import MembersTable from "@/components/tables/MembersTable";
-import NewSheetModal from "@/components/sheets/NewSheetModal";
-import InviteTeamModal from "@/components/modals/InviteTeamModal";
-import GridBackground from "@/components/common/GridBackground";
+import SheetsTable from "@/components/tables/Sheets-table";
+import MembersTable from "@/components/tables/Members-table";
+import NewSheetModal from "@/components/sheets/New-sheet-modal";
+import InviteTeamModal from "@/components/modals/Invite-team-modal";
+import GridBackground from "@/components/common/Grid-gackground";
 import {
   Building2,
   Users,
@@ -44,8 +44,14 @@ import {
 // Mock data for a single organization
 const getOrganizationData = (id: string) => ({
   id,
-  name: id === "1" ? "Acme Corporation" : id === "2" ? "TechStart Inc" : "Design Studio",
-  description: "A collaborative workspace for managing spreadsheets and data across teams.",
+  name:
+    id === "1"
+      ? "Acme Corporation"
+      : id === "2"
+        ? "TechStart Inc"
+        : "Design Studio",
+  description:
+    "A collaborative workspace for managing spreadsheets and data across teams.",
   role: "Admin" as const,
   members: 24,
   activeNow: 8,
@@ -61,32 +67,214 @@ const getOrganizationData = (id: string) => ({
     collaborations: 34,
   },
   membersList: [
-    { id: "1", name: "John Doe", email: "john@acme.com", role: "Admin" as const, status: "online" as const, lastActive: "Now", avatar: "JD" },
-    { id: "2", name: "Sarah Wilson", email: "sarah@acme.com", role: "Admin" as const, status: "online" as const, lastActive: "Now", avatar: "SW" },
-    { id: "3", name: "Mike Chen", email: "mike@acme.com", role: "Member" as const, status: "online" as const, lastActive: "Now", avatar: "MC" },
-    { id: "4", name: "Emily Brown", email: "emily@acme.com", role: "Member" as const, status: "online" as const, lastActive: "Now", avatar: "EB" },
-    { id: "5", name: "Alex Turner", email: "alex@acme.com", role: "Member" as const, status: "online" as const, lastActive: "Now", avatar: "AT" },
-    { id: "6", name: "Lisa Park", email: "lisa@acme.com", role: "Member" as const, status: "online" as const, lastActive: "Now", avatar: "LP" },
-    { id: "7", name: "David Kim", email: "david@acme.com", role: "Member" as const, status: "online" as const, lastActive: "Now", avatar: "DK" },
-    { id: "8", name: "Rachel Green", email: "rachel@acme.com", role: "Member" as const, status: "online" as const, lastActive: "Now", avatar: "RG" },
-    { id: "9", name: "Tom Harris", email: "tom@acme.com", role: "Viewer" as const, status: "offline" as const, lastActive: "1 hour ago", avatar: "TH" },
-    { id: "10", name: "Nina Patel", email: "nina@acme.com", role: "Member" as const, status: "offline" as const, lastActive: "3 hours ago", avatar: "NP" },
+    {
+      id: "1",
+      name: "John Doe",
+      email: "john@acme.com",
+      role: "Admin" as const,
+      status: "online" as const,
+      lastActive: "Now",
+      avatar: "JD",
+    },
+    {
+      id: "2",
+      name: "Sarah Wilson",
+      email: "sarah@acme.com",
+      role: "Admin" as const,
+      status: "online" as const,
+      lastActive: "Now",
+      avatar: "SW",
+    },
+    {
+      id: "3",
+      name: "Mike Chen",
+      email: "mike@acme.com",
+      role: "Member" as const,
+      status: "online" as const,
+      lastActive: "Now",
+      avatar: "MC",
+    },
+    {
+      id: "4",
+      name: "Emily Brown",
+      email: "emily@acme.com",
+      role: "Member" as const,
+      status: "online" as const,
+      lastActive: "Now",
+      avatar: "EB",
+    },
+    {
+      id: "5",
+      name: "Alex Turner",
+      email: "alex@acme.com",
+      role: "Member" as const,
+      status: "online" as const,
+      lastActive: "Now",
+      avatar: "AT",
+    },
+    {
+      id: "6",
+      name: "Lisa Park",
+      email: "lisa@acme.com",
+      role: "Member" as const,
+      status: "online" as const,
+      lastActive: "Now",
+      avatar: "LP",
+    },
+    {
+      id: "7",
+      name: "David Kim",
+      email: "david@acme.com",
+      role: "Member" as const,
+      status: "online" as const,
+      lastActive: "Now",
+      avatar: "DK",
+    },
+    {
+      id: "8",
+      name: "Rachel Green",
+      email: "rachel@acme.com",
+      role: "Member" as const,
+      status: "online" as const,
+      lastActive: "Now",
+      avatar: "RG",
+    },
+    {
+      id: "9",
+      name: "Tom Harris",
+      email: "tom@acme.com",
+      role: "Viewer" as const,
+      status: "offline" as const,
+      lastActive: "1 hour ago",
+      avatar: "TH",
+    },
+    {
+      id: "10",
+      name: "Nina Patel",
+      email: "nina@acme.com",
+      role: "Member" as const,
+      status: "offline" as const,
+      lastActive: "3 hours ago",
+      avatar: "NP",
+    },
   ],
   sheetsList: [
-    { id: "1", title: "Q4 Financial Report", owner: { name: "John Doe", initials: "JD" }, visibility: "team" as const, lastModified: "2 hours ago", lastModifiedBy: "John Doe", collaborators: 5, activeEditors: 2, isStarred: true, size: "2.4 MB" },
-    { id: "2", title: "Marketing Campaign Data", owner: { name: "Sarah Wilson", initials: "SW" }, visibility: "team" as const, lastModified: "5 hours ago", lastModifiedBy: "Sarah Wilson", collaborators: 3, activeEditors: 1, isStarred: false, size: "1.8 MB" },
-    { id: "3", title: "Employee Directory", owner: { name: "Mike Chen", initials: "MC" }, visibility: "private" as const, lastModified: "1 day ago", lastModifiedBy: "Mike Chen", collaborators: 8, activeEditors: 0, isStarred: true, size: "3.2 MB" },
-    { id: "4", title: "Sales Pipeline 2024", owner: { name: "Emily Brown", initials: "EB" }, visibility: "team" as const, lastModified: "2 days ago", lastModifiedBy: "Emily Brown", collaborators: 4, activeEditors: 3, isStarred: false, size: "1.5 MB" },
-    { id: "5", title: "Product Roadmap", owner: { name: "Alex Turner", initials: "AT" }, visibility: "public" as const, lastModified: "3 days ago", lastModifiedBy: "Alex Turner", collaborators: 6, activeEditors: 0, isStarred: false, size: "890 KB" },
-    { id: "6", title: "Budget Planning", owner: { name: "John Doe", initials: "JD" }, visibility: "private" as const, lastModified: "1 week ago", lastModifiedBy: "John Doe", collaborators: 2, activeEditors: 0, isStarred: false, size: "1.1 MB" },
+    {
+      id: "1",
+      title: "Q4 Financial Report",
+      owner: { name: "John Doe", initials: "JD" },
+      visibility: "team" as const,
+      lastModified: "2 hours ago",
+      lastModifiedBy: "John Doe",
+      collaborators: 5,
+      activeEditors: 2,
+      isStarred: true,
+      size: "2.4 MB",
+    },
+    {
+      id: "2",
+      title: "Marketing Campaign Data",
+      owner: { name: "Sarah Wilson", initials: "SW" },
+      visibility: "team" as const,
+      lastModified: "5 hours ago",
+      lastModifiedBy: "Sarah Wilson",
+      collaborators: 3,
+      activeEditors: 1,
+      isStarred: false,
+      size: "1.8 MB",
+    },
+    {
+      id: "3",
+      title: "Employee Directory",
+      owner: { name: "Mike Chen", initials: "MC" },
+      visibility: "private" as const,
+      lastModified: "1 day ago",
+      lastModifiedBy: "Mike Chen",
+      collaborators: 8,
+      activeEditors: 0,
+      isStarred: true,
+      size: "3.2 MB",
+    },
+    {
+      id: "4",
+      title: "Sales Pipeline 2024",
+      owner: { name: "Emily Brown", initials: "EB" },
+      visibility: "team" as const,
+      lastModified: "2 days ago",
+      lastModifiedBy: "Emily Brown",
+      collaborators: 4,
+      activeEditors: 3,
+      isStarred: false,
+      size: "1.5 MB",
+    },
+    {
+      id: "5",
+      title: "Product Roadmap",
+      owner: { name: "Alex Turner", initials: "AT" },
+      visibility: "public" as const,
+      lastModified: "3 days ago",
+      lastModifiedBy: "Alex Turner",
+      collaborators: 6,
+      activeEditors: 0,
+      isStarred: false,
+      size: "890 KB",
+    },
+    {
+      id: "6",
+      title: "Budget Planning",
+      owner: { name: "John Doe", initials: "JD" },
+      visibility: "private" as const,
+      lastModified: "1 week ago",
+      lastModifiedBy: "John Doe",
+      collaborators: 2,
+      activeEditors: 0,
+      isStarred: false,
+      size: "1.1 MB",
+    },
   ],
   recentActivity: [
-    { user: "John Doe", action: "edited", target: "Q4 Financial Report", time: "2 minutes ago", avatar: "JD" },
-    { user: "Sarah Wilson", action: "created", target: "New Marketing Sheet", time: "1 hour ago", avatar: "SW" },
-    { user: "Mike Chen", action: "shared", target: "Employee Directory", time: "3 hours ago", avatar: "MC" },
-    { user: "Emily Brown", action: "commented on", target: "Sales Pipeline 2024", time: "5 hours ago", avatar: "EB" },
-    { user: "Alex Turner", action: "updated", target: "Product Roadmap", time: "6 hours ago", avatar: "AT" },
-    { user: "Lisa Park", action: "downloaded", target: "Budget Report Q3", time: "Yesterday", avatar: "LP" },
+    {
+      user: "John Doe",
+      action: "edited",
+      target: "Q4 Financial Report",
+      time: "2 minutes ago",
+      avatar: "JD",
+    },
+    {
+      user: "Sarah Wilson",
+      action: "created",
+      target: "New Marketing Sheet",
+      time: "1 hour ago",
+      avatar: "SW",
+    },
+    {
+      user: "Mike Chen",
+      action: "shared",
+      target: "Employee Directory",
+      time: "3 hours ago",
+      avatar: "MC",
+    },
+    {
+      user: "Emily Brown",
+      action: "commented on",
+      target: "Sales Pipeline 2024",
+      time: "5 hours ago",
+      avatar: "EB",
+    },
+    {
+      user: "Alex Turner",
+      action: "updated",
+      target: "Product Roadmap",
+      time: "6 hours ago",
+      avatar: "AT",
+    },
+    {
+      user: "Lisa Park",
+      action: "downloaded",
+      target: "Budget Report Q3",
+      time: "Yesterday",
+      avatar: "LP",
+    },
   ],
   quickStats: [
     { label: "Views Today", value: "1,247", icon: Eye, change: "+12%" },
@@ -109,8 +297,8 @@ const OrganizationDetailPage = () => {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   const org = getOrganizationData(id || "1");
-  const onlineMembers = org.membersList.filter(m => m.status === "online");
-  const offlineMembers = org.membersList.filter(m => m.status === "offline");
+  const onlineMembers = org.membersList.filter((m) => m.status === "online");
+  const offlineMembers = org.membersList.filter((m) => m.status === "offline");
 
   return (
     <DashboardLayout breadcrumbItems={["Organizations", org.name]}>
@@ -131,11 +319,20 @@ const OrganizationDetailPage = () => {
                 <span className="hidden sm:inline">Back to Organizations</span>
               </Button>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsInviteOpen(true)} className="gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsInviteOpen(true)}
+                  className="gap-2"
+                >
                   <UserPlus className="h-4 w-4" />
                   <span className="hidden sm:inline">Invite</span>
                 </Button>
-                <Button size="sm" onClick={() => setIsNewSheetOpen(true)} className="gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => setIsNewSheetOpen(true)}
+                  className="gap-2"
+                >
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Create Sheet</span>
                 </Button>
@@ -155,15 +352,22 @@ const OrganizationDetailPage = () => {
                   </div>
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl md:text-3xl font-bold">{org.name}</h1>
+                      <h1 className="text-2xl md:text-3xl font-bold">
+                        {org.name}
+                      </h1>
                       <Badge variant={roleVariants[org.role]} className="gap-1">
                         <Shield className="h-3 w-3" />
                         {org.role}
                       </Badge>
                     </div>
-                    <p className="text-muted-foreground max-w-xl">{org.description}</p>
+                    <p className="text-muted-foreground max-w-xl">
+                      {org.description}
+                    </p>
                     <div className="flex flex-wrap items-center gap-3 text-sm">
-                      <Badge variant="outline" className="bg-background/50 gap-1">
+                      <Badge
+                        variant="outline"
+                        className="bg-background/50 gap-1"
+                      >
                         <Zap className="h-3 w-3 text-primary" />
                         {org.plan} Plan
                       </Badge>
@@ -179,14 +383,21 @@ const OrganizationDetailPage = () => {
               {/* Right - Quick Stats */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3 lg:max-w-md">
                 {org.quickStats.map((stat, i) => (
-                  <div key={i} className="bg-background/60 backdrop-blur-sm rounded-xl p-3 border">
+                  <div
+                    key={i}
+                    className="bg-background/60 backdrop-blur-sm rounded-xl p-3 border"
+                  >
                     <div className="flex items-center gap-2 mb-1">
                       <stat.icon className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{stat.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {stat.label}
+                      </span>
                     </div>
                     <div className="flex items-baseline gap-2">
                       <span className="text-xl font-bold">{stat.value}</span>
-                      <span className="text-xs text-emerald-600">{stat.change}</span>
+                      <span className="text-xs text-emerald-600">
+                        {stat.change}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -205,7 +416,8 @@ const OrganizationDetailPage = () => {
                   <p className="text-sm text-muted-foreground">Total Members</p>
                   <p className="text-3xl font-bold mt-1">{org.members}</p>
                   <p className="text-xs text-emerald-600 flex items-center gap-1 mt-1">
-                    <TrendingUp className="h-3 w-3" />+12% this month
+                    <TrendingUp className="h-3 w-3" />
+                    +12% this month
                   </p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -221,7 +433,9 @@ const OrganizationDetailPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Active Now</p>
-                  <p className="text-3xl font-bold mt-1 text-emerald-600">{org.activeNow}</p>
+                  <p className="text-3xl font-bold mt-1 text-emerald-600">
+                    {org.activeNow}
+                  </p>
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                     <Circle className="h-2 w-2 fill-emerald-500 text-emerald-500 animate-pulse" />
                     Live collaborating
@@ -242,7 +456,8 @@ const OrganizationDetailPage = () => {
                   <p className="text-sm text-muted-foreground">Total Sheets</p>
                   <p className="text-3xl font-bold mt-1">{org.sheets}</p>
                   <p className="text-xs text-emerald-600 flex items-center gap-1 mt-1">
-                    <TrendingUp className="h-3 w-3" />+8 this week
+                    <TrendingUp className="h-3 w-3" />
+                    +8 this week
                   </p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -258,8 +473,13 @@ const OrganizationDetailPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Storage</p>
-                  <p className="text-3xl font-bold mt-1">{org.storageUsed} GB</p>
-                  <Progress value={(org.storageUsed / org.storageLimit) * 100} className="h-1.5 mt-2 w-20" />
+                  <p className="text-3xl font-bold mt-1">
+                    {org.storageUsed} GB
+                  </p>
+                  <Progress
+                    value={(org.storageUsed / org.storageLimit) * 100}
+                    className="h-1.5 mt-2 w-20"
+                  />
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
                   <HardDrive className="h-6 w-6 text-primary" />
@@ -281,12 +501,17 @@ const OrganizationDetailPage = () => {
                 <div>
                   <CardTitle className="text-lg flex items-center gap-2">
                     Currently Active
-                    <Badge variant="secondary" className="ml-1 bg-emerald-500/10 text-emerald-600 gap-1">
+                    <Badge
+                      variant="secondary"
+                      className="ml-1 bg-emerald-500/10 text-emerald-600 gap-1"
+                    >
                       <Circle className="h-2 w-2 fill-emerald-500 animate-pulse" />
                       {onlineMembers.length} online
                     </Badge>
                   </CardTitle>
-                  <p className="text-sm text-muted-foreground">Team members working right now</p>
+                  <p className="text-sm text-muted-foreground">
+                    Team members working right now
+                  </p>
                 </div>
               </div>
               <span className="text-xs text-muted-foreground hidden sm:block">
@@ -311,8 +536,12 @@ const OrganizationDetailPage = () => {
                     <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 border-2 border-card" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{member.name}</p>
-                    <p className="text-xs text-muted-foreground">{member.role}</p>
+                    <p className="text-sm font-medium truncate">
+                      {member.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {member.role}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -324,18 +553,25 @@ const OrganizationDetailPage = () => {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {offlineMembers.slice(0, 5).map((member) => (
-                    <div key={member.id} className="flex items-center gap-2 px-2 py-1 rounded-lg bg-muted/50">
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-2 px-2 py-1 rounded-lg bg-muted/50"
+                    >
                       <Avatar className="h-6 w-6">
                         <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
                           {member.avatar}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-xs text-muted-foreground">{member.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {member.name}
+                      </span>
                     </div>
                   ))}
                   {offlineMembers.length > 5 && (
                     <div className="flex items-center px-2 py-1 rounded-lg bg-muted/50">
-                      <span className="text-xs text-muted-foreground">+{offlineMembers.length - 5} more</span>
+                      <span className="text-xs text-muted-foreground">
+                        +{offlineMembers.length - 5} more
+                      </span>
                     </div>
                   )}
                 </div>
@@ -395,10 +631,16 @@ const OrganizationDetailPage = () => {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm">
                         <span className="font-medium">{activity.user}</span>{" "}
-                        <span className="text-muted-foreground">{activity.action}</span>{" "}
-                        <span className="font-medium truncate">{activity.target}</span>
+                        <span className="text-muted-foreground">
+                          {activity.action}
+                        </span>{" "}
+                        <span className="font-medium truncate">
+                          {activity.target}
+                        </span>
                       </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{activity.time}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {activity.time}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -416,16 +658,28 @@ const OrganizationDetailPage = () => {
               </CardHeader>
               <CardContent className="relative space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Sheets Created</span>
-                  <span className="font-semibold">{org.weeklyStats.sheetsCreated}</span>
+                  <span className="text-sm text-muted-foreground">
+                    Sheets Created
+                  </span>
+                  <span className="font-semibold">
+                    {org.weeklyStats.sheetsCreated}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Edits</span>
-                  <span className="font-semibold">{org.weeklyStats.editsThisWeek}</span>
+                  <span className="text-sm text-muted-foreground">
+                    Total Edits
+                  </span>
+                  <span className="font-semibold">
+                    {org.weeklyStats.editsThisWeek}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Collaborations</span>
-                  <span className="font-semibold">{org.weeklyStats.collaborations}</span>
+                  <span className="text-sm text-muted-foreground">
+                    Collaborations
+                  </span>
+                  <span className="font-semibold">
+                    {org.weeklyStats.collaborations}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -436,19 +690,37 @@ const OrganizationDetailPage = () => {
                 <CardTitle className="text-base">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-2">
-                <Button variant="outline" size="sm" className="justify-start gap-2" onClick={() => setIsNewSheetOpen(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start gap-2"
+                  onClick={() => setIsNewSheetOpen(true)}
+                >
                   <Plus className="h-4 w-4" />
                   New Sheet
                 </Button>
-                <Button variant="outline" size="sm" className="justify-start gap-2" onClick={() => setIsInviteOpen(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start gap-2"
+                  onClick={() => setIsInviteOpen(true)}
+                >
                   <UserPlus className="h-4 w-4" />
                   Invite
                 </Button>
-                <Button variant="outline" size="sm" className="justify-start gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start gap-2"
+                >
                   <Star className="h-4 w-4" />
                   Starred
                 </Button>
-                <Button variant="outline" size="sm" className="justify-start gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="justify-start gap-2"
+                >
                   <Settings className="h-4 w-4" />
                   Settings
                 </Button>

@@ -93,7 +93,9 @@ const MembersTable = ({ members }: MembersTableProps) => {
               </TableCell>
               <TableCell className="text-center">
                 <div className="flex items-center justify-center gap-1.5">
-                  <Circle className={`h-2 w-2 ${statusColors[member.status]}`} />
+                  <Circle
+                    className={`h-2 w-2 ${statusColors[member.status]}`}
+                  />
                   <span className="text-sm capitalize">{member.status}</span>
                 </div>
               </TableCell>

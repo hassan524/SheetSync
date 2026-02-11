@@ -1,12 +1,12 @@
-'use client'
+"use client";
 
 import { useState } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import SheetsTable from "@/components/tables/SheetsTable";
-import SheetCard from "@/components/sheets/SheetCard";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
+import SheetsTable from "@/components/tables/Sheets-table";
+import SheetCard from "@/components/sheets/Sheet-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, Search, Grid3X3, List, Filter } from "lucide-react";
 
 const recentSheets = [
@@ -72,7 +72,7 @@ const recentSheets = [
   },
 ];
 
-const cardData = recentSheets.map(s => ({
+const cardData = recentSheets.map((s) => ({
   title: s.title,
   lastEdited: s.lastModified,
   isStarred: s.isStarred,
@@ -118,7 +118,10 @@ const RecentPage = () => {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "table")}>
+            <Tabs
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as "grid" | "table")}
+            >
               <TabsList className="h-9">
                 <TabsTrigger value="table" className="px-3">
                   <List className="h-4 w-4" />
@@ -137,7 +140,10 @@ const RecentPage = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {cardData.map((sheet, index) => (
-              <div key={sheet.title} style={{ animationDelay: `${index * 30}ms` }}>
+              <div
+                key={sheet.title}
+                style={{ animationDelay: `${index * 30}ms` }}
+              >
                 <SheetCard {...sheet} />
               </div>
             ))}

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import TemplateCard from "@/components/sheets/TemplateCard";
-import UseTemplateModal from "@/components/sheets/UseTemplateModal";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
+import TemplateCard from "@/components/sheets/Template-card";
+import UseTemplateModal from "@/components/sheets/Use-template-modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,11 +21,17 @@ const allTemplates = [
   {
     id: "budget",
     title: "Budget Tracker",
-    description: "Track income, expenses, and savings with automated calculations",
+    description:
+      "Track income, expenses, and savings with automated calculations",
     icon: <Calculator className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
     category: "Finance",
-    features: ["Auto-sum formulas", "Monthly breakdown", "Expense categories", "Savings goals"],
+    features: [
+      "Auto-sum formulas",
+      "Monthly breakdown",
+      "Expense categories",
+      "Savings goals",
+    ],
   },
   {
     id: "timeline",
@@ -34,7 +40,12 @@ const allTemplates = [
     icon: <Calendar className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
     category: "Project Management",
-    features: ["Gantt view", "Milestone tracking", "Team assignments", "Due date alerts"],
+    features: [
+      "Gantt view",
+      "Milestone tracking",
+      "Team assignments",
+      "Due date alerts",
+    ],
   },
   {
     id: "sales",
@@ -43,7 +54,12 @@ const allTemplates = [
     icon: <BarChart3 className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
     category: "Sales",
-    features: ["Real-time charts", "KPI widgets", "Pipeline tracking", "Revenue forecast"],
+    features: [
+      "Real-time charts",
+      "KPI widgets",
+      "Pipeline tracking",
+      "Revenue forecast",
+    ],
   },
   {
     id: "blank",
@@ -52,7 +68,12 @@ const allTemplates = [
     icon: <FileSpreadsheet className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
     category: "General",
-    features: ["100+ columns", "10,000+ rows", "All formulas", "Custom styling"],
+    features: [
+      "100+ columns",
+      "10,000+ rows",
+      "All formulas",
+      "Custom styling",
+    ],
   },
   {
     id: "team",
@@ -61,7 +82,12 @@ const allTemplates = [
     icon: <Users className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
     category: "HR",
-    features: ["Contact management", "Role assignments", "Department grouping", "Quick search"],
+    features: [
+      "Contact management",
+      "Role assignments",
+      "Department grouping",
+      "Quick search",
+    ],
   },
   {
     id: "inventory",
@@ -70,7 +96,12 @@ const allTemplates = [
     icon: <Package className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
     category: "Operations",
-    features: ["Stock alerts", "Supplier tracking", "Order history", "Barcode support"],
+    features: [
+      "Stock alerts",
+      "Supplier tracking",
+      "Order history",
+      "Barcode support",
+    ],
   },
   {
     id: "invoice",
@@ -79,7 +110,12 @@ const allTemplates = [
     icon: <DollarSign className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
     category: "Finance",
-    features: ["Auto calculations", "Tax support", "Client details", "PDF export"],
+    features: [
+      "Auto calculations",
+      "Tax support",
+      "Client details",
+      "PDF export",
+    ],
   },
   {
     id: "tasks",
@@ -88,26 +124,43 @@ const allTemplates = [
     icon: <CheckSquare className="h-5 w-5 text-primary-foreground" />,
     color: "bg-primary",
     category: "Project Management",
-    features: ["Priority levels", "Due dates", "Assignees", "Progress tracking"],
+    features: [
+      "Priority levels",
+      "Due dates",
+      "Assignees",
+      "Progress tracking",
+    ],
   },
 ];
 
-const categories = ["All", "Finance", "Project Management", "Sales", "HR", "Operations", "General"];
+const categories = [
+  "All",
+  "Finance",
+  "Project Management",
+  "Sales",
+  "HR",
+  "Operations",
+  "General",
+];
 
 const TemplatesPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<typeof allTemplates[0] | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<
+    (typeof allTemplates)[0] | null
+  >(null);
 
   const filteredTemplates = allTemplates.filter((template) => {
-    const matchesSearch = template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch =
+      template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       template.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "All" || template.category === selectedCategory;
+    const matchesCategory =
+      selectedCategory === "All" || template.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const handleTemplateClick = (template: typeof allTemplates[0]) => {
+  const handleTemplateClick = (template: (typeof allTemplates)[0]) => {
     setSelectedTemplate(template);
     setTemplateModalOpen(true);
   };
@@ -122,7 +175,9 @@ const TemplatesPage = () => {
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold animate-fade-in">Templates</h1>
+              <h1 className="text-2xl font-semibold animate-fade-in">
+                Templates
+              </h1>
               <p className="text-muted-foreground animate-fade-in">
                 Start quickly with pre-built spreadsheet templates
               </p>
@@ -179,8 +234,8 @@ const TemplatesPage = () => {
         {/* Templates Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {filteredTemplates.map((template, index) => (
-            <div 
-              key={template.id} 
+            <div
+              key={template.id}
               style={{ animationDelay: `${index * 50}ms` }}
               onClick={() => handleTemplateClick(template)}
             >
@@ -191,7 +246,9 @@ const TemplatesPage = () => {
 
         {filteredTemplates.length === 0 && (
           <div className="text-center py-12 animate-fade-in">
-            <p className="text-muted-foreground">No templates found matching your criteria.</p>
+            <p className="text-muted-foreground">
+              No templates found matching your criteria.
+            </p>
           </div>
         )}
 
@@ -205,13 +262,15 @@ const TemplatesPage = () => {
             <div>
               <h4 className="font-medium mb-1">Save Time</h4>
               <p className="text-muted-foreground">
-                Pre-built formulas and layouts mean you can start working immediately.
+                Pre-built formulas and layouts mean you can start working
+                immediately.
               </p>
             </div>
             <div>
               <h4 className="font-medium mb-1">Best Practices</h4>
               <p className="text-muted-foreground">
-                Templates are designed following industry standards and best practices.
+                Templates are designed following industry standards and best
+                practices.
               </p>
             </div>
             <div>

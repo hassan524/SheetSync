@@ -1,11 +1,11 @@
-'use client'
+"use client";
 
 import { useState } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import SheetCard from "@/components/sheets/SheetCard";
-import NewSheetModal from "@/components/sheets/NewSheetModal";
-import SheetsTable from "@/components/tables/SheetsTable";
-import FilterPopover from "@/components/common/FilterPopover";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
+import SheetCard from "@/components/sheets/Sheet-card";
+import NewSheetModal from "@/components/sheets/New-sheet-modal";
+import SheetsTable from "@/components/tables/Sheets-table";
+import FilterPopover from "@/components/common/Filter-popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,11 +19,11 @@ import {
 import { Plus, Search, Grid3X3, List } from "lucide-react";
 
 const allSheets = [
-  { 
+  {
     id: "1",
-    title: "Q4 Financial Report", 
-    lastEdited: "2 hours ago", 
-    isStarred: true, 
+    title: "Q4 Financial Report",
+    lastEdited: "2 hours ago",
+    isStarred: true,
     sharedWith: 5,
     owner: { name: "You", initials: "JD" },
     visibility: "private" as const,
@@ -32,11 +32,11 @@ const allSheets = [
     activeEditors: 2,
     size: "1.2 MB",
   },
-  { 
+  {
     id: "2",
-    title: "Marketing Budget 2024", 
-    lastEdited: "Yesterday", 
-    isStarred: false, 
+    title: "Marketing Budget 2024",
+    lastEdited: "Yesterday",
+    isStarred: false,
     sharedWith: 3,
     owner: { name: "You", initials: "JD" },
     visibility: "team" as const,
@@ -45,10 +45,10 @@ const allSheets = [
     activeEditors: 0,
     size: "856 KB",
   },
-  { 
+  {
     id: "3",
-    title: "Team Roster", 
-    lastEdited: "3 days ago", 
+    title: "Team Roster",
+    lastEdited: "3 days ago",
     isStarred: true,
     owner: { name: "You", initials: "JD" },
     visibility: "team" as const,
@@ -57,10 +57,10 @@ const allSheets = [
     activeEditors: 1,
     size: "324 KB",
   },
-  { 
+  {
     id: "4",
-    title: "Product Roadmap", 
-    lastEdited: "1 week ago", 
+    title: "Product Roadmap",
+    lastEdited: "1 week ago",
     sharedWith: 12,
     owner: { name: "Emily Davis", initials: "ED" },
     visibility: "team" as const,
@@ -70,9 +70,9 @@ const allSheets = [
     isStarred: false,
     size: "2.1 MB",
   },
-  { 
+  {
     id: "5",
-    title: "Expense Tracker", 
+    title: "Expense Tracker",
     lastEdited: "2 weeks ago",
     owner: { name: "You", initials: "JD" },
     visibility: "private" as const,
@@ -82,10 +82,10 @@ const allSheets = [
     isStarred: false,
     size: "156 KB",
   },
-  { 
+  {
     id: "6",
-    title: "Customer List", 
-    lastEdited: "3 weeks ago", 
+    title: "Customer List",
+    lastEdited: "3 weeks ago",
     sharedWith: 2,
     owner: { name: "You", initials: "JD" },
     visibility: "team" as const,
@@ -95,10 +95,10 @@ const allSheets = [
     isStarred: false,
     size: "445 KB",
   },
-  { 
+  {
     id: "7",
-    title: "Inventory Management", 
-    lastEdited: "1 month ago", 
+    title: "Inventory Management",
+    lastEdited: "1 month ago",
     isStarred: true,
     owner: { name: "You", initials: "JD" },
     visibility: "private" as const,
@@ -107,10 +107,10 @@ const allSheets = [
     activeEditors: 0,
     size: "1.8 MB",
   },
-  { 
+  {
     id: "8",
-    title: "Employee Schedule", 
-    lastEdited: "1 month ago", 
+    title: "Employee Schedule",
+    lastEdited: "1 month ago",
     sharedWith: 8,
     owner: { name: "Olivia Martinez", initials: "OM" },
     visibility: "team" as const,
@@ -122,7 +122,7 @@ const allSheets = [
   },
 ];
 
-const tableData = allSheets.map(s => ({
+const tableData = allSheets.map((s) => ({
   id: s.id,
   title: s.title,
   owner: s.owner,
@@ -149,15 +149,20 @@ const SheetsPage = () => {
   });
 
   const filteredSheets = allSheets.filter((sheet) => {
-    const matchesSearch = sheet.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesVisibility = 
+    const matchesSearch = sheet.title
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchesVisibility =
       (sheet.visibility === "private" && filterSettings.showPrivate) ||
       (sheet.visibility === "team" && filterSettings.showTeam) ||
       (filterSettings.showPublic ?? true);
     const matchesStarred = !filterSettings.onlyStarred || sheet.isStarred;
-    const matchesShared = !filterSettings.onlyShared || (sheet.sharedWith && sheet.sharedWith > 0);
-    
-    return matchesSearch && matchesVisibility && matchesStarred && matchesShared;
+    const matchesShared =
+      !filterSettings.onlyShared || (sheet.sharedWith && sheet.sharedWith > 0);
+
+    return (
+      matchesSearch && matchesVisibility && matchesStarred && matchesShared
+    );
   });
 
   const sortedSheets = [...filteredSheets].sort((a, b) => {
@@ -166,15 +171,19 @@ const SheetsPage = () => {
   });
 
   const filteredTableData = tableData.filter((sheet) => {
-    const matchesSearch = sheet.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesVisibility = 
+    const matchesSearch = sheet.title
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchesVisibility =
       (sheet.visibility === "private" && filterSettings.showPrivate) ||
       (sheet.visibility === "team" && filterSettings.showTeam) ||
       (filterSettings.showPublic ?? true);
     const matchesStarred = !filterSettings.onlyStarred || sheet.isStarred;
     const matchesShared = !filterSettings.onlyShared || sheet.collaborators > 0;
-    
-    return matchesSearch && matchesVisibility && matchesStarred && matchesShared;
+
+    return (
+      matchesSearch && matchesVisibility && matchesStarred && matchesShared
+    );
   });
 
   return (
@@ -183,12 +192,17 @@ const SheetsPage = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-semibold animate-fade-in">Personal Sheets</h1>
+            <h1 className="text-2xl font-semibold animate-fade-in">
+              Personal Sheets
+            </h1>
             <p className="text-muted-foreground animate-fade-in">
               {sortedSheets.length} sheets in your personal workspace
             </p>
           </div>
-          <Button className="animate-fade-in" onClick={() => setNewSheetOpen(true)}>
+          <Button
+            className="animate-fade-in"
+            onClick={() => setNewSheetOpen(true)}
+          >
             <Plus className="h-4 w-4 mr-2" />
             New Sheet
           </Button>
@@ -219,12 +233,17 @@ const SheetsPage = () => {
               </SelectContent>
             </Select>
 
-            <FilterPopover 
+            <FilterPopover
               title="Filter Sheets"
-              onApply={(filters) => setFilterSettings(filters as typeof filterSettings)}
+              onApply={(filters) =>
+                setFilterSettings(filters as typeof filterSettings)
+              }
             />
 
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "table")}>
+            <Tabs
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as "grid" | "table")}
+            >
               <TabsList className="h-9">
                 <TabsTrigger value="grid" className="px-3">
                   <Grid3X3 className="h-4 w-4" />
@@ -241,8 +260,11 @@ const SheetsPage = () => {
         {viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sortedSheets.map((sheet, index) => (
-              <div key={sheet.title} style={{ animationDelay: `${index * 30}ms` }}>
-                <SheetCard 
+              <div
+                key={sheet.title}
+                style={{ animationDelay: `${index * 30}ms` }}
+              >
+                <SheetCard
                   title={sheet.title}
                   lastEdited={sheet.lastEdited}
                   isStarred={sheet.isStarred}
@@ -257,7 +279,9 @@ const SheetsPage = () => {
 
         {sortedSheets.length === 0 && (
           <div className="text-center py-12 animate-fade-in">
-            <p className="text-muted-foreground">No sheets found matching your search.</p>
+            <p className="text-muted-foreground">
+              No sheets found matching your search.
+            </p>
           </div>
         )}
       </div>

@@ -156,7 +156,8 @@ const InviteTeamModal = ({ open, onOpenChange }: InviteTeamModalProps) => {
             Cancel
           </Button>
           <Button onClick={handleInvite} disabled={invitedEmails.length === 0}>
-            Send {invitedEmails.length > 0 ? `(${invitedEmails.length})` : ""} Invitation
+            Send {invitedEmails.length > 0 ? `(${invitedEmails.length})` : ""}{" "}
+            Invitation
           </Button>
         </DialogFooter>
       </DialogContent>

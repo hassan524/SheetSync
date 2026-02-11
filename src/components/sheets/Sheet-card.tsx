@@ -1,4 +1,10 @@
-import { FileSpreadsheet, MoreHorizontal, Star, Clock, Users } from "lucide-react";
+import {
+  FileSpreadsheet,
+  MoreHorizontal,
+  Star,
+  Clock,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import GridBackground from "@/components/common/GridBackground";
+import GridBackground from "@/components/common/Grid-gackground";
 
 interface SheetCardProps {
   title: string;
@@ -29,8 +35,15 @@ const SheetCard = ({
   // Generate a consistent variant based on title hash
   const getVariant = (): "default" | "dots" | "lines" | "cells" => {
     if (variant) return variant;
-    const variants: ("default" | "dots" | "lines" | "cells")[] = ["default", "dots", "lines", "cells"];
-    const hash = title.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const variants: ("default" | "dots" | "lines" | "cells")[] = [
+      "default",
+      "dots",
+      "lines",
+      "cells",
+    ];
+    const hash = title
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return variants[hash % variants.length];
   };
 
@@ -39,7 +52,11 @@ const SheetCard = ({
       {/* Thumbnail with SVG Background */}
       <div className="aspect-[4/3] bg-gradient-to-br from-muted to-secondary relative overflow-hidden">
         {thumbnail ? (
-          <img src={thumbnail} alt={title} className="w-full h-full object-cover" />
+          <img
+            src={thumbnail}
+            alt={title}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <>
             <GridBackground variant={getVariant()} />
@@ -55,7 +72,7 @@ const SheetCard = ({
             </div>
           </>
         )}
-        
+
         {/* Hover Actions */}
         <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/5 transition-colors duration-200" />
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -111,7 +128,9 @@ const SheetCard = ({
               <DropdownMenuItem>Move to folder</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Rename</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive">
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

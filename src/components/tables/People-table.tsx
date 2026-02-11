@@ -99,7 +99,9 @@ const PeopleTable = ({ people }: PeopleTableProps) => {
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${statusColors[person.status]}`} />
+                  <div
+                    className={`h-2 w-2 rounded-full ${statusColors[person.status]}`}
+                  />
                   <span className="text-sm capitalize">{person.status}</span>
                 </div>
               </TableCell>
@@ -110,7 +112,9 @@ const PeopleTable = ({ people }: PeopleTableProps) => {
                 </span>
               </TableCell>
               <TableCell className="text-center">
-                <span className="text-sm font-medium">{person.sheetsAccess}</span>
+                <span className="text-sm font-medium">
+                  {person.sheetsAccess}
+                </span>
               </TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">

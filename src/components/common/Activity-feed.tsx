@@ -1,12 +1,12 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  FileSpreadsheet, 
-  UserPlus, 
-  Edit, 
-  Share2, 
-  Trash2, 
+import {
+  FileSpreadsheet,
+  UserPlus,
+  Edit,
+  Share2,
+  Trash2,
   MessageSquare,
-  Star
+  Star,
 } from "lucide-react";
 
 interface ActivityItem {
@@ -16,7 +16,14 @@ interface ActivityItem {
     initials: string;
     avatar?: string;
   };
-  action: "created" | "edited" | "shared" | "deleted" | "commented" | "starred" | "joined";
+  action:
+    | "created"
+    | "edited"
+    | "shared"
+    | "deleted"
+    | "commented"
+    | "starred"
+    | "joined";
   target: string;
   time: string;
 }
@@ -106,7 +113,9 @@ const ActivityFeed = () => {
             <div className="flex-1 min-w-0">
               <p className="text-sm">
                 <span className="font-medium">{activity.user.name}</span>{" "}
-                <span className="text-muted-foreground">{actionText[activity.action]}</span>{" "}
+                <span className="text-muted-foreground">
+                  {actionText[activity.action]}
+                </span>{" "}
                 <span className="font-medium">{activity.target}</span>
               </p>
               <div className="flex items-center gap-2 mt-1">

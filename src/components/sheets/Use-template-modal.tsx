@@ -33,7 +33,11 @@ interface UseTemplateModalProps {
   template?: Template | null;
 }
 
-const UseTemplateModal = ({ open, onOpenChange, template }: UseTemplateModalProps) => {
+const UseTemplateModal = ({
+  open,
+  onOpenChange,
+  template,
+}: UseTemplateModalProps) => {
   const [sheetName, setSheetName] = useState(template?.title || "");
   const [organization, setOrganization] = useState("personal");
 

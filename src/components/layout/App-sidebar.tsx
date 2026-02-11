@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import SettingsDialog from "@/components/header/SettingsDialog";
+import SettingsDialog from "@/components/header/Settings-dialog";
 import JoinOrgModal from "@/components/modals/JoinOrgModal";
 
 const mainNavItems = [
@@ -75,9 +75,10 @@ export function AppSidebar() {
   const isActive = (path: string) => pathname === path;
 
   const getLinkClasses = (path: string) =>
-    `flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 ${isActive(path)
-      ? "bg-primary text-primary-foreground"
-      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+    `flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 ${
+      isActive(path)
+        ? "bg-primary text-primary-foreground"
+        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
     }`;
 
   return (
@@ -163,8 +164,9 @@ export function AppSidebar() {
             <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 text-xs text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
               <span>My Organizations</span>
               <ChevronDown
-                className={`h-3 w-3 transition-transform duration-200 ${orgsOpen ? "rotate-180" : ""
-                  }`}
+                className={`h-3 w-3 transition-transform duration-200 ${
+                  orgsOpen ? "rotate-180" : ""
+                }`}
               />
             </CollapsibleTrigger>
             <CollapsibleContent className="animate-accordion-down">
@@ -232,7 +234,9 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="flex-1 min-w-0 animate-fade-in">
               <p className="text-sm font-medium truncate">John Doe</p>
-              <p className="text-xs text-muted-foreground truncate">john@example.com</p>
+              <p className="text-xs text-muted-foreground truncate">
+                john@example.com
+              </p>
             </div>
           )}
           {!collapsed && <SettingsDialog />}

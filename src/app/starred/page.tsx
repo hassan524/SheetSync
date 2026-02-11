@@ -1,7 +1,7 @@
 import { useState } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import SheetsTable from "@/components/tables/SheetsTable";
-import SheetCard from "@/components/sheets/SheetCard";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
+import SheetsTable from "@/components/tables/Sheets-table";
+import SheetCard from "@/components/sheets/Sheet-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -58,7 +58,7 @@ const starredSheets = [
   },
 ];
 
-const cardData = starredSheets.map(s => ({
+const cardData = starredSheets.map((s) => ({
   title: s.title,
   lastEdited: s.lastModified,
   isStarred: s.isStarred,
@@ -79,7 +79,9 @@ const StarredPage = () => {
               <Star className="h-5 w-5 text-warning fill-warning" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold animate-fade-in">Starred</h1>
+              <h1 className="text-2xl font-semibold animate-fade-in">
+                Starred
+              </h1>
               <p className="text-muted-foreground animate-fade-in">
                 {starredSheets.length} sheets marked as important
               </p>
@@ -104,7 +106,10 @@ const StarredPage = () => {
             <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "table")}>
+            <Tabs
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as "grid" | "table")}
+            >
               <TabsList className="h-9">
                 <TabsTrigger value="table" className="px-3">
                   <List className="h-4 w-4" />
@@ -123,7 +128,10 @@ const StarredPage = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {cardData.map((sheet, index) => (
-              <div key={sheet.title} style={{ animationDelay: `${index * 30}ms` }}>
+              <div
+                key={sheet.title}
+                style={{ animationDelay: `${index * 30}ms` }}
+              >
                 <SheetCard {...sheet} />
               </div>
             ))}
