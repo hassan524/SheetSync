@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
 
-yarn format:staged
+# Run lint-staged
+npx lint-staged
