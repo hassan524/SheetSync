@@ -24,14 +24,6 @@ const eslintConfig = [
     rules: {
       // turn off react/no-unescaped-entities globally
       "react/no-unescaped-entities": "off",
-
-      // optional: make React strict
-      "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off",
-
-      // optional: make TS ESLint strict
-      "@typescript-eslint/no-unused-vars": ["error"],
-      "@typescript-eslint/explicit-function-return-type": "warn",
     },
   },
 ];
