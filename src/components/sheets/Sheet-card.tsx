@@ -4,6 +4,7 @@ import {
   Star,
   Clock,
   Users,
+  Folder,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import GridBackground from "@/components/common/Grid-gackground";
+import GridBackground from "@/components/common/Grid-background";
 
 interface SheetCardProps {
   title: string;
@@ -22,8 +23,8 @@ interface SheetCardProps {
   sharedWith?: number;
   thumbnail?: string;
   variant?: "default" | "dots" | "lines" | "cells";
+  folder?: string;
 }
-
 const SheetCard = ({
   title,
   lastEdited,
@@ -31,6 +32,7 @@ const SheetCard = ({
   sharedWith,
   thumbnail,
   variant,
+  folder,
 }: SheetCardProps) => {
   // Generate a consistent variant based on title hash
   const getVariant = (): "default" | "dots" | "lines" | "cells" => {
@@ -94,6 +96,12 @@ const SheetCard = ({
       <div className="p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
+            {folder && (
+              <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1 mb-0.5">
+                <Folder className="h-2.5 w-2.5" />
+                {folder}
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <FileSpreadsheet className="h-4 w-4 text-primary flex-shrink-0" />
               <h3 className="font-medium text-sm truncate">{title}</h3>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import DashboardLayout from "@/components/layout/Dashboard-layout";
-import OrganizationCard from "@/components/organizations/OrganizationCard";
+import OrganizationCard from "@/components/organizations/Organization-card";
 import OrganizationsTable from "@/components/tables/Organizations-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

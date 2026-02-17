@@ -14,7 +14,7 @@ import SheetsTable from "@/components/tables/Sheets-table";
 import MembersTable from "@/components/tables/Members-table";
 import NewSheetModal from "@/components/sheets/New-sheet-modal";
 import InviteTeamModal from "@/components/modals/Invite-team-modal";
-import GridBackground from "@/components/common/Grid-gackground";
+import GridBackground from "@/components/common/Grid-background";
 import {
   Building2,
   Users,

@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,125 +17,253 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileSpreadsheet, Lock, Globe, Users } from "lucide-react";
+import {
+  FileSpreadsheet,
+  Calculator,
+  Calendar,
+  BarChart3,
+  Folder,
+  CheckCircle2,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface NewSheetModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+const templates = [
+  {
+    id: "blank",
+    title: "Blank Sheet",
+    description: "Start fresh with a clean spreadsheet",
+    icon: FileSpreadsheet,
+    color: "bg-slate-500",
+    features: [
+      "100+ columns",
+      "10,000+ rows",
+      "All formulas",
+      "Custom styling",
+    ],
+  },
+  {
+    id: "budget",
+    title: "Budget Tracker",
+    description:
+      "Track income, expenses, and savings with automated calculations",
+    icon: Calculator,
+    color: "bg-emerald-500",
+    features: [
+      "Auto-sum formulas",
+      "Monthly breakdown",
+      "Expense categories",
+      "Savings goals",
+    ],
+  },
+  {
+    id: "timeline",
+    title: "Project Timeline",
+    description: "Plan and visualize project milestones and deadlines",
+    icon: Calendar,
+    color: "bg-blue-500",
+    features: [
+      "Gantt view",
+      "Milestone tracking",
+      "Team assignments",
+      "Due date alerts",
+    ],
+  },
+  {
+    id: "inventory",
+    title: "Inventory Tracker",
+    description: "Track products, assets, and stock levels",
+    icon: BarChart3,
+    color: "bg-purple-500",
+    features: [
+      "Quantity & price tracking",
+      "Low stock alerts",
+      "Total value calculations",
+      "Category management",
+    ],
+  },
+];
+
 const NewSheetModal = ({ open, onOpenChange }: NewSheetModalProps) => {
   const [sheetName, setSheetName] = useState("");
-  const [description, setDescription] = useState("");
-  const [visibility, setVisibility] = useState("private");
-  const [organization, setOrganization] = useState("personal");
+  const [selectedTemplate, setSelectedTemplate] = useState("blank");
+  const [folder, setFolder] = useState("personal");
 
   const handleCreate = () => {
-    // Handle sheet creation logic
-    console.log({ sheetName, description, visibility, organization });
+    console.log({ sheetName, selectedTemplate, folder });
     onOpenChange(false);
     setSheetName("");
-    setDescription("");
-    setVisibility("private");
-    setOrganization("personal");
+    setSelectedTemplate("blank");
+    setFolder("personal");
   };
+
+  const activeTemplate = templates.find((t) => t.id === selectedTemplate);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[520px] max-h-[85vh]">
         <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <FileSpreadsheet className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div>
-              <DialogTitle>Create New Sheet</DialogTitle>
-              <DialogDescription>
-                Start with a blank spreadsheet or customize your settings
-              </DialogDescription>
-            </div>
-          </div>
+          <DialogTitle>Create New Sheet</DialogTitle>
+          <DialogDescription>
+            Set up your spreadsheet with a template and organize it in your
+            workspace
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div
+          className="space-y-4 overflow-y-auto pr-1 max-h-[calc(85vh-180px)] scrollbar-hide"
+          style={{
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
+          <style jsx>{`
+            .scrollbar-hide::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
+          {/* Sheet Name */}
           <div className="space-y-2">
-            <Label htmlFor="sheet-name">Sheet Name</Label>
+            <Label htmlFor="sheet-name" className="text-sm font-medium">
+              Sheet Name
+            </Label>
             <Input
               id="sheet-name"
-              placeholder="e.g., Q4 Budget Report"
+              placeholder="Enter a descriptive name for your sheet"
               value={sheetName}
               onChange={(e) => setSheetName(e.target.value)}
+              className="h-10"
             />
+            <p className="text-xs text-muted-foreground">
+              Give your sheet a clear, memorable name
+            </p>
           </div>
 
+          {/* Template Selection */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
-            <Textarea
-              id="description"
-              placeholder="What is this sheet for?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
+            <Label className="text-sm font-medium">Choose Template</Label>
+            <Select
+              value={selectedTemplate}
+              onValueChange={setSelectedTemplate}
+            >
+              <SelectTrigger className="h-10">
+                <div className="flex items-center gap-2">
+                  {activeTemplate && (
+                    <>
+                      <div className={cn("p-1 rounded", activeTemplate.color)}>
+                        <activeTemplate.icon className="h-3.5 w-3.5 text-white" />
+                      </div>
+                      <SelectValue />
+                    </>
+                  )}
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map((template) => {
+                  const Icon = template.icon;
+                  return (
+                    <SelectItem key={template.id} value={template.id}>
+                      <div className="flex items-center gap-2">
+                        <div className={cn("p-1 rounded", template.color)}>
+                          <Icon className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span>{template.title}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Visibility</Label>
-              <Select value={visibility} onValueChange={setVisibility}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="private">
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-4 w-4" />
-                      <span>Private</span>
+          {/* Template Info */}
+          {activeTemplate && (
+            <div className="rounded-lg border bg-gradient-to-br from-muted/40 to-muted/20 p-3 space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <div
+                  className={cn(
+                    "p-2 rounded-lg flex-shrink-0 shadow-sm",
+                    activeTemplate.color,
+                  )}
+                >
+                  <activeTemplate.icon className="h-4 w-4 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-sm">
+                    {activeTemplate.title}
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    {activeTemplate.description}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1.5 pt-1 border-t">
+                <p className="text-xs font-medium text-foreground/80">
+                  What's included:
+                </p>
+                <div className="space-y-1">
+                  {activeTemplate.features.map((feature, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-2 text-xs text-muted-foreground"
+                    >
+                      <CheckCircle2 className="h-3 w-3 text-primary mt-0.5 flex-shrink-0" />
+                      <span>{feature}</span>
                     </div>
-                  </SelectItem>
-                  <SelectItem value="team">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      <span>Team Only</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="public">
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-4 w-4" />
-                      <span>Public</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                  ))}
+                </div>
+              </div>
             </div>
+          )}
 
-            <div className="space-y-2">
-              <Label>Location</Label>
-              <Select value={organization} onValueChange={setOrganization}>
-                <SelectTrigger>
+          {/* Folder Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Save Location</Label>
+            <Select value={folder} onValueChange={setFolder}>
+              <SelectTrigger className="h-10">
+                <div className="flex items-center gap-2">
+                  <Folder className="h-4 w-4 text-muted-foreground" />
                   <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="personal">Personal Sheets</SelectItem>
-                  <SelectItem value="acme">Acme Corporation</SelectItem>
-                  <SelectItem value="design">Design Team</SelectItem>
-                  <SelectItem value="marketing">Marketing Dept</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-            <h4 className="text-sm font-medium">Quick Tips</h4>
-            <ul className="text-xs text-muted-foreground space-y-1">
-              <li>• Private sheets are only visible to you</li>
-              <li>• Team sheets can be accessed by organization members</li>
-              <li>• You can change visibility settings anytime</li>
-            </ul>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="personal">
+                  <div className="flex items-center gap-2">
+                    <Folder className="h-4 w-4" />
+                    <span>Personal Sheets</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="acme">
+                  <div className="flex items-center gap-2">
+                    <Folder className="h-4 w-4" />
+                    <span>Acme Corporation</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="design">
+                  <div className="flex items-center gap-2">
+                    <Folder className="h-4 w-4" />
+                    <span>Design Team</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="marketing">
+                  <div className="flex items-center gap-2">
+                    <Folder className="h-4 w-4" />
+                    <span>Marketing Dept</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Choose where to organize this sheet in your workspace
+            </p>
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

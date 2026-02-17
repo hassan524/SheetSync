@@ -10,7 +10,6 @@ import {
   Users,
   Upload,
   LayoutTemplate,
-  Settings,
   Plus,
   ChevronDown,
   Star,
@@ -38,7 +37,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SettingsDialog from "@/components/header/Settings-dialog";
-import JoinOrgModal from "@/components/modals/JoinOrgModal";
+import { useAuth } from "@/context/AuthContext";
+import JoinOrgModal from "@/components/modals/Join-org-modal";
 
 const mainNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
@@ -69,6 +69,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const [orgsOpen, setOrgsOpen] = useState(true);
   const [joinOrgOpen, setJoinOrgOpen] = useState(false);
+  const { user } = useAuth();
 
   const pathname = usePathname();
 
@@ -226,19 +227,44 @@ export function AppSidebar() {
       <SidebarFooter className="p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8">
-            <AvatarImage src="" />
+            <AvatarImage src={user?.avatar_url || ""} />
+
             <AvatarFallback className="bg-accent text-accent-foreground text-xs">
-              JD
+              {(() => {
+                if (!user?.name) return "U";
+
+                const parts = user.name.trim().split(" ");
+
+                if (parts.length === 1) {
+                  return parts[0][0].toUpperCase();
+                }
+
+                return parts[0][0].toUpperCase() + parts[1][0].toUpperCase();
+              })()}
             </AvatarFallback>
           </Avatar>
+
           {!collapsed && (
             <div className="flex-1 min-w-0 animate-fade-in">
-              <p className="text-sm font-medium truncate">John Doe</p>
+              <p className="text-sm font-medium truncate">
+                {user?.name
+                  ? user.name
+                      .toLowerCase()
+                      .split(" ")
+                      .map(
+                        (word: string) =>
+                          word.charAt(0).toUpperCase() + word.slice(1),
+                      )
+                      .join(" ")
+                  : "Unknown User"}
+              </p>
+
               <p className="text-xs text-muted-foreground truncate">
-                john@example.com
+                {user?.email || ""}
               </p>
             </div>
           )}
+
           {!collapsed && <SettingsDialog />}
         </div>
       </SidebarFooter>
