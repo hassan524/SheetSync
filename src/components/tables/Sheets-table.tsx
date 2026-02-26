@@ -27,23 +27,7 @@ import {
   Globe,
   Circle,
 } from "lucide-react";
-
-interface Sheet {
-  id: string;
-  title: string;
-  owner: {
-    name: string;
-    initials: string;
-    avatar?: string;
-  };
-  visibility: "private" | "team" | "public";
-  lastModified: string;
-  lastModifiedBy: string;
-  collaborators: number;
-  activeEditors: number;
-  isStarred: boolean;
-  size: string;
-}
+import { Sheet } from "@/types/types";
 
 interface SheetsTableProps {
   sheets: Sheet[];
@@ -98,7 +82,7 @@ const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{sheet.title}</span>
-                    {sheet.isStarred && (
+                    {sheet.is_starred && (
                       <Star className="h-3.5 w-3.5 fill-warning text-warning" />
                     )}
                   </div>
@@ -123,12 +107,8 @@ const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
               </TableCell>
               <TableCell>
                 <div className="text-sm">
-                  <p className="flex items-center gap-1 text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    {sheet.lastModified}
-                  </p>
                   <p className="text-xs text-muted-foreground/70">
-                    by {sheet.lastModifiedBy}
+                    by {sheet.last_modified_by}
                   </p>
                 </div>
               </TableCell>
@@ -139,7 +119,7 @@ const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
                 </div>
               </TableCell>
               <TableCell className="text-center">
-                {sheet.activeEditors > 0 ? (
+                {sheet?.activeEditors > 0 ? (
                   <div className="flex items-center justify-center gap-1.5">
                     <Circle className="h-2 w-2 fill-emerald-500 text-emerald-500" />
                     <span className="text-sm font-medium text-emerald-600">
@@ -150,11 +130,7 @@ const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
                   <span className="text-sm text-muted-foreground">—</span>
                 )}
               </TableCell>
-              <TableCell>
-                <span className="text-sm text-muted-foreground">
-                  {sheet.size}
-                </span>
-              </TableCell>
+              <TableCell></TableCell>
               <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

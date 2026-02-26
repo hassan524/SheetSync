@@ -1,3 +1,5 @@
+// ================= TYPES =================
+
 export interface CellFormat {
   bold?: boolean;
   italic?: boolean;
@@ -44,26 +46,13 @@ export interface LockedCell {
   colKey: string;
 }
 
+// ================= STATUS =================
+
 const STATUS_COLORS: Record<string, StatusOption> = {
-  "In Process": { label: "In Process", color: "#b45309", bgColor: "#fef3c7" },
   "In Progress": { label: "In Progress", color: "#b45309", bgColor: "#fef3c7" },
-  Complete: { label: "Complete", color: "#166534", bgColor: "#dcfce7" },
   Done: { label: "Done", color: "#166534", bgColor: "#dcfce7" },
-  "Need to Start": {
-    label: "Need to Start",
-    color: "#1e40af",
-    bgColor: "#dbeafe",
-  },
   "Not Started": { label: "Not Started", color: "#6b7280", bgColor: "#f3f4f6" },
   Blocked: { label: "Blocked", color: "#dc2626", bgColor: "#fee2e2" },
-  Active: { label: "Active", color: "#166534", bgColor: "#dcfce7" },
-  "In Stock": { label: "In Stock", color: "#166534", bgColor: "#dcfce7" },
-  "Low Stock": { label: "Low Stock", color: "#b45309", bgColor: "#fef3c7" },
-  "Out of Stock": {
-    label: "Out of Stock",
-    color: "#dc2626",
-    bgColor: "#fee2e2",
-  },
   High: { label: "High", color: "#dc2626", bgColor: "#fee2e2" },
   Medium: { label: "Medium", color: "#b45309", bgColor: "#fef3c7" },
   Low: { label: "Low", color: "#166534", bgColor: "#dcfce7" },
@@ -73,204 +62,30 @@ export const getStatusStyle = (value: string): StatusOption | undefined => {
   return STATUS_COLORS[value];
 };
 
+// ================= TEMPLATES =================
+
 export const getTemplateData = (
   templateId: string,
 ): { columns: ColumnDef[]; rows: SheetRow[]; title: string } => {
   switch (templateId) {
-    case "budget":
+    // ================= QA TRACKER =================
+    case "qa":
       return {
-        title: "Budget Tracker",
+        title: "QA Tracker",
         columns: [
+          { key: "id", name: "ID", width: 100, editable: true, type: "text" },
           {
-            key: "date",
-            name: "Date",
-            width: 130,
-            editable: true,
-            resizable: true,
-            type: "text",
-          },
-          {
-            key: "category",
-            name: "Category",
-            width: 150,
-            editable: true,
-            resizable: true,
-            type: "text",
-          },
-          {
-            key: "description",
-            name: "Description",
+            key: "title",
+            name: "Title",
             width: 220,
             editable: true,
-            resizable: true,
             type: "text",
           },
           {
-            key: "income",
-            name: "Income",
-            width: 130,
-            editable: true,
-            resizable: true,
-            type: "currency",
-          },
-          {
-            key: "expense",
-            name: "Expense",
-            width: 130,
-            editable: true,
-            resizable: true,
-            type: "currency",
-          },
-          {
-            key: "balance",
-            name: "Balance",
-            width: 130,
-            editable: false,
-            resizable: true,
-            type: "currency",
-          },
-          {
-            key: "approved",
-            name: "Approved",
-            width: 100,
-            editable: true,
-            resizable: true,
-            type: "checkbox",
-          },
-          {
-            key: "priority",
-            name: "Priority",
-            width: 120,
-            editable: true,
-            resizable: true,
-            type: "status",
-          },
-        ],
-        rows: [
-          {
-            id: "1",
-            date: "2025-01-01",
-            category: "Salary",
-            description: "Monthly salary",
-            income: 5000,
-            expense: 0,
-            balance: 5000,
-            approved: true,
-            priority: "High",
-          },
-          {
-            id: "2",
-            date: "2025-01-03",
-            category: "Rent",
-            description: "Office rent",
-            income: 0,
-            expense: 1500,
-            balance: 3500,
-            approved: true,
-            priority: "High",
-          },
-          {
-            id: "3",
-            date: "2025-01-05",
-            category: "Utilities",
-            description: "Electricity bill",
-            income: 0,
-            expense: 200,
-            balance: 3300,
-            approved: true,
-            priority: "Medium",
-          },
-          {
-            id: "4",
-            date: "2025-01-10",
-            category: "Freelance",
-            description: "Web design project",
-            income: 1200,
-            expense: 0,
-            balance: 4500,
-            approved: false,
-            priority: "Medium",
-          },
-          {
-            id: "5",
-            date: "2025-01-15",
-            category: "Software",
-            description: "SaaS subscriptions",
-            income: 0,
-            expense: 350,
-            balance: 4150,
-            approved: true,
-            priority: "Low",
-          },
-          {
-            id: "6",
-            date: "2025-01-20",
-            category: "Marketing",
-            description: "Ad campaign",
-            income: 0,
-            expense: 800,
-            balance: 3350,
-            approved: false,
-            priority: "High",
-          },
-          {
-            id: "7",
-            date: "2025-01-25",
-            category: "Consulting",
-            description: "Strategy session",
-            income: 2000,
-            expense: 0,
-            balance: 5350,
-            approved: true,
-            priority: "Medium",
-          },
-          ...Array.from({ length: 18 }, (_, i) => ({
-            id: String(i + 8),
-            date: "",
-            category: "",
-            description: "",
-            income: 0,
-            expense: 0,
-            balance: 0,
-            approved: false,
-            priority: "",
-          })),
-        ],
-      };
-    case "timeline":
-      return {
-        title: "Project Timeline",
-        columns: [
-          {
-            key: "task",
-            name: "Task",
-            width: 220,
-            editable: true,
-            resizable: true,
-            type: "text",
-          },
-          {
-            key: "owner",
-            name: "Owner",
+            key: "module",
+            name: "Module",
             width: 150,
             editable: true,
-            resizable: true,
-            type: "text",
-          },
-          {
-            key: "startDate",
-            name: "Start Date",
-            width: 130,
-            editable: true,
-            resizable: true,
-            type: "text",
-          },
-          {
-            key: "endDate",
-            name: "End Date",
-            width: 130,
-            editable: true,
-            resizable: true,
             type: "text",
           },
           {
@@ -278,132 +93,135 @@ export const getTemplateData = (
             name: "Status",
             width: 140,
             editable: true,
-            resizable: true,
             type: "status",
-          },
-          {
-            key: "progress",
-            name: "Progress %",
-            width: 120,
-            editable: true,
-            resizable: true,
-            type: "number",
-          },
-          {
-            key: "critical",
-            name: "Critical",
-            width: 100,
-            editable: true,
-            resizable: true,
-            type: "checkbox",
           },
           {
             key: "priority",
             name: "Priority",
             width: 120,
             editable: true,
-            resizable: true,
+            type: "status",
+          },
+          {
+            key: "assigned",
+            name: "Assigned",
+            width: 150,
+            editable: true,
+            type: "text",
+          },
+          {
+            key: "date",
+            name: "Date",
+            width: 130,
+            editable: true,
+            type: "text",
+          },
+        ],
+        rows: [
+          {
+            id: "1",
+            title: "Login bug",
+            module: "Auth",
+            status: "In Progress",
+            priority: "High",
+            assigned: "Hassan",
+            date: "2026-02-17",
+          },
+          ...Array.from({ length: 20 }, (_, i) => ({
+            id: String(i + 2),
+            title: "",
+            module: "",
+            status: "",
+            priority: "",
+            assigned: "",
+            date: "",
+          })),
+        ],
+      };
+
+    // ================= PROJECT TRACKER =================
+    case "project":
+      return {
+        title: "Project Tracker",
+        columns: [
+          {
+            key: "task",
+            name: "Task",
+            width: 220,
+            editable: true,
+            type: "text",
+          },
+          {
+            key: "owner",
+            name: "Owner",
+            width: 150,
+            editable: true,
+            type: "text",
+          },
+          {
+            key: "start",
+            name: "Start",
+            width: 130,
+            editable: true,
+            type: "text",
+          },
+          { key: "end", name: "End", width: 130, editable: true, type: "text" },
+          {
+            key: "status",
+            name: "Status",
+            width: 140,
+            editable: true,
+            type: "status",
+          },
+          {
+            key: "progress",
+            name: "Progress",
+            width: 120,
+            editable: true,
+            type: "number",
+          },
+          {
+            key: "priority",
+            name: "Priority",
+            width: 120,
+            editable: true,
             type: "status",
           },
         ],
         rows: [
           {
             id: "1",
-            task: "Requirements Gathering",
-            owner: "Alice Thompson",
-            startDate: "2025-01-01",
-            endDate: "2025-01-15",
+            task: "Setup project",
+            owner: "Hassan",
+            start: "2026-02-01",
+            end: "2026-02-05",
             status: "Done",
             progress: 100,
-            critical: true,
             priority: "High",
           },
-          {
-            id: "2",
-            task: "UI/UX Design",
-            owner: "Bob Williams",
-            startDate: "2025-01-10",
-            endDate: "2025-02-01",
-            status: "In Progress",
-            progress: 75,
-            critical: false,
-            priority: "Medium",
-          },
-          {
-            id: "3",
-            task: "Backend Development",
-            owner: "Charlie Davis",
-            startDate: "2025-01-20",
-            endDate: "2025-03-01",
-            status: "In Progress",
-            progress: 40,
-            critical: true,
-            priority: "High",
-          },
-          {
-            id: "4",
-            task: "Frontend Development",
-            owner: "Diana Rodriguez",
-            startDate: "2025-02-01",
-            endDate: "2025-03-15",
-            status: "Need to Start",
-            progress: 0,
-            critical: false,
-            priority: "Medium",
-          },
-          {
-            id: "5",
-            task: "Testing & QA",
-            owner: "Eve Martinez",
-            startDate: "2025-03-01",
-            endDate: "2025-03-20",
-            status: "Not Started",
-            progress: 0,
-            critical: true,
-            priority: "High",
-          },
-          {
-            id: "6",
-            task: "Deployment Setup",
-            owner: "Frank Anderson",
-            startDate: "2025-03-15",
-            endDate: "2025-03-25",
-            status: "Blocked",
-            progress: 0,
-            critical: false,
-            priority: "Low",
-          },
-          ...Array.from({ length: 19 }, (_, i) => ({
-            id: String(i + 7),
+          ...Array.from({ length: 20 }, (_, i) => ({
+            id: String(i + 2),
             task: "",
             owner: "",
-            startDate: "",
-            endDate: "",
+            start: "",
+            end: "",
             status: "",
             progress: 0,
-            critical: false,
             priority: "",
           })),
         ],
       };
-    case "inventory":
+
+    // ================= FINANCE TRACKER =================
+    case "finance":
       return {
-        title: "Inventory Tracker",
+        title: "Finance Tracker",
         columns: [
           {
-            key: "productName",
-            name: "Product Name",
-            width: 220,
+            key: "date",
+            name: "Date",
+            width: 130,
             editable: true,
-            resizable: true,
-            type: "text",
-          },
-          {
-            key: "sku",
-            name: "SKU",
-            width: 120,
-            editable: true,
-            resizable: true,
             type: "text",
           },
           {
@@ -411,139 +229,77 @@ export const getTemplateData = (
             name: "Category",
             width: 150,
             editable: true,
-            resizable: true,
             type: "text",
           },
           {
-            key: "quantity",
-            name: "Quantity",
-            width: 110,
+            key: "desc",
+            name: "Description",
+            width: 220,
             editable: true,
-            resizable: true,
-            type: "number",
+            type: "text",
           },
           {
-            key: "unitPrice",
-            name: "Unit Price",
+            key: "income",
+            name: "Income",
             width: 130,
             editable: true,
-            resizable: true,
             type: "currency",
           },
           {
-            key: "totalValue",
-            name: "Total Value",
-            width: 140,
+            key: "expense",
+            name: "Expense",
+            width: 130,
+            editable: true,
+            type: "currency",
+          },
+          {
+            key: "balance",
+            name: "Balance",
+            width: 130,
             editable: false,
-            resizable: true,
             type: "currency",
           },
           {
-            key: "stockStatus",
-            name: "Stock Status",
-            width: 140,
+            key: "status",
+            name: "Status",
+            width: 120,
             editable: true,
-            resizable: true,
             type: "status",
-          },
-          {
-            key: "reorder",
-            name: "Reorder",
-            width: 100,
-            editable: true,
-            resizable: true,
-            type: "checkbox",
           },
         ],
         rows: [
           {
             id: "1",
-            productName: "Wireless Mouse",
-            sku: "WM-001",
-            category: "Electronics",
-            quantity: 150,
-            unitPrice: 29.99,
-            totalValue: 4498.5,
-            stockStatus: "In Stock",
-            reorder: false,
+            date: "2026-02-01",
+            category: "Salary",
+            desc: "Monthly salary",
+            income: 5000,
+            expense: 0,
+            balance: 5000,
+            status: "Done",
           },
-          {
-            id: "2",
-            productName: "USB-C Cable",
-            sku: "UC-002",
-            category: "Accessories",
-            quantity: 500,
-            unitPrice: 9.99,
-            totalValue: 4995,
-            stockStatus: "In Stock",
-            reorder: false,
-          },
-          {
-            id: "3",
-            productName: "Monitor Stand",
-            sku: "MS-003",
-            category: "Furniture",
-            quantity: 25,
-            unitPrice: 89.99,
-            totalValue: 2249.75,
-            stockStatus: "Low Stock",
-            reorder: true,
-          },
-          {
-            id: "4",
-            productName: "Mechanical Keyboard",
-            sku: "MK-004",
-            category: "Electronics",
-            quantity: 0,
-            unitPrice: 59.99,
-            totalValue: 0,
-            stockStatus: "Out of Stock",
-            reorder: true,
-          },
-          {
-            id: "5",
-            productName: "Webcam HD Pro",
-            sku: "WC-005",
-            category: "Electronics",
-            quantity: 75,
-            unitPrice: 49.99,
-            totalValue: 3749.25,
-            stockStatus: "In Stock",
-            reorder: false,
-          },
-          {
-            id: "6",
-            productName: "Noise Cancelling Headset",
-            sku: "NH-006",
-            category: "Audio",
-            quantity: 12,
-            unitPrice: 129.99,
-            totalValue: 1559.88,
-            stockStatus: "Low Stock",
-            reorder: true,
-          },
-          ...Array.from({ length: 19 }, (_, i) => ({
-            id: String(i + 7),
-            productName: "",
-            sku: "",
+          ...Array.from({ length: 20 }, (_, i) => ({
+            id: String(i + 2),
+            date: "",
             category: "",
-            quantity: 0,
-            unitPrice: 0,
-            totalValue: 0,
-            stockStatus: "",
-            reorder: false,
+            desc: "",
+            income: 0,
+            expense: 0,
+            balance: 0,
+            status: "",
           })),
         ],
       };
-    default: // blank
+
+    // ================= BLANK =================
+    default:
       return {
-        title: "Untitled Sheet",
+        title: "Blank Sheet",
         columns: Array.from({ length: 12 }, (_, i) => ({
           key: `col${i}`,
           name: String.fromCharCode(65 + i),
           width: 130,
           editable: true,
-          resizable: true,
           type: "text" as CellType,
         })),
         rows: Array.from({ length: 50 }, (_, i) => {
@@ -557,25 +313,22 @@ export const getTemplateData = (
   }
 };
 
-export const recalculateBudget = (rows: SheetRow[]): SheetRow[] => {
-  let runningBalance = 0;
+// ================= CALCULATIONS =================
+
+export const recalculateFinance = (rows: SheetRow[]): SheetRow[] => {
+  let balance = 0;
+
   return rows.map((row) => {
     const income = Number(row.income) || 0;
     const expense = Number(row.expense) || 0;
+
     if (income || expense || row.date) {
-      runningBalance += income - expense;
+      balance += income - expense;
     }
+
     return {
       ...row,
-      balance: income || expense || row.date ? runningBalance : 0,
+      balance: income || expense || row.date ? balance : 0,
     };
-  });
-};
-
-export const recalculateInventory = (rows: SheetRow[]): SheetRow[] => {
-  return rows.map((row) => {
-    const qty = Number(row.quantity) || 0;
-    const price = Number(row.unitPrice) || 0;
-    return { ...row, totalValue: qty * price };
   });
 };

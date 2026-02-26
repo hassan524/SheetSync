@@ -9,11 +9,10 @@ import {
 } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { AuthError, Session } from "@supabase/supabase-js";
-import Cookies from "js-cookie";
 
 // -----------------------
 // User type
-// -----------------------
+// ----------------------
 interface UserProfile {
   id: string;
   name: string | null;
@@ -59,19 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     setAccessToken(token);
-
-    // Store access token in cookie (expires in 1 day)
-    Cookies.set("my-supabase-session", token, {
-      expires: 1,
-      path: "/",
-      sameSite: "lax",
-    });
   };
 
   const clearSession = () => {
     setUser(null);
     setAccessToken(null);
-    Cookies.remove("my-supabase-session");
   };
 
   useEffect(() => {

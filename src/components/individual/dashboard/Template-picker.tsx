@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { templates } from "@/data/templates";
+import { SHEET_TEMPLATES } from "@/app/constants/Sheet-templates";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import TemplateCard from "@/components/sheets/Template-card";
@@ -13,10 +13,10 @@ const TemplatePicker = () => {
 
   const [templateModalOpen, setTemplateModalOpen] = React.useState(false);
   const [selectedTemplate, setSelectedTemplate] = React.useState<
-    (typeof templates)[0] | null
+    (typeof SHEET_TEMPLATES)[0] | null
   >(null);
 
-  const handleTemplateClick = (template: (typeof templates)[0]) => {
+  const handleTemplateClick = (template: (typeof SHEET_TEMPLATES)[0]) => {
     setSelectedTemplate(template);
     setTemplateModalOpen(true);
   };
@@ -41,7 +41,7 @@ const TemplatePicker = () => {
         </Button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {templates.map((template, index) => (
+        {SHEET_TEMPLATES.map((template, index) => (
           <div
             key={template.id}
             className={`stagger-${index + 1}`}

@@ -1,7 +1,7 @@
 // app/sheets/[id]/page.tsx
 import { Suspense } from "react";
 import { Metadata } from "next";
-import SheetClient from "@/components/individual/sheets/Sheet-client";
+import SheetClient from "@/components/individual/sheet/Sheet-client";
 import { Loader2 } from "lucide-react";
 
 // SEO metadata

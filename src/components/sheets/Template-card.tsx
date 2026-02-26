@@ -1,26 +1,30 @@
-import { Plus } from "lucide-react";
+import { Plus, LucideIcon } from "lucide-react";
 
 interface TemplateCardProps {
+  id: string;
   title: string;
   description: string;
-  icon: React.ReactNode;
+  icon: LucideIcon; // icon is a component type
   color: string;
+  features: string[];
 }
 
 const TemplateCard = ({
+  id,
   title,
   description,
-  icon,
+  icon: Icon,
   color,
+  features,
 }: TemplateCardProps) => {
   return (
     <button
-      className={`group relative p-4 rounded-xl border border-border bg-card text-left transition-all duration-300 hover:shadow-elevated hover:border-primary/30 hover:-translate-y-1 animate-slide-up`}
+      className={`w-full group relative p-4 rounded-xl border border-border bg-card text-left transition-all duration-300 hover:shadow-elevated hover:border-primary/30 hover:-translate-y-1 animate-slide-up`}
     >
       <div
-        className={`h-10 w-10 rounded-lg flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110 ${color}`}
+        className={`h-10 w-10 flex-shrink-0 rounded-lg flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110 ${color}`}
       >
-        {icon}
+        <Icon className="h-5 w-5 text-white" />
       </div>
       <h4 className="font-medium text-sm mb-1">{title}</h4>
       <p className="text-xs text-muted-foreground line-clamp-2">
@@ -32,5 +36,4 @@ const TemplateCard = ({
     </button>
   );
 };
-
 export default TemplateCard;

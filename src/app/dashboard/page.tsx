@@ -1,6 +1,6 @@
 import DashboardLayout from "@/components/layout/Dashboard-layout";
 import StatsCard from "@/components/common/Stats-card";
-import ActivityFeed from "@/components/common/Activity-feed";
+import DashboardPanel from "@/components/common/Dashboard-panel";
 import {
   FileSpreadsheet,
   Users,
@@ -59,13 +59,7 @@ const Index = () => {
 
           {/* Activity Feed */}
           <section className="animate-fade-in">
-            <div className="bg-card rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Activity className="h-5 w-5 text-muted-foreground" />
-                <h3 className="font-semibold">Activity</h3>
-              </div>
-              <ActivityFeed />
-            </div>
+            <DashboardPanel />
           </section>
         </div>
 
