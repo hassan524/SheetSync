@@ -72,11 +72,9 @@ export async function createSheet({
 }) {
   const supabase = await createSupabaseServerClient();
 
-  // ✅ validate ONLY name
   const parsed = createSheetSchema.safeParse({ name });
   if (!parsed.success) throw new Error("Invalid sheet name");
 
-  // ✅ auth
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -87,7 +85,7 @@ export async function createSheet({
     .from("sheets")
     .insert([
       {
-        name: parsed.data.name, // validated name
+        name: parsed.data.name,
         folder_id: folder_id ?? null,
         owner_id: user.id,
         organization_id: organizationId ?? null,

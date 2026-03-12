@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { FolderItem } from "@/data/sheets";
 import DashboardLayout from "@/components/layout/Dashboard-layout";
@@ -33,6 +33,8 @@ interface Props {
 
 const SheetsPageClient = ({ initialFolders }: Props) => {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // -------- Extract organizationId safely --------
   const organizationId = useMemo(() => {
@@ -48,9 +50,26 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
   const [sortBy, setSortBy] = useState("recent");
 
   const [folders, setFolders] = useState(initialFolders);
+
+  // -------- Current folder controlled by selection --------
   const [currentFolder, setCurrentFolder] = useState<string | null>(
-    initialFolders[0]?.id || null,
+    initialFolders[0]?.id || null
   );
+
+  // Initialize folder from URL if available
+  useEffect(() => {
+    const folderIdFromUrl = searchParams.get("folder");
+    if (folderIdFromUrl && folders.find((f) => f.id === folderIdFromUrl)) {
+      setCurrentFolder(folderIdFromUrl);
+    }
+  }, [searchParams, folders]);
+
+  // Update folder selection
+  const handleFolderChange = (id: string) => {
+    setCurrentFolder(id);
+    router.replace(`${pathname}?folder=${id}`);
+    setSearchQuery(""); // reset search when switching folders
+  };
 
   const [filterSettings, setFilterSettings] = useState({
     showPrivate: true,
@@ -60,10 +79,10 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
     onlyShared: false,
   });
 
-  // -------- Derived Data (Optimized with useMemo) --------
+  // -------- Derived Data --------
   const currentFolderData = useMemo(
     () => folders.find((f) => f.id === currentFolder),
-    [folders, currentFolder],
+    [folders, currentFolder]
   );
 
   const sheetsInView = currentFolderData?.sheets || [];
@@ -103,7 +122,7 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
 
   const filteredFolders = useMemo(() => {
     return folders.filter((f) =>
-      f.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      f.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [folders, searchQuery]);
 
@@ -116,7 +135,7 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
     try {
       const newFolderData = organizationId
         ? await createFolder(name, organizationId)
-        : await createFolder(name); // no orgId passed
+        : await createFolder(name);
 
       const newFolder: FolderItem = {
         ...newFolderData,
@@ -127,7 +146,7 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
       };
 
       setFolders((prev) => [...prev, newFolder]);
-      setCurrentFolder(newFolder.id);
+      handleFolderChange(newFolder.id); // also updates defaultFolderId
       setNewFolderOpen(false);
 
       toast.success(`Folder "${name}" created`);
@@ -136,9 +155,20 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
     }
   };
 
+  const handleSheetCreated = (sheet: any, folderId: string) => {
+    setFolders((prev) =>
+      prev.map((f) =>
+        f.id === folderId
+          ? { ...f, sheets: [...(f.sheets || []), sheet] }
+          : f
+      )
+    );
+
+    handleFolderChange(folderId); // also updates defaultFolderId
+  };
+
   const breadcrumbItems = useMemo(() => {
     if (!currentFolder) return ["SheetSync", "Personal Sheets"];
-
     return ["SheetSync", "Personal Sheets", currentFolderData?.name || ""];
   }, [currentFolder, currentFolderData]);
 
@@ -225,10 +255,7 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
           <FoldersList
             folders={filteredFolders}
             currentFolder={currentFolder}
-            onSelectFolder={(id) => {
-              setCurrentFolder(id);
-              setSearchQuery("");
-            }}
+            onSelectFolder={handleFolderChange}
             onCreateFolder={() => setNewFolderOpen(true)}
           />
         </div>
@@ -245,11 +272,16 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
         )}
       </div>
 
-      <NewSheetModal
-        open={newSheetOpen}
-        onOpenChange={setNewSheetOpen}
-        ShowSaveTo={false}
-      />
+      {currentFolder && (
+        <NewSheetModal
+          open={newSheetOpen}
+          onOpenChange={setNewSheetOpen}
+          ShowSaveTo={false}
+          folders={folders}
+          onSheetCreated={handleSheetCreated}
+          currentFolder={currentFolder}
+        />
+      )}
 
       <CreateFolderDialog
         open={newFolderOpen}

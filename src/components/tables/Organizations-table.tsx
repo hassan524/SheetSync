@@ -25,28 +25,18 @@ import {
   Clock,
   Circle,
 } from "lucide-react";
+import { OrganizationTableData, Role } from "@/types/organization.types";
 
-interface Organization {
-  id: string;
-  name: string;
-  role: "Admin" | "Member" | "Viewer";
-  members: number;
-  activeNow: number;
-  sheets: number;
-  storageUsed: number;
-  storageLimit: number;
-  lastModified: string;
-  createdAt: string;
-}
 
 interface OrganizationsTableProps {
-  organizations: Organization[];
+  organizations: OrganizationTableData[];
 }
 
-const roleVariants = {
-  Admin: "default" as const,
-  Member: "secondary" as const,
-  Viewer: "outline" as const,
+const roleVariants: Record<Role, "default" | "secondary" | "outline"> = {
+  owner: "default",
+  admin: "default",
+  editor: "secondary",
+  viewer: "outline",
 };
 
 const OrganizationsTable = ({ organizations }: OrganizationsTableProps) => {
