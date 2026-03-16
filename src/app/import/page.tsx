@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ImportDropzone from "@/components/import/ImportDropzone";
+=======
+import DashboardLayout from "@/components/layout/Dashboard-layout";
+import ImportDropzone from "@/components/import/Import-dropzone";
+>>>>>>> updating-ui
 import { FileSpreadsheet, FileText, FileCode, HelpCircle } from "lucide-react";
 import {
   Accordion,
@@ -35,9 +40,18 @@ const ImportPage = () => {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
+<<<<<<< HEAD
           <h1 className="text-2xl font-semibold mb-2 animate-fade-in">Import Spreadsheets</h1>
           <p className="text-muted-foreground animate-fade-in">
             Upload your existing spreadsheets to start collaborating in SheetSync
+=======
+          <h1 className="text-2xl font-semibold mb-2 animate-fade-in">
+            Import Spreadsheets
+          </h1>
+          <p className="text-muted-foreground animate-fade-in">
+            Upload your existing spreadsheets to start collaborating in
+            SheetSync
+>>>>>>> updating-ui
           </p>
         </div>
 
@@ -58,8 +72,17 @@ const ImportPage = () => {
                 {format.icon}
               </div>
               <h3 className="font-medium mb-1">{format.name}</h3>
+<<<<<<< HEAD
               <p className="text-sm text-muted-foreground mb-1">{format.extensions}</p>
               <p className="text-xs text-muted-foreground">{format.description}</p>
+=======
+              <p className="text-sm text-muted-foreground mb-1">
+                {format.extensions}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {format.description}
+              </p>
+>>>>>>> updating-ui
             </div>
           ))}
         </div>
@@ -68,7 +91,13 @@ const ImportPage = () => {
         <div className="animate-slide-up">
           <div className="flex items-center gap-2 mb-4">
             <HelpCircle className="h-5 w-5 text-muted-foreground" />
+<<<<<<< HEAD
             <h2 className="text-lg font-semibold">Frequently Asked Questions</h2>
+=======
+            <h2 className="text-lg font-semibold">
+              Frequently Asked Questions
+            </h2>
+>>>>>>> updating-ui
           </div>
           <Accordion type="single" collapsible className="border rounded-xl">
             <AccordionItem value="item-1" className="px-4">
@@ -76,8 +105,13 @@ const ImportPage = () => {
                 What happens to my original file?
               </AccordionTrigger>
               <AccordionContent className="text-muted-foreground">
+<<<<<<< HEAD
                 Your original file remains unchanged. SheetSync creates a new copy in your
                 workspace that you can edit and share with others.
+=======
+                Your original file remains unchanged. SheetSync creates a new
+                copy in your workspace that you can edit and share with others.
+>>>>>>> updating-ui
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-2" className="px-4">
@@ -85,8 +119,13 @@ const ImportPage = () => {
                 What's the maximum file size?
               </AccordionTrigger>
               <AccordionContent className="text-muted-foreground">
+<<<<<<< HEAD
                 You can upload files up to 50MB. For larger files, we recommend splitting
                 them into smaller sheets.
+=======
+                You can upload files up to 50MB. For larger files, we recommend
+                splitting them into smaller sheets.
+>>>>>>> updating-ui
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-3" className="px-4 border-0">
@@ -94,8 +133,13 @@ const ImportPage = () => {
                 Will my formulas be preserved?
               </AccordionTrigger>
               <AccordionContent className="text-muted-foreground">
+<<<<<<< HEAD
                 Yes, most common formulas are automatically converted to SheetSync format.
                 Complex macros may need manual adjustment.
+=======
+                Yes, most common formulas are automatically converted to
+                SheetSync format. Complex macros may need manual adjustment.
+>>>>>>> updating-ui
               </AccordionContent>
             </AccordionItem>
           </Accordion>

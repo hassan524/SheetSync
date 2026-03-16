@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+<<<<<<< HEAD
+=======
+git
+>>>>>>> updating-ui
 
 # next.js
 /.next/

@@ -3,6 +3,10 @@ import type { Metadata } from "next";
 import "./app.css"
 import "./index.css"
 import { Providers } from "@/layout/providers";
+<<<<<<< HEAD
+=======
+import { Toaster } from "sonner";
+>>>>>>> updating-ui
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -17,6 +21,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+<<<<<<< HEAD
+=======
+         <Toaster richColors position="top-right" />
+>>>>>>> updating-ui
         <Providers>
           {children}
         </Providers>

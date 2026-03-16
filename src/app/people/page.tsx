@@ -1,9 +1,18 @@
+<<<<<<< HEAD
 'use client'
 
 import { useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PersonCard from "@/components/people/PersonCard";
 import PeopleTable from "@/components/tables/PeopleTable";
+=======
+"use client";
+
+import { useState } from "react";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
+import PersonCard from "@/components/people/PersonCard";
+import PeopleTable from "@/components/tables/People-table";
+>>>>>>> updating-ui
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,7 +32,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+<<<<<<< HEAD
 import { UserPlus, Search, Filter, Grid3X3, List, Mail, Users } from "lucide-react";
+=======
+import {
+  UserPlus,
+  Search,
+  Filter,
+  Grid3X3,
+  List,
+  Mail,
+  Users,
+} from "lucide-react";
+>>>>>>> updating-ui
 
 const people = [
   {
@@ -80,10 +101,29 @@ const tableData = people.map((person, index) => ({
   id: `person-${index}`,
   name: person.name,
   email: person.email,
+<<<<<<< HEAD
   initials: person.name.split(" ").map(n => n[0]).join(""),
   role: (["Admin", "Editor", "Viewer"] as const)[index % 3],
   status: person.status,
   lastActive: ["Just now", "5 min ago", "1 hour ago", "3 hours ago", "Yesterday", "2 days ago", "1 week ago", "Just now"][index],
+=======
+  initials: person.name
+    .split(" ")
+    .map((n) => n[0])
+    .join(""),
+  role: (["Admin", "Editor", "Viewer"] as const)[index % 3],
+  status: person.status,
+  lastActive: [
+    "Just now",
+    "5 min ago",
+    "1 hour ago",
+    "3 hours ago",
+    "Yesterday",
+    "2 days ago",
+    "1 week ago",
+    "Just now",
+  ][index],
+>>>>>>> updating-ui
   sheetsAccess: Math.floor(Math.random() * 20) + 5,
   organizations: person.organizations,
 }));
@@ -106,6 +146,7 @@ const PeoplePage = () => {
 
   // Filter people based on search, org, and status
   const filteredPeople = people.filter((person) => {
+<<<<<<< HEAD
     const matchesSearch = 
       person.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       person.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -117,10 +158,26 @@ const PeoplePage = () => {
     
     const matchesStatus = statusFilter === "all-status" || person.status === statusFilter;
     
+=======
+    const matchesSearch =
+      person.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      person.email.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesOrg =
+      orgFilter === "all" ||
+      person.organizations.some((org) =>
+        org.toLowerCase().includes(orgFilter.toLowerCase()),
+      );
+
+    const matchesStatus =
+      statusFilter === "all-status" || person.status === statusFilter;
+
+>>>>>>> updating-ui
     return matchesSearch && matchesOrg && matchesStatus;
   });
 
   const filteredTableData = tableData.filter((person) => {
+<<<<<<< HEAD
     const matchesSearch = 
       person.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       person.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -137,6 +194,28 @@ const PeoplePage = () => {
 
   const onlineCount = filteredPeople.filter(p => p.status === "online").length;
   const awayCount = filteredPeople.filter(p => p.status === "away").length;
+=======
+    const matchesSearch =
+      person.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      person.email.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesOrg =
+      orgFilter === "all" ||
+      person.organizations.some((org) =>
+        org.toLowerCase().includes(orgFilter.toLowerCase()),
+      );
+
+    const matchesStatus =
+      statusFilter === "all-status" || person.status === statusFilter;
+
+    return matchesSearch && matchesOrg && matchesStatus;
+  });
+
+  const onlineCount = filteredPeople.filter(
+    (p) => p.status === "online",
+  ).length;
+  const awayCount = filteredPeople.filter((p) => p.status === "away").length;
+>>>>>>> updating-ui
 
   return (
     <DashboardLayout breadcrumbItems={["SheetSync", "People"]}>
@@ -149,7 +228,14 @@ const PeoplePage = () => {
               View and manage collaborators across your organizations
             </p>
           </div>
+<<<<<<< HEAD
           <Button className="animate-fade-in" onClick={() => setInviteOpen(true)}>
+=======
+          <Button
+            className="animate-fade-in"
+            onClick={() => setInviteOpen(true)}
+          >
+>>>>>>> updating-ui
             <UserPlus className="h-4 w-4 mr-2" />
             Invite People
           </Button>
@@ -221,8 +307,13 @@ const PeoplePage = () => {
               </SelectContent>
             </Select>
 
+<<<<<<< HEAD
             <Button 
               variant="outline" 
+=======
+            <Button
+              variant="outline"
+>>>>>>> updating-ui
               size="icon"
               onClick={() => {
                 setOrgFilter("all");
@@ -234,7 +325,14 @@ const PeoplePage = () => {
               <Filter className="h-4 w-4" />
             </Button>
 
+<<<<<<< HEAD
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "cards" | "table")}>
+=======
+            <Tabs
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as "cards" | "table")}
+            >
+>>>>>>> updating-ui
               <TabsList className="h-9">
                 <TabsTrigger value="table" className="px-3">
                   <List className="h-4 w-4" />
@@ -253,7 +351,14 @@ const PeoplePage = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredPeople.map((person, index) => (
+<<<<<<< HEAD
               <div key={person.email} style={{ animationDelay: `${index * 50}ms` }}>
+=======
+              <div
+                key={person.email}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+>>>>>>> updating-ui
                 <PersonCard {...person} />
               </div>
             ))}
@@ -262,7 +367,13 @@ const PeoplePage = () => {
 
         {filteredPeople.length === 0 && (
           <div className="text-center py-12 animate-fade-in">
+<<<<<<< HEAD
             <p className="text-muted-foreground">No people found matching your filters.</p>
+=======
+            <p className="text-muted-foreground">
+              No people found matching your filters.
+            </p>
+>>>>>>> updating-ui
           </div>
         )}
       </div>
@@ -308,7 +419,13 @@ const PeoplePage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin - Full access</SelectItem>
+<<<<<<< HEAD
                   <SelectItem value="editor">Editor - Can edit sheets</SelectItem>
+=======
+                  <SelectItem value="editor">
+                    Editor - Can edit sheets
+                  </SelectItem>
+>>>>>>> updating-ui
                   <SelectItem value="viewer">Viewer - View only</SelectItem>
                 </SelectContent>
               </Select>
@@ -323,7 +440,13 @@ const PeoplePage = () => {
                 <SelectContent>
                   <SelectItem value="acme">Acme Corporation</SelectItem>
                   <SelectItem value="design">Design Team</SelectItem>
+<<<<<<< HEAD
                   <SelectItem value="marketing">Marketing Department</SelectItem>
+=======
+                  <SelectItem value="marketing">
+                    Marketing Department
+                  </SelectItem>
+>>>>>>> updating-ui
                 </SelectContent>
               </Select>
             </div>

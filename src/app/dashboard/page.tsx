@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 'use client'
 
 import { useState } from "react";
@@ -82,10 +83,29 @@ const Index = () => {
     setTemplateModalOpen(true);
   };
 
+=======
+import DashboardLayout from "@/components/layout/Dashboard-layout";
+import StatsCard from "@/components/common/Stats-card";
+import DashboardPanel from "@/components/common/Dashboard-panel";
+import {
+  FileSpreadsheet,
+  Users,
+  Building2,
+  TrendingUp,
+  Activity,
+} from "lucide-react";
+import QuickActions from "@/components/individual/dashboard/Quick-actions";
+import DashboardWelcome from "@/components/individual/dashboard/Dashboard-welcome";
+import TemplatePicker from "@/components/individual/dashboard/Template-picker";
+import RecentSheets from "@/components/individual/dashboard/Recent-sheets";
+
+const Index = () => {
+>>>>>>> updating-ui
   return (
     <DashboardLayout breadcrumbItems={["SheetSync", "Dashboard"]}>
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Welcome Section */}
+<<<<<<< HEAD
         <section className="animate-fade-in">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
@@ -101,6 +121,9 @@ const Index = () => {
             </Button>
           </div>
         </section>
+=======
+        <DashboardWelcome />
+>>>>>>> updating-ui
 
         {/* Stats Section */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -131,6 +154,7 @@ const Index = () => {
           />
         </section>
 
+<<<<<<< HEAD
         {/* Templates Section */}
         <section className="animate-fade-in">
           <div className="flex items-center justify-between mb-4">
@@ -162,10 +186,15 @@ const Index = () => {
             ))}
           </div>
         </section>
+=======
+        {/* Template picker section  */}
+        <TemplatePicker />
+>>>>>>> updating-ui
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Recent Sheets */}
+<<<<<<< HEAD
           <section className="lg:col-span-2 animate-fade-in">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -200,10 +229,18 @@ const Index = () => {
               </div>
               <ActivityFeed />
             </div>
+=======
+          <RecentSheets />
+
+          {/* Activity Feed */}
+          <section className="animate-fade-in">
+            <DashboardPanel />
+>>>>>>> updating-ui
           </section>
         </div>
 
         {/* Quick Actions */}
+<<<<<<< HEAD
         <section className="animate-fade-in">
           <div className="bg-muted/30 rounded-xl p-6 border">
             <h3 className="font-semibold mb-4">Quick Actions</h3>
@@ -254,6 +291,10 @@ const Index = () => {
       />
       <InviteTeamModal open={inviteTeamOpen} onOpenChange={setInviteTeamOpen} />
       <CreateOrgModal open={createOrgOpen} onOpenChange={setCreateOrgOpen} />
+=======
+        <QuickActions />
+      </div>
+>>>>>>> updating-ui
     </DashboardLayout>
   );
 };

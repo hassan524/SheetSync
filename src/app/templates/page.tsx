@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import TemplateCard from "@/components/sheets/TemplateCard";
@@ -94,10 +95,29 @@ const allTemplates = [
 
 const categories = ["All", "Finance", "Project Management", "Sales", "HR", "Operations", "General"];
 
+=======
+"use client";
+
+import { useState } from "react";
+import DashboardLayout from "@/components/layout/Dashboard-layout";
+import TemplateCard from "@/components/sheets/Template-card";
+import UseTemplateModal from "@/components/sheets/Use-template-modal";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, Sparkles } from "lucide-react";
+import { SHEET_TEMPLATES } from "../../constants/Sheet-templates";
+
+const categories = [
+  "All",
+  ...Array.from(new Set(SHEET_TEMPLATES.map((t) => t.category))),
+];
+
+>>>>>>> updating-ui
 const TemplatesPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
+<<<<<<< HEAD
   const [selectedTemplate, setSelectedTemplate] = useState<typeof allTemplates[0] | null>(null);
 
   const filteredTemplates = allTemplates.filter((template) => {
@@ -109,6 +129,27 @@ const TemplatesPage = () => {
 
   const handleTemplateClick = (template: typeof allTemplates[0]) => {
     setSelectedTemplate(template);
+=======
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+    null
+  );
+
+  const filteredTemplates = SHEET_TEMPLATES.filter((template) => {
+    const matchesSearch =
+      template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      template.description
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+
+    const matchesCategory =
+      selectedCategory === "All" || template.category === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  const handleTemplateClick = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+>>>>>>> updating-ui
     setTemplateModalOpen(true);
   };
 
@@ -122,8 +163,13 @@ const TemplatesPage = () => {
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
             <div>
+<<<<<<< HEAD
               <h1 className="text-2xl font-semibold animate-fade-in">Templates</h1>
               <p className="text-muted-foreground animate-fade-in">
+=======
+              <h1 className="text-2xl font-semibold">Templates</h1>
+              <p className="text-muted-foreground">
+>>>>>>> updating-ui
                 Start quickly with pre-built spreadsheet templates
               </p>
             </div>
@@ -134,6 +180,7 @@ const TemplatesPage = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-card border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Total Templates</p>
+<<<<<<< HEAD
             <p className="text-2xl font-semibold">{allTemplates.length}</p>
           </div>
           <div className="bg-card border rounded-lg p-4">
@@ -147,11 +194,26 @@ const TemplatesPage = () => {
           <div className="bg-card border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">New This Month</p>
             <p className="text-2xl font-semibold">2</p>
+=======
+            <p className="text-2xl font-semibold">
+              {SHEET_TEMPLATES.length}
+            </p>
+          </div>
+          <div className="bg-card border rounded-lg p-4">
+            <p className="text-sm text-muted-foreground">Categories</p>
+            <p className="text-2xl font-semibold">
+              {categories.length - 1}
+            </p>
+>>>>>>> updating-ui
           </div>
         </div>
 
         {/* Search & Filters */}
+<<<<<<< HEAD
         <div className="flex flex-col sm:flex-row gap-4 mb-6 animate-slide-up">
+=======
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+>>>>>>> updating-ui
           <div className="relative max-w-md flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -162,11 +224,21 @@ const TemplatesPage = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+<<<<<<< HEAD
+=======
+
+>>>>>>> updating-ui
           <div className="flex flex-wrap gap-2">
             {categories.map((category) => (
               <Button
                 key={category}
+<<<<<<< HEAD
                 variant={selectedCategory === category ? "default" : "outline"}
+=======
+                variant={
+                  selectedCategory === category ? "default" : "outline"
+                }
+>>>>>>> updating-ui
                 size="sm"
                 onClick={() => setSelectedCategory(category)}
               >
@@ -178,11 +250,19 @@ const TemplatesPage = () => {
 
         {/* Templates Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<<<<<<< HEAD
           {filteredTemplates.map((template, index) => (
             <div 
               key={template.id} 
               style={{ animationDelay: `${index * 50}ms` }}
               onClick={() => handleTemplateClick(template)}
+=======
+          {filteredTemplates.map((template) => (
+            <div
+              key={template.id}
+              onClick={() => handleTemplateClick(template.id)}
+              className="cursor-pointer"
+>>>>>>> updating-ui
             >
               <TemplateCard {...template} />
             </div>
@@ -190,6 +270,7 @@ const TemplatesPage = () => {
         </div>
 
         {filteredTemplates.length === 0 && (
+<<<<<<< HEAD
           <div className="text-center py-12 animate-fade-in">
             <p className="text-muted-foreground">No templates found matching your criteria.</p>
           </div>
@@ -229,8 +310,33 @@ const TemplatesPage = () => {
         onOpenChange={setTemplateModalOpen}
         template={selectedTemplate}
       />
+=======
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">
+              No templates found matching your criteria.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Modal (only render when ID exists) */}
+      {selectedTemplateId && (
+        <UseTemplateModal
+          open={templateModalOpen}
+          onOpenChange={(open) => {
+            setTemplateModalOpen(open);
+            if (!open) setSelectedTemplateId(null);
+          }}
+          templateId={selectedTemplateId}
+        />
+      )}
+>>>>>>> updating-ui
     </DashboardLayout>
   );
 };
 
+<<<<<<< HEAD
 export default TemplatesPage;
+=======
+export default TemplatesPage;
+>>>>>>> updating-ui

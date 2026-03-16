@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { AuthError, Session } from "@supabase/supabase-js";
@@ -8,6 +9,21 @@ import { cookies } from "js-cookie";
 // -----------------------
 // User type
 // -----------------------
+=======
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import { supabase } from "@/lib/supabase/client";
+import { AuthError, Session } from "@supabase/supabase-js";
+
+// -----------------------
+// User type
+// ----------------------
+>>>>>>> updating-ui
 interface UserProfile {
   id: string;
   name: string | null;
@@ -40,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+<<<<<<< HEAD
   // -----------------------
   // Load session on mount
   // -----------------------
@@ -69,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // -----------------------
   // Helper: set user from session
   // -----------------------
+=======
+>>>>>>> updating-ui
   const setUserFromSession = (session: Session) => {
     const u = session.user;
     const token = session.access_token;
@@ -82,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     setAccessToken(token);
+<<<<<<< HEAD
 
     // Store access token in cookie (expires in 1 day)
     Cookies.set("my-supabase-session", token, {
@@ -100,6 +120,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     Cookies.remove("my-supabase-session");
   };
 
+=======
+  };
+
+  const clearSession = () => {
+    setUser(null);
+    setAccessToken(null);
+  };
+
+  useEffect(() => {
+    const initSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) setUserFromSession(session);
+      console.log("current session", session);
+      setLoading(false);
+    };
+
+    initSession();
+
+    // Listen to auth changes (login / logout / token refresh)
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) setUserFromSession(session);
+        else {
+          clearSession();
+        }
+      },
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+>>>>>>> updating-ui
   // -----------------------
   // Google login
   // -----------------------
