@@ -27,7 +27,7 @@ interface CreateOrganizationDialogProps {
 const CreateOrganizationDialog: React.FC<CreateOrganizationDialogProps> = ({
   open,
   onOpenChange,
-  onCreated,
+  // onCreated, 
 }) => {
 
   const [orgName, setOrgName] = useState("");
@@ -44,16 +44,14 @@ const CreateOrganizationDialog: React.FC<CreateOrganizationDialogProps> = ({
 
       const newOrg = await createOrganization(orgName.trim());
 
-      if (onCreated) onCreated(newOrg);
+      // if (onCreated) onCreated(newOrg); 
 
       toast.success(`Organization "${newOrg.name}" created successfully`);
 
-      // Reset form
       setOrgName("");
       setOrgDescription("");
       onOpenChange(false);
 
-      // to show organization in the UI instantly
       router.refresh()
 
     } catch (err: any) {

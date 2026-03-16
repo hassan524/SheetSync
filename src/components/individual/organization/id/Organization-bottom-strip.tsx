@@ -1,7 +1,7 @@
 import { Globe, Lock, Calendar, TrendingUp } from "lucide-react";
-import { OrgDetail } from "@/app/organizations/[id]/page";
+import { Organization } from "@/types";
 
-export function OrgBottomStrip({ org }: { org: OrgDetail }) {
+export function OrgBottomStrip({ org }: { org: Organization }) {
   const stats     = org.weeklyStats;
   const createdAt = new Date(org.created_at).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",

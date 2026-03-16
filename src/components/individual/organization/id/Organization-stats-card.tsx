@@ -1,10 +1,10 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress }               from "@/components/ui/progress";
 import { Users, Activity, FileSpreadsheet, HardDrive } from "lucide-react";
-import { OrgDetail } from "@/app/organizations/[id]/page";
+import { Organization } from "@/types";
 
-export function OrgStatCards({ org }: { org: OrgDetail }) {
-  const members = org.membersList ?? [];
+export function OrgStatCards({ org }: { org: Organization }) {
+  const members = org.members ?? [];
   const online  = members.filter(m => m.status === "online");
   const pct     = org.storageUsed && org.storageLimit
     ? Math.round((org.storageUsed / org.storageLimit) * 100)
@@ -36,7 +36,7 @@ export function OrgStatCards({ org }: { org: OrgDetail }) {
             {online.slice(0, 5).map((m, i) => (
               <Avatar key={m.id} className="h-4 w-4 ring-1 ring-background" style={{ marginLeft: i ? -5 : 0 }}>
                 <AvatarFallback className="text-[7px] font-bold bg-primary/10 text-primary">
-                  {m.avatar[0]}
+                  {m.avatar?.[0]}
                 </AvatarFallback>
               </Avatar>
             ))}
@@ -53,7 +53,7 @@ export function OrgStatCards({ org }: { org: OrgDetail }) {
         </div>
         <div>
           <p className="text-[11px] text-muted-foreground">Sheets</p>
-          <p className="text-xl font-bold leading-tight">{org.sheetsList?.length ?? org.sheets.length}</p>
+          <p className="text-xl font-bold leading-tight">{org.sheets?.length ?? org.sheets.length}</p>
           <p className="text-[10px] text-green-600">↑ +8 this week</p>
         </div>
       </div>

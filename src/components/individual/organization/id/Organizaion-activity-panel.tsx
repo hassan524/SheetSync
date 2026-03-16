@@ -1,8 +1,8 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { BarChart3 }              from "lucide-react";
-import { OrgDetail } from "@/app/organizations/[id]/page";
+import { Organization } from "@/types";
 
-export function OrgActivityPanel({ org }: { org: OrgDetail }) {
+export function OrgActivityPanel({ org }: { org: Organization }) {
   const activity = org.recentActivity ?? [];
 
   return (

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Users, Building2, FileSpreadsheet } from "lucide-react";
 import NewSheetModal from "@/components/sheets/New-sheet-modal";
 import InviteTeamModal from "@/components/modals/Invite-team-modal";
-import CreateOrgModal from "@/components/modals/Create-org-modal";
+import CreateOrganizationDialog from "../organization/Create-organization-dialog";
 import { getAllFolders } from "@/lib/querys/folder/folders";
 import { getAllOrganizations } from "@/lib/querys/organization/organization";
 
@@ -100,7 +100,7 @@ export default function QuickActions() {
         organizations={organizations} // <-- new prop
       />
 
-      <CreateOrgModal
+      <CreateOrganizationDialog
         open={createOrgOpen}
         onOpenChange={setCreateOrgOpen}
       />
