@@ -85,11 +85,12 @@ export async function createSheet({
     .from("sheets")
     .insert([
       {
-        name: parsed.data.name,
+        title: parsed.data.name,
         folder_id: folder_id ?? null,
         owner_id: user.id,
         organization_id: organizationId ?? null,
         template_id: templateId,
+        is_personal: !organizationId,
       },
     ])
     .select()

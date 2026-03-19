@@ -3,16 +3,14 @@
 import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 
 const createFolderSchema = z.object({
   name: z.string().min(1).max(50),
 });
 
 export async function getAllFolders() {
-  const cookieStore = await cookies();
-  console.log("COOKIES:", cookieStore.getAll());
   const supabase = await createSupabaseServerClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -21,12 +19,24 @@ export async function getAllFolders() {
 
   const { data, error } = await supabase
     .from("folders")
-    .select(`*, sheets(*)`)
+    .select(`
+      *,
+      sheets (
+        *,
+        owner:profiles!sheets_owner_id_fkey (
+          id,
+          name,
+          email,
+          avatar_url
+        )
+      )
+    `)
     .eq("owner_id", user.id)
     .is("organization_id", null)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
+
   return data;
 }
 
@@ -38,8 +48,6 @@ export async function createFolder(name: string, OrganizationId?: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  console.log("SERVER USER:", user);
 
   if (!user) throw new Error("Unauthorized");
 

@@ -55,7 +55,7 @@ export interface Member {
   lastActive?: string;
 
   avatar?: string;
-  
+
 }
 
 
@@ -122,6 +122,7 @@ export interface Sheet {
 
   owner: {
     name: string;
+    email: string;
     initials: string;
     avatar?: string;
   };
@@ -205,14 +206,14 @@ export interface ColumnDef {
   resizable?: boolean;
 
   type?:
-    | "text"
-    | "number"
-    | "currency"
-    | "status"
-    | "checkbox"
-    | "url"
-    | "date"
-    | "priority";
+  | "text"
+  | "number"
+  | "currency"
+  | "status"
+  | "checkbox"
+  | "url"
+  | "date"
+  | "priority";
 }
 
 
@@ -239,13 +240,13 @@ export interface HistoryEntry {
   timestamp: number;
 
   action:
-    | "cell_edit"
-    | "format"
-    | "row_add"
-    | "row_delete"
-    | "col_add"
-    | "col_delete"
-    | "col_reorder";
+  | "cell_edit"
+  | "format"
+  | "row_add"
+  | "row_delete"
+  | "col_add"
+  | "col_delete"
+  | "col_reorder";
 
   data: any;
 }

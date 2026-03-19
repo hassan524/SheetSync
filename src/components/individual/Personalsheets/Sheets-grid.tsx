@@ -1,49 +1,58 @@
 "use client";
 
-import { SheetItem } from "@/data/sheets";
+import { Sheet } from "@/types";
 import SheetCard from "@/components/sheets/Sheet-card";
-import SheetsTable from "@/components/tables/Sheets-table";
 import { Button } from "@/components/ui/button";
 import { FileSpreadsheet, FolderOpen, Plus } from "lucide-react";
+import { formatDistanceToNowStrict, parseISO } from "date-fns";
+import { DataTable } from "@/components/common/Data-table";
+import { sheetAction, NoSheetsIcon, sheetColumns } from "@/data/tables/personalSheets/personalTableColumns";
 
 interface Props {
-  sheets: SheetItem[];
+  sheets: Sheet[];
   viewMode: "grid" | "table";
   searchQuery: string;
   folderName: string;
   onNewSheet: () => void;
 }
 
-const SheetsGrid = ({
-  sheets,
-  viewMode,
-  searchQuery,
-  folderName,
-  onNewSheet,
-}: Props) => {
-  const tableData = sheets.map((s) => ({
-    id: s.id,
-    title: s.title,
-    owner: s.owner,
-    visibility: s.visibility,
-    lastModified: s.lastEdited,
-    lastModifiedBy: s.lastModifiedBy,
-    collaborators: s.collaborators,
-    activeEditors: s.activeEditors,
-    isStarred: s.isStarred,
-    size: s.size,
-  }));
+const hashId = (str: string) => str.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
 
+const getMockMeta = (id: string) => {
+  const h = hashId(id);
+  const rows = 50 + (h % 950);
+  const cols = 4 + (h % 20);
+  return {
+    rows,
+    cols,
+    fileSizeKb: Math.round(rows * cols * 0.08),
+    fillPercent: 30 + (h % 65),
+  };
+};
+
+const getTag = (title: string) => {
+  const t = title.toLowerCase();
+  if (t.includes("budget") || t.includes("revenue") || t.includes("finance")) return "Finance";
+  if (t.includes("churn") || t.includes("analytics") || t.includes("data")) return "Analytics";
+  if (t.includes("marketing") || t.includes("spend") || t.includes("campaign")) return "Marketing";
+  if (t.includes("headcount") || t.includes("hr") || t.includes("hiring")) return "HR";
+  if (t.includes("inventory") || t.includes("stock") || t.includes("ops")) return "Ops";
+  if (t.includes("sales") || t.includes("revenue") || t.includes("deal")) return "Sales";
+  if (t.includes("product") || t.includes("roadmap") || t.includes("feature")) return "Product";
+  return "General";
+};
+
+const SheetsGrid = ({ sheets, viewMode, searchQuery, folderName, onNewSheet }: Props) => {
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center gap-2 mb-3">
-        <FolderOpen className="h-4 w-4 text-primary" />
-        <h2 className="text-sm font-medium text-muted-foreground">
-          {folderName}
-        </h2>
-        <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-          {sheets.length}
-        </span>
+      <div className="flex items-center justify-between my-4">
+        <div className="flex items-center gap-2">
+          <FolderOpen className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-medium text-muted-foreground">{folderName}</h2>
+          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+            {sheets.length}
+          </span>
+        </div>
       </div>
 
       {sheets.length === 0 ? (
@@ -55,9 +64,7 @@ const SheetsGrid = ({
             {searchQuery ? "No results found" : "This folder is empty"}
           </p>
           <p className="text-sm text-muted-foreground/70 mt-1 mb-4">
-            {searchQuery
-              ? "Try a different search term"
-              : "Create a new sheet to get started"}
+            {searchQuery ? "Try a different search term" : "Create a new sheet"}
           </p>
           {!searchQuery && (
             <Button size="sm" onClick={onNewSheet}>
@@ -68,23 +75,43 @@ const SheetsGrid = ({
         </div>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {sheets.map((sheet, index) => (
-            <div
-              key={sheet.id}
-              className="animate-scale-in"
-              style={{ animationDelay: `${index * 30}ms` }}
-            >
-              <SheetCard
-                title={sheet.title}
-                lastEdited={sheet.lastEdited}
-                isStarred={sheet.isStarred}
-                sharedWith={sheet.sharedWith}
-              />
-            </div>
-          ))}
+          {sheets.map((sheet, index) => {
+            const lastEdited = sheet.updated_at
+              ? formatDistanceToNowStrict(parseISO(sheet.updated_at), { addSuffix: true })
+              : "—";
+            const { rows, cols, fileSizeKb, fillPercent } = getMockMeta(sheet.id);
+
+            return (
+              <div
+                key={sheet.id}
+                style={{ animationDelay: `${index * 50}ms` }}
+                className="animate-scale-in"
+              >
+                <SheetCard
+                  title={sheet.title}
+                  lastEdited={lastEdited}
+                  isStarred={sheet.is_starred}
+                  rows={rows}
+                  cols={cols}
+                  fileSizeKb={fileSizeKb}
+                  fillPercent={fillPercent}
+                  tag={getTag(sheet.title)}
+                  templateId={sheet.template_id ?? undefined}
+                />
+              </div>
+            );
+          })}
         </div>
       ) : (
-        <SheetsTable sheets={tableData} />
+        <DataTable
+          columns={sheetColumns}
+          rows={sheets}
+          getKey={(s) => s.id}
+          action={sheetAction}
+          emptyText="No sheets yet"
+          emptyDescription="Sheets in this folder will appear here."
+          emptyIcon={<NoSheetsIcon />}
+        />
       )}
     </div>
   );

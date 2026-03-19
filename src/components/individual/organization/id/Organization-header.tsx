@@ -24,15 +24,13 @@ interface OrgHeaderProps {
 export function OrgHeader({ org }: OrgHeaderProps) {
   const router = useRouter();
 
-  // Modal states
   const [newSheetOpen, setNewSheetOpen] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteOpen, setInviteOpen]     = useState(false);
 
   return (
     <>
       {/* ───────────── Top Action Bar ───────────── */}
-      <div className="flex items-center justify-between mb-4">
-        {/* Back button */}
+      <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => router.push("/organizations")}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -40,7 +38,6 @@ export function OrgHeader({ org }: OrgHeaderProps) {
           <ArrowLeft className="h-4 w-4" /> Organizations
         </button>
 
-        {/* Action buttons */}
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -67,22 +64,18 @@ export function OrgHeader({ org }: OrgHeaderProps) {
 
       {/* ───────────── Organization Info ───────────── */}
       <div className="flex items-center gap-3 mb-6">
-        {/* Icon */}
         <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
           <Building2 className="h-5 w-5 text-primary-foreground" />
         </div>
 
-        {/* Name & badges */}
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-base font-semibold">{org.name}</h1>
 
-            {/* Role badge */}
             <Badge variant="secondary" className="h-5 px-1.5 text-[11px] gap-1">
               <Shield className="h-2.5 w-2.5" /> {org.role}
             </Badge>
 
-            {/* Plan badge (if exists) */}
             {org.plan && (
               <Badge variant="outline" className="h-5 px-1.5 text-[11px] gap-1">
                 <Zap className="h-2.5 w-2.5 text-yellow-500" /> {org.plan}
@@ -90,7 +83,6 @@ export function OrgHeader({ org }: OrgHeaderProps) {
             )}
           </div>
 
-          {/* Description */}
           {org.description && (
             <p className="text-xs text-muted-foreground mt-0.5">
               {org.description}
@@ -100,8 +92,18 @@ export function OrgHeader({ org }: OrgHeaderProps) {
       </div>
 
       {/* ───────────── Modals ───────────── */}
-      {/* <NewSheetModal open={newSheetOpen} onOpenChange={setNewSheetOpen} />
-      <InviteTeamModal open={inviteOpen} onOpenChange={setInviteOpen} /> */}
+      <NewSheetModal
+        open={newSheetOpen}
+        onOpenChange={setNewSheetOpen}
+        ShowSaveTo={false}     
+        folders={[]}             
+        onSheetCreated={() => {}} 
+      />
+
+      {/* <InviteTeamModal
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+      /> */}
     </>
   );
 }
