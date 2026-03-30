@@ -1,7 +1,7 @@
 // hooks/sheets/use-sheet-formatting.ts
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import type { CellFormat } from "@/types/sheet.types";
+import type { CellFormat } from "@/types/index";
 
 export function useSheetFormatting(onSave: () => void) {
   const [cellFormats, setCellFormats] = useState<Record<string, CellFormat>>(
@@ -48,6 +48,7 @@ export function useSheetFormatting(onSave: () => void) {
       const isWrapEnabled = textWrapColumns.has(colKey);
 
       return {
+        fontFamily: format.fontFamily || undefined,
         fontWeight: format.bold ? 700 : 400,
         fontStyle: format.italic ? "italic" : "normal",
         textDecoration:
@@ -57,10 +58,10 @@ export function useSheetFormatting(onSave: () => void) {
           ]
             .filter(Boolean)
             .join(" ") || "none",
-        fontSize: format.fontSize ? `${format.fontSize}px` : "12px",
-        color: format.textColor || "#000000",
-        backgroundColor: format.bgColor || "#ffffff",
-        textAlign: (format.align as any) || "left",
+        fontSize: format.fontSize ? `${format.fontSize}px` : undefined,
+        color: format.textColor || undefined,
+        backgroundColor: format.bgColor || undefined,
+        textAlign: (format.align as any) || undefined,
         whiteSpace: isWrapEnabled ? "pre-wrap" : "nowrap",
         wordBreak: isWrapEnabled ? "break-word" : "normal",
         overflow: isWrapEnabled ? "visible" : "hidden",

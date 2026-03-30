@@ -27,7 +27,7 @@ import {
 import { CellFormat } from "@/types/sheet.types";
 
 interface FormattingToolbarProps {
-  currentFormat: CellFormat;
+  currentFormat?: CellFormat;
   onFormatChange: (format: Partial<CellFormat>) => void;
   disabled?: boolean;
 }
@@ -68,7 +68,7 @@ const PRESET_COLORS = [
 ];
 
 export default function FormattingToolbar({
-  currentFormat,
+  currentFormat = {}, // ← add default empty object here
   onFormatChange,
   disabled = false,
 }: FormattingToolbarProps) {
@@ -84,7 +84,7 @@ export default function FormattingToolbar({
             disabled={disabled}
           >
             <Type className="h-3.5 w-3.5" />
-            <span className="text-xs">{currentFormat.fontSize || 12}</span>
+           <span className="text-xs">{currentFormat?.fontSize || 12}</span>
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>

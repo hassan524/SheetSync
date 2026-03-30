@@ -88,6 +88,7 @@ const SheetsGrid = ({ sheets, viewMode, searchQuery, folderName, onNewSheet }: P
                 className="animate-scale-in"
               >
                 <SheetCard
+                id={sheet.id}
                   title={sheet.title}
                   lastEdited={lastEdited}
                   isStarred={sheet.is_starred}
