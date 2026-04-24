@@ -1,0 +1,96 @@
+// hooks/useOrgActivity.ts
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase/client";
+import { getInitials, timeAgo } from "../lib/utils";
+
+export type OrgActivity = {
+  id: string;
+  organization_id: string;
+  user: string;
+  action: string;
+  target: string;
+  time: string;
+  avatar: string;
+};
+
+export function useOrgActivity(orgId: string) {
+  const [activities, setActivities] = useState<OrgActivity[]>([]);
+
+  useEffect(() => {
+    if (!orgId) return;
+
+    // Fetch last 10 activities on first mount
+    supabase
+      .from("activity_log")
+      .select(`
+        id,
+        organization_id,
+        user_id,
+        action,
+        target,
+        created_at,
+        profiles!activity_log_user_id_fkey (name, avatar_url)
+      `)
+      .eq("organization_id", orgId)
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Error fetching activity:", error);
+          return;
+        }
+        if (data) {
+          setActivities(
+            data.map((d: any) => ({
+              id: d.id,
+              organization_id: d.organization_id,
+              user: d.profiles?.name || "Unknown",
+              action: d.action,
+              target: d.target,
+              time: timeAgo(d.created_at),
+              avatar: d.profiles?.name ? getInitials(d.profiles.name) : "U",
+            }))
+          );
+        }
+      });
+
+    // Realtime subscription
+    const subscription = supabase
+      .channel(`org-activity-${orgId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "activity_log",
+          filter: `organization_id=eq.${orgId}`,
+        },
+        (payload: any) => {
+          const newActivity = payload.new;
+          setActivities((prev) => [
+            {
+              id: newActivity.id,
+              organization_id: newActivity.organization_id,
+              user: newActivity.user_name || "Unknown", // map name here
+              action: newActivity.action,
+              target: newActivity.target,
+              time: timeAgo(newActivity.created_at),
+              avatar: newActivity.user_name
+                ? getInitials(newActivity.user_name)
+                : "U",
+            },
+            ...prev,
+          ].slice(0, 10)); // keep last 10 activities
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [orgId, supabase]);
+
+  return activities;
+}
