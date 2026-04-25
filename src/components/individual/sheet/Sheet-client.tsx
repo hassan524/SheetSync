@@ -191,6 +191,7 @@ import KeyboardShortcutsDialog from "./dialogs/Keyboard-shortcuts-dialog";
 import ShareDialog from "./dialogs/Share-dialog";
 import RightPanel from "./Right-panel";
 import { loadSheet } from "@/lib/querys/sheet/sheet";
+import { exportSheet, ExportFormat } from "@/lib/querys/export";
 
 // ─────────────────────────────────────────────
 //  DUMMY DATA
@@ -523,11 +524,9 @@ function IconBtn({
         <button
           onClick={onClick}
           disabled={disabled}
-          className={`sheet-icon-btn relative flex items-center justify-center h-7 w-7 rounded-md transition-all duration-100 ${
-            active ? "sheet-icon-btn--active" : ""
-          } ${danger ? "sheet-icon-btn--danger" : ""} ${
-            disabled ? "opacity-35 cursor-not-allowed" : "cursor-pointer"
-          }`}
+          className={`sheet-icon-btn relative flex items-center justify-center h-7 w-7 rounded-md transition-all duration-100 ${active ? "sheet-icon-btn--active" : ""
+            } ${danger ? "sheet-icon-btn--danger" : ""} ${disabled ? "opacity-35 cursor-not-allowed" : "cursor-pointer"
+            }`}
         >
           <Icon className="h-3.5 w-3.5" />
           {badge != null && badge > 0 && (
@@ -617,11 +616,10 @@ function FormulaDialog({
                     <button
                       key={f.name}
                       onClick={() => setSelected(f)}
-                      className={`w-full text-left px-2.5 py-1.5 text-[11px] font-mono border-b transition-colors ${
-                        selected?.name === f.name
-                          ? "bg-primary/10 text-primary font-semibold"
-                          : "hover:bg-gray-50 text-gray-700"
-                      }`}
+                      className={`w-full text-left px-2.5 py-1.5 text-[11px] font-mono border-b transition-colors ${selected?.name === f.name
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "hover:bg-gray-50 text-gray-700"
+                        }`}
                     >
                       {f.name}
                     </button>
@@ -782,19 +780,19 @@ export default function SheetClient() {
   const playbackTimer = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // ── Feature hooks ─────────────────────────────────────────
-  const formatting = useSheetFormatting(() => {});
-  const textWrap = useTextWrap(rows, () => {});
-  const clipboard = useClipboard(rows, rowsHistory, () => {});
-  const protection = useProtectedCells(() => {});
-  const rowOps = useRowOperations(rows, columns, rowsHistory, () => {});
+  const formatting = useSheetFormatting(() => { });
+  const textWrap = useTextWrap(rows, () => { });
+  const clipboard = useClipboard(rows, rowsHistory, () => { });
+  const protection = useProtectedCells(() => { });
+  const rowOps = useRowOperations(rows, columns, rowsHistory, () => { });
   const colOps = useColumnOperations(
     rows,
     columns,
     columnsHistory,
     rowsHistory,
-    () => {},
+    () => { },
   );
-  const cellTypes = useCellTypes(rows, rowsHistory, () => {});
+  const cellTypes = useCellTypes(rows, rowsHistory, () => { });
   const formulas = useFormulas(rows, columns);
 
   // Sync history state → sheetState.rows / sheetState.columns (FIX #2)
@@ -1274,27 +1272,17 @@ export default function SheetClient() {
   //  HANDLERS — Export, Sort, Font, Zoom
   // ─────────────────────────────────────────────
 
-  const handleExport = useCallback(() => {
-    const csv = [
-      columns.map((c) => c.name).join(","),
-      ...rows.map((row) =>
-        columns
-          .map((col) => {
-            const v = row[col.key] ?? "";
-            return typeof v === "string" && v.includes(",") ? `"${v}"` : v;
-          })
-          .join(","),
-      ),
-    ].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    const link = Object.assign(document.createElement("a"), {
-      href: url,
-      download: `${title}.csv`,
-    });
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("Exported as CSV");
-  }, [columns, rows, title]);
+  // Remove the old handleExport entirely and replace with this
+  const handleExport = useCallback(async (format: ExportFormat) => {
+    const toastId = toast.loading(`Preparing ${format.toUpperCase()} export…`);
+    try {
+      await exportSheet({ format, sheetId });
+      toast.success(`Downloaded as ${format.toUpperCase()}`, { id: toastId });
+    } catch (err) {
+      console.error(err);
+      toast.error("Export failed. Please try again.", { id: toastId });
+    }
+  }, [sheetId]);
 
   const handleSort = useCallback(
     (direction: "asc" | "desc") => {
@@ -1386,17 +1374,17 @@ export default function SheetClient() {
         [cellKey]: (prev[cellKey] || []).map((c) =>
           c.id === commentId
             ? {
-                ...c,
-                thread: [
-                  ...c.thread,
-                  {
-                    author: "You",
-                    color: "#0d7c5f",
-                    text: text.trim(),
-                    timestamp: "Just now",
-                  },
-                ],
-              }
+              ...c,
+              thread: [
+                ...c.thread,
+                {
+                  author: "You",
+                  color: "#0d7c5f",
+                  text: text.trim(),
+                  timestamp: "Just now",
+                },
+              ],
+            }
             : c,
         ),
       }));
@@ -1465,12 +1453,12 @@ export default function SheetClient() {
       const activeCollab =
         isOrgSheet && liveTracking
           ? DUMMY_COLLABORATORS.find(
-              (c) =>
-                c.cell ===
-                `${String.fromCharCode(
-                  66 + columns.findIndex((col) => col.key === colKey),
-                )}${rowIdx + 1}`,
-            )
+            (c) =>
+              c.cell ===
+              `${String.fromCharCode(
+                66 + columns.findIndex((col) => col.key === colKey),
+              )}${rowIdx + 1}`,
+          )
           : null;
 
       let displayValue = row[colKey];
@@ -1602,18 +1590,16 @@ export default function SheetClient() {
 
       return (
         <div
-          className={`h-full w-full flex relative group/cell ${
-            isWrapped ? "items-start pt-1.5" : "items-center"
-          } ${type === "currency" || type === "number" ? "justify-end" : ""} ${
-            type === "checkbox" ? "justify-center" : ""
-          } px-2.5 py-1 gap-1.5`}
+          className={`h-full w-full flex relative group/cell ${isWrapped ? "items-start pt-1.5" : "items-center"
+            } ${type === "currency" || type === "number" ? "justify-end" : ""} ${type === "checkbox" ? "justify-center" : ""
+            } px-2.5 py-1 gap-1.5`}
           style={{
             ...cellStyle,
             ...(activeCollab
               ? {
-                  outline: `2px solid ${activeCollab.color}`,
-                  outlineOffset: "-2px",
-                }
+                outline: `2px solid ${activeCollab.color}`,
+                outlineOffset: "-2px",
+              }
               : {}),
           }}
           onClick={() => setSelectedCell({ row: rowIdx, col: colKey })}
@@ -1701,22 +1687,19 @@ export default function SheetClient() {
         const isSel = selectedRows.has(props.row.id);
         return (
           <div
-            className={`h-full w-full flex items-center justify-center sheet-row-num border-r group/rownum ${
-              isSel ? "sheet-row-num--selected" : ""
-            }`}
+            className={`h-full w-full flex items-center justify-center sheet-row-num border-r group/rownum ${isSel ? "sheet-row-num--selected" : ""
+              }`}
           >
             <span
-              className={`${
-                isSel ? "hidden" : "group-hover/rownum:hidden"
-              } sheet-row-num-text`}
+              className={`${isSel ? "hidden" : "group-hover/rownum:hidden"
+                } sheet-row-num-text`}
             >
               {rowIdx + 1}
             </span>
             <input
               type="checkbox"
-              className={`h-3.5 w-3.5 rounded border-gray-300 cursor-pointer ${
-                isSel ? "" : "hidden group-hover/rownum:block"
-              }`}
+              className={`h-3.5 w-3.5 rounded border-gray-300 cursor-pointer ${isSel ? "" : "hidden group-hover/rownum:block"
+                }`}
               style={{ accentColor: "var(--primary)" }}
               checked={isSel}
               onChange={(e) => {
@@ -1763,8 +1746,8 @@ export default function SheetClient() {
             {[...textWrap.textWrapColumns].some((k) =>
               k.endsWith(`-${col.key}`),
             ) && (
-              <WrapText className="h-3 w-3 text-primary flex-shrink-0 opacity-60" />
-            )}
+                <WrapText className="h-3 w-3 text-primary flex-shrink-0 opacity-60" />
+              )}
             <ColumnHeaderMenu
               column={col}
               onChangeType={(newType) =>
@@ -2031,10 +2014,10 @@ export default function SheetClient() {
     // FIX: depend on stable getCellType function, not the entire cellTypes object
     return col
       ? cellTypes.getCellType(
-          selectedCell.row,
-          selectedCell.col,
-          col.type || "text",
-        )
+        selectedCell.row,
+        selectedCell.col,
+        col.type || "text",
+      )
       : null;
   }, [selectedCell, columns, cellTypes.getCellType]);
 
@@ -2042,8 +2025,8 @@ export default function SheetClient() {
     () =>
       selectedCell
         ? textWrap.textWrapColumns.has(
-            `${selectedCell.row}-${selectedCell.col}`,
-          )
+          `${selectedCell.row}-${selectedCell.col}`,
+        )
         : false,
     [selectedCell, textWrap.textWrapColumns],
   );
@@ -2069,9 +2052,8 @@ export default function SheetClient() {
   return (
     <TooltipProvider delayDuration={250}>
       <div
-        className={`sheet-root h-screen flex flex-col select-none overflow-hidden ${
-          isDark ? "sheet-dark" : "sheet-light"
-        }`}
+        className={`sheet-root h-screen flex flex-col select-none overflow-hidden ${isDark ? "sheet-dark" : "sheet-light"
+          }`}
       >
         {/* ══════════════════════════════════════════
             TITLE BAR
@@ -2106,11 +2088,10 @@ export default function SheetClient() {
                 className="shrink-0 p-0.5 rounded transition-transform hover:scale-110"
               >
                 <Star
-                  className={`h-3.5 w-3.5 transition-colors ${
-                    starred
-                      ? "fill-amber-400 text-amber-400"
-                      : "text-gray-300 hover:text-amber-400"
-                  }`}
+                  className={`h-3.5 w-3.5 transition-colors ${starred
+                    ? "fill-amber-400 text-amber-400"
+                    : "text-gray-300 hover:text-amber-400"
+                    }`}
                 />
               </button>
               <div className="sheet-save-status flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium shrink-0">
@@ -2206,31 +2187,19 @@ export default function SheetClient() {
                   Export as
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleExport}
-                  className="text-xs gap-2"
-                >
+                <DropdownMenuItem onClick={() => handleExport("csv")} className="text-xs gap-2">
                   <FileSpreadsheet className="h-3 w-3" />
                   CSV (.csv)
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  onClick={() => toast.info("Excel export coming soon")}
-                >
+                <DropdownMenuItem onClick={() => handleExport("xlsx")} className="text-xs gap-2">
                   <Layers className="h-3 w-3" />
                   Excel (.xlsx)
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  onClick={() => toast.info("PDF export coming soon")}
-                >
+                <DropdownMenuItem onClick={() => handleExport("pdf")} className="text-xs gap-2">
                   <Printer className="h-3 w-3" />
                   PDF (.pdf)
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  onClick={() => toast.info("JSON export coming soon")}
-                >
+                <DropdownMenuItem onClick={() => handleExport("json")} className="text-xs gap-2">
                   <Code2 className="h-3 w-3" />
                   JSON (.json)
                 </DropdownMenuItem>
@@ -2381,7 +2350,7 @@ export default function SheetClient() {
           <IconBtn
             icon={
               selectedCell &&
-              protection.isCellProtected(selectedCell.row, selectedCell.col)
+                protection.isCellProtected(selectedCell.row, selectedCell.col)
                 ? Lock
                 : Unlock
             }
@@ -2507,9 +2476,8 @@ export default function SheetClient() {
           <button
             disabled={selectedRows.size === 0}
             onClick={handleDeleteRow}
-            className={`sheet-action-btn sheet-action-btn--danger flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium transition-all ${
-              selectedRows.size === 0 ? "opacity-35 cursor-not-allowed" : ""
-            }`}
+            className={`sheet-action-btn sheet-action-btn--danger flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium transition-all ${selectedRows.size === 0 ? "opacity-35 cursor-not-allowed" : ""
+              }`}
           >
             <Trash2 className="h-3 w-3" />
             {selectedRows.size > 0 ? `Delete (${selectedRows.size})` : "Delete"}
@@ -2531,9 +2499,8 @@ export default function SheetClient() {
           </button>
 
           <button
-            className={`sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium transition-all ${
-              showFilters ? "sheet-action-btn--active" : ""
-            }`}
+            className={`sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium transition-all ${showFilters ? "sheet-action-btn--active" : ""
+              }`}
             onClick={() => setShowFilters(!showFilters)}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -2732,9 +2699,9 @@ export default function SheetClient() {
           <div className="sheet-cell-ref h-5 min-w-[56px] px-2 text-[11px] font-mono rounded flex items-center justify-center font-semibold">
             {selectedCell
               ? `${String.fromCharCode(
-                  65 +
-                    (columns.findIndex((c) => c.key === selectedCell.col) + 1),
-                )}${selectedCell.row + 1}`
+                65 +
+                (columns.findIndex((c) => c.key === selectedCell.col) + 1),
+              )}${selectedCell.row + 1}`
               : "—"}
           </div>
           <div className="sheet-formula-sep h-4 w-px" />
@@ -2815,9 +2782,8 @@ export default function SheetClient() {
                 return Math.max(32, 8 + maxLines * 20);
               }}
               headerRowHeight={33}
-              className={`rdg-sheet fill-grid ${
-                isDark ? "rdg-dark" : "rdg-light"
-              }`}
+              className={`rdg-sheet fill-grid ${isDark ? "rdg-dark" : "rdg-light"
+                }`}
             />
           </div>
 
