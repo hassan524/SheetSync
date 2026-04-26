@@ -72,7 +72,15 @@ export async function loadSheet(sheetId: string) {
     ),
 
     formulas: Object.fromEntries(
-      (formulas.data ?? []).map((f) => [f.cell_key, f.formula]),
+      (formulas.data ?? [])
+        .filter((f) => !f.cell_key.startsWith("col:"))
+        .map((f) => [f.cell_key, f.formula]),
+    ),
+
+    columnFormulas: Object.fromEntries(
+      (formulas.data ?? [])
+        .filter((f) => f.cell_key.startsWith("col:"))
+        .map((f) => [f.cell_key.replace("col:", ""), f.formula]),
     ),
 
     protectedCells: new Set((protectedCells.data ?? []).map((p) => p.cell_key)),

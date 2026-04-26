@@ -55,12 +55,12 @@ export function useSheetFormatting(onSave: () => void) {
         textOverflow: isWrapEnabled ? "clip" : "ellipsis",
         backgroundColor: format.bgColor || undefined,
         textAlign: (format.align as any) || undefined,
-        // typography — set on wrapper so ALL children inherit
+        // typography
         fontFamily: format.fontFamily || "inherit",
         fontWeight: format.bold ? 700 : "inherit",
         fontStyle: format.italic ? "italic" : "inherit",
         fontSize: format.fontSize ? `${format.fontSize}px` : "inherit",
-        // color and decoration on wrapper so spans pick it up
+        // color — DO NOT add WebkitTextFillColor, it overrides color and causes transparent text
         color: format.textColor || "inherit",
         textDecoration:
           [
@@ -69,8 +69,6 @@ export function useSheetFormatting(onSave: () => void) {
           ]
             .filter(Boolean)
             .join(" ") || "inherit",
-        // force children to inherit — overrides any CSS class colors
-        WebkitTextFillColor: format.textColor || "inherit",
       };
     },
     [cellFormats],

@@ -24,9 +24,10 @@ import {
   AlertCircle,
   Trash2,
   WrapText,
-  Pencil,
   Check,
   BarChart2,
+  Sigma,
+  X,
 } from "lucide-react";
 import { ColumnDef } from "@/types";
 
@@ -37,6 +38,9 @@ interface ColumnHeaderMenuProps {
   onRename?: (newName: string) => void;
   onToggleTextWrap?: () => void;
   textWrapEnabled?: boolean;
+  columnFormula?: string;
+  onApplyColumnFormula?: (formula: string) => void;
+  onRemoveColumnFormula?: () => void;
 }
 
 const COLUMN_TYPES = [
@@ -58,20 +62,28 @@ export default function ColumnHeaderMenu({
   onRename,
   onToggleTextWrap,
   textWrapEnabled,
+  columnFormula,
+  onApplyColumnFormula,
+  onRemoveColumnFormula,
 }: ColumnHeaderMenuProps) {
-  const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(column.name);
   const [open, setOpen] = useState(false);
+  const [colFormulaValue, setColFormulaValue] = useState(columnFormula || "");
 
   const handleRenameSubmit = () => {
     if (renameValue.trim() && onRename) {
       onRename(renameValue.trim());
     }
-    setIsRenaming(false);
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) setColFormulaValue(columnFormula || "");
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -100,10 +112,9 @@ export default function ColumnHeaderMenu({
                     setOpen(false);
                   }
                   if (e.key === "Escape") {
-                    setIsRenaming(false);
                     setRenameValue(column.name);
                   }
-                  e.stopPropagation(); // prevent grid from catching keystrokes
+                  e.stopPropagation();
                 }}
                 onClick={(e) => e.stopPropagation()}
               />
@@ -142,6 +153,58 @@ export default function ColumnHeaderMenu({
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+
+        {/* ── Column Formula ── */}
+        {onApplyColumnFormula && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider pb-1 flex items-center gap-1">
+              <Sigma className="h-3 w-3" /> Column Formula
+            </DropdownMenuLabel>
+            <div className="px-2 pb-2 flex items-center gap-1.5">
+              <input
+                className="flex-1 h-7 px-2 text-xs font-mono rounded border border-gray-200 bg-gray-50 outline-none focus:border-primary focus:bg-white"
+                value={colFormulaValue}
+                onChange={(e) => setColFormulaValue(e.target.value)}
+                placeholder="=UPPER(name)"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && colFormulaValue.startsWith("=")) {
+                    onApplyColumnFormula(colFormulaValue);
+                    setOpen(false);
+                  }
+                  e.stopPropagation();
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <button
+                className="h-7 w-7 flex items-center justify-center rounded bg-primary text-white hover:opacity-90 shrink-0 disabled:opacity-40"
+                disabled={!colFormulaValue.startsWith("=")}
+                onClick={() => {
+                  if (colFormulaValue.startsWith("=")) {
+                    onApplyColumnFormula(colFormulaValue);
+                    setOpen(false);
+                  }
+                }}
+              >
+                <Check className="h-3 w-3" />
+              </button>
+            </div>
+            {columnFormula && onRemoveColumnFormula && (
+              <div className="px-2 pb-2">
+                <button
+                  className="w-full h-6 flex items-center justify-center gap-1 text-[10px] text-red-500 hover:bg-red-50 rounded transition-colors"
+                  onClick={() => {
+                    onRemoveColumnFormula();
+                    setColFormulaValue("");
+                    setOpen(false);
+                  }}
+                >
+                  <X className="h-3 w-3" /> Remove column formula
+                </button>
+              </div>
+            )}
+          </>
+        )}
 
         {/* ── Text wrap toggle ── */}
         {onToggleTextWrap && (
