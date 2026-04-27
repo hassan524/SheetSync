@@ -2746,60 +2746,6 @@ export default function SheetClient() {
             </button>
           </div>
         )}
-
-        {/* ══════════════════════════════════════════
-            FORMULA BAR
-        ══════════════════════════════════════════ */}
-        <div className="sheet-formulabar h-7 border-b flex items-center px-3 gap-2 shrink-0">
-          <div className="sheet-cell-ref h-5 min-w-[56px] px-2 text-[11px] font-mono rounded flex items-center justify-center font-semibold">
-            {selectedCell
-              ? `${String.fromCharCode(
-                65 +
-                (columns.findIndex((c) => c.key === selectedCell.col) + 1),
-              )}${selectedCell.row + 1}`
-              : "—"}
-          </div>
-          <div className="sheet-formula-sep h-4 w-px" />
-          <span className="sheet-formula-fx text-[11px] font-mono italic text-gray-400 mr-0.5 select-none">
-            fx
-          </span>
-          <span className="flex-1 text-[11px] font-mono sheet-formula-text truncate">
-            {selectedCell ? (
-              <>
-                {formulas.getFormula(selectedCell.row, selectedCell.col) ||
-                  String(rows[selectedCell.row]?.[selectedCell.col] ?? "")}
-                {formulas.columnFormulas[selectedCell.col] && !formulas.formulas[`${selectedCell.row}-${selectedCell.col}`] && (
-                  <span className="ml-2 text-[9px] font-sans text-amber-500 font-semibold">COL</span>
-                )}
-              </>
-            ) : (
-              <span className="text-gray-400">
-                Select a cell to view or edit its formula
-              </span>
-            )}
-          </span>
-          {isOrgSheet && selectedCell && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="sheet-icon-btn h-5 w-5 rounded flex items-center justify-center"
-                  onClick={() => {
-                    setActiveCommentCell(
-                      `${selectedCell.row}-${selectedCell.col}`,
-                    );
-                    toggleRightPanel("comments");
-                  }}
-                >
-                  <MessageSquare className="h-3 w-3" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="text-xs">
-                Add comment to cell
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-
         {/* ══════════════════════════════════════════
             MAIN BODY
         ══════════════════════════════════════════ */}
