@@ -4,6 +4,7 @@ import CommentsPanel from "./panels/Comments-panel";
 import HistoryPanel from "./panels/History-panel";
 import CollaboratorsPanel from "./panels/Collaborators-panel";
 import DeveloperPanel from "./panels/Developers-panel";
+import type { HistoryEntry } from "@/lib/querys/sheet/firebase-realtime"
 
 type RightPanelType = "comments" | "history" | "collaborators" | "developer";
 
@@ -22,7 +23,7 @@ interface RightPanelProps {
     handleResolveComment: (cellKey: string, commentId: string) => void;
     setReplyText: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     // History
-    history: any[];
+    history: HistoryEntry[]
     setShowPlayback: (show: boolean) => void;
     // Collaborators
     liveTracking: boolean;

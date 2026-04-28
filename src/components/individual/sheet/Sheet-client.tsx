@@ -193,6 +193,21 @@ import RightPanel from "./Right-panel";
 import { loadSheet } from "@/lib/querys/sheet/sheet";
 import { exportSheet, ExportFormat } from "@/lib/querys/export";
 import { FORMULA_REFERENCE } from "@/data/formulaRefrence";
+import {
+  subscribeToHistory,
+  subscribeToComments,
+  addComment,
+  resolveComment,
+  logCellEdit,
+  logRowAdd,
+  logRowDelete,
+  logColAdd,
+  logColDelete,
+  logFormulaSet,
+  logColumnRename,
+  type HistoryEntry,
+  type SheetComment,
+} from "@/lib/querys/sheet/firebase-realtime";
 
 // ─────────────────────────────────────────────
 //  DUMMY DATA
@@ -690,7 +705,10 @@ export default function SheetClient() {
   const [zoomLevel, setZoomLevel] = useState(100);
 
   // ── Comment state ────────────────────────────────────────
-  const [comments, setComments] = useState(DUMMY_COMMENTS);
+  const [comments, setComments] = useState<Record<string, SheetComment[]>>({});
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+
   const [activeCommentCell, setActiveCommentCell] = useState<string | null>(
     null,
   );
@@ -743,24 +761,6 @@ export default function SheetClient() {
     });
   }, [columnsHistory.currentState]);
 
-  // Auto-advance playback
-  useEffect(() => {
-    if (isPlaying) {
-      playbackTimer.current = setInterval(() => {
-        setPlaybackIndex((i) => {
-          if (i >= DUMMY_HISTORY.length - 1) {
-            setIsPlaying(false);
-            return i;
-          }
-          return i + 1;
-        });
-      }, 1500);
-    } else {
-      clearInterval(playbackTimer.current);
-    }
-    return () => clearInterval(playbackTimer.current);
-  }, [isPlaying]);
-
   const effectiveRightPanel = useMemo((): RightPanelType => {
     if (
       !isOrgSheet &&
@@ -770,18 +770,6 @@ export default function SheetClient() {
     }
     return rightPanel;
   }, [isOrgSheet, rightPanel]);
-
-  // Guard collaboration-only panels when sheet type changes
-  // useEffect(() => {
-  //   if (!isOrgSheet) {
-  //     setRightPanel((prev) =>
-  //       prev === "comments" || prev === "collaborators" ? null : prev
-  //     );
-  //     setSheetState((prev) =>
-  //       prev.liveTracking ? { ...prev, liveTracking: false } : prev
-  //     );
-  //   }
-  // }, [isOrgSheet]);
 
   // ── Load sheet (FIX #3: single setSheetState call) ─────────
   useEffect(() => {
@@ -867,6 +855,28 @@ export default function SheetClient() {
 
     // templateId and hook refs are stable; sheetId is the only real dep here.
   }, [sheetId]);
+
+  useEffect(() => {
+    if (!sheetId) return;
+    console.log("Sheet ID:", sheetId);
+
+    const unsubHistory = subscribeToHistory(sheetId, (entries) => {
+      console.log("History entries received:", entries);
+      setHistory(entries);
+    });
+
+    return () => unsubHistory();
+  }, [sheetId]);
+
+  useEffect(() => {
+    if (!sheetId || !isOrgSheet) return;
+
+    const unsubComments = subscribeToComments(sheetId, (grouped) => {
+      setComments(grouped);
+    });
+
+    return () => unsubComments();
+  }, [sheetId, isOrgSheet]);
 
   // ── Save helpers ──────────────────────────────────────────
   const markSaving = useCallback(() => setSaveStatus("saving"), []);
@@ -1009,6 +1019,9 @@ export default function SheetClient() {
         markSaving();
         await saveAllRows(sheetId, rowsHistory.currentState);
         markSaved();
+        if (isOrgSheet) {
+          logRowAdd(sheetId, rowsHistory.currentState.length);
+        }
       } catch (err) {
         console.error("Insert row save failed:", err);
         toast.error("Row added locally but failed to persist.");
@@ -1026,6 +1039,7 @@ export default function SheetClient() {
   const handleDeleteRow = useCallback(async () => {
     if (selectedRows.size === 0) return;
     const keys = Array.from(selectedRows);
+    const count = selectedRows.size;
     rowOps.deleteRow(selectedRows);
     setSelectedRows(new Set());
     try {
@@ -1034,20 +1048,18 @@ export default function SheetClient() {
       setTimeout(async () => {
         await saveAllRows(sheetId, rowsHistory.currentState);
         markSaved();
+        // LOG TO FIREBASE
+        if (isOrgSheet) {
+          logRowDelete(sheetId, count);
+        }
       }, 50);
     } catch (err) {
       console.error("Delete row failed:", err);
       toast.error("Row deleted locally but failed to persist.");
       setSaveStatus("saved");
     }
-  }, [
-    selectedRows,
-    rowOps.deleteRow,
-    sheetId,
-    rowsHistory.currentState,
-    markSaving,
-    markSaved,
-  ]);
+  }, [selectedRows, rowOps.deleteRow, sheetId, rowsHistory.currentState, markSaving, markSaved, isOrgSheet]);
+
 
   const handleInsertColumn = useCallback(
     async (type: ColumnDef["type"]) => {
@@ -1059,20 +1071,20 @@ export default function SheetClient() {
           saveAllRows(sheetId, rowsHistory.currentState),
         ]);
         markSaved();
+        // LOG TO FIREBASE
+        if (isOrgSheet) {
+          const newCol = columnsHistory.currentState[columnsHistory.currentState.length - 1];
+          logColAdd(sheetId, newCol?.name ?? "Column", type ?? "text");
+        }
       }, 50);
     },
-    [
-      colOps.insertColumn,
-      sheetId,
-      columnsHistory.currentState,
-      rowsHistory.currentState,
-      markSaving,
-      markSaved,
-    ],
+    [colOps.insertColumn, sheetId, columnsHistory.currentState, rowsHistory.currentState, markSaving, markSaved, isOrgSheet]
   );
 
   const handleDeleteColumn = useCallback(
     async (colKey: string) => {
+      // Grab name BEFORE deleting
+      const colName = columns.find((c) => c.key === colKey)?.name ?? colKey;
       colOps.deleteColumn(colKey);
       markSaving();
       await deleteColumn(sheetId, colKey);
@@ -1082,16 +1094,13 @@ export default function SheetClient() {
           saveAllRows(sheetId, rowsHistory.currentState),
         ]);
         markSaved();
+        // LOG TO FIREBASE
+        if (isOrgSheet) {
+          logColDelete(sheetId, colName);
+        }
       }, 50);
     },
-    [
-      colOps.deleteColumn,
-      sheetId,
-      columnsHistory.currentState,
-      rowsHistory.currentState,
-      markSaving,
-      markSaved,
-    ],
+    [colOps.deleteColumn, sheetId, columnsHistory.currentState, rowsHistory.currentState, markSaving, markSaved, columns, isOrgSheet]
   );
 
   const handleChangeColumnType = useCallback(
@@ -1265,6 +1274,11 @@ export default function SheetClient() {
       formulas.setFormulas((prev) => ({ ...prev, [cellKey]: example }));
       markSaving();
       await saveFormula(sheetId, cellKey, example);
+      if (isOrgSheet) {
+        const colLetter = String.fromCharCode(65 + columns.findIndex((c) => c.key === selectedCell.col));
+        const cellRef = `${colLetter}${selectedCell.row + 1}`;
+        logFormulaSet(sheetId, cellRef, example);
+      }
       markSaved();
       toast.success("Formula inserted — edit as needed");
     },
@@ -1306,68 +1320,47 @@ export default function SheetClient() {
   // ─────────────────────────────────────────────
 
   const handleAddComment = useCallback(
-    (cellKey: string) => {
+    async (cellKey: string) => {
       if (!newCommentText.trim()) return;
-      const c = {
-        id: `c${Date.now()}`,
+      await addComment({
+        sheetId,
         cellKey,
+        userId: "local",
         author: "You",
-        avatar: "",
-        color: "#0d7c5f",
+        authorColor: "#0d7c5f",
         text: newCommentText.trim(),
-        timestamp: "Just now",
-        resolved: false,
-        thread: [],
-      };
-      setComments((prev) => ({
-        ...prev,
-        [cellKey]: [...(prev[cellKey] || []), c],
-      }));
+        parentId: null,
+      });
       setNewCommentText("");
       toast.success("Comment added");
     },
-    [newCommentText],
+    [newCommentText, sheetId]
   );
 
   const handleReply = useCallback(
-    (cellKey: string, commentId: string) => {
+    async (cellKey: string, commentId: string) => {
       const text = replyText[commentId];
       if (!text?.trim()) return;
-      setComments((prev) => ({
-        ...prev,
-        [cellKey]: (prev[cellKey] || []).map((c) =>
-          c.id === commentId
-            ? {
-              ...c,
-              thread: [
-                ...c.thread,
-                {
-                  author: "You",
-                  color: "#0d7c5f",
-                  text: text.trim(),
-                  timestamp: "Just now",
-                },
-              ],
-            }
-            : c,
-        ),
-      }));
+      await addComment({
+        sheetId,
+        cellKey,
+        userId: "local",
+        author: "You",
+        authorColor: "#0d7c5f",
+        text: text.trim(),
+        parentId: commentId,
+      });
       setReplyText((prev) => ({ ...prev, [commentId]: "" }));
     },
-    [replyText],
+    [replyText, sheetId]
   );
 
   const handleResolveComment = useCallback(
-    (cellKey: string, commentId: string) => {
-      setComments((prev) => ({
-        ...prev,
-        [cellKey]: (prev[cellKey] || []).map((c) =>
-          c.id === commentId ? { ...c, resolved: true } : c,
-        ),
-      }));
+    async (cellKey: string, commentId: string) => {
+      await resolveComment(commentId);
       toast.success("Comment resolved");
     },
-    [],
+    []
   );
 
   const getCellComments = useCallback(
@@ -1375,7 +1368,7 @@ export default function SheetClient() {
       if (!isOrgSheet) return [];
       return comments[`${rowIdx}-${colKey}`] || [];
     },
-    [comments, isOrgSheet],
+    [comments, isOrgSheet]
   );
 
   const toggleRightPanel = useCallback(
@@ -1388,6 +1381,33 @@ export default function SheetClient() {
     },
     [isOrgSheet],
   );
+
+
+  const isPlayingRef = useRef(false);
+
+  const handleSetIsPlaying = useCallback((playing: boolean) => {
+    isPlayingRef.current = playing;
+    setIsPlaying(playing);
+
+    if (playing) {
+      playbackTimer.current = setInterval(() => {
+        setPlaybackIndex((i) => {
+          const next = i + 1;
+          if (next >= history.length) {
+            isPlayingRef.current = false;
+            setIsPlaying(false);
+            clearInterval(playbackTimer.current);
+            return i;
+          }
+          return next;
+        });
+      }, 800); // faster = smoother
+    } else {
+      clearInterval(playbackTimer.current);
+    }
+  }, [history.length]);
+
+  // Remove the old isPlaying useEffect entirely
 
   // ─────────────────────────────────────────────
   //  CELL RENDERER
@@ -1623,8 +1643,31 @@ export default function SheetClient() {
       const prev = rows;
       rowsHistory.pushState(updatedRows);
       handleSaveChangedRow(updatedRows, prev);
+
+      // LOG cell edits to Firebase (org sheets only)
+      // if (isOrgSheet) {
+      updatedRows.forEach((row, rowIdx) => {
+        const prevRow = prev[rowIdx];
+        if (!prevRow) return;
+        columns.forEach((col) => {
+          const oldVal = prevRow[col.key];
+          const newVal = row[col.key];
+          if (oldVal !== newVal) {
+            const colLetter = String.fromCharCode(65 + columns.findIndex((c) => c.key === col.key));
+            const cellRef = `${colLetter}${rowIdx + 1}`;
+            logCellEdit(
+              sheetId,
+              cellRef,
+              col.name,
+              oldVal ?? null,   // ← fix
+              newVal ?? null,   // ← fix
+            );
+          }
+        });
+      });
+      // }
     },
-    [rows, rowsHistory.pushState, handleSaveChangedRow],
+    [rows, columns, rowsHistory.pushState, handleSaveChangedRow, sheetId, isOrgSheet]
   );
 
   const gridColumns = useMemo<Column<SheetRow>[]>(() => {
@@ -1726,6 +1769,9 @@ export default function SheetClient() {
                 setTimeout(async () => {
                   markSaving();
                   await saveAllColumns(sheetId, columnsHistory.currentState);
+                  if (isOrgSheet) {
+                    logColumnRename(sheetId, col.name, newName);
+                  }
                   markSaved();
                 }, 50);
               }}
@@ -2036,7 +2082,7 @@ export default function SheetClient() {
     if (!isOrgSheet) return 0;
     return Object.values(comments).reduce(
       (a, b) => a + b.filter((c) => !c.resolved).length,
-      0,
+      0
     );
   }, [comments, isOrgSheet]);
 
@@ -2659,7 +2705,7 @@ export default function SheetClient() {
               onClick={() => setShowKeyboardShortcuts(true)}
             />
             <ToolSep />
-            <DropdownMenu>
+            {/* <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="sheet-icon-btn h-7 w-7 rounded-md flex items-center justify-center">
                   <MoreHorizontal className="h-3.5 w-3.5" />
@@ -2707,7 +2753,7 @@ export default function SheetClient() {
                   Sheet settings
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu> */}
           </div>
         </div>
 
@@ -2810,7 +2856,7 @@ export default function SheetClient() {
                 handleReply={handleReply}
                 handleResolveComment={handleResolveComment}
                 setReplyText={setReplyText}
-                history={DUMMY_HISTORY}
+                history={history}
                 setShowPlayback={setShowPlayback}
                 liveTracking={liveTracking}
                 isOrganizationSheet={isOrgSheet}
@@ -2876,7 +2922,8 @@ export default function SheetClient() {
           playbackIndex={playbackIndex}
           setPlaybackIndex={setPlaybackIndex}
           isPlaying={isPlaying}
-          setIsPlaying={setIsPlaying}
+          setIsPlaying={handleSetIsPlaying}
+          history={history}
         />
         {isOrgSheet && (
           <ShareDialog
