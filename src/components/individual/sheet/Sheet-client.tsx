@@ -256,65 +256,6 @@ const DUMMY_COLLABORATORS = [
   },
 ];
 
-const DUMMY_COMMENTS: Record<
-  string,
-  {
-    id: string;
-    cellKey: string;
-    author: string;
-    avatar: string;
-    color: string;
-    text: string;
-    timestamp: string;
-    resolved: boolean;
-    thread: {
-      author: string;
-      color: string;
-      text: string;
-      timestamp: string;
-    }[];
-  }[]
-> = {
-  "2-1": [
-    {
-      id: "c1",
-      cellKey: "2-1",
-      author: "Sarah Chen",
-      avatar: "",
-      color: "#0d7c5f",
-      text: "This value looks off — can you double check with the finance team?",
-      timestamp: "2h ago",
-      resolved: false,
-      thread: [
-        {
-          author: "Marcus Webb",
-          color: "#f59e0b",
-          text: "Agreed, I'll ping them now.",
-          timestamp: "1h ago",
-        },
-        {
-          author: "Sarah Chen",
-          color: "#0d7c5f",
-          text: "Thanks Marcus!",
-          timestamp: "45m ago",
-        },
-      ],
-    },
-  ],
-  "5-2": [
-    {
-      id: "c2",
-      cellKey: "5-2",
-      author: "Priya Nair",
-      avatar: "",
-      color: "#10b981",
-      text: "Updated per Q3 report.",
-      timestamp: "Yesterday",
-      resolved: true,
-      thread: [],
-    },
-  ],
-};
 
 const DUMMY_HISTORY = [
   {
@@ -779,7 +720,7 @@ export default function SheetClient() {
     loadSheet(sheetId)
       .then(async (data) => {
         if (data.rows.length > 0 || data.columns.length > 0) {
-          const sheetIsOrg = data.isPersonal === false;
+          const sheetIsOrg = data.isPersonal === false || isOrganizationSheet;
 
           // Build wrap set from cellFormats before setState
           let wrapSet = new Set<string>();
@@ -853,15 +794,16 @@ export default function SheetClient() {
         setIsLoading(false);
       });
 
-    // templateId and hook refs are stable; sheetId is the only real dep here.
   }, [sheetId]);
 
   useEffect(() => {
+    setPlaybackIndex(0);
+  }, [history.length]);
+
+  useEffect(() => {
     if (!sheetId) return;
-    console.log("Sheet ID:", sheetId);
 
     const unsubHistory = subscribeToHistory(sheetId, (entries) => {
-      console.log("History entries received:", entries);
       setHistory(entries);
     });
 
@@ -869,14 +811,13 @@ export default function SheetClient() {
   }, [sheetId]);
 
   useEffect(() => {
-    if (!sheetId || !isOrgSheet) return;
-
+    if (!sheetId) return;
     const unsubComments = subscribeToComments(sheetId, (grouped) => {
+      console.log("🔥 Firebase comments received:", grouped);
       setComments(grouped);
     });
-
     return () => unsubComments();
-  }, [sheetId, isOrgSheet]);
+  }, [sheetId]);
 
   // ── Save helpers ──────────────────────────────────────────
   const markSaving = useCallback(() => setSaveStatus("saving"), []);
@@ -1285,6 +1226,33 @@ export default function SheetClient() {
     [selectedCell, formulas.setFormulas, sheetId, markSaving, markSaved],
   );
 
+  const groupedCommentsForPanel = useMemo(() => {
+    const result: Record<string, any[]> = {};
+    Object.entries(comments).forEach(([cellKey, cellComments]) => {
+      const roots = cellComments.filter(c => !c.parentId);
+      const replies = cellComments.filter(c => c.parentId);
+      result[cellKey] = roots.map(root => ({
+        ...root,
+        timestamp: root.createdAt
+          ? new Date(root.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : "just now",
+        thread: replies
+          .filter(r => r.parentId === root.id)
+          .map(r => ({
+            author: r.author,
+            color: r.authorColor,
+            text: r.text,
+            timestamp: r.createdAt
+              ? new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : "just now",
+          })),
+      }));
+    });
+    return result;
+  }, [comments]);
+
+  console.log("📦 groupedCommentsForPanel:", groupedCommentsForPanel);
+
   const handleApplyFormulaToColumn = useCallback(
     async (columnKey: string, formula: string) => {
       if (!formula.startsWith("=")) {
@@ -1431,6 +1399,7 @@ export default function SheetClient() {
       const formula = formulas.getFormula(rowIdx, colKey);
       const isProtected = protection.isCellProtected(rowIdx, colKey);
       const cellComments = getCellComments(rowIdx, colKey);
+      // console.log("cell comments", cellComments)
       const commentKey = `${rowIdx}-${colKey}`;
       const isWrapped = textWrap.textWrapColumns.has(`${rowIdx}-${colKey}`);
 
@@ -1587,7 +1556,10 @@ export default function SheetClient() {
               }
               : {}),
           }}
-          onClick={() => setSelectedCell({ row: rowIdx, col: colKey })}
+          onClick={() => {
+            setSelectedCell({ row: rowIdx, col: colKey });
+            if (isOrgSheet) setActiveCommentCell(`${rowIdx}-${colKey}`);
+          }}
         >
           {isProtected && (
             <Lock className="absolute top-1 right-1 h-2 w-2 text-gray-300 opacity-0 group-hover/cell:opacity-60 transition-opacity" />
@@ -1620,6 +1592,7 @@ export default function SheetClient() {
       columns,
       isOrgSheet,
       liveTracking,
+      comments,
       formatting.getCellStyle,
       formatting.getCurrentCellFormat,
       textWrap.textWrapColumns,
@@ -2847,7 +2820,7 @@ export default function SheetClient() {
                 rightPanel={effectiveRightPanel}
                 isDark={isDark}
                 setRightPanel={setRightPanel}
-                comments={comments}
+                comments={groupedCommentsForPanel}
                 activeCommentCell={activeCommentCell}
                 newCommentText={newCommentText}
                 replyText={replyText}

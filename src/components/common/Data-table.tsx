@@ -29,6 +29,7 @@ export interface DataTableProps<T> {
   emptyText?: string;
   emptyDescription?: string;
   emptyIcon?: ReactNode;
+  onRowClick?: (row: T) => void;
 }
 
 // ── Empty SVG ──────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ function DefaultEmptyIcon() {
       <line x1="10" y1="36" x2="62" y2="36" stroke="currentColor" strokeWidth="1" className="text-border/60" />
       <line x1="10" y1="50" x2="62" y2="50" stroke="currentColor" strokeWidth="1" className="text-border/60" />
       <rect x="14" y="28" width="12" height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/25" />
-      <rect x="34" y="28" width="8"  height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/20" />
+      <rect x="34" y="28" width="8" height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/20" />
       <rect x="14" y="42" width="10" height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/15" />
       <rect x="34" y="42" width="12" height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/10" />
       <circle cx="54" cy="54" r="11" fill="hsl(var(--background))" />
@@ -64,6 +65,7 @@ export function DataTable<T>({
   emptyText = "Nothing here yet",
   emptyDescription = "Data will appear here once added.",
   emptyIcon,
+  onRowClick
 }: DataTableProps<T>) {
 
   // ── Empty state ────────────────────────────────────────────────
@@ -122,6 +124,7 @@ export function DataTable<T>({
               <tr
                 key={getKey(row)}
                 className="transition-colors duration-150 hover:bg-muted/10 cursor-pointer"
+                onClick={() => onRowClick?.(row)}
               >
                 {columns.map((col) => (
                   <td key={col.key} className="px-4 py-3.5 align-middle text-sm">

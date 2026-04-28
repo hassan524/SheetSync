@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, AvatarFallback }                  from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTable } from "@/components/common/Data-table";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -9,16 +9,17 @@ import {
   Download, Trash2, Share2, Mail, UserMinus, UserCog, Edit3,
 } from "lucide-react";
 import type { Organization, Sheet, Member } from "@/types";
+import { useRouter } from "next/navigation";
 
 const VIS = {
-  team:    { label: "Team",    dot: "bg-blue-400"   },
+  team: { label: "Team", dot: "bg-blue-400" },
   private: { label: "Private", dot: "bg-orange-400" },
-  public:  { label: "Public",  dot: "bg-green-400"  },
+  public: { label: "Public", dot: "bg-green-400" },
 } as const;
 
 const ROLE_STYLE: Record<string, string> = {
-  owner:  "text-amber-700 bg-amber-50 border border-amber-200",
-  admin:  "text-purple-700 bg-purple-50 border border-purple-200",
+  owner: "text-amber-700 bg-amber-50 border border-amber-200",
+  admin: "text-purple-700 bg-purple-50 border border-purple-200",
   editor: "text-blue-700 bg-blue-50 border border-blue-200",
   viewer: "text-slate-600 bg-slate-50 border border-slate-200",
 };
@@ -40,7 +41,7 @@ export function NoSheetsIcon() {
       <line x1="10" y1="50" x2="62" y2="50" stroke="currentColor" strokeWidth="1" className="text-border/60" />
       {/* Cell content dots */}
       <rect x="14" y="28" width="12" height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/25" />
-      <rect x="34" y="28" width="8"  height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/20" />
+      <rect x="34" y="28" width="8" height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/20" />
       <rect x="14" y="42" width="10" height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/15" />
       <rect x="34" y="42" width="12" height="2.5" rx="1.25" fill="currentColor" className="text-muted-foreground/10" />
       {/* Plus badge */}
@@ -62,7 +63,7 @@ function NoMembersIcon() {
       <circle cx="28" cy="24" r="11" fill="hsl(var(--background))" stroke="currentColor" strokeWidth="1.5" className="text-border" />
       <circle cx="28" cy="24" r="8" fill="currentColor" className="text-muted/50" />
       <path d="M8 60c0-11 9-18 20-18s20 7 20 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="hsl(var(--background))" />
-      <path d="M8 60c0-11 9-18 20-18s20 7 20 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-border" fill="currentColor" fillOpacity="0.15"/>
+      <path d="M8 60c0-11 9-18 20-18s20 7 20 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-border" fill="currentColor" fillOpacity="0.15" />
       {/* Plus badge */}
       <circle cx="56" cy="54" r="11" fill="hsl(var(--background))" />
       <circle cx="56" cy="54" r="11" stroke="currentColor" strokeWidth="1.5" className="text-border" />
@@ -161,7 +162,7 @@ export const sheetColumns = [
 export const sheetAction = {
   render: (s: Sheet) => (
     <>
-      <DropdownMenuItem className="text-xs gap-2"><Edit3 className="h-3.5 w-3.5" />Open & Edit</DropdownMenuItem>
+      {/* <DropdownMenuItem className="text-xs gap-2"><Edit3 className="h-3.5 w-3.5" />Open & Edit</DropdownMenuItem> */}
       <DropdownMenuItem className="text-xs gap-2"><Share2 className="h-3.5 w-3.5" />Share</DropdownMenuItem>
       <DropdownMenuItem className="text-xs gap-2"><Download className="h-3.5 w-3.5" />Download</DropdownMenuItem>
       <DropdownMenuItem className="text-xs gap-2">
@@ -244,7 +245,8 @@ const memberAction = {
 
 // ── Component ─────────────────────────────────────────────────────
 export function OrgTablesPanel({ org }: { org: Organization }) {
-  const sheets  = org.sheets  ?? [];
+  const sheets = org.sheets ?? [];
+  const router = useRouter();
   const members = org.members ?? [];
 
   return (
@@ -266,6 +268,7 @@ export function OrgTablesPanel({ org }: { org: Organization }) {
           rows={sheets}
           getKey={(s) => s.id}
           action={sheetAction}
+          onRowClick={(s) => router.push(`/sheet/${s.id}?org=true&template=${s.template_id ?? "blank"}`)}
           emptyText="No sheets yet"
           emptyDescription="Sheets created in this organization will appear here."
           emptyIcon={<NoSheetsIcon />}

@@ -87,10 +87,9 @@ export default function CommentsPanel({
                                         <span className={`text-[10px] ${isDark ? "text-gray-600" : "text-gray-400"}`}>
                                             {comment.timestamp}
                                         </span>
-                                        <span className={`ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${
-                                            isDark ? "bg-gray-800 text-primary" : "bg-primary/8 text-primary border border-primary/15"
-                                        }`}>
-                                            {cellKey.split("-")[0]}{String.fromCharCode(65 + parseInt(cellKey.split("-")[1]))}
+                                        <span className={`ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${isDark ? "bg-gray-800 text-primary" : "bg-primary/8 text-primary border border-primary/15"
+                                            }`}>
+                                            {`Row ${parseInt(cellKey) + 1} · ${cellKey.substring(cellKey.indexOf("-") + 1)}`}
                                         </span>
                                     </div>
 
@@ -153,9 +152,8 @@ export default function CommentsPanel({
                                                     value={replyText[comment.id] || ""}
                                                     onChange={(e) => setReplyText(prev => ({ ...prev, [comment.id]: e.target.value }))}
                                                     placeholder="Reply..."
-                                                    className={`flex-1 text-[12px] bg-transparent outline-none placeholder:text-gray-400 border-b pb-1 transition-colors ${
-                                                        isDark ? "text-gray-200 border-gray-700 focus:border-primary" : "text-gray-700 border-gray-200 focus:border-primary"
-                                                    }`}
+                                                    className={`flex-1 text-[12px] bg-transparent outline-none placeholder:text-gray-400 border-b pb-1 transition-colors ${isDark ? "text-gray-200 border-gray-700 focus:border-primary" : "text-gray-700 border-gray-200 focus:border-primary"
+                                                        }`}
                                                     onKeyDown={(e) => {
                                                         if (e.key === "Enter") { handleReply(cellKey, comment.id); setReplyingTo(null); }
                                                         if (e.key === "Escape") setReplyingTo(null);
@@ -187,19 +185,17 @@ export default function CommentsPanel({
                         </span>
                     </p>
                 )}
-                <div className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${
-                    isDark
-                        ? "border-gray-700 bg-gray-900 focus-within:border-primary/50"
-                        : "border-gray-200 bg-gray-50 focus-within:border-primary/40"
-                }`}>
+                <div className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${isDark
+                    ? "border-gray-700 bg-gray-900 focus-within:border-primary/50"
+                    : "border-gray-200 bg-gray-50 focus-within:border-primary/40"
+                    }`}>
                     <input
                         value={newCommentText}
                         onChange={(e) => setNewCommentText(e.target.value)}
                         placeholder={activeCommentCell ? "Add a comment..." : "Select a cell first"}
                         disabled={!activeCommentCell}
-                        className={`flex-1 text-[12px] bg-transparent outline-none placeholder:text-gray-400 ${
-                            isDark ? "text-gray-200" : "text-gray-700"
-                        }`}
+                        className={`flex-1 text-[12px] bg-transparent outline-none placeholder:text-gray-400 ${isDark ? "text-gray-200" : "text-gray-700"
+                            }`}
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && activeCommentCell && newCommentText.trim()) {
                                 handleAddComment(activeCommentCell);
