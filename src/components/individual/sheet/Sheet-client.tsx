@@ -184,7 +184,7 @@ import { updateSheetTitle, updateSheetStarred } from "@/lib/querys/sheet/sheet";
 import { saveRow, saveAllRows, deleteRows } from "@/lib/querys/sheet/rows";
 import { saveAllColumns, deleteColumn } from "@/lib/querys/sheet/columns";
 import { saveCellFormat } from "@/lib/querys/sheet/format";
-import { saveFormula, deleteFormula } from "@/lib/querys/sheet/formulas";
+import { saveFormula, deleteFormula, saveColumnFormula, deleteColumnFormula } from "@/lib/querys/sheet/formulas";
 import { protectCell, unprotectCell } from "@/lib/querys/sheet/protection";
 import PlaybackModal from "./panels/Playback-panel";
 import KeyboardShortcutsDialog from "./dialogs/Keyboard-shortcuts-dialog";
@@ -192,6 +192,22 @@ import ShareDialog from "./dialogs/Share-dialog";
 import RightPanel from "./Right-panel";
 import { loadSheet } from "@/lib/querys/sheet/sheet";
 import { exportSheet, ExportFormat } from "@/lib/querys/export";
+import { FORMULA_REFERENCE } from "@/data/formulaRefrence";
+import {
+  subscribeToHistory,
+  subscribeToComments,
+  addComment,
+  resolveComment,
+  logCellEdit,
+  logRowAdd,
+  logRowDelete,
+  logColAdd,
+  logColDelete,
+  logFormulaSet,
+  logColumnRename,
+  type HistoryEntry,
+  type SheetComment,
+} from "@/lib/querys/sheet/firebase-realtime";
 
 // ─────────────────────────────────────────────
 //  DUMMY DATA
@@ -348,79 +364,6 @@ const DUMMY_HISTORY = [
     action: "Deleted rows",
     detail: "Rows 3-5 removed",
     timestamp: "Yesterday",
-  },
-];
-
-const FORMULA_REFERENCE = [
-  {
-    name: "SUM",
-    category: "Math",
-    syntax: "=SUM(col, startRow, endRow)",
-    description: "Adds up all numeric values in a column range.",
-    example: "=SUM(amount, 0, 10)",
-  },
-  {
-    name: "AVERAGE",
-    category: "Math",
-    syntax: "=AVERAGE(col, startRow, endRow)",
-    description: "Returns the average of values in a range.",
-    example: "=AVERAGE(score, 0, 5)",
-  },
-  {
-    name: "COUNT",
-    category: "Math",
-    syntax: "=COUNT(col, startRow, endRow)",
-    description: "Counts how many cells have a numeric value.",
-    example: "=COUNT(qty, 0, 20)",
-  },
-  {
-    name: "MAX",
-    category: "Math",
-    syntax: "=MAX(col, startRow, endRow)",
-    description: "Returns the largest value in a range.",
-    example: "=MAX(price, 0, 10)",
-  },
-  {
-    name: "MIN",
-    category: "Math",
-    syntax: "=MIN(col, startRow, endRow)",
-    description: "Returns the smallest value in a range.",
-    example: "=MIN(price, 0, 10)",
-  },
-  {
-    name: "IF",
-    category: "Logic",
-    syntax: "=IF(col, value, trueVal, falseVal)",
-    description: "Returns trueVal if cell equals value, else falseVal.",
-    example: '=IF(status, "active", "✓", "✗")',
-  },
-  {
-    name: "CONCAT",
-    category: "Text",
-    syntax: "=CONCAT(col1, col2)",
-    description: "Joins the text of two columns in the same row.",
-    example: "=CONCAT(first_name, last_name)",
-  },
-  {
-    name: "UPPER",
-    category: "Text",
-    syntax: "=UPPER(col)",
-    description: "Converts the cell value to uppercase.",
-    example: "=UPPER(name)",
-  },
-  {
-    name: "LOWER",
-    category: "Text",
-    syntax: "=LOWER(col)",
-    description: "Converts the cell value to lowercase.",
-    example: "=LOWER(email)",
-  },
-  {
-    name: "LEN",
-    category: "Text",
-    syntax: "=LEN(col)",
-    description: "Returns the character length of the cell's text.",
-    example: "=LEN(description)",
   },
 ];
 
@@ -762,7 +705,10 @@ export default function SheetClient() {
   const [zoomLevel, setZoomLevel] = useState(100);
 
   // ── Comment state ────────────────────────────────────────
-  const [comments, setComments] = useState(DUMMY_COMMENTS);
+  const [comments, setComments] = useState<Record<string, SheetComment[]>>({});
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+
   const [activeCommentCell, setActiveCommentCell] = useState<string | null>(
     null,
   );
@@ -815,24 +761,6 @@ export default function SheetClient() {
     });
   }, [columnsHistory.currentState]);
 
-  // Auto-advance playback
-  useEffect(() => {
-    if (isPlaying) {
-      playbackTimer.current = setInterval(() => {
-        setPlaybackIndex((i) => {
-          if (i >= DUMMY_HISTORY.length - 1) {
-            setIsPlaying(false);
-            return i;
-          }
-          return i + 1;
-        });
-      }, 1500);
-    } else {
-      clearInterval(playbackTimer.current);
-    }
-    return () => clearInterval(playbackTimer.current);
-  }, [isPlaying]);
-
   const effectiveRightPanel = useMemo((): RightPanelType => {
     if (
       !isOrgSheet &&
@@ -842,18 +770,6 @@ export default function SheetClient() {
     }
     return rightPanel;
   }, [isOrgSheet, rightPanel]);
-
-  // Guard collaboration-only panels when sheet type changes
-  // useEffect(() => {
-  //   if (!isOrgSheet) {
-  //     setRightPanel((prev) =>
-  //       prev === "comments" || prev === "collaborators" ? null : prev
-  //     );
-  //     setSheetState((prev) =>
-  //       prev.liveTracking ? { ...prev, liveTracking: false } : prev
-  //     );
-  //   }
-  // }, [isOrgSheet]);
 
   // ── Load sheet (FIX #3: single setSheetState call) ─────────
   useEffect(() => {
@@ -881,6 +797,9 @@ export default function SheetClient() {
           }
           if (data.formulas && Object.keys(data.formulas).length > 0) {
             formulas.setFormulas(data.formulas);
+          }
+          if (data.columnFormulas && Object.keys(data.columnFormulas).length > 0) {
+            formulas.setColumnFormulas(data.columnFormulas);
           }
           if (data.protectedCells && data.protectedCells.size > 0) {
             protection.setProtectedCells(data.protectedCells);
@@ -936,6 +855,28 @@ export default function SheetClient() {
 
     // templateId and hook refs are stable; sheetId is the only real dep here.
   }, [sheetId]);
+
+  useEffect(() => {
+    if (!sheetId) return;
+    console.log("Sheet ID:", sheetId);
+
+    const unsubHistory = subscribeToHistory(sheetId, (entries) => {
+      console.log("History entries received:", entries);
+      setHistory(entries);
+    });
+
+    return () => unsubHistory();
+  }, [sheetId]);
+
+  useEffect(() => {
+    if (!sheetId || !isOrgSheet) return;
+
+    const unsubComments = subscribeToComments(sheetId, (grouped) => {
+      setComments(grouped);
+    });
+
+    return () => unsubComments();
+  }, [sheetId, isOrgSheet]);
 
   // ── Save helpers ──────────────────────────────────────────
   const markSaving = useCallback(() => setSaveStatus("saving"), []);
@@ -1078,6 +1019,9 @@ export default function SheetClient() {
         markSaving();
         await saveAllRows(sheetId, rowsHistory.currentState);
         markSaved();
+        if (isOrgSheet) {
+          logRowAdd(sheetId, rowsHistory.currentState.length);
+        }
       } catch (err) {
         console.error("Insert row save failed:", err);
         toast.error("Row added locally but failed to persist.");
@@ -1095,6 +1039,7 @@ export default function SheetClient() {
   const handleDeleteRow = useCallback(async () => {
     if (selectedRows.size === 0) return;
     const keys = Array.from(selectedRows);
+    const count = selectedRows.size;
     rowOps.deleteRow(selectedRows);
     setSelectedRows(new Set());
     try {
@@ -1103,20 +1048,18 @@ export default function SheetClient() {
       setTimeout(async () => {
         await saveAllRows(sheetId, rowsHistory.currentState);
         markSaved();
+        // LOG TO FIREBASE
+        if (isOrgSheet) {
+          logRowDelete(sheetId, count);
+        }
       }, 50);
     } catch (err) {
       console.error("Delete row failed:", err);
       toast.error("Row deleted locally but failed to persist.");
       setSaveStatus("saved");
     }
-  }, [
-    selectedRows,
-    rowOps.deleteRow,
-    sheetId,
-    rowsHistory.currentState,
-    markSaving,
-    markSaved,
-  ]);
+  }, [selectedRows, rowOps.deleteRow, sheetId, rowsHistory.currentState, markSaving, markSaved, isOrgSheet]);
+
 
   const handleInsertColumn = useCallback(
     async (type: ColumnDef["type"]) => {
@@ -1128,20 +1071,20 @@ export default function SheetClient() {
           saveAllRows(sheetId, rowsHistory.currentState),
         ]);
         markSaved();
+        // LOG TO FIREBASE
+        if (isOrgSheet) {
+          const newCol = columnsHistory.currentState[columnsHistory.currentState.length - 1];
+          logColAdd(sheetId, newCol?.name ?? "Column", type ?? "text");
+        }
       }, 50);
     },
-    [
-      colOps.insertColumn,
-      sheetId,
-      columnsHistory.currentState,
-      rowsHistory.currentState,
-      markSaving,
-      markSaved,
-    ],
+    [colOps.insertColumn, sheetId, columnsHistory.currentState, rowsHistory.currentState, markSaving, markSaved, isOrgSheet]
   );
 
   const handleDeleteColumn = useCallback(
     async (colKey: string) => {
+      // Grab name BEFORE deleting
+      const colName = columns.find((c) => c.key === colKey)?.name ?? colKey;
       colOps.deleteColumn(colKey);
       markSaving();
       await deleteColumn(sheetId, colKey);
@@ -1151,16 +1094,13 @@ export default function SheetClient() {
           saveAllRows(sheetId, rowsHistory.currentState),
         ]);
         markSaved();
+        // LOG TO FIREBASE
+        if (isOrgSheet) {
+          logColDelete(sheetId, colName);
+        }
       }, 50);
     },
-    [
-      colOps.deleteColumn,
-      sheetId,
-      columnsHistory.currentState,
-      rowsHistory.currentState,
-      markSaving,
-      markSaved,
-    ],
+    [colOps.deleteColumn, sheetId, columnsHistory.currentState, rowsHistory.currentState, markSaving, markSaved, columns, isOrgSheet]
   );
 
   const handleChangeColumnType = useCallback(
@@ -1325,16 +1265,54 @@ export default function SheetClient() {
   );
 
   const handleFormulaInsert = useCallback(
-    (example: string) => {
+    async (example: string) => {
       if (!selectedCell) {
         toast.info("Select a cell first, then insert formula");
         return;
       }
       const cellKey = `${selectedCell.row}-${selectedCell.col}`;
       formulas.setFormulas((prev) => ({ ...prev, [cellKey]: example }));
+      markSaving();
+      await saveFormula(sheetId, cellKey, example);
+      if (isOrgSheet) {
+        const colLetter = String.fromCharCode(65 + columns.findIndex((c) => c.key === selectedCell.col));
+        const cellRef = `${colLetter}${selectedCell.row + 1}`;
+        logFormulaSet(sheetId, cellRef, example);
+      }
+      markSaved();
       toast.success("Formula inserted — edit as needed");
     },
-    [selectedCell, formulas.setFormulas],
+    [selectedCell, formulas.setFormulas, sheetId, markSaving, markSaved],
+  );
+
+  const handleApplyFormulaToColumn = useCallback(
+    async (columnKey: string, formula: string) => {
+      if (!formula.startsWith("=")) {
+        toast.error("Formula must start with =");
+        return;
+      }
+      formulas.setColumnFormulas((prev) => ({ ...prev, [columnKey]: formula }));
+      markSaving();
+      await saveColumnFormula(sheetId, columnKey, formula);
+      markSaved();
+      toast.success(`Formula applied to entire "${columnKey}" column`);
+    },
+    [formulas.setColumnFormulas, sheetId, markSaving, markSaved],
+  );
+
+  const handleRemoveColumnFormula = useCallback(
+    async (columnKey: string) => {
+      formulas.setColumnFormulas((prev) => {
+        const n = { ...prev };
+        delete n[columnKey];
+        return n;
+      });
+      markSaving();
+      await deleteColumnFormula(sheetId, columnKey);
+      markSaved();
+      toast.success("Column formula removed");
+    },
+    [formulas.setColumnFormulas, sheetId, markSaving, markSaved],
   );
 
   // ─────────────────────────────────────────────
@@ -1342,68 +1320,47 @@ export default function SheetClient() {
   // ─────────────────────────────────────────────
 
   const handleAddComment = useCallback(
-    (cellKey: string) => {
+    async (cellKey: string) => {
       if (!newCommentText.trim()) return;
-      const c = {
-        id: `c${Date.now()}`,
+      await addComment({
+        sheetId,
         cellKey,
+        userId: "local",
         author: "You",
-        avatar: "",
-        color: "#0d7c5f",
+        authorColor: "#0d7c5f",
         text: newCommentText.trim(),
-        timestamp: "Just now",
-        resolved: false,
-        thread: [],
-      };
-      setComments((prev) => ({
-        ...prev,
-        [cellKey]: [...(prev[cellKey] || []), c],
-      }));
+        parentId: null,
+      });
       setNewCommentText("");
       toast.success("Comment added");
     },
-    [newCommentText],
+    [newCommentText, sheetId]
   );
 
   const handleReply = useCallback(
-    (cellKey: string, commentId: string) => {
+    async (cellKey: string, commentId: string) => {
       const text = replyText[commentId];
       if (!text?.trim()) return;
-      setComments((prev) => ({
-        ...prev,
-        [cellKey]: (prev[cellKey] || []).map((c) =>
-          c.id === commentId
-            ? {
-              ...c,
-              thread: [
-                ...c.thread,
-                {
-                  author: "You",
-                  color: "#0d7c5f",
-                  text: text.trim(),
-                  timestamp: "Just now",
-                },
-              ],
-            }
-            : c,
-        ),
-      }));
+      await addComment({
+        sheetId,
+        cellKey,
+        userId: "local",
+        author: "You",
+        authorColor: "#0d7c5f",
+        text: text.trim(),
+        parentId: commentId,
+      });
       setReplyText((prev) => ({ ...prev, [commentId]: "" }));
     },
-    [replyText],
+    [replyText, sheetId]
   );
 
   const handleResolveComment = useCallback(
-    (cellKey: string, commentId: string) => {
-      setComments((prev) => ({
-        ...prev,
-        [cellKey]: (prev[cellKey] || []).map((c) =>
-          c.id === commentId ? { ...c, resolved: true } : c,
-        ),
-      }));
+    async (cellKey: string, commentId: string) => {
+      await resolveComment(commentId);
       toast.success("Comment resolved");
     },
-    [],
+    []
   );
 
   const getCellComments = useCallback(
@@ -1411,7 +1368,7 @@ export default function SheetClient() {
       if (!isOrgSheet) return [];
       return comments[`${rowIdx}-${colKey}`] || [];
     },
-    [comments, isOrgSheet],
+    [comments, isOrgSheet]
   );
 
   const toggleRightPanel = useCallback(
@@ -1424,6 +1381,33 @@ export default function SheetClient() {
     },
     [isOrgSheet],
   );
+
+
+  const isPlayingRef = useRef(false);
+
+  const handleSetIsPlaying = useCallback((playing: boolean) => {
+    isPlayingRef.current = playing;
+    setIsPlaying(playing);
+
+    if (playing) {
+      playbackTimer.current = setInterval(() => {
+        setPlaybackIndex((i) => {
+          const next = i + 1;
+          if (next >= history.length) {
+            isPlayingRef.current = false;
+            setIsPlaying(false);
+            clearInterval(playbackTimer.current);
+            return i;
+          }
+          return next;
+        });
+      }, 800); // faster = smoother
+    } else {
+      clearInterval(playbackTimer.current);
+    }
+  }, [history.length]);
+
+  // Remove the old isPlaying useEffect entirely
 
   // ─────────────────────────────────────────────
   //  CELL RENDERER
@@ -1444,7 +1428,7 @@ export default function SheetClient() {
         textWrap.textWrapColumns,
       );
       const cellKey = protection.getCellKey(rowIdx, colKey);
-      const formula = formulas.formulas[cellKey];
+      const formula = formulas.getFormula(rowIdx, colKey);
       const isProtected = protection.isCellProtected(rowIdx, colKey);
       const cellComments = getCellComments(rowIdx, colKey);
       const commentKey = `${rowIdx}-${colKey}`;
@@ -1456,7 +1440,7 @@ export default function SheetClient() {
             (c) =>
               c.cell ===
               `${String.fromCharCode(
-                66 + columns.findIndex((col) => col.key === colKey),
+                65 + columns.findIndex((col) => col.key === colKey),
               )}${rowIdx + 1}`,
           )
           : null;
@@ -1594,6 +1578,7 @@ export default function SheetClient() {
             } ${type === "currency" || type === "number" ? "justify-end" : ""} ${type === "checkbox" ? "justify-center" : ""
             } px-2.5 py-1 gap-1.5`}
           style={{
+            color: 'inherit',   // ← ADD THIS
             ...cellStyle,
             ...(activeCollab
               ? {
@@ -1641,7 +1626,9 @@ export default function SheetClient() {
       protection.getCellKey,
       protection.isCellProtected,
       formulas.formulas,
+      formulas.columnFormulas,
       formulas.evaluateFormula,
+      formulas.getFormula,
       getCellComments,
     ],
   );
@@ -1656,8 +1643,31 @@ export default function SheetClient() {
       const prev = rows;
       rowsHistory.pushState(updatedRows);
       handleSaveChangedRow(updatedRows, prev);
+
+      // LOG cell edits to Firebase (org sheets only)
+      // if (isOrgSheet) {
+      updatedRows.forEach((row, rowIdx) => {
+        const prevRow = prev[rowIdx];
+        if (!prevRow) return;
+        columns.forEach((col) => {
+          const oldVal = prevRow[col.key];
+          const newVal = row[col.key];
+          if (oldVal !== newVal) {
+            const colLetter = String.fromCharCode(65 + columns.findIndex((c) => c.key === col.key));
+            const cellRef = `${colLetter}${rowIdx + 1}`;
+            logCellEdit(
+              sheetId,
+              cellRef,
+              col.name,
+              oldVal ?? null,   // ← fix
+              newVal ?? null,   // ← fix
+            );
+          }
+        });
+      });
+      // }
     },
-    [rows, rowsHistory.pushState, handleSaveChangedRow],
+    [rows, columns, rowsHistory.pushState, handleSaveChangedRow, sheetId, isOrgSheet]
   );
 
   const gridColumns = useMemo<Column<SheetRow>[]>(() => {
@@ -1759,11 +1769,17 @@ export default function SheetClient() {
                 setTimeout(async () => {
                   markSaving();
                   await saveAllColumns(sheetId, columnsHistory.currentState);
+                  if (isOrgSheet) {
+                    logColumnRename(sheetId, col.name, newName);
+                  }
                   markSaved();
                 }, 50);
               }}
               onToggleTextWrap={handleTextWrapToggle}
               textWrapEnabled={textWrap.textWrapColumns.has(col.key)}
+              columnFormula={formulas.columnFormulas[col.key]}
+              onApplyColumnFormula={(f) => handleApplyFormulaToColumn(col.key, f)}
+              onRemoveColumnFormula={() => handleRemoveColumnFormula(col.key)}
             />
           </div>
         ),
@@ -1788,10 +1804,60 @@ export default function SheetClient() {
             column.key,
             textWrap.textWrapColumns,
           );
-          const cellKey = protection.getCellKey(rowIdx, col.key);
-          const formula = formulas.formulas[cellKey];
+          const formula = formulas.getFormula(rowIdx, col.key);
           const isTextWrap = textWrap.textWrapColumns.has(col.key);
           const isProtected = protection.isCellProtected(rowIdx, col.key);
+
+          // ── Shared formula handlers for ANY cell type ──
+          const handleFormulaAwareChange = (v: string) => {
+            if (v.startsWith("=")) {
+              formulas.setFormulas((prev) => ({
+                ...prev,
+                [cellKey]: v,
+              }));
+            } else {
+              // Remove cell-level formula if user clears it
+              formulas.setFormulas((prev) => {
+                const n = { ...prev };
+                delete n[cellKey];
+                return n;
+              });
+              onRowChange({ ...row, [column.key]: v });
+            }
+          };
+
+          const handleFormulaAwareChangeNum = (v: string) => {
+            if (v.startsWith("=")) {
+              formulas.setFormulas((prev) => ({
+                ...prev,
+                [cellKey]: v,
+              }));
+            } else {
+              formulas.setFormulas((prev) => {
+                const n = { ...prev };
+                delete n[cellKey];
+                return n;
+              });
+              const num = v === "" ? 0 : Number(v);
+              if (!isNaN(num)) onRowChange({ ...row, [column.key]: num });
+            }
+          };
+
+          const handleBlurSave = async () => {
+            const currentFormula = formulas.formulas[cellKey];
+            if (currentFormula) {
+              await saveFormula(sheetId, cellKey, currentFormula);
+            } else {
+              // Only delete if it was previously a cell-level formula
+              await deleteFormula(sheetId, cellKey).catch(() => { });
+            }
+          };
+
+          // The value to show in the edit input: raw formula text if present
+          const cellKey = protection.getCellKey(rowIdx, col.key); // already exists above
+          const editDisplayValue = formulas.formulas[cellKey]
+            ?? formulas.columnFormulas[col.key]
+            ?? String(row[column.key] ?? "");
 
           if (isProtected) {
             toast.error("This cell is protected");
@@ -1845,12 +1911,11 @@ export default function SheetClient() {
               <input
                 className="w-full h-full px-2.5 text-xs bg-white outline-none border-0"
                 style={cellStyle}
-                type="date"
+                type={formula ? "text" : "date"}
                 autoFocus
-                value={String(row[column.key] || "")}
-                onChange={(e) =>
-                  onRowChange({ ...row, [column.key]: e.target.value })
-                }
+                value={editDisplayValue}
+                onChange={(e) => handleFormulaAwareChange(e.target.value)}
+                onBlur={handleBlurSave}
               />
             );
 
@@ -1878,23 +1943,25 @@ export default function SheetClient() {
               <input
                 className="w-full h-full px-2.5 text-xs bg-white outline-none border-0 text-right tabular-nums font-mono"
                 style={cellStyle}
-                type="number"
+                type="text"
                 autoFocus
                 min={0}
                 max={100}
-                placeholder="0–100"
-                value={
-                  row[column.key] !== undefined && row[column.key] !== 0
-                    ? String(row[column.key])
-                    : ""
-                }
+                placeholder="0–100 or =formula"
+                value={editDisplayValue}
                 onChange={(e) => {
-                  const num =
-                    e.target.value === ""
-                      ? 0
-                      : Math.min(100, Math.max(0, Number(e.target.value)));
-                  if (!isNaN(num)) onRowChange({ ...row, [column.key]: num });
+                  const v = e.target.value;
+                  if (v.startsWith("=")) {
+                    handleFormulaAwareChangeNum(v);
+                  } else {
+                    const num =
+                      v === ""
+                        ? 0
+                        : Math.min(100, Math.max(0, Number(v)));
+                    if (!isNaN(num)) onRowChange({ ...row, [column.key]: num });
+                  }
                 }}
+                onBlur={handleBlurSave}
               />
             );
 
@@ -1906,33 +1973,9 @@ export default function SheetClient() {
                 type="text"
                 autoFocus
                 placeholder={formula ?? undefined}
-                value={
-                  formula ||
-                  (row[column.key] !== undefined && row[column.key] !== 0
-                    ? String(row[column.key])
-                    : "")
-                }
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v.startsWith("=")) {
-                    formulas.setFormulas((prev) => ({
-                      ...prev,
-                      [cellKey]: v,
-                    }));
-                  } else {
-                    formulas.setFormulas((prev) => {
-                      const n = { ...prev };
-                      delete n[cellKey];
-                      return n;
-                    });
-                    const num = v === "" ? 0 : Number(v);
-                    if (!isNaN(num)) onRowChange({ ...row, [column.key]: num });
-                  }
-                }}
-                onBlur={async () => {
-                  if (formula) await saveFormula(sheetId, cellKey, formula);
-                  else await deleteFormula(sheetId, cellKey);
-                }}
+                value={editDisplayValue}
+                onChange={(e) => handleFormulaAwareChangeNum(e.target.value)}
+                onBlur={handleBlurSave}
               />
             );
 
@@ -1942,25 +1985,24 @@ export default function SheetClient() {
                 className="w-full h-full px-2.5 py-2 text-xs bg-white outline-none border-0 resize-none"
                 style={cellStyle}
                 autoFocus
-                value={String(row[column.key] || "")}
-                onChange={(e) =>
-                  onRowChange({ ...row, [column.key]: e.target.value })
-                }
+                value={editDisplayValue}
+                onChange={(e) => handleFormulaAwareChange(e.target.value)}
+                onBlur={handleBlurSave}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
                 }}
               />
             );
 
+          // ── DEFAULT TEXT CELL — now with formula support ──
           return (
             <input
               className="w-full h-full px-2.5 text-xs bg-white outline-none border-0"
               style={cellStyle}
               autoFocus
-              value={String(row[column.key] || "")}
-              onChange={(e) =>
-                onRowChange({ ...row, [column.key]: e.target.value })
-              }
+              value={editDisplayValue}
+              onChange={(e) => handleFormulaAwareChange(e.target.value)}
+              onBlur={handleBlurSave}
             />
           );
         },
@@ -1976,7 +2018,9 @@ export default function SheetClient() {
     cellTypes.getCellType,
     formatting.getCellStyle,
     formulas.formulas,
+    formulas.columnFormulas,
     formulas.setFormulas,
+    formulas.getFormula,
     protection.getCellKey,
     protection.isCellProtected,
     renderCellByType,
@@ -1991,6 +2035,8 @@ export default function SheetClient() {
     colOps.renameColumn,
     markSaving,
     markSaved,
+    handleApplyFormulaToColumn,
+    handleRemoveColumnFormula,
   ]);
 
   // ─────────────────────────────────────────────
@@ -2036,7 +2082,7 @@ export default function SheetClient() {
     if (!isOrgSheet) return 0;
     return Object.values(comments).reduce(
       (a, b) => a + b.filter((c) => !c.resolved).length,
-      0,
+      0
     );
   }, [comments, isOrgSheet]);
 
@@ -2426,6 +2472,61 @@ export default function SheetClient() {
         </div>
 
         {/* ══════════════════════════════════════════
+            FORMULA BAR
+        ══════════════════════════════════════════ */}
+        <div className="sheet-toolbar h-8 border-b flex items-center px-3 gap-2 shrink-0 bg-white">
+          <div className="flex items-center justify-center h-5 px-2 bg-gray-100 text-gray-500 font-mono text-[11px] rounded border border-gray-200">
+            {selectedCell ? `${String.fromCharCode(65 + columns.findIndex(c => c.key === selectedCell.col))}${selectedCell.row + 1}` : ""}
+          </div>
+          <div className="text-gray-400 font-serif italic font-bold">fx</div>
+          <input
+            className="flex-1 h-full bg-transparent border-0 outline-none text-[12px] font-mono placeholder:text-gray-300"
+            placeholder={selectedCell ? "Enter a formula starting with =" : ""}
+            value={
+              selectedCell
+                ? (formulas.formulas[protection.getCellKey(selectedCell.row, selectedCell.col)]
+                  ?? formulas.columnFormulas[selectedCell.col]
+                  ?? String(rows[selectedCell.row]?.[selectedCell.col] ?? ""))
+                : ""
+            }
+            onChange={(e) => {
+              if (selectedCell) {
+                const val = e.target.value;
+                const cellKey = protection.getCellKey(selectedCell.row, selectedCell.col);
+                if (val.startsWith("=")) {
+                  formulas.setFormulas(prev => ({ ...prev, [cellKey]: val }));
+                } else {
+                  formulas.setFormulas(prev => {
+                    const n = { ...prev };
+                    delete n[cellKey];
+                    return n;
+                  });
+                  // Update the actual row data
+                  const newRows = [...rows];
+                  const num = Number(val);
+                  newRows[selectedCell.row] = {
+                    ...newRows[selectedCell.row],
+                    [selectedCell.col]: val === "" ? "" : !isNaN(num) ? num : val
+                  };
+                  handleRowsChange(newRows);
+                }
+              }
+            }}
+            onBlur={async () => {
+              if (!selectedCell) return;
+              const cellKey = protection.getCellKey(selectedCell.row, selectedCell.col);
+              const currentFormula = formulas.formulas[cellKey];
+              if (currentFormula) {
+                await saveFormula(sheetId, cellKey, currentFormula);
+              } else {
+                await deleteFormula(sheetId, cellKey).catch(() => { });
+              }
+            }}
+            readOnly={!selectedCell || !!(selectedCell && protection.isCellProtected(selectedCell.row, selectedCell.col))}
+          />
+        </div>
+
+        {/* ══════════════════════════════════════════
             ACTION BAR
         ══════════════════════════════════════════ */}
         <div className="sheet-actionbar h-9 border-b flex items-center px-3 gap-0.5 shrink-0">
@@ -2604,7 +2705,7 @@ export default function SheetClient() {
               onClick={() => setShowKeyboardShortcuts(true)}
             />
             <ToolSep />
-            <DropdownMenu>
+            {/* <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="sheet-icon-btn h-7 w-7 rounded-md flex items-center justify-center">
                   <MoreHorizontal className="h-3.5 w-3.5" />
@@ -2652,7 +2753,7 @@ export default function SheetClient() {
                   Sheet settings
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu> */}
           </div>
         </div>
 
@@ -2691,55 +2792,6 @@ export default function SheetClient() {
             </button>
           </div>
         )}
-
-        {/* ══════════════════════════════════════════
-            FORMULA BAR
-        ══════════════════════════════════════════ */}
-        <div className="sheet-formulabar h-7 border-b flex items-center px-3 gap-2 shrink-0">
-          <div className="sheet-cell-ref h-5 min-w-[56px] px-2 text-[11px] font-mono rounded flex items-center justify-center font-semibold">
-            {selectedCell
-              ? `${String.fromCharCode(
-                65 +
-                (columns.findIndex((c) => c.key === selectedCell.col) + 1),
-              )}${selectedCell.row + 1}`
-              : "—"}
-          </div>
-          <div className="sheet-formula-sep h-4 w-px" />
-          <span className="sheet-formula-fx text-[11px] font-mono italic text-gray-400 mr-0.5 select-none">
-            fx
-          </span>
-          <span className="flex-1 text-[11px] font-mono sheet-formula-text truncate">
-            {selectedCell ? (
-              formulas.formulas[`${selectedCell.row}-${selectedCell.col}`] ||
-              String(rows[selectedCell.row]?.[selectedCell.col] ?? "")
-            ) : (
-              <span className="text-gray-400">
-                Select a cell to view or edit its formula
-              </span>
-            )}
-          </span>
-          {isOrgSheet && selectedCell && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="sheet-icon-btn h-5 w-5 rounded flex items-center justify-center"
-                  onClick={() => {
-                    setActiveCommentCell(
-                      `${selectedCell.row}-${selectedCell.col}`,
-                    );
-                    toggleRightPanel("comments");
-                  }}
-                >
-                  <MessageSquare className="h-3 w-3" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="text-xs">
-                Add comment to cell
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-
         {/* ══════════════════════════════════════════
             MAIN BODY
         ══════════════════════════════════════════ */}
@@ -2804,7 +2856,7 @@ export default function SheetClient() {
                 handleReply={handleReply}
                 handleResolveComment={handleResolveComment}
                 setReplyText={setReplyText}
-                history={DUMMY_HISTORY}
+                history={history}
                 setShowPlayback={setShowPlayback}
                 liveTracking={liveTracking}
                 isOrganizationSheet={isOrgSheet}
@@ -2870,7 +2922,8 @@ export default function SheetClient() {
           playbackIndex={playbackIndex}
           setPlaybackIndex={setPlaybackIndex}
           isPlaying={isPlaying}
-          setIsPlaying={setIsPlaying}
+          setIsPlaying={handleSetIsPlaying}
+          history={history}
         />
         {isOrgSheet && (
           <ShareDialog

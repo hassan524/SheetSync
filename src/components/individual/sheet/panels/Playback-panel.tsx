@@ -2,15 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { History, Play, Pause, SkipBack, SkipForward, ChevronRight, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-
-type HistoryItem = {
-    id: string;
-    user: string;
-    color: string;
-    action: string;
-    detail: string;
-    timestamp: string;
-};
+import type { HistoryEntry } from "@/lib/querys/sheet/firebase-realtime";
 
 interface PlaybackModalProps {
     showPlayback: boolean;
@@ -19,77 +11,155 @@ interface PlaybackModalProps {
     setPlaybackIndex: React.Dispatch<React.SetStateAction<number>>;
     isPlaying: boolean;
     setIsPlaying: (playing: boolean) => void;
+    history: HistoryEntry[];
 }
-
-const DUMMY_HISTORY = [
-  { id: "h1", user: "Sarah Chen", color: "#0d7c5f", action: "Edited cell B3", detail: "Changed 'Pending' → 'Active'", timestamp: "2 min ago" },
-  { id: "h2", user: "Marcus Webb", color: "#f59e0b", action: "Added row", detail: "Row 12 inserted", timestamp: "14 min ago" },
-  { id: "h3", user: "You", color: "#0d7c5f", action: "Formatted column D", detail: "Applied currency format", timestamp: "1h ago" },
-  { id: "h4", user: "Priya Nair", color: "#10b981", action: "Edited cell F7", detail: "Changed '42' → '89'", timestamp: "2h ago" },
-  { id: "h5", user: "You", color: "#0d7c5f", action: "Added column", detail: "'Status' column added", timestamp: "3h ago" },
-  { id: "h6", user: "Tom Okafor", color: "#ef4444", action: "Deleted rows", detail: "Rows 3-5 removed", timestamp: "Yesterday" },
-];
 
 export default function PlaybackModal({
     showPlayback, setShowPlayback, playbackIndex,
-    setPlaybackIndex, isPlaying, setIsPlaying,
+    setPlaybackIndex, isPlaying, setIsPlaying, history
 }: PlaybackModalProps) {
-     return (  // ← you're missing this
-        // your JSX here
-    
-    <Dialog open={showPlayback} onOpenChange={setShowPlayback}>
-        <DialogContent className="max-w-lg">
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <History className="h-4 w-4 text-primary" /> History Playback
-                </DialogTitle>
-                <DialogDescription>Step through every change made to this sheet</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-                <div className="relative h-1 bg-gray-100 rounded-full">
-                    <div className="absolute left-0 top-0 h-1 bg-primary rounded-full transition-all"
-                        style={{ width: `${((playbackIndex + 1) / DUMMY_HISTORY.length) * 100}%` }} />
-                    <div className="absolute top-1/2 -translate-y-1/2 h-3 w-3 bg-primary rounded-full border-2 border-white shadow transition-all"
-                        style={{ left: `${((playbackIndex + 1) / DUMMY_HISTORY.length) * 100}%`, transform: "translate(-50%, -50%)" }} />
-                </div>
-                <div className="bg-gray-50 rounded-xl p-4 min-h-[80px] flex flex-col justify-center">
-                    <div className="flex items-center gap-2 mb-1">
-                        <div className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-                            style={{ backgroundColor: DUMMY_HISTORY[playbackIndex].color }}>
-                            {DUMMY_HISTORY[playbackIndex].user === "You" ? "Y" : DUMMY_HISTORY[playbackIndex].user.split(" ").map(n => n[0]).join("")}
+    const total = history.length;
+    const safeIndex = total === 0 ? 0 : Math.min(Math.max(playbackIndex, 0), total - 1);
+    const current = history[safeIndex];
+    const progress = total === 0 ? 0 : Math.round(((safeIndex + 1) / total) * 100);
+
+    const getInitials = (name: string) => {
+        if (!name) return "?";
+        if (name === "You") return "Y";
+        return name.split(" ").filter(Boolean).map((n: string) => n[0]).join("").toUpperCase();
+    };
+
+    const stop = () => setIsPlaying(false);
+
+    return (
+        <Dialog open={showPlayback} onOpenChange={(open) => {
+            if (!open) { stop(); setShowPlayback(false); }
+        }}>
+            <DialogContent className="max-w-md w-full">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-sm">
+                        <History className="h-4 w-4 text-primary" /> History Playback
+                    </DialogTitle>
+                    <DialogDescription className="text-xs">
+                        Step through every change made to this sheet
+                    </DialogDescription>
+                </DialogHeader>
+
+                {total === 0 ? (
+                    <div className="text-center py-10 text-sm text-gray-400">No history yet</div>
+                ) : (
+                    <div className="space-y-4 pt-1">
+
+                        {/* Progress bar */}
+                        <div className="space-y-1">
+                            <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                    className="absolute left-0 top-0 h-full bg-primary rounded-full transition-all duration-200"
+                                    style={{ width: `${progress}%` }}
+                                />
+                            </div>
+                            <div className="flex justify-between text-[10px] text-gray-400">
+                                <span>Start</span>
+                                <span>{safeIndex + 1} of {total}</span>
+                                <span>End</span>
+                            </div>
                         </div>
-                        <span className="text-sm font-semibold">{DUMMY_HISTORY[playbackIndex].user}</span>
-                        <span className="text-xs text-gray-400">{DUMMY_HISTORY[playbackIndex].timestamp}</span>
+
+                        {/* Current entry card */}
+                        <div className="bg-gray-50 rounded-xl p-4 min-h-[100px] flex flex-col justify-center border border-gray-100">
+                            {current ? (
+                                <>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div
+                                            className="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                                            style={{ backgroundColor: current.userColor ?? "#6b7280" }}
+                                        >
+                                            {getInitials(current.userName ?? "")}
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-[12px] font-semibold text-gray-800 leading-tight">
+                                                {current.userName ?? "Unknown"}
+                                            </span>
+                                            <span className="text-[10px] text-gray-400">{current.createdAt ?? ""}</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-[12px] font-medium text-gray-700 capitalize">
+                                        {String(current.action ?? "").replace(/_/g, " ")}
+                                    </p>
+                                    <p className="text-[11px] text-gray-500 mt-0.5 break-words">
+                                        {current.detail ?? ""}
+                                    </p>
+                                </>
+                            ) : (
+                                <p className="text-sm text-gray-400 text-center">No entry</p>
+                            )}
+                        </div>
+
+                        {/* Controls */}
+                        <div className="flex items-center justify-center gap-2">
+                            <Button
+                                variant="outline" size="icon"
+                                className="h-8 w-8 rounded-full"
+                                disabled={safeIndex === 0}
+                                onClick={() => { stop(); setPlaybackIndex(0); }}
+                            >
+                                <SkipBack className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                                variant="outline" size="icon"
+                                className="h-8 w-8 rounded-full"
+                                disabled={safeIndex === 0}
+                                onClick={() => { stop(); setPlaybackIndex((i) => Math.max(0, i - 1)); }}
+                            >
+                                <ArrowLeft className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                                size="icon"
+                                className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90 transition-all active:scale-95"
+                                onClick={() => setIsPlaying(!isPlaying)}
+                            >
+                                {isPlaying
+                                    ? <Pause className="h-4 w-4 text-white" />
+                                    : <Play className="h-4 w-4 text-white" />}
+                            </Button>
+                            <Button
+                                variant="outline" size="icon"
+                                className="h-8 w-8 rounded-full"
+                                disabled={safeIndex === total - 1}
+                                onClick={() => { stop(); setPlaybackIndex((i) => Math.min(total - 1, i + 1)); }}
+                            >
+                                <ChevronRight className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                                variant="outline" size="icon"
+                                className="h-8 w-8 rounded-full"
+                                disabled={safeIndex === total - 1}
+                                onClick={() => { stop(); setPlaybackIndex(total - 1); }}
+                            >
+                                <SkipForward className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                            <span className="text-[11px] text-gray-400">
+                                Change {safeIndex + 1} of {total}
+                            </span>
+                            <Button
+                                variant="ghost" size="sm"
+                                className="h-7 text-xs text-primary hover:text-primary/80"
+                                onClick={() => {
+                                    stop();
+                                    setShowPlayback(false);
+                                    toast.info("Restore to this version — coming soon");
+                                }}
+                            >
+                                Restore this version
+                            </Button>
+                        </div>
                     </div>
-                    <p className="text-sm">{DUMMY_HISTORY[playbackIndex].action}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{DUMMY_HISTORY[playbackIndex].detail}</p>
-                </div>
-                <div className="flex items-center justify-center gap-2">
-                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => setPlaybackIndex(0)}>
-                        <SkipBack className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => setPlaybackIndex((i) => Math.max(0, i - 1))}>
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="icon" className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90" onClick={() => setIsPlaying(!isPlaying)}>
-                        {isPlaying ? <Pause className="h-4 w-4 text-primary-foreground" /> : <Play className="h-4 w-4 text-primary-foreground" />}
-                    </Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => setPlaybackIndex((i) => Math.min(DUMMY_HISTORY.length - 1, i + 1))}>
-                        <ChevronRight className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => setPlaybackIndex(DUMMY_HISTORY.length - 1)}>
-                        <SkipForward className="h-3.5 w-3.5" />
-                    </Button>
-                </div>
-                <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>{playbackIndex + 1} / {DUMMY_HISTORY.length}</span>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-primary hover:text-primary/80"
-                        onClick={() => { setShowPlayback(false); toast.info("Restore to this version — coming soon"); }}>
-                        Restore this version
-                    </Button>
-                </div>
-            </div>
-        </DialogContent>
-    </Dialog>
-     )
+                )}
+            </DialogContent>
+        </Dialog>
+    );
 }
