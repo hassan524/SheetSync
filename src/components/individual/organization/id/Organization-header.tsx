@@ -25,17 +25,20 @@ export function OrgHeader({ org }: OrgHeaderProps) {
   const router = useRouter();
 
   const [newSheetOpen, setNewSheetOpen] = useState(false);
-  const [inviteOpen, setInviteOpen]     = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+
+
 
   return (
     <>
-      {/* ───────────── Top Action Bar ───────────── */}
+      {/* ─── Top bar ─── */}
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => router.push("/organizations")}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" /> Organizations
+          <ArrowLeft className="h-4 w-4" />
+          Organizations
         </button>
 
         <div className="flex items-center gap-2">
@@ -45,7 +48,8 @@ export function OrgHeader({ org }: OrgHeaderProps) {
             className="h-8 gap-1.5 text-xs"
             onClick={() => setInviteOpen(true)}
           >
-            <UserPlus className="h-3.5 w-3.5" /> Invite
+            <UserPlus className="h-3.5 w-3.5" />
+            Invite
           </Button>
 
           <Button
@@ -53,7 +57,8 @@ export function OrgHeader({ org }: OrgHeaderProps) {
             className="h-8 gap-1.5 text-xs"
             onClick={() => setNewSheetOpen(true)}
           >
-            <Plus className="h-3.5 w-3.5" /> New Sheet
+            <Plus className="h-3.5 w-3.5" />
+            New Sheet
           </Button>
 
           <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -62,7 +67,7 @@ export function OrgHeader({ org }: OrgHeaderProps) {
         </div>
       </div>
 
-      {/* ───────────── Organization Info ───────────── */}
+      {/* ─── Org info ─── */}
       <div className="flex items-center gap-3 mb-6">
         <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
           <Building2 className="h-5 w-5 text-primary-foreground" />
@@ -73,37 +78,39 @@ export function OrgHeader({ org }: OrgHeaderProps) {
             <h1 className="text-base font-semibold">{org.name}</h1>
 
             <Badge variant="secondary" className="h-5 px-1.5 text-[11px] gap-1">
-              <Shield className="h-2.5 w-2.5" /> {org.role}
+              <Shield className="h-2.5 w-2.5" />
+              {org.role}
             </Badge>
 
             {org.plan && (
               <Badge variant="outline" className="h-5 px-1.5 text-[11px] gap-1">
-                <Zap className="h-2.5 w-2.5 text-yellow-500" /> {org.plan}
+                <Zap className="h-2.5 w-2.5 text-yellow-500" />
+                {org.plan}
               </Badge>
             )}
           </div>
 
           {org.description && (
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {org.description}
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{org.description}</p>
           )}
         </div>
       </div>
 
-      {/* ───────────── Modals ───────────── */}
+      {/* ─── Modals ─── */}
       <NewSheetModal
         open={newSheetOpen}
         onOpenChange={setNewSheetOpen}
-        ShowSaveTo={false}     
-        folders={[]}             
-        onSheetCreated={() => {}} 
+        ShowSaveTo={false}
+        folders={[]}
+        onSheetCreated={() => { }}
       />
 
-      {/* <InviteTeamModal
+      <InviteTeamModal
         open={inviteOpen}
         onOpenChange={setInviteOpen}
-      /> */}
+        currentOrg={{ id: org.id, name: org.name }}
+        onInvited={() => {/* refresh members if needed */ }}
+      />
     </>
   );
 }

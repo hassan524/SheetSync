@@ -1228,29 +1228,37 @@ export default function SheetClient() {
 
   const groupedCommentsForPanel = useMemo(() => {
     const result: Record<string, any[]> = {};
+
     Object.entries(comments).forEach(([cellKey, cellComments]) => {
-      const roots = cellComments.filter(c => !c.parentId);
-      const replies = cellComments.filter(c => c.parentId);
-      result[cellKey] = roots.map(root => ({
+      // Separate roots from replies
+      const roots = cellComments.filter((c) => !c.parentId);
+      const replies = cellComments.filter((c) => c.parentId);
+
+      result[cellKey] = roots.map((root) => ({
         ...root,
-        timestamp: root.createdAt
-          ? new Date(root.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : "just now",
+        cellKey, // ← CRITICAL: must be explicit so CommentsPanel reads the right key
+
         thread: replies
-          .filter(r => r.parentId === root.id)
-          .map(r => ({
+          .filter((r) => r.parentId === root.id)
+          .map((r) => ({
             author: r.author,
-            color: r.authorColor,
+            color: r.authorColor,  // CommentsPanel reads `reply.color`
             text: r.text,
+            createdAt: r.createdAt,    // raw ISO string → timeAgo() works correctly
             timestamp: r.createdAt
-              ? new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              ? new Date(r.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
               : "just now",
           })),
       }));
     });
+
     return result;
   }, [comments]);
 
+  // DEBUG — remove once confirmed working
   console.log("📦 groupedCommentsForPanel:", groupedCommentsForPanel);
 
   const handleApplyFormulaToColumn = useCallback(
@@ -1558,7 +1566,7 @@ export default function SheetClient() {
           }}
           onClick={() => {
             setSelectedCell({ row: rowIdx, col: colKey });
-            if (isOrgSheet) setActiveCommentCell(`${rowIdx}-${colKey}`);
+            setActiveCommentCell(`${rowIdx}-${colKey}`);   // always track, panel guards isOrgSheet
           }}
         >
           {isProtected && (

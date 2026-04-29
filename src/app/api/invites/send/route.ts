@@ -192,7 +192,13 @@ export async function POST(req: NextRequest) {
       try {
         console.log("Sending invite email to:", cleanEmail);
 
-        await sendInviteEmail(cleanEmail, orgName, token);
+        await sendInviteEmail({
+          email: cleanEmail,
+          organizationName: orgName,
+          token,
+          inviterName: user.user_metadata?.full_name || "Someone",
+          role,
+        });
 
         results.push({
           email: cleanEmail,
