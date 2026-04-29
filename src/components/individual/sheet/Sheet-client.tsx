@@ -193,6 +193,8 @@ import RightPanel from "./Right-panel";
 import { loadSheet } from "@/lib/querys/sheet/sheet";
 import { exportSheet, ExportFormat } from "@/lib/querys/export";
 import { FORMULA_REFERENCE } from "@/data/formulaRefrence";
+import { getSheetOrgMembers, type OrgMember } from "@/lib/querys/organization/get-sheet-members";
+import { supabase } from "@/lib/supabase/client";
 import {
   subscribeToHistory,
   subscribeToComments,
@@ -210,103 +212,29 @@ import {
 } from "@/lib/querys/sheet/firebase-realtime";
 
 // ─────────────────────────────────────────────
-//  DUMMY DATA
+//  MEMBER AVATAR HELPERS
 // ─────────────────────────────────────────────
 
-const DUMMY_COLLABORATORS = [
-  {
-    id: "1",
-    name: "Sarah Chen",
-    role: "Owner",
-    avatar: "",
-    color: "#0d7c5f",
-    status: "active",
-    cell: "B3",
-    lastSeen: "now",
-  },
-  {
-    id: "2",
-    name: "Marcus Webb",
-    role: "Editor",
-    avatar: "",
-    color: "#f59e0b",
-    status: "active",
-    cell: "D7",
-    lastSeen: "now",
-  },
-  {
-    id: "3",
-    name: "Priya Nair",
-    role: "Viewer",
-    avatar: "",
-    color: "#10b981",
-    status: "idle",
-    cell: null,
-    lastSeen: "2m ago",
-  },
-  {
-    id: "4",
-    name: "Tom Okafor",
-    role: "Editor",
-    avatar: "",
-    color: "#ef4444",
-    status: "offline",
-    cell: null,
-    lastSeen: "1h ago",
-  },
+const MEMBER_COLORS = [
+  "#0d7c5f", "#f59e0b", "#10b981", "#ef4444",
+  "#6366f1", "#ec4899", "#14b8a6", "#f97316",
+  "#8b5cf6", "#06b6d4",
 ];
 
+function getMemberColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return MEMBER_COLORS[Math.abs(hash) % MEMBER_COLORS.length];
+}
 
-const DUMMY_HISTORY = [
-  {
-    id: "h1",
-    user: "Sarah Chen",
-    color: "#0d7c5f",
-    action: "Edited cell B3",
-    detail: "Changed 'Pending' → 'Active'",
-    timestamp: "2 min ago",
-  },
-  {
-    id: "h2",
-    user: "Marcus Webb",
-    color: "#f59e0b",
-    action: "Added row",
-    detail: "Row 12 inserted",
-    timestamp: "14 min ago",
-  },
-  {
-    id: "h3",
-    user: "You",
-    color: "#0d7c5f",
-    action: "Formatted column D",
-    detail: "Applied currency format",
-    timestamp: "1h ago",
-  },
-  {
-    id: "h4",
-    user: "Priya Nair",
-    color: "#10b981",
-    action: "Edited cell F7",
-    detail: "Changed '42' → '89'",
-    timestamp: "2h ago",
-  },
-  {
-    id: "h5",
-    user: "You",
-    color: "#0d7c5f",
-    action: "Added column",
-    detail: "'Status' column added",
-    timestamp: "3h ago",
-  },
-  {
-    id: "h6",
-    user: "Tom Okafor",
-    color: "#ef4444",
-    action: "Deleted rows",
-    detail: "Rows 3-5 removed",
-    timestamp: "Yesterday",
-  },
-];
+function getMemberInitials(name: string): string {
+  if (!name) return "?";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 // ─────────────────────────────────────────────
 //  TYPES
@@ -645,6 +573,12 @@ export default function SheetClient() {
   const [fontFamily, setFontFamily] = useState("Arial");
   const [zoomLevel, setZoomLevel] = useState(100);
 
+  // ── Org members state (real collaborators) ──────────────
+  const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email: string; avatar_url: string | null } | null>(null);
+
+  const [activeCursors, setActiveCursors] = useState<Record<string, { name: string; color: string; row: number; col: string }>>({});
+  const presenceChannelRef = useRef<any>(null);
   // ── Comment state ────────────────────────────────────────
   const [comments, setComments] = useState<Record<string, SheetComment[]>>({});
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -796,6 +730,37 @@ export default function SheetClient() {
 
   }, [sheetId]);
 
+  // ── Load current user ─────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setCurrentUser({
+          id: data.user.id,
+          name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || data.user.email?.split("@")[0] || "You",
+          email: data.user.email || "",
+          avatar_url: data.user.user_metadata?.avatar_url || null,
+        });
+      }
+    });
+  }, []);
+
+  // ── Load real org members when sheet is loaded ────────────
+  useEffect(() => {
+    if (!sheetId || !isOrgSheet) {
+      setOrgMembers([]);
+      return;
+    }
+    getSheetOrgMembers(sheetId)
+      .then((data) => {
+        if (data) {
+          setOrgMembers(data.members);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load org members:", err);
+      });
+  }, [sheetId, isOrgSheet]);
+
   useEffect(() => {
     setPlaybackIndex(0);
   }, [history.length]);
@@ -818,6 +783,52 @@ export default function SheetClient() {
     });
     return () => unsubComments();
   }, [sheetId]);
+
+  useEffect(() => {
+    if (!sheetId || !isOrgSheet || !currentUser) return;
+
+    const channel = supabase.channel(`sheet-cursors:${sheetId}`, {
+      config: { presence: { key: currentUser.id } },
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState<{
+          name: string;
+          color: string;
+          row: number;
+          col: string;
+        }>();
+        const cursors: typeof activeCursors = {};
+        Object.entries(state).forEach(([userId, presences]) => {
+          if (userId === currentUser.id) return; // skip self
+          const presence = presences[0];
+          if (presence) cursors[userId] = presence;
+        });
+        setActiveCursors(cursors);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          presenceChannelRef.current = channel;
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      presenceChannelRef.current = null;
+    };
+  }, [sheetId, isOrgSheet, currentUser]);
+
+  useEffect(() => {
+    if (!presenceChannelRef.current || !currentUser || !selectedCell) return;
+
+    presenceChannelRef.current.track({
+      name: currentUser.name,
+      color: getMemberColor(currentUser.id),
+      row: selectedCell.row,
+      col: selectedCell.col,
+    });
+  }, [selectedCell, currentUser]);
 
   // ── Save helpers ──────────────────────────────────────────
   const markSaving = useCallback(() => setSaveStatus("saving"), []);
@@ -1411,16 +1422,12 @@ export default function SheetClient() {
       const commentKey = `${rowIdx}-${colKey}`;
       const isWrapped = textWrap.textWrapColumns.has(`${rowIdx}-${colKey}`);
 
-      const activeCollab =
-        isOrgSheet && liveTracking
-          ? DUMMY_COLLABORATORS.find(
-            (c) =>
-              c.cell ===
-              `${String.fromCharCode(
-                65 + columns.findIndex((col) => col.key === colKey),
-              )}${rowIdx + 1}`,
-          )
-          : null;
+      const activeCollabEntry = Object.values(activeCursors).find(
+        (c) => c.row === rowIdx && c.col === colKey
+      );
+      const activeCollab: { name: string; color: string } | null = activeCollabEntry
+        ? { name: activeCollabEntry.name, color: activeCollabEntry.color }
+        : null;
 
       let displayValue = row[colKey];
       if (formula?.startsWith("="))
@@ -1575,8 +1582,8 @@ export default function SheetClient() {
           {isOrgSheet && cellComments.length > 0 && (
             <CommentDot count={cellComments.length} />
           )}
-          {activeCollab && (
-            <CollabCursor name={activeCollab.name} color={activeCollab.color} />
+          {activeCollab != null && (
+            <CollabCursor name={(activeCollab as { name: string; color: string }).name} color={(activeCollab as { name: string; color: string }).color} />
           )}
           {cellContent}
           {isOrgSheet && (
@@ -2068,8 +2075,8 @@ export default function SheetClient() {
   }, [comments, isOrgSheet]);
 
   const activeCollaborators = useMemo(
-    () => DUMMY_COLLABORATORS.filter((c) => c.status === "active"),
-    [],
+    () => orgMembers,
+    [orgMembers],
   );
 
   // ─────────────────────────────────────────────
@@ -2144,53 +2151,66 @@ export default function SheetClient() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Live pill — org sheets only */}
             {isOrgSheet && liveTracking && (
               <div className="sheet-live-pill flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {activeCollaborators.length} live
+                {activeCollaborators.length} member{activeCollaborators.length !== 1 ? "s" : ""}
               </div>
             )}
 
-            {isOrgSheet && (
+            {/* Collaborator avatars — real org members for org sheets, current user only for personal */}
+            {isOrgSheet ? (
               <>
                 <div className="flex -space-x-2">
-                  {DUMMY_COLLABORATORS.slice(0, 4).map((c) => (
-                    <Tooltip key={c.id}>
-                      <TooltipTrigger>
-                        <div
-                          className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white cursor-pointer transition-all hover:scale-110 hover:z-10 relative border-2"
-                          style={{
-                            backgroundColor: c.color,
-                            borderColor: "var(--sheet-titlebar-bg)",
-                            opacity: c.status === "offline" ? 0.4 : 1,
-                          }}
-                        >
-                          {c.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                          {c.status === "active" && (
+                  {orgMembers.slice(0, 5).map((c) => {
+                    const color = getMemberColor(c.id);
+                    return (
+                      <Tooltip key={c.id}>
+                        <TooltipTrigger>
+                          <div
+                            className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white cursor-pointer transition-all hover:scale-110 hover:z-10 relative border-2"
+                            style={{
+                              borderColor: "var(--sheet-titlebar-bg)",
+                            }}
+                          >
+                            {c.avatar_url ? (
+                              <img
+                                src={c.avatar_url}
+                                alt={c.name}
+                                className="h-full w-full rounded-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="h-full w-full rounded-full flex items-center justify-center"
+                                style={{ backgroundColor: color }}
+                              >
+                                {getMemberInitials(c.name)}
+                              </div>
+                            )}
                             <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 bg-emerald-500 rounded-full border border-white" />
-                          )}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="bottom"
-                        className="text-xs sheet-tooltip"
-                      >
-                        <p className="font-semibold">{c.name}</p>
-                        <p className="text-gray-400 text-[10px]">
-                          {c.role} ·{" "}
-                          {c.status === "active" ? "Active now" : c.lastSeen}
-                        </p>
-                        {c.cell && (
-                          <p className="text-primary text-[10px]">
-                            Editing {c.cell}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="bottom"
+                          className="text-xs sheet-tooltip"
+                        >
+                          <p className="font-semibold">{c.name}</p>
+                          <p className="text-gray-400 text-[10px]">
+                            {c.role} · {c.email}
                           </p>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                  {orgMembers.length > 5 && (
+                    <div
+                      className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold cursor-pointer border-2 bg-gray-200 text-gray-600"
+                      style={{ borderColor: "var(--sheet-titlebar-bg)" }}
+                    >
+                      +{orgMembers.length - 5}
+                    </div>
+                  )}
                 </div>
                 <div className="sheet-vdiv h-5 w-px mx-0.5" />
                 <IconBtn
@@ -2199,7 +2219,37 @@ export default function SheetClient() {
                   badge={totalComments}
                 />
               </>
-            )}
+            ) : currentUser ? (
+              <Tooltip>
+                <TooltipTrigger>
+                  <div
+                    className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white cursor-pointer transition-all hover:scale-110 relative border-2"
+                    style={{
+                      borderColor: "var(--sheet-titlebar-bg)",
+                    }}
+                  >
+                    {currentUser.avatar_url ? (
+                      <img
+                        src={currentUser.avatar_url}
+                        alt={currentUser.name}
+                        className="h-full w-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="h-full w-full rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: getMemberColor(currentUser.id) }}
+                      >
+                        {getMemberInitials(currentUser.name)}
+                      </div>
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs sheet-tooltip">
+                  <p className="font-semibold">{currentUser.name}</p>
+                  <p className="text-gray-400 text-[10px]">Personal sheet</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -2849,6 +2899,7 @@ export default function SheetClient() {
                 rows={rows}
                 columns={columns}
                 totalComments={totalComments}
+                members={orgMembers}
               />
             )}
         </div>

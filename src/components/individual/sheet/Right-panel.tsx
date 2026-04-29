@@ -5,6 +5,7 @@ import HistoryPanel from "./panels/History-panel";
 import CollaboratorsPanel from "./panels/Collaborators-panel";
 import DeveloperPanel from "./panels/Developers-panel";
 import type { HistoryEntry } from "@/lib/querys/sheet/firebase-realtime"
+import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 
 type RightPanelType = "comments" | "history" | "collaborators" | "developer";
 
@@ -35,6 +36,8 @@ interface RightPanelProps {
     rows: any[];
     columns: any[];
     totalComments: number;
+    // Members
+    members: OrgMember[];
 }
 
 const PANEL_TITLES = {
@@ -51,7 +54,7 @@ export default function RightPanel({
     handleResolveComment, setReplyText,
     history, setShowPlayback,
     liveTracking, isOrganizationSheet, setLiveTracking, setShowShareDialog,
-    sheetId, rows, columns, totalComments,
+    sheetId, rows, columns, totalComments, members,
 }: RightPanelProps) {
     const meta = PANEL_TITLES[rightPanel];
     const Icon = meta.icon;
@@ -107,6 +110,7 @@ export default function RightPanel({
                         isOrganizationSheet={isOrganizationSheet}
                         setLiveTracking={setLiveTracking}
                         setShowShareDialog={setShowShareDialog}
+                        members={members}
                     />
                 )}
                 {rightPanel === "developer" && (

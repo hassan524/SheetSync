@@ -5,13 +5,29 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Radio, Plus, MoreHorizontal, Wifi, WifiOff, Clock } from "lucide-react";
 import { toast } from "sonner";
+import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 
-const DUMMY_COLLABORATORS = [
-    { id: "1", name: "Sarah Chen", role: "Owner", avatar: "", color: "#0d7c5f", status: "active", cell: "B3", lastSeen: "now" },
-    { id: "2", name: "Marcus Webb", role: "Editor", avatar: "", color: "#f59e0b", status: "active", cell: "D7", lastSeen: "now" },
-    { id: "3", name: "Priya Nair", role: "Viewer", avatar: "", color: "#10b981", status: "idle", cell: null, lastSeen: "2m ago" },
-    { id: "4", name: "Tom Okafor", role: "Editor", avatar: "", color: "#ef4444", status: "offline", cell: null, lastSeen: "1h ago" },
+// Deterministic color for a user based on their ID
+const MEMBER_COLORS = [
+    "#0d7c5f", "#f59e0b", "#10b981", "#ef4444",
+    "#6366f1", "#ec4899", "#14b8a6", "#f97316",
+    "#8b5cf6", "#06b6d4",
 ];
+
+function getMemberColor(id: string): string {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+        hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return MEMBER_COLORS[Math.abs(hash) % MEMBER_COLORS.length];
+}
+
+function getInitials(name: string): string {
+    if (!name) return "?";
+    const parts = name.trim().split(" ");
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 interface CollaboratorsPanelProps {
     isDark: boolean;
@@ -19,14 +35,15 @@ interface CollaboratorsPanelProps {
     isOrganizationSheet: boolean;
     setLiveTracking: (value: boolean) => void;
     setShowShareDialog: (value: boolean) => void;
+    members: OrgMember[];
 }
 
 export default function CollaboratorsPanel({
     isDark, liveTracking, isOrganizationSheet,
     setLiveTracking, setShowShareDialog,
+    members,
 }: CollaboratorsPanelProps) {
-    const activeCount = DUMMY_COLLABORATORS.filter(c => c.status === "active").length;
-    const idleCount = DUMMY_COLLABORATORS.filter(c => c.status === "idle").length;
+    const memberCount = members.length;
 
     return (
         <div className="flex flex-col h-full">
@@ -35,17 +52,11 @@ export default function CollaboratorsPanel({
                 <div className="flex items-center gap-3 text-[11px]">
                     <span className={`flex items-center gap-1.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        {activeCount} active
+                        {memberCount} member{memberCount !== 1 ? "s" : ""}
                     </span>
-                    {idleCount > 0 && (
-                        <span className={`flex items-center gap-1.5 ${isDark ? "text-gray-600" : "text-gray-400"}`}>
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                            {idleCount} idle
-                        </span>
-                    )}
                 </div>
                 <span className={`text-[11px] ${isDark ? "text-gray-600" : "text-gray-400"}`}>
-                    {DUMMY_COLLABORATORS.length} total
+                    {memberCount} total
                 </span>
             </div>
 
@@ -99,74 +110,77 @@ export default function CollaboratorsPanel({
 
                     {/* Members list */}
                     <div className="space-y-1.5">
-                        {DUMMY_COLLABORATORS.map((c) => (
-                            <div
-                                key={c.id}
-                                className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all group ${
-                                    isDark
-                                        ? "border-gray-700/50 bg-gray-900/40 hover:border-gray-600 hover:bg-gray-900/80"
-                                        : "border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm"
-                                }`}
-                            >
-                                {/* Avatar with status dot */}
-                                <div className="relative shrink-0">
-                                    <div
-                                        className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
-                                        style={{ backgroundColor: c.color }}
-                                    >
-                                        {c.name.split(" ").map(n => n[0]).join("")}
-                                    </div>
-                                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 ${isDark ? "border-gray-950" : "border-white"} ${
-                                        c.status === "active" ? "bg-emerald-400"
-                                        : c.status === "idle" ? "bg-amber-400"
-                                        : "bg-gray-300"
-                                    }`} />
-                                </div>
-
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`text-[12px] font-semibold truncate ${isDark ? "text-gray-200" : "text-gray-800"}`}>{c.name}</span>
-                                        <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-medium shrink-0 ${
-                                            c.role === "Owner" ? "bg-primary/10 text-primary"
-                                            : c.role === "Editor" ? isDark ? "bg-blue-900/40 text-blue-400" : "bg-blue-50 text-blue-600"
-                                            : isDark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"
-                                        }`}>{c.role}</span>
-                                    </div>
-                                    <div className={`flex items-center gap-1 mt-0.5 text-[10px]`}>
-                                        {c.status === "active" ? (
-                                            <>
-                                                <span className="text-emerald-500 font-medium">Active now</span>
-                                                {c.cell && <span className={isDark ? "text-gray-600" : "text-gray-400"}>· cell {c.cell}</span>}
-                                            </>
-                                        ) : c.status === "idle" ? (
-                                            <span className={`flex items-center gap-1 ${isDark ? "text-amber-600" : "text-amber-500"}`}>
-                                                <Clock className="h-2.5 w-2.5" /> Idle · {c.lastSeen}
-                                            </span>
-                                        ) : (
-                                            <span className={isDark ? "text-gray-600" : "text-gray-400"}>Last seen {c.lastSeen}</span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Actions */}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className={`h-6 w-6 rounded-md opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}
-                                        >
-                                            <MoreHorizontal className="h-3.5 w-3.5" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-36">
-                                        <DropdownMenuItem className="text-xs">Change role</DropdownMenuItem>
-                                        <DropdownMenuItem className="text-xs text-red-500">Remove</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                        {members.length === 0 ? (
+                            <div className={`text-center py-6 text-xs ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                                No members yet. Invite people to collaborate.
                             </div>
-                        ))}
+                        ) : (
+                            members.map((c) => {
+                                const color = getMemberColor(c.id);
+                                return (
+                                    <div
+                                        key={c.id}
+                                        className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all group ${
+                                            isDark
+                                                ? "border-gray-700/50 bg-gray-900/40 hover:border-gray-600 hover:bg-gray-900/80"
+                                                : "border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm"
+                                        }`}
+                                    >
+                                        {/* Avatar */}
+                                        <div className="relative shrink-0">
+                                            {c.avatar_url ? (
+                                                <img
+                                                    src={c.avatar_url}
+                                                    alt={c.name}
+                                                    className="h-8 w-8 rounded-full object-cover"
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
+                                                    style={{ backgroundColor: color }}
+                                                >
+                                                    {getInitials(c.name)}
+                                                </div>
+                                            )}
+                                            <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 ${isDark ? "border-gray-950" : "border-white"} bg-emerald-400`} />
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`text-[12px] font-semibold truncate ${isDark ? "text-gray-200" : "text-gray-800"}`}>{c.name}</span>
+                                                <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-medium shrink-0 capitalize ${
+                                                    c.role === "owner" ? "bg-primary/10 text-primary"
+                                                    : c.role === "admin" ? "bg-purple-50 text-purple-600"
+                                                    : c.role === "editor" ? isDark ? "bg-blue-900/40 text-blue-400" : "bg-blue-50 text-blue-600"
+                                                    : isDark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"
+                                                }`}>{c.role}</span>
+                                            </div>
+                                            <p className={`text-[10px] mt-0.5 truncate ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                                                {c.email}
+                                            </p>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className={`h-6 w-6 rounded-md opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}
+                                                >
+                                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-36">
+                                                <DropdownMenuItem className="text-xs">Change role</DropdownMenuItem>
+                                                <DropdownMenuItem className="text-xs text-red-500">Remove</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                );
+                            })
+                        )}
                     </div>
 
                     {/* Invite button */}

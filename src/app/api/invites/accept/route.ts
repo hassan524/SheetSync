@@ -24,8 +24,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invite not found or expired" }, { status: 404 });
     }
 
+    // Check if user is already a member (prevent duplicates)
+    const { data: existingMember } = await supabase
+      .from("organization_members")
+      .select("id")
+      .eq("organization_id", inviteData.organization_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existingMember) {
+      // Already a member — just mark invite as accepted
+      await supabase
+        .from("organization_invites")
+        .update({ status: "accepted" })
+        .eq("id", inviteData.id);
+
+      return NextResponse.json({
+        message: "You are already a member of this organization",
+        organizationId: inviteData.organization_id,
+      });
+    }
+
     const { error: memberError } = await supabase.from("organization_members").insert({
-      org_id: inviteData.org_id,
+      organization_id: inviteData.organization_id,
       user_id: user.id,
       role: inviteData.role,
       joined_at: new Date().toISOString(),
@@ -40,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     if (updateError) throw updateError;
 
-    return NextResponse.json({ message: "Invite accepted", organizationId: inviteData.org_id });
+    return NextResponse.json({ message: "Invite accepted", organizationId: inviteData.organization_id });
   } catch (err: any) {
     console.error(err);
     return NextResponse.json({ error: err.message }, { status: 500 });

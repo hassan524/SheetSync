@@ -81,14 +81,14 @@ export async function POST(req: NextRequest) {
       }
 
       // Prevent inviting yourself
-      // if (cleanEmail === user.email) {
-      //   results.push({
-      //     email: cleanEmail,
-      //     status: "skipped",
-      //     error: "You cannot invite yourself",
-      //   });
-      //   continue;
-      // }
+      if (cleanEmail === user.email) {
+        results.push({
+          email: cleanEmail,
+          status: "skipped",
+          error: "You cannot invite yourself",
+        });
+        continue;
+      }
 
       // -----------------------------
       // Check if email belongs to an existing user
@@ -116,14 +116,14 @@ export async function POST(req: NextRequest) {
           console.error("Member check error:", memberError);
         }
 
-        // if (member) {
-        //   results.push({
-        //     email: cleanEmail,
-        //     status: "skipped",
-        //     error: "User is already a member",
-        //   });
-        //   continue;
-        // }
+        if (member) {
+          results.push({
+            email: cleanEmail,
+            status: "skipped",
+            error: "User is already a member",
+          });
+          continue;
+        }
       }
 
       // -----------------------------
