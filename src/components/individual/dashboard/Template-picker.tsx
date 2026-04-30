@@ -1,12 +1,13 @@
 "use client";
 
-import React, {useEffect} from "react";
+import React, { useEffect } from "react";
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import TemplateCard from "@/components/sheets/Template-card";
 import UseTemplateModal from "@/components/sheets/Use-template-modal";
 import { getAllFolders } from "@/lib/querys/folder/folders";
+import { getAllOrganizations } from "@/lib/querys/organization/organization";
 import { ArrowRight } from "lucide-react";
 
 const TemplatePicker = () => {
@@ -16,27 +17,35 @@ const TemplatePicker = () => {
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
 
   const [folders, setFolders] = React.useState<any[]>([]);
-  const [loadingFolders, setLoadingFolders] = React.useState(false);
+  const [organizations, setOrganizations] = React.useState<any[]>([]);
+
+  const [loading, setLoading] = React.useState(false);
 
   const handleTemplateClick = (templateId: string) => {
     setSelectedTemplateId(templateId);
     setTemplateModalOpen(true);
   };
 
-    useEffect(() => {
-    const fetchFolders = async () => {
+  useEffect(() => {
+    const fetchData = async () => {
       try {
-        setLoadingFolders(true);
-        const data = await getAllFolders();
-        setFolders(data || []);
+        setLoading(true);
+
+        const [folderData, orgData] = await Promise.all([
+          getAllFolders(),
+          getAllOrganizations(),
+        ]);
+
+        setFolders(folderData || []);
+        setOrganizations(orgData || []);
       } catch (error) {
-        console.error("Failed to fetch folders:", error);
+        console.error("Failed to fetch data:", error);
       } finally {
-        setLoadingFolders(false);
+        setLoading(false);
       }
     };
 
-    fetchFolders();
+    fetchData();
   }, []);
 
   return (
@@ -62,7 +71,7 @@ const TemplatePicker = () => {
 
       {/* Templates */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-       {(SHEET_TEMPLATES ?? []).map((template, index) => (
+        {(SHEET_TEMPLATES ?? []).map((template, index) => (
           <div
             key={template.id}
             className={`stagger-${index + 1} cursor-pointer`}
@@ -82,6 +91,7 @@ const TemplatePicker = () => {
           }}
           templateId={selectedTemplateId}
           folders={folders}
+          organizations={organizations} // ✅ NEW
         />
       )}
     </section>

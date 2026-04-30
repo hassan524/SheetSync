@@ -1,0 +1,577 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap");
+
+/* ─── Theme tokens ───────────────────────────────────────────────────────── */
+.sheet-light {
+    --sh-bg: #fff;
+    --sh-toolbar: #fafafa;
+    --sh-border: #e8eaed;
+    --sh-border-sub: #f0f1f3;
+    --sh-text: #1a1d23;
+    --sh-text2: #6b7280;
+    --sh-muted: #9ca3af;
+    --sh-hover: rgba(0, 0, 0, 0.04);
+    --sh-active: rgba(13, 124, 95, 0.08);
+    --sh-div: #e8eaed;
+    --sh-pop-bg: #ffffff;
+    --sh-pop-border: #e8eaed;
+    --sh-pop-text: #1a1d23;
+    --sh-pop-hover: #f3f4f6;
+    --sh-pop-muted: #9ca3af;
+    --sh-status-bg: #f9fafb;
+    --sh-filter-bg: #fffbeb;
+    --sh-save-bg: #f0fdf4;
+    --sh-live-bg: #f0fdf4;
+    --sh-live-text: #15803d;
+    --sh-org-bg: rgba(13, 124, 95, 0.08);
+    --sh-org-text: var(--primary);
+    --sh-head-bg: #f5f6f8;
+    --sh-col-label: #5f6b7a;
+    --sh-fx-bg: #f0fdf4;
+    --sh-fx-text: var(--primary);
+    --sh-fx-border: rgba(13, 124, 95, 0.25);
+}
+
+.sheet-dark {
+    --sh-bg: #0f1117;
+    --sh-toolbar: #131620;
+    --sh-border: #1e2330;
+    --sh-border-sub: #191e2a;
+    --sh-text: #e2e8f0;
+    --sh-text2: #8892a4;
+    --sh-muted: #4a5568;
+    --sh-hover: rgba(255, 255, 255, 0.05);
+    --sh-active: rgba(13, 124, 95, 0.15);
+    --sh-div: #1e2330;
+    --sh-pop-bg: #1a1f2e;
+    --sh-pop-border: #2a3045;
+    --sh-pop-text: #e2e8f0;
+    --sh-pop-hover: rgba(255, 255, 255, 0.07);
+    --sh-pop-muted: #4a5568;
+    --sh-status-bg: #0a0d13;
+    --sh-filter-bg: #1a1608;
+    --sh-save-bg: #0a1a11;
+    --sh-live-bg: #0a1a11;
+    --sh-live-text: #34d399;
+    --sh-org-bg: rgba(13, 124, 95, 0.15);
+    --sh-org-text: #34d399;
+    --sh-head-bg: #131620;
+    --sh-col-label: #8892a4;
+    --sh-fx-bg: rgba(13, 124, 95, 0.12);
+    --sh-fx-text: #34d399;
+    --sh-fx-border: rgba(52, 211, 153, 0.2);
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+.sheet-root {
+    font-family: "DM Sans", system-ui, sans-serif;
+    background: var(--sh-bg);
+    color: var(--sh-text);
+}
+
+.sheet-titlebar {
+    background: var(--sh-bg);
+    border-color: var(--sh-border);
+}
+
+.sheet-toolbar,
+.sheet-formatting-bar {
+    background: var(--sh-toolbar);
+    border-color: var(--sh-border);
+}
+
+.sheet-actionbar {
+    background: var(--sh-bg);
+    border-color: var(--sh-border);
+}
+
+.sheet-filterbar {
+    background: var(--sh-filter-bg);
+    border-color: #fde68a;
+}
+
+.sheet-statusbar {
+    background: var(--sh-status-bg);
+    border-color: var(--sh-border);
+}
+
+.sheet-tool-sep,
+.sheet-vdiv {
+    background: var(--sh-div);
+}
+
+/* ─── Header / Title ─────────────────────────────────────────────────────── */
+.sheet-app-icon {
+    background: var(--primary);
+}
+
+.sheet-back-btn {
+    color: var(--sh-text2);
+}
+
+.sheet-back-btn:hover {
+    background: var(--sh-hover);
+    color: var(--sh-text);
+}
+
+.sheet-title-input {
+    color: var(--sh-text) !important;
+    font-size: 13.5px;
+    letter-spacing: -0.01em;
+}
+
+.sheet-title-input:hover {
+    background: var(--sh-hover) !important;
+}
+
+.sheet-save-status {
+    background: var(--sh-save-bg);
+}
+
+.sheet-live-pill {
+    background: var(--sh-live-bg);
+    color: var(--sh-live-text);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.sheet-org-badge {
+    background: var(--sh-org-bg);
+    color: var(--sh-org-text);
+}
+
+.sheet-avatar {
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.sheet-btn-primary {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(13, 124, 95, 0.3);
+}
+
+.sheet-btn-primary:hover {
+    opacity: .92;
+}
+
+.sheet-btn-secondary {
+    background: var(--sh-hover);
+    color: var(--sh-text2);
+    border: 1px solid var(--sh-border);
+}
+
+.sheet-btn-secondary:hover {
+    color: var(--sh-text);
+}
+
+.sheet-formula-btn {
+    background: var(--sh-fx-bg);
+    color: var(--sh-fx-text);
+    border: 1px solid var(--sh-fx-border);
+    border-radius: 5px;
+}
+
+.sheet-formula-btn:hover {
+    opacity: .85;
+}
+
+.sheet-icon-btn {
+    color: var(--sh-text2);
+    border-radius: 5px;
+}
+
+.sheet-icon-btn:hover:not(:disabled) {
+    background: var(--sh-hover);
+    color: var(--sh-text);
+}
+
+.sheet-icon-btn--active {
+    background: var(--sh-active) !important;
+    color: var(--primary) !important;
+}
+
+.sheet-icon-btn--danger:hover:not(:disabled) {
+    background: rgba(239, 68, 68, .08) !important;
+    color: #ef4444 !important;
+}
+
+.sheet-action-btn {
+    color: var(--sh-text2);
+    border-radius: 5px;
+    font-size: 11px;
+}
+
+.sheet-action-btn:hover:not(:disabled) {
+    background: var(--sh-hover);
+    color: var(--sh-text);
+}
+
+.sheet-action-btn--active {
+    background: var(--sh-active) !important;
+    color: var(--primary) !important;
+}
+
+.sheet-action-btn--danger {
+    color: #ef4444;
+}
+
+.sheet-action-btn--danger:hover:not(:disabled) {
+    background: rgba(239, 68, 68, .08) !important;
+}
+
+/* ─── Select / Search / Filter ───────────────────────────────────────────── */
+.sheet-select {
+    background: transparent;
+    border-color: var(--sh-border) !important;
+    color: var(--sh-text2);
+    font-size: 11px;
+}
+
+.sheet-search-input {
+    background: var(--sh-bg);
+    border: 1px solid var(--sh-border);
+    color: var(--sh-text);
+    border-radius: 5px;
+    outline: none;
+}
+
+.sheet-search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(13, 124, 95, .1);
+}
+
+.sheet-filter-input {
+    background: var(--sh-bg);
+    color: var(--sh-text);
+    outline: none;
+}
+
+.sheet-filter-input:focus {
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, .12);
+}
+
+.sheet-clear-filter {
+    color: #b45309;
+}
+
+.sheet-clear-filter:hover {
+    background: rgba(245, 158, 11, .1);
+}
+
+/* ─── Grid header / rows ─────────────────────────────────────────────────── */
+.sheet-header-cell {
+    background: var(--sh-head-bg);
+    border-color: var(--sh-border);
+}
+
+.sheet-col-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--sh-col-label);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.sheet-row-num {
+    background: var(--sh-head-bg);
+    border-color: var(--sh-border);
+    font-size: 10px;
+    font-family: "Geist Mono", monospace;
+}
+
+.sheet-row-num-text {
+    color: var(--sh-muted);
+}
+
+.sheet-row-num--selected {
+    background: rgba(13, 124, 95, .05);
+}
+
+/* ─── Cell content ───────────────────────────────────────────────────────── */
+.sheet-cell-text {
+    font-size: inherit;
+    font-family: inherit;
+    color: inherit;
+}
+
+.sheet-cell-mono {
+    font-family: "Geist Mono", "Courier New", monospace;
+    font-size: 11.5px;
+}
+
+.sheet-link {
+    color: var(--primary);
+    font-size: 11.5px;
+}
+
+.sheet-link:hover {
+    text-decoration: underline;
+}
+
+.sheet-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+}
+
+/* ─── Status bar ─────────────────────────────────────────────────────────── */
+.sheet-status-text {
+    font-size: 10px;
+    color: var(--sh-muted);
+}
+
+.sheet-status-highlight {
+    font-size: 10px;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.sheet-status-cell {
+    font-size: 10px;
+    color: var(--sh-muted);
+}
+
+/* ─── Tooltip ────────────────────────────────────────────────────────────── */
+.sheet-tooltip {
+    background: #1a1d23 !important;
+    color: #e2e8f0 !important;
+    border: 1px solid #2d3244 !important;
+    font-family: "DM Sans", system-ui;
+    font-size: 11px;
+}
+
+.sheet-kbd {
+    background: #2d3244;
+    color: #8892a4;
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-size: 9px;
+    font-family: "Geist Mono", monospace;
+    border: 1px solid #3d4460;
+}
+
+/* ─── DataGrid ───────────────────────────────────────────────────────────── */
+.rdg-sheet {
+    border: none;
+    --rdg-selection-color: var(--primary);
+    font-family: "DM Sans", system-ui, sans-serif;
+    font-size: 12px;
+}
+
+.rdg-light {
+    --rdg-background-color: #fff;
+    --rdg-header-background-color: #f5f6f8;
+    --rdg-row-hover-background-color: #f8fffe;
+    --rdg-border-color: #e8eaed;
+    --rdg-color: #1a1d23;
+}
+
+.rdg-dark {
+    --rdg-background-color: #0f1117;
+    --rdg-header-background-color: #131620;
+    --rdg-row-hover-background-color: #0f1a17;
+    --rdg-border-color: #1e2330;
+    --rdg-color: #e2e8f0;
+}
+
+.rdg-cell {
+    border-right: 1px solid var(--rdg-border-color);
+    border-bottom: 1px solid var(--rdg-border-color);
+    padding: 0 !important;
+    background-color: var(--rdg-background-color);
+    cursor: pointer;
+    overflow: hidden;
+    contain: layout style;
+}
+
+.rdg-header-row {
+    background: var(--rdg-header-background-color);
+    border-bottom: 1.5px solid var(--rdg-border-color);
+}
+
+.rdg-header-cell {
+    border-right: 1px solid var(--rdg-border-color);
+    padding: 0 !important;
+}
+
+.rdg-cell[aria-selected="true"] {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+    z-index: 1;
+}
+
+.fill-grid {
+    block-size: 100%;
+}
+
+.rdg-cell:first-child,
+.rdg-header-cell:first-child {
+    background-color: var(--rdg-header-background-color) !important;
+    border-right: 1px solid var(--rdg-border-color) !important;
+}
+
+.rdg-row {
+    transition: background-color .08s;
+}
+
+.rdg-row:hover .rdg-cell {
+    background: var(--rdg-row-hover-background-color) !important;
+}
+
+/* ─── Popover / Dropdown (Radix portals) ─────────────────────────────────── */
+/* These render at <body> level so we target them globally with data attrs    */
+[data-radix-popper-content-wrapper] {
+    --popover-bg: #ffffff;
+    --popover-border: #e8eaed;
+    --popover-text: #1a1d23;
+    --popover-hover: #f3f4f6;
+    --popover-muted: #9ca3af;
+    --popover-sep: #e8eaed;
+}
+
+/* When a .sheet-dark ancestor exists, override the tokens via JS class on <html> or body.
+   We handle this with a data attribute set by the component — see SheetClient. */
+body[data-sheet-dark="true"] [data-radix-popper-content-wrapper],
+body[data-sheet-dark="true"] [data-radix-select-viewport] {
+    --popover-bg: #1a1f2e;
+    --popover-border: #2a3045;
+    --popover-text: #e2e8f0;
+    --popover-hover: rgba(255, 255, 255, 0.07);
+    --popover-muted: #4a5568;
+    --popover-sep: #2a3045;
+}
+
+[data-radix-popper-content-wrapper]>[role="menu"],
+[data-radix-popper-content-wrapper]>[role="listbox"],
+[data-radix-popper-content-wrapper]>div[data-state],
+[data-radix-select-viewport] {
+    background: var(--popover-bg) !important;
+    border-color: var(--popover-border) !important;
+    color: var(--popover-text) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .18) !important;
+}
+
+/* Items */
+[role="menuitem"],
+[role="option"] {
+    color: var(--popover-text, #1a1d23) !important;
+}
+
+[role="menuitem"]:hover,
+[role="menuitem"]:focus,
+[role="option"]:hover,
+[role="option"]:focus,
+[role="option"][data-highlighted] {
+    background: var(--popover-hover, #f3f4f6) !important;
+    color: var(--popover-text, #1a1d23) !important;
+}
+
+[role="separator"] {
+    background: var(--popover-sep, #e8eaed) !important;
+}
+
+[role="group"]>[class*="Label"],
+[data-radix-dropdown-menu-label] {
+    color: var(--popover-muted, #9ca3af) !important;
+}
+
+/* ─── Dialog (also a Radix portal) ──────────────────────────────────────── */
+[data-radix-dialog-overlay] {
+    background: rgba(0, 0, 0, .5);
+}
+
+body[data-sheet-dark="true"] [data-radix-dialog-overlay] {
+    background: rgba(0, 0, 0, .75);
+}
+
+[role="dialog"] {
+    background: #ffffff;
+    border: 1px solid #e8eaed;
+    color: #1a1d23;
+    font-family: "DM Sans", system-ui, sans-serif;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] {
+    background: #1a1f2e !important;
+    border-color: #2a3045 !important;
+    color: #e2e8f0 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] h2,
+body[data-sheet-dark="true"] [role="dialog"] h3,
+body[data-sheet-dark="true"] [role="dialog"] p,
+body[data-sheet-dark="true"] [role="dialog"] label,
+body[data-sheet-dark="true"] [role="dialog"] span:not([class*="badge"]) {
+    color: #e2e8f0 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] input,
+body[data-sheet-dark="true"] [role="dialog"] textarea {
+    background: #0f1117 !important;
+    border-color: #2a3045 !important;
+    color: #e2e8f0 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] input::placeholder,
+body[data-sheet-dark="true"] [role="dialog"] textarea::placeholder {
+    color: #4a5568 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] .border-t,
+body[data-sheet-dark="true"] [role="dialog"] .border-b {
+    border-color: #2a3045 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] button:not(.bg-primary):not([class*="btn-primary"]) {
+    border-color: #2a3045 !important;
+    color: #8892a4 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] button:not(.bg-primary):hover {
+    background: rgba(255, 255, 255, .05) !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] code {
+    background: #0f1117 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] .bg-gray-50,
+body[data-sheet-dark="true"] [role="dialog"] .bg-gray-100 {
+    background: #131620 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] .border,
+body[data-sheet-dark="true"] [role="dialog"] .border-gray-200 {
+    border-color: #2a3045 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] .text-gray-400,
+body[data-sheet-dark="true"] [role="dialog"] .text-gray-500,
+body[data-sheet-dark="true"] [role="dialog"] .text-gray-600 {
+    color: #8892a4 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] .text-gray-700,
+body[data-sheet-dark="true"] [role="dialog"] .text-gray-900 {
+    color: #e2e8f0 !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] .hover\:bg-gray-50:hover {
+    background: rgba(255, 255, 255, .05) !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] .bg-amber-50 {
+    background: rgba(251, 191, 36, .08) !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] .bg-blue-50 {
+    background: rgba(59, 130, 246, .08) !important;
+}
+
+body[data-sheet-dark="true"] [role="dialog"] .bg-gray-900 {
+    background: #0a0d13 !important;
+}

@@ -5,15 +5,17 @@ import {
   FileSpreadsheet,
   Users,
   Building2,
-  TrendingUp,
-  Activity,
+  TrendingUp
 } from "lucide-react";
 import QuickActions from "@/components/individual/dashboard/Quick-actions";
 import DashboardWelcome from "@/components/individual/dashboard/Dashboard-welcome";
 import TemplatePicker from "@/components/individual/dashboard/Template-picker";
 import RecentSheets from "@/components/individual/dashboard/Recent-sheets";
+import { getDashboardStats } from "@/lib/querys/individual/dashboard/getDashboardStats";
 
-const Index = () => {
+const Index = async () => {
+  const stats = await getDashboardStats();
+
   return (
     <DashboardLayout breadcrumbItems={["SheetSync", "Dashboard"]}>
       <div className="max-w-7xl mx-auto space-y-8">
@@ -24,27 +26,22 @@ const Index = () => {
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
             title="Total Sheets"
-            value="47"
-            change={12}
+            value={String(stats.totalSheets)}
             icon={<FileSpreadsheet className="h-5 w-5 text-primary" />}
           />
           <StatsCard
-            title="Active Collaborators"
-            value="24"
-            change={8}
+            title="Collaborators"
+            value={String(stats.activeCollaborators)}
             icon={<Users className="h-5 w-5 text-primary" />}
           />
           <StatsCard
             title="Organizations"
-            value="5"
-            change={0}
+            value={String(stats.organizationsCount)}
             icon={<Building2 className="h-5 w-5 text-primary" />}
           />
           <StatsCard
-            title="Hours Saved"
-            value="128"
-            change={23}
-            changeLabel="this month"
+            title="Est. Hours Saved"
+            value={String(stats.hoursSaved)}
             icon={<TrendingUp className="h-5 w-5 text-primary" />}
           />
         </section>
