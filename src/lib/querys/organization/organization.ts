@@ -300,10 +300,7 @@ export async function deleteOrganization(id: string) {
 export async function getMyInvitesActivity() {
   const supabase = await createSupabaseServerClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
   const { data, error } = await supabase
@@ -312,16 +309,13 @@ export async function getMyInvitesActivity() {
       id,
       status,
       created_at,
-      organizations (
-        id,
-        name
-      )
+      organizations (id, name),
+      invited_by
     `)
     .eq("email", user.email)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-
   return data || [];
 }

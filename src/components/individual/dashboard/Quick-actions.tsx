@@ -2,18 +2,49 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Plus, Users, Building2, FileSpreadsheet } from "lucide-react";
+import { Users, Building2, FileSpreadsheet, ArrowRight, Zap } from "lucide-react";
 import NewSheetModal from "@/components/sheets/New-sheet-modal";
 import InviteTeamModal from "@/components/modals/Invite-team-modal";
 import CreateOrganizationDialog from "../organization/Create-organization-dialog";
 import { getAllFolders } from "@/lib/querys/folder/folders";
 import { getAllOrganizations } from "@/lib/querys/organization/organization";
 
+const actions = [
+  {
+    key: "invite",
+    icon: Users,
+    label: "Invite Team",
+    description: "Add members to your org",
+    accent: "from-primary/20 via-primary/5 to-transparent",
+    iconBg: "bg-primary/15 ring-primary/30",
+    iconColor: "text-primary",
+    arrowColor: "text-primary/50 group-hover:text-primary",
+  },
+  {
+    key: "org",
+    icon: Building2,
+    label: "New Organization",
+    description: "Create a new workspace",
+    accent: "from-primary/15 via-primary/5 to-transparent",
+    iconBg: "bg-primary/10 ring-primary/20",
+    iconColor: "text-primary",
+    arrowColor: "text-primary/50 group-hover:text-primary",
+  },
+  {
+    key: "import",
+    icon: FileSpreadsheet,
+    label: "Import Sheet",
+    description: "Upload a spreadsheet file",
+    accent: "from-primary/10 via-primary/5 to-transparent",
+    iconBg: "bg-primary/10 ring-primary/20",
+    iconColor: "text-primary",
+    arrowColor: "text-primary/50 group-hover:text-primary",
+  },
+];
+
 export default function QuickActions() {
   const router = useRouter();
 
-  const [newSheetOpen, setNewSheetOpen] = useState(false);
   const [inviteTeamOpen, setInviteTeamOpen] = useState(false);
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
 
@@ -22,7 +53,6 @@ export default function QuickActions() {
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
 
-  // Fetch folders
   useEffect(() => {
     const fetchFolders = async () => {
       try {
@@ -38,7 +68,6 @@ export default function QuickActions() {
     fetchFolders();
   }, []);
 
-  // Fetch organizations
   useEffect(() => {
     const fetchOrganizations = async () => {
       try {
@@ -54,50 +83,102 @@ export default function QuickActions() {
     fetchOrganizations();
   }, []);
 
+  const handleAction = (key: string) => {
+    if (key === "invite") setInviteTeamOpen(true);
+    if (key === "org") setCreateOrgOpen(true);
+    if (key === "import") router.push("/import");
+  };
+
+  const isDisabled = (key: string) => {
+    if (key === "invite") return loadingOrgs || organizations.length === 0;
+    return false;
+  };
+
   return (
     <>
       <section className="animate-fade-in">
-        <div className="bg-muted/30 rounded-xl p-6 border">
-          <h3 className="font-semibold mb-4">Quick Actions</h3>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex-col gap-2"
-              onClick={() => setInviteTeamOpen(true)}
-              disabled={loadingOrgs || organizations.length === 0} // disable if no orgs loaded
-            >
-              <Users className="h-5 w-5" />
-              <span className="text-sm">Invite Team</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex-col gap-2"
-              onClick={() => setCreateOrgOpen(true)}
-            >
-              <Building2 className="h-5 w-5" />
-              <span className="text-sm">New Org</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex-col gap-2"
-              onClick={() => router.push("/import")}
-            >
-              <FileSpreadsheet className="h-5 w-5" />
-              <span className="text-sm">Import</span>
-            </Button>
+        {/* Header */}
+        <div className="flex items-center gap-2 mb-3 px-0.5">
+          <div className="h-6 w-6 rounded-md bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center">
+            <Zap className="h-3 w-3 text-primary" />
           </div>
+          <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+            Quick Actions
+          </span>
+          <div className="flex-1 h-px bg-gradient-to-r from-border to-transparent ml-1" />
+        </div>
+
+        {/* Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {actions.map((action) => {
+            const Icon = action.icon;
+            const disabled = isDisabled(action.key);
+
+            return (
+              <button
+                key={action.key}
+                onClick={() => handleAction(action.key)}
+                disabled={disabled}
+                className={`
+                  group relative overflow-hidden
+                  flex items-center gap-3
+                  rounded-xl border border-border bg-card
+                  px-4 py-3.5
+                  text-left
+                  transition-all duration-200
+                  hover:border-primary/30 hover:bg-primary/[0.02] hover:shadow-sm
+                  disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:bg-card
+                `}
+              >
+                {/* Gradient shine on hover */}
+                <div
+                  className={`
+                    pointer-events-none absolute inset-0 opacity-0
+                    group-hover:opacity-100 transition-opacity duration-300
+                    bg-gradient-to-br ${action.accent}
+                  `}
+                />
+
+                {/* Icon */}
+                <div
+                  className={`
+                    relative h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0
+                    ring-1 ${action.iconBg}
+                    transition-transform duration-200 group-hover:scale-105
+                  `}
+                >
+                  <Icon className={`h-4 w-4 ${action.iconColor}`} />
+                </div>
+
+                {/* Text */}
+                <div className="relative flex-1 min-w-0">
+                  <p className="text-[12px] font-semibold text-foreground leading-tight">
+                    {action.label}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                    {action.description}
+                  </p>
+                </div>
+
+                {/* Arrow */}
+                <ArrowRight
+                  className={`
+                    relative h-3.5 w-3.5 flex-shrink-0
+                    transition-all duration-200
+                    translate-x-0 group-hover:translate-x-0.5
+                    ${action.arrowColor}
+                  `}
+                />
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* Pass organizations to InviteTeamModal */}
       <InviteTeamModal
         open={inviteTeamOpen}
         onOpenChange={setInviteTeamOpen}
-        organizations={organizations} // <-- new prop
+        organizations={organizations}
       />
 
       <CreateOrganizationDialog

@@ -18,6 +18,7 @@ const RecentSheets = () => {
       try {
 
         const data = await getRecentSheets();
+        console.log("Recent sheets:", data);
 
         const formatted = data.map((sheet: any) => ({
           id: sheet.id,
@@ -28,7 +29,7 @@ const RecentSheets = () => {
           rows: sheet.rowsCount,
           cols: sheet.colsCount,
 
-          fileSizeKb: 120, // 🔥 you can replace later with real size
+          fileSizeKb: 120,
 
           templateId: sheet.templateId,
 

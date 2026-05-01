@@ -19,7 +19,7 @@ const TemplateCard = ({
 }: TemplateCardProps) => {
   return (
     <button
-      className={`w-full group relative p-4 rounded-xl border border-border bg-card text-left transition-all duration-300 hover:shadow-elevated hover:border-primary/30 hover:-translate-y-1 animate-slide-up`}
+      className={`w-full group relative p-4 rounded-xl border border-border cursor-pointer bg-card text-left transition-all duration-300 hover:shadow-elevated hover:border-primary/30 hover:-translate-y-1 animate-slide-up`}
     >
       <div
         className={`h-10 w-10 flex-shrink-0 rounded-lg flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110 ${color}`}

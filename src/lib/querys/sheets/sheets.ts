@@ -1,6 +1,10 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getTemplateData } from "@/lib/sheet-templates";
+import { saveAllRows } from "../sheet/rows";
+import { saveAllColumns } from "../sheet/columns";
+
 import { z } from "zod";
 
 // Validation schemas
@@ -75,28 +79,30 @@ export async function createSheet({
   const parsed = createSheetSchema.safeParse({ name });
   if (!parsed.success) throw new Error("Invalid sheet name");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
   const { data, error } = await supabase
     .from("sheets")
-    .insert([
-      {
-        title: parsed.data.name,
-        folder_id: folder_id ?? null,
-        owner_id: user.id,
-        organization_id: organizationId ?? null,
-        template_id: templateId,
-        is_personal: !organizationId,
-      },
-    ])
+    .insert([{
+      title: parsed.data.name,
+      folder_id: folder_id ?? null,
+      owner_id: user.id,
+      organization_id: organizationId ?? null,
+      template_id: templateId,
+      is_personal: !organizationId,
+    }])
     .select()
     .single();
 
   if (error) throw new Error(error.message);
+
+  // ✅ Seed template data immediately so dashboard shows correct counts
+  const templateData = getTemplateData(templateId);
+  await Promise.all([
+    saveAllRows(data.id, templateData.rows),
+    saveAllColumns(data.id, templateData.columns),
+  ]);
 
   return data;
 }
@@ -151,50 +157,25 @@ export async function deleteSheet(sheetId: string) {
 
 
 export async function getRecentSheets() {
-
   const supabase = await createSupabaseServerClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
   const { data, error } = await supabase
     .from("sheets")
     .select(`
-      id,
-      title,
-      template_id,
-      created_at,
-      updated_at,
-      organization_id,
-      folder_id,
-
-      folders (
-        id,
-        name
-      ),
-
-      organizations (
-        id,
-        name,
-        organization_members (
-          id
-        )
-      ),
-
-      rows (
-        id
-      ),
-
-      columns (
-        id
-      )
+      id, title, template_id,
+      created_at, updated_at, last_opened_at,
+      organization_id, folder_id,
+      folders ( id, name ),
+      organizations ( id, name, organization_members ( id ) ),
+      rows ( id ),
+      columns ( id )
     `)
     .eq("owner_id", user.id)
-    .order("updated_at", { ascending: false })
-    .limit(20);
+    .not("last_opened_at", "is", null)   // ← only sheets that were actually opened
+    .order("last_opened_at", { ascending: false })  // ← order by last opened
+    .limit(6);  // ← max 6
 
   if (error) throw error;
 
@@ -206,30 +187,14 @@ export async function getRecentSheets() {
       id: sheet.id,
       title: sheet.title,
       templateId: sheet.template_id,
-
-      lastEdited: sheet.updated_at,
-
-      // 🔥 detect type
+      lastEdited: sheet.last_opened_at ?? sheet.updated_at,
       isOrganization: !!sheet.organization_id,
-
-      // ✅ organization safe mapping
-      organization: org
-        ? {
-          id: org.id,
-          name: org.name,
-          membersCount: org.organization_members?.length ?? 0,
-        }
-        : null,
-
-      // ✅ folder safe mapping
-      folder: folder
-        ? {
-          id: folder.id,
-          name: folder.name,
-        }
-        : null,
-
-      // ⚠️ NOTE: these are row objects, not counts from DB
+      organization: org ? {
+        id: org.id,
+        name: org.name,
+        membersCount: org.organization_members?.length ?? 0,
+      } : null,
+      folder: folder ? { id: folder.id, name: folder.name } : null,
       rowsCount: sheet.rows?.length ?? 0,
       colsCount: sheet.columns?.length ?? 0,
     };

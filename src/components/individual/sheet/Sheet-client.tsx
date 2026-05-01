@@ -43,6 +43,7 @@ import { saveAllColumns, deleteColumn } from "@/lib/querys/sheet/columns";
 import { saveCellFormat } from "@/lib/querys/sheet/format";
 import { saveFormula, deleteFormula, saveColumnFormula, deleteColumnFormula } from "@/lib/querys/sheet/formulas";
 import { protectCell, unprotectCell } from "@/lib/querys/sheet/protection";
+import { logActivity } from "@/lib/querys/activity/activity";
 import PlaybackModal from "./panels/Playback-panel";
 import KeyboardShortcutsDialog from "./dialogs/Keyboard-shortcuts-dialog";
 import ShareDialog from "./dialogs/Share-dialog";
@@ -52,6 +53,7 @@ import { exportSheet, ExportFormat } from "@/lib/querys/export";
 import { FORMULA_REFERENCE } from "@/data/formulaRefrence";
 import { getSheetOrgMembers, type OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import { supabase } from "@/lib/supabase/client";
+import { trackSheetOpen } from "@/lib/querys/sheet/track-open";
 import {
   subscribeToHistory, subscribeToComments, addComment, resolveComment,
   logCellEdit, logRowAdd, logRowDelete, logColAdd, logColDelete,
@@ -69,6 +71,7 @@ type RightPanelType = "comments" | "history" | "collaborators" | "developer" | n
 interface SheetState {
   title: string; isOrgSheet: boolean; liveTracking: boolean;
   createdAt: string | null; updatedAt: string | null; ownerId: string | null;
+  organizationId: string | null;
   size: string | null; starred: boolean; rows: SheetRow[]; columns: ColumnDef[];
 }
 
@@ -197,10 +200,10 @@ export default function SheetClient() {
 
   const [sheetState, setSheetState] = useState<SheetState>({
     title: "", isOrgSheet: isOrganizationSheet, liveTracking: isOrganizationSheet,
-    createdAt: null, updatedAt: null, ownerId: null, size: null,
-    starred: false, rows: [], columns: [],
+    createdAt: null, updatedAt: null, ownerId: null, organizationId: null,
+    size: null, starred: false, rows: [], columns: [],
   });
-  const { title, isOrgSheet, liveTracking, starred, rows, columns } = sheetState;
+  const { title, isOrgSheet, liveTracking, starred, rows, columns, organizationId } = sheetState;
 
   const [isLoading, setIsLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
@@ -237,6 +240,20 @@ export default function SheetClient() {
   const rowSaveTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const columnResizeTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const playbackTimer = useRef<NodeJS.Timeout | undefined>(undefined);
+  const activityLogTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Debounced activity log for cell edits (max once per 30s per sheet)
+  const logCellEditActivity = useCallback((sheetTitle: string) => {
+    clearTimeout(activityLogTimeout.current);
+    activityLogTimeout.current = setTimeout(() => {
+      logActivity({
+        sheetId,
+        organizationId: organizationId ?? undefined,
+        action: "edited cells",
+        target: sheetTitle || title,
+      }).catch(() => { });
+    }, 30000);
+  }, [sheetId, organizationId, title]);
 
   const formatting = useSheetFormatting(() => { });
   const textWrap = useTextWrap(rows, () => { });
@@ -271,12 +288,13 @@ export default function SheetClient() {
         if (wrapSet.size > 0) textWrap.setTextWrapColumns(wrapSet);
         rowsHistory.pushState(data.rows);
         columnsHistory.pushState(data.columns);
-        setSheetState({ title: data.title, isOrgSheet: sheetIsOrg, liveTracking: sheetIsOrg, createdAt: data.created_at, updatedAt: data.updated_at, ownerId: data.ownerId, size: data.size, starred: data.isStarred, rows: data.rows, columns: data.columns });
+        setSheetState({ title: data.title, isOrgSheet: sheetIsOrg, liveTracking: sheetIsOrg, createdAt: data.created_at, updatedAt: data.updated_at, ownerId: data.ownerId, organizationId: data.organizationId ?? null, size: data.size, starred: data.isStarred, rows: data.rows, columns: data.columns });
       } else {
         const td = getTemplateData(templateId);
         rowsHistory.pushState(td.rows); columnsHistory.pushState(td.columns);
         setSheetState(p => ({ ...p, title: data.title || td.title, starred: false, rows: td.rows, columns: td.columns }));
         await Promise.all([saveAllRows(sheetId, td.rows), saveAllColumns(sheetId, td.columns)]);
+        await trackSheetOpen(sheetId);
       }
     }).catch(err => { console.error(err); toast.error("Failed to load sheet. Please refresh."); }).finally(() => setIsLoading(false));
   }, [sheetId]);
@@ -356,30 +374,31 @@ export default function SheetClient() {
 
   const handleInsertRow = useCallback(async () => {
     rowOps.insertRow();
-    setTimeout(async () => { try { markSaving(); await saveAllRows(sheetId, rowsHistory.currentState); markSaved(); if (isOrgSheet) logRowAdd(sheetId, rowsHistory.currentState.length); } catch { toast.error("Row added locally but failed to persist."); setSaveStatus("saved"); } }, 50);
-  }, [rowOps.insertRow, sheetId, rowsHistory.currentState, markSaving, markSaved, isOrgSheet]);
+    setTimeout(async () => { try { markSaving(); await saveAllRows(sheetId, rowsHistory.currentState); markSaved(); if (isOrgSheet) logRowAdd(sheetId, rowsHistory.currentState.length); logActivity({ sheetId, organizationId: organizationId ?? undefined, action: "inserted a row", target: title }).catch(() => { }); } catch { toast.error("Row added locally but failed to persist."); setSaveStatus("saved"); } }, 50);
+  }, [rowOps.insertRow, sheetId, rowsHistory.currentState, markSaving, markSaved, isOrgSheet, organizationId, title]);
 
   const handleDeleteRow = useCallback(async () => {
     if (selectedRows.size === 0) return;
     const keys = Array.from(selectedRows); const count = selectedRows.size;
     rowOps.deleteRow(selectedRows); setSelectedRows(new Set());
-    try { markSaving(); await deleteRows(sheetId, keys); setTimeout(async () => { await saveAllRows(sheetId, rowsHistory.currentState); markSaved(); if (isOrgSheet) logRowDelete(sheetId, count); }, 50); }
+    try { markSaving(); await deleteRows(sheetId, keys); setTimeout(async () => { await saveAllRows(sheetId, rowsHistory.currentState); markSaved(); if (isOrgSheet) logRowDelete(sheetId, count); logActivity({ sheetId, organizationId: organizationId ?? undefined, action: `deleted ${count} row${count > 1 ? "s" : ""}`, target: title }).catch(() => { }); }, 50); }
     catch { toast.error("Row deleted locally but failed to persist."); setSaveStatus("saved"); }
-  }, [selectedRows, rowOps.deleteRow, sheetId, rowsHistory.currentState, markSaving, markSaved, isOrgSheet]);
+  }, [selectedRows, rowOps.deleteRow, sheetId, rowsHistory.currentState, markSaving, markSaved, isOrgSheet, organizationId, title]);
 
   const handleInsertColumn = useCallback(async (type: ColumnDef["type"]) => {
     colOps.insertColumn(type);
     setTimeout(async () => {
       markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved();
       if (isOrgSheet) { const nc = columnsHistory.currentState[columnsHistory.currentState.length - 1]; logColAdd(sheetId, nc?.name ?? "Column", type ?? "text"); }
+      logActivity({ sheetId, organizationId: organizationId ?? undefined, action: `added a column (${type ?? "text"})`, target: title }).catch(() => { });
     }, 50);
-  }, [colOps.insertColumn, sheetId, columnsHistory.currentState, rowsHistory.currentState, markSaving, markSaved, isOrgSheet]);
+  }, [colOps.insertColumn, sheetId, columnsHistory.currentState, rowsHistory.currentState, markSaving, markSaved, isOrgSheet, organizationId, title]);
 
   const handleDeleteColumn = useCallback(async (colKey: string) => {
     const colName = columns.find(c => c.key === colKey)?.name ?? colKey;
     colOps.deleteColumn(colKey); markSaving(); await deleteColumn(sheetId, colKey);
-    setTimeout(async () => { await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); if (isOrgSheet) logColDelete(sheetId, colName); }, 50);
-  }, [colOps.deleteColumn, sheetId, columnsHistory.currentState, rowsHistory.currentState, markSaving, markSaved, columns, isOrgSheet]);
+    setTimeout(async () => { await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); if (isOrgSheet) logColDelete(sheetId, colName); logActivity({ sheetId, organizationId: organizationId ?? undefined, action: `deleted column "${colName}"`, target: title }).catch(() => { }); }, 50);
+  }, [colOps.deleteColumn, sheetId, columnsHistory.currentState, rowsHistory.currentState, markSaving, markSaved, columns, isOrgSheet, organizationId, title]);
 
   const handleChangeColumnType = useCallback(async (colKey: string, newType: ColumnDef["type"]) => {
     colOps.changeColumnType(colKey, newType);
@@ -540,11 +559,13 @@ export default function SheetClient() {
 
   const handleRowsChange = useCallback((updatedRows: SheetRow[]) => {
     const prev = rows; rowsHistory.pushState(updatedRows); handleSaveChangedRow(updatedRows, prev);
+    let hadChange = false;
     updatedRows.forEach((row, rowIdx) => {
       const prevRow = prev[rowIdx]; if (!prevRow) return;
-      columns.forEach(col => { const o = prevRow[col.key]; const n = row[col.key]; if (o !== n) { const cl = String.fromCharCode(65 + columns.findIndex(c => c.key === col.key)); logCellEdit(sheetId, `${cl}${rowIdx + 1}`, col.name, o ?? null, n ?? null); } });
+      columns.forEach(col => { const o = prevRow[col.key]; const n = row[col.key]; if (o !== n) { hadChange = true; const cl = String.fromCharCode(65 + columns.findIndex(c => c.key === col.key)); logCellEdit(sheetId, `${cl}${rowIdx + 1}`, col.name, o ?? null, n ?? null); } });
     });
-  }, [rows, columns, rowsHistory.pushState, handleSaveChangedRow, sheetId, isOrgSheet]);
+    if (hadChange) logCellEditActivity(title);
+  }, [rows, columns, rowsHistory.pushState, handleSaveChangedRow, sheetId, isOrgSheet, logCellEditActivity, title]);
 
   // ── Grid columns ──────────────────────────────────────────────────────────
   const gridColumns = useMemo<Column<SheetRow>[]>(() => {

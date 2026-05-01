@@ -1,11 +1,3 @@
--- ============================================================
--- SheetSync — Complete Database Schema (Supabase / PostgreSQL)
--- ============================================================
--- This file documents the existing production schema.
--- Do NOT run this against an existing database without checking
--- for conflicts first.
--- ============================================================
-
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null unique,
@@ -118,18 +110,6 @@ create table if not exists public.cell_type_overrides (
   unique(sheet_id, cell_key)
 );
 
--- ============================================================
--- FORMULAS TABLE
--- ============================================================
--- Stores per-cell formulas AND whole-column formulas.
---
--- Per-cell formula:   cell_key = "rowIndex-columnKey"  e.g. "0-amount"
--- Column formula:     cell_key = "col:columnKey"       e.g. "col:amount"
---
--- Column formulas apply to EVERY row in that column. If a cell
--- has BOTH a per-cell formula and a column formula, the per-cell
--- formula takes priority.
--- ============================================================
 create table if not exists public.formulas (
   id uuid primary key default gen_random_uuid(),
   sheet_id uuid references public.sheets(id) on delete cascade,
@@ -150,7 +130,7 @@ create table if not exists public.protected_cells (
 create table if not exists public.templates (
   id uuid primary key default gen_random_uuid(),
   name text not null unique
-);
+)
 
 create table organization_invites (
   id uuid primary key default uuid_generate_v4(),
@@ -170,9 +150,6 @@ insert into public.templates (name) values
 ('Finance Tracker'),
 ('Blank Sheet');
 
--- ============================================================
--- INDEXES
--- ============================================================
 create index if not exists idx_sheets_owner on public.sheets(owner_id);
 create index if not exists idx_sheets_organization on public.sheets(organization_id);
 create index if not exists idx_sheets_folder on public.sheets(folder_id);
@@ -186,24 +163,33 @@ create index if not exists idx_organization_members_org on public.organization_m
 create index if not exists idx_organization_members_user on public.organization_members(user_id);
 create index if not exists idx_folders_organization on public.folders(organization_id);
 create index if not exists idx_folders_owner on public.folders(owner_id);
+create index if not exists idx_folders_parent on public.folders(parent_folder_id);
 create unique index if not exists idx_organization_email
 on public.organization_invites(organization_id, email);
+
 
 CREATE TABLE IF NOT EXISTS public.sheet_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sheet_id UUID REFERENCES public.sheets(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES public.profiles(id),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  actor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE,
   action TEXT NOT NULL,
   target TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Indexes for fast queries
 CREATE INDEX IF NOT EXISTS idx_sheet_history_sheet ON public.sheet_history(sheet_id);
 CREATE INDEX IF NOT EXISTS idx_sheet_history_user ON public.sheet_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_sheet_history_created_at ON public.sheet_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_sheet_history_org ON public.sheet_history(organization_id);
+CREATE INDEX IF NOT EXISTS idx_sheet_history_actor ON public.sheet_history(actor_id);
+
 CREATE INDEX IF NOT EXISTS idx_sheets_created_at ON public.sheets(created_at);
 CREATE INDEX IF NOT EXISTS idx_sheets_updated_at ON public.sheets(updated_at);
 CREATE INDEX IF NOT EXISTS idx_rows_updated_at ON public.rows(updated_at);
+
 
 ALTER TABLE public.organizations
 ADD COLUMN IF NOT EXISTS storage_limit NUMERIC DEFAULT 10;
@@ -211,26 +197,35 @@ ADD COLUMN IF NOT EXISTS storage_limit NUMERIC DEFAULT 10;
 ALTER TABLE public.sheets
 ADD COLUMN IF NOT EXISTS size_mb NUMERIC DEFAULT 0;
 
+-- profiles: real online/offline tracking
 ALTER TABLE public.profiles
 ADD COLUMN IF NOT EXISTS last_seen_at timestamptz;
 
+-- organizations: just description
 ALTER TABLE public.organizations
 ADD COLUMN IF NOT EXISTS description text;
 
+-- organization_members: real status instead of random
 ALTER TABLE public.organization_members
-ADD COLUMN IF NOT EXISTS status text default 'offline'
+ADD COLUMN IF NOT EXISTS status text default 'offline' 
   check (status in ('online', 'offline', 'away')),
 ADD COLUMN IF NOT EXISTS last_active_at timestamptz;
 
+-- indexes
 CREATE INDEX IF NOT EXISTS idx_profiles_last_seen ON public.profiles(last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_org_members_status ON public.organization_members(status);
 CREATE INDEX IF NOT EXISTS idx_org_members_last_active ON public.organization_members(last_active_at);
 
+
 ALTER TABLE public.cell_formats
 ADD COLUMN IF NOT EXISTS font_family text DEFAULT 'Arial';
+
 
 ALTER TABLE public.cell_formats
 ADD COLUMN IF NOT EXISTS text_wrap BOOLEAN NOT NULL DEFAULT false;
 
+-- Remove the old column-level wrap (no longer used)
 ALTER TABLE public.columns
 DROP COLUMN IF EXISTS text_wrap_enabled;
+
+

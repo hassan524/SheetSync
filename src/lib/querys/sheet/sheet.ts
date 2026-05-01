@@ -32,6 +32,7 @@ export async function loadSheet(sheetId: string) {
     title: sheet.data.title,
     isStarred: sheet.data.is_starred,
     isPersonal: sheet.data.is_personal,
+    organizationId: sheet.data.organization_id ?? null,
     ownerId: sheet.data.owner_id,
     size: sheet.data.size_mb,
     created_at: sheet.data.created_at,
