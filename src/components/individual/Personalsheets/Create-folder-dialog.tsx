@@ -13,14 +13,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Folder } from "lucide-react";
 
+import { logActivity } from "@/lib/querys/activity/activity";
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (name: string) => void;
+  onConfirm: (name: string) => Promise<void> | void;
 }
 
 const CreateFolderDialog = ({ open, onOpenChange, onConfirm }: Props) => {
   const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+
+    try {
+      setLoading(true);
+
+      await onConfirm(name);
+
+      await logActivity({
+        action: "created folder",
+        target: name,
+        organizationId: null,
+      });
+
+      setName("");
+      onOpenChange(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -31,25 +57,33 @@ const CreateFolderDialog = ({ open, onOpenChange, onConfirm }: Props) => {
             New Folder
           </DialogTitle>
         </DialogHeader>
+
         <div className="space-y-2 py-2">
           <Label htmlFor="folderName" className="text-sm">
             Folder name
           </Label>
+
           <Input
             id="folderName"
             placeholder="e.g. Project Alpha"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && onConfirm(name)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
             autoFocus
           />
         </div>
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             Cancel
           </Button>
-          <Button onClick={() => onConfirm(name)} disabled={!name.trim()}>
-            Create
+
+          <Button onClick={handleCreate} disabled={!name.trim() || loading}>
+            {loading ? "Creating..." : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>

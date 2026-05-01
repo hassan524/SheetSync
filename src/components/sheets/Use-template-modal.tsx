@@ -13,8 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Check, Building2, User, FolderPlus, Folder, X } from "lucide-react";
+import { Building2, User, X } from "lucide-react";
+
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
+import { createSheet } from "@/lib/querys/sheets/sheets";
+import { logActivity } from "@/lib/querys/activity/activity";
+import { toast } from "sonner";
 
 interface UseTemplateModalProps {
   open: boolean;
@@ -33,9 +37,9 @@ const UseTemplateModal = ({
 }: UseTemplateModalProps) => {
   const [sheetName, setSheetName] = useState("");
   const [saveToOrg, setSaveToOrg] = useState(false);
-
   const [selectedOrg, setSelectedOrg] = useState<string>("");
   const [selectedFolder, setSelectedFolder] = useState<string>("");
+  const [loading, setLoading] = useState(false);
 
   const template = SHEET_TEMPLATES.find((t) => t.id === templateId);
   const Icon = template?.icon;
@@ -52,25 +56,43 @@ const UseTemplateModal = ({
     setSelectedFolder("");
   };
 
-  const handleCreateSheet = () => {
-    if (!template) return;
+  const handleCreateSheet = async () => {
+    if (!template || !sheetName.trim()) return;
 
-    const sheet = {
-      id: crypto.randomUUID(),
-      name: sheetName.trim(),
-      templateId: template.id,
-      organizationId: saveToOrg ? selectedOrg || undefined : undefined,
-      folderId: !saveToOrg && selectedFolder ? selectedFolder : undefined,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      setLoading(true);
 
-    console.log("Created Sheet:", sheet);
-    onOpenChange(false);
+      const createdSheet = await createSheet({
+        name: sheetName.trim(),
+        templateId: template.id,
+        organizationId: saveToOrg ? selectedOrg || undefined : undefined,
+        folder_id: !saveToOrg ? selectedFolder || undefined : undefined,
+      });
+
+      // ✅ IMPORTANT: decide org vs personal
+      const isOrg = saveToOrg && selectedOrg;
+
+      await logActivity({
+        sheetId: createdSheet.id,
+        organizationId: isOrg ? selectedOrg : null,
+        action: "created sheet",
+        target: isOrg
+          ? `${createdSheet.name} (Org)`
+          : createdSheet.name,
+      });
+
+      toast.success(`Sheet "${sheetName}" created`);
+
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create sheet");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const canCreate =
-    !!sheetName.trim() &&
-    (saveToOrg ? !!selectedOrg : true);
+    !!sheetName.trim() && (saveToOrg ? !!selectedOrg : true);
 
   if (!template) return null;
 
@@ -134,7 +156,7 @@ const UseTemplateModal = ({
               <Switch checked={saveToOrg} onCheckedChange={handleToggleOrg} />
             </div>
 
-            {/* ORGANIZATION SELECT */}
+            {/* ORGANIZATION */}
             {saveToOrg && (
               <Select value={selectedOrg} onValueChange={setSelectedOrg}>
                 <SelectTrigger>
@@ -150,41 +172,42 @@ const UseTemplateModal = ({
               </Select>
             )}
 
-            {/* PERSONAL → FOLDERS */}
+            {/* PERSONAL FOLDER */}
             {!saveToOrg && (
-              <div className="space-y-2">
-                <Select
-                  value={selectedFolder}
-                  onValueChange={setSelectedFolder}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select folder..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {folders?.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* <button className="text-xs flex items-center gap-1 text-zinc-400">
-                  <FolderPlus className="h-3 w-3" />
-                  New folder
-                </button> */}
-              </div>
+              <Select
+                value={selectedFolder}
+                onValueChange={setSelectedFolder}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select folder..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {folders?.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
         </div>
 
         {/* FOOTER */}
         <div className="flex justify-end gap-2 p-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             Cancel
           </Button>
-          <Button onClick={handleCreateSheet} disabled={!canCreate}>
-            Create
+
+          <Button
+            onClick={handleCreateSheet}
+            disabled={!canCreate || loading}
+          >
+            {loading ? "Creating..." : "Create"}
           </Button>
         </div>
       </DialogContent>

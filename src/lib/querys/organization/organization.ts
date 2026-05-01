@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createOrganizationMember } from "./members";
-import { getInitials,  } from "@/lib/utils";
+import { getInitials, } from "@/lib/utils";
 import type { Organization, Sheet, Member } from "@/types";
 
 /**
@@ -294,4 +294,34 @@ export async function deleteOrganization(id: string) {
   if (error) throw new Error(error.message);
 
   return data;
+}
+
+// Get all my organization invites
+export async function getMyInvitesActivity() {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Unauthorized");
+
+  const { data, error } = await supabase
+    .from("organization_invites")
+    .select(`
+      id,
+      status,
+      created_at,
+      organizations (
+        id,
+        name
+      )
+    `)
+    .eq("email", user.email)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return data || [];
 }
