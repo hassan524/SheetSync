@@ -148,3 +148,90 @@ export async function deleteSheet(sheetId: string) {
   if (error) throw new Error(error.message);
   return data;
 }
+
+
+export async function getRecentSheets() {
+
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Unauthorized");
+
+  const { data, error } = await supabase
+    .from("sheets")
+    .select(`
+      id,
+      title,
+      template_id,
+      created_at,
+      updated_at,
+      organization_id,
+      folder_id,
+
+      folders (
+        id,
+        name
+      ),
+
+      organizations (
+        id,
+        name,
+        organization_members (
+          id
+        )
+      ),
+
+      rows (
+        id
+      ),
+
+      columns (
+        id
+      )
+    `)
+    .eq("owner_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+
+  return (data || []).map((sheet) => {
+    const org = sheet.organizations?.[0] ?? null;
+    const folder = sheet.folders?.[0] ?? null;
+
+    return {
+      id: sheet.id,
+      title: sheet.title,
+      templateId: sheet.template_id,
+
+      lastEdited: sheet.updated_at,
+
+      // 🔥 detect type
+      isOrganization: !!sheet.organization_id,
+
+      // ✅ organization safe mapping
+      organization: org
+        ? {
+          id: org.id,
+          name: org.name,
+          membersCount: org.organization_members?.length ?? 0,
+        }
+        : null,
+
+      // ✅ folder safe mapping
+      folder: folder
+        ? {
+          id: folder.id,
+          name: folder.name,
+        }
+        : null,
+
+      // ⚠️ NOTE: these are row objects, not counts from DB
+      rowsCount: sheet.rows?.length ?? 0,
+      colsCount: sheet.columns?.length ?? 0,
+    };
+  });
+}
