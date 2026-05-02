@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Folder } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { logActivity } from "@/lib/querys/activity/activity";
 
@@ -24,6 +25,8 @@ interface Props {
 const CreateFolderDialog = ({ open, onOpenChange, onConfirm }: Props) => {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
 
   const handleCreate = async () => {
     if (!name.trim()) return;
@@ -38,7 +41,7 @@ const CreateFolderDialog = ({ open, onOpenChange, onConfirm }: Props) => {
         target: name,
         organizationId: null,
       });
-
+      router.refresh()
       setName("");
       onOpenChange(false);
     } catch (err) {

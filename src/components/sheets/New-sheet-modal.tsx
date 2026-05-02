@@ -93,6 +93,7 @@ const NewSheetModal = ({
       );
 
       toast.success(`Sheet "${sheetName}" created`);
+      router.refresh()
       setSheetName("");
       onOpenChange(false);
     } catch (err: any) {
