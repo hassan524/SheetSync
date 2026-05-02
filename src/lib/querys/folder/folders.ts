@@ -20,17 +20,19 @@ export async function getAllFolders() {
   const { data, error } = await supabase
     .from("folders")
     .select(`
+    *,
+    sheets (
       *,
-      sheets (
-        *,
-        owner:profiles!sheets_owner_id_fkey (
-          id,
-          name,
-          email,
-          avatar_url
-        )
-      )
-    `)
+      owner:profiles!sheets_owner_id_fkey (
+        id,
+        name,
+        email,
+        avatar_url
+      ),
+      rows ( id ),
+      columns ( id )
+    )
+  `)
     .eq("owner_id", user.id)
     .is("organization_id", null)
     .order("created_at", { ascending: false });

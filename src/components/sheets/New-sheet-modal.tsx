@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Folder, FolderPlus, FileSpreadsheet } from "lucide-react";
-import { useRouter, usePathname } from "next/navigation";
+import { X, Folder, FolderPlus, ChevronLeft, ChevronRight } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 
 import CreateFolderDialog from "../individual/Personalsheets/Create-folder-dialog";
@@ -41,13 +41,14 @@ const NewSheetModal = ({
   onSheetCreated,
 }: Props) => {
   const [sheetName, setSheetName] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState(SHEET_TEMPLATES[0].id);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(SHEET_TEMPLATES[0].id);
   const [selectedFolder, setSelectedFolder] = useState(currentFolder || "personal");
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   const pathname = usePathname();
-  const router = useRouter();
 
   const organizationId = useMemo(() => {
     const match = pathname.match(/^\/organizations\/([^/]+)/);
@@ -58,10 +59,28 @@ const NewSheetModal = ({
     if (currentFolder) setSelectedFolder(currentFolder);
   }, [currentFolder]);
 
-  const activeTemplate = useMemo(
-    () => SHEET_TEMPLATES.find((t) => t.id === selectedTemplate),
-    [selectedTemplate]
-  );
+  useEffect(() => {
+    if (open) {
+      setActiveIndex(0);
+      setSelectedTemplateId(SHEET_TEMPLATES[0].id);
+      setSheetName("");
+    }
+  }, [open]);
+
+  const activeTemplate = SHEET_TEMPLATES[activeIndex];
+  const Icon = activeTemplate.icon;
+
+  const scrollTo = (index: number) => {
+    const next = ((index % SHEET_TEMPLATES.length) + SHEET_TEMPLATES.length) % SHEET_TEMPLATES.length;
+    setActiveIndex(next);
+    setSelectedTemplateId(SHEET_TEMPLATES[next].id);
+
+    const container = carouselRef.current;
+    if (container) {
+      const card = container.children[next] as HTMLElement;
+      card?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }
+  };
 
   const handleCreate = async () => {
     if (!sheetName.trim()) return;
@@ -71,26 +90,19 @@ const NewSheetModal = ({
 
       const createdSheet = await createSheet({
         name: sheetName,
-        templateId: selectedTemplate,
+        templateId: selectedTemplateId,
         folder_id: selectedFolder !== "personal" ? selectedFolder : undefined,
         organizationId: organizationId || undefined,
       });
 
-      // ✅ LOG SHEET CREATION ACTIVITY
       await logActivity({
-        // userId: "", // backend already uses auth user (safe)
         sheetId: createdSheet.id,
         organizationId: organizationId || null,
-        action: organizationId
-          ? "created sheet in organization"
-          : "created sheet",
+        action: organizationId ? "created sheet in organization" : "created sheet",
         target: sheetName,
       });
 
-      onSheetCreated?.(
-        createdSheet,
-        selectedFolder === "personal" ? "" : selectedFolder
-      );
+      onSheetCreated?.(createdSheet, selectedFolder === "personal" ? "" : selectedFolder);
 
       toast.success(`Sheet "${sheetName}" created`);
       setSheetName("");
@@ -104,16 +116,13 @@ const NewSheetModal = ({
 
   const handleCreateFolder = async (name: string) => {
     try {
-      const newFolder = organizationId
+      organizationId
         ? await createFolder(name, organizationId)
         : await createFolder(name);
 
       await logActivity({
-        // userId: "", 
         organizationId: organizationId || null,
-        action: organizationId
-          ? "created folder in organization"
-          : "created folder",
+        action: organizationId ? "created folder in organization" : "created folder",
         target: name,
       });
 
@@ -131,38 +140,71 @@ const NewSheetModal = ({
         <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden rounded-2xl border border-zinc-200/80 shadow-xl [&>button]:hidden">
 
           {/* HEADER */}
-          <div className="relative h-[152px] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100/60">
+          <div className={`relative h-[160px] overflow-hidden bg-gradient-to-br ${activeTemplate.accent.from}`}>
             <button
               onClick={() => onOpenChange(false)}
-              className="absolute top-3.5 right-3.5 h-7 w-7 rounded-full bg-black/5 hover:bg-black/10 border flex items-center justify-center"
+              className="absolute top-3.5 right-3.5 z-10 h-7 w-7 rounded-full bg-black/5 hover:bg-black/10 border flex items-center justify-center"
             >
               <X className="h-3.5 w-3.5 text-zinc-500" />
             </button>
 
-            <div className="absolute inset-0 flex flex-col justify-end px-6 pb-5">
+            {/* Prev arrow — always visible, wraps around */}
+            {/* <button
+              onClick={() => scrollTo(activeIndex - 1)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 h-7 w-7 rounded-full bg-white/80 hover:bg-white border shadow-sm flex items-center justify-center"
+            >
+              <ChevronLeft className="h-3.5 w-3.5 text-zinc-600" />
+            </button> */}
+
+            {/* Next arrow — always visible, wraps around */}
+            <button
+              onClick={() => scrollTo(activeIndex + 1)}
+              className="absolute cursor-pointer right-10 top-1/2 -translate-y-1/2 z-10 h-7 w-7 rounded-full bg-white/80 hover:bg-white border shadow-sm flex items-center justify-center"
+            >
+              <ChevronRight className="h-3.5 w-3.5 text-zinc-600" />
+            </button>
+
+            <div className="absolute inset-0 flex flex-col justify-end px-6 pb-4">
               <div className="flex items-center gap-2.5 mb-2">
-                <div className="h-7 w-7 rounded-lg border bg-white flex items-center justify-center">
-                  <FileSpreadsheet className="h-3.5 w-3.5 text-zinc-600" />
+                <div className={`h-7 w-7 rounded-lg border flex items-center justify-center ${activeTemplate.accent.iconRing}`}>
+                  <Icon className="h-3.5 w-3.5 text-zinc-600" />
                 </div>
-                <span className="text-[10.5px] font-semibold uppercase text-zinc-400">
-                  {activeTemplate?.title}
+                <span className="text-[10.5px] font-semibold uppercase text-zinc-400 tracking-wide">
+                  {activeTemplate.title}
                 </span>
               </div>
 
-              <p className="text-[19px] font-bold">
-                {activeTemplate?.copy?.tagline}
+              <p className="text-[19px] font-bold leading-snug">
+                {activeTemplate.copy.tagline}
               </p>
+
+              {/* Dot indicators */}
+              <div className="flex items-center gap-1 mt-3">
+                {SHEET_TEMPLATES.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => scrollTo(i)}
+                    className={`h-1.5 rounded-full transition-all duration-200 ${i === activeIndex ? "w-4 bg-zinc-500" : "w-1.5 bg-zinc-300"
+                      }`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 
           {/* BODY */}
-          <div className="px-6 py-5 space-y-5 bg-white">
+          <div className="px-6 py-5 space-y-4 bg-white">
+            <p className="text-[13px] text-zinc-500 leading-relaxed">
+              {activeTemplate.copy.body}
+            </p>
 
             <div className="space-y-1.5">
               <Label>Sheet name</Label>
               <Input
                 value={sheetName}
                 onChange={(e) => setSheetName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && canCreate && handleCreate()}
+                placeholder={`e.g. My ${activeTemplate.title}`}
               />
             </div>
 
@@ -174,13 +216,11 @@ const NewSheetModal = ({
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-
                   <SelectContent>
                     <SelectItem value="personal">
                       <Folder className="h-3 w-3 mr-2" />
                       Personal
                     </SelectItem>
-
                     {folders?.map((f) => (
                       <SelectItem key={f.id} value={f.id}>
                         {f.name}
@@ -190,7 +230,7 @@ const NewSheetModal = ({
                 </Select>
 
                 <button
-                  className="text-xs text-zinc-500 flex items-center gap-1"
+                  className="text-xs text-zinc-500 flex items-center gap-1 hover:text-zinc-700 transition-colors"
                   onClick={() => setCreateFolderOpen(true)}
                 >
                   <FolderPlus className="h-3 w-3" />
@@ -205,7 +245,6 @@ const NewSheetModal = ({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-
             <Button onClick={handleCreate} disabled={!canCreate || loading}>
               {loading ? "Creating..." : "Create"}
             </Button>

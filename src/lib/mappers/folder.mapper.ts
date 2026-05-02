@@ -37,19 +37,19 @@ export const mapFolders = (folders: any[]): FolderWithSheets[] => {
 
         owner: sheet.owner
           ? {
-              id: sheet.owner.id,
-              name: sheet.owner.name ?? "Unknown",
-              email: sheet.owner.email ?? "",
-              avatar: sheet.owner.avatar_url ?? undefined,
-              initials,
-            }
+            id: sheet.owner.id,
+            name: sheet.owner.name ?? "Unknown",
+            email: sheet.owner.email ?? "",
+            avatar: sheet.owner.avatar_url ?? undefined,
+            initials,
+          }
           : {
-              id: sheet.owner_id,
-              name: "Unknown",
-              email: "",
-              avatar: undefined,
-              initials: "?",
-            },
+            id: sheet.owner_id,
+            name: "Unknown",
+            email: "",
+            avatar: undefined,
+            initials: "?",
+          },
 
         visibility: "private",
         lastModified: sheet.updated_at,
@@ -57,8 +57,8 @@ export const mapFolders = (folders: any[]): FolderWithSheets[] => {
         collaborators: sheet.collaborators ?? 0,
         activeEditors: sheet.activeEditors ?? 0,
         size: `${sheet.size_mb ?? 0} MB`,
-        rows: sheet.rows_count ?? 0,
-        columns: sheet.columns_count ?? 0,
+        rows: sheet.rows?.length ?? 0,
+        columns: sheet.columns?.length ?? 0,
       };
     }),
   }));

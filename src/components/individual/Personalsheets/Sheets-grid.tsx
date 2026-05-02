@@ -43,6 +43,7 @@ const getTag = (title: string) => {
 };
 
 const SheetsGrid = ({ sheets, viewMode, searchQuery, folderName, onNewSheet }: Props) => {
+  console.log("SHEETS", sheets)
   return (
     <div className="animate-fade-in">
       <div className="flex items-center justify-between my-4">
@@ -88,7 +89,7 @@ const SheetsGrid = ({ sheets, viewMode, searchQuery, folderName, onNewSheet }: P
                 className="animate-scale-in"
               >
                 <SheetCard
-                id={sheet.id}
+                  id={sheet.id}
                   title={sheet.title}
                   lastEdited={lastEdited}
                   isStarred={sheet.is_starred}
