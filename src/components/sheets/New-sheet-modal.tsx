@@ -105,6 +105,7 @@ const NewSheetModal = ({
       onSheetCreated?.(createdSheet, selectedFolder === "personal" ? "" : selectedFolder);
 
       toast.success(`Sheet "${sheetName}" created`);
+      router.refresh()
       setSheetName("");
       onOpenChange(false);
     } catch (err: any) {

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Building2, User, X } from "lucide-react";
-
+import { useRouter } from "next/navigation";
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { createSheet } from "@/lib/querys/sheets/sheets";
 import { logActivity } from "@/lib/querys/activity/activity";
@@ -40,6 +40,8 @@ const UseTemplateModal = ({
   const [selectedOrg, setSelectedOrg] = useState<string>("");
   const [selectedFolder, setSelectedFolder] = useState<string>("");
   const [loading, setLoading] = useState(false);
+
+  const router = useRouter()
 
   const template = SHEET_TEMPLATES.find((t) => t.id === templateId);
   const Icon = template?.icon;
@@ -69,7 +71,6 @@ const UseTemplateModal = ({
         folder_id: !saveToOrg ? selectedFolder || undefined : undefined,
       });
 
-      // ✅ IMPORTANT: decide org vs personal
       const isOrg = saveToOrg && selectedOrg;
 
       await logActivity({
@@ -82,7 +83,7 @@ const UseTemplateModal = ({
       });
 
       toast.success(`Sheet "${sheetName}" created`);
-
+      router.refresh()
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Failed to create sheet");

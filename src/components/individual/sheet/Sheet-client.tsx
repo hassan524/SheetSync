@@ -294,8 +294,9 @@ export default function SheetClient() {
         rowsHistory.pushState(td.rows); columnsHistory.pushState(td.columns);
         setSheetState(p => ({ ...p, title: data.title || td.title, starred: false, rows: td.rows, columns: td.columns }));
         await Promise.all([saveAllRows(sheetId, td.rows), saveAllColumns(sheetId, td.columns)]);
-        await trackSheetOpen(sheetId);
       }
+      await trackSheetOpen(sheetId);
+
     }).catch(err => { console.error(err); toast.error("Failed to load sheet. Please refresh."); }).finally(() => setIsLoading(false));
   }, [sheetId]);
 
