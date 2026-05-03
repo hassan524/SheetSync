@@ -24,6 +24,10 @@ export async function saveAllColumns(sheetId: string, columns: ColumnDef[]) {
     type: col.type ?? "text",
     width: col.width ?? 150,
     position: idx,
+    select_options:
+      col.selectOptions && col.selectOptions.length > 0
+        ? JSON.stringify(col.selectOptions)
+        : null,
     // text_wrap_enabled: textWrapColumns.has(col.key),
   }));
 

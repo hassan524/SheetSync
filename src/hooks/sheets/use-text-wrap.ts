@@ -1,7 +1,7 @@
 // hooks/sheets/use-text-wrap.ts
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import type { SheetRow } from "@/types/sheet.types";
+import type { SheetRow } from "@/types";
 
 export function useTextWrap(rows: SheetRow[], onSave: () => void) {
   const [textWrapColumns, setTextWrapColumns] = useState<Set<string>>(

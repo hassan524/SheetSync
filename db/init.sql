@@ -171,11 +171,9 @@ on public.organization_invites(organization_id, email);
 CREATE TABLE IF NOT EXISTS public.sheet_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sheet_id UUID REFERENCES public.sheets(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  actor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE,
-  action TEXT NOT NULL,
-  target TEXT,
+  user_id UUID REFERENCES public.profiles(id),
+  action TEXT NOT NULL, -- 'edited', 'created', 'shared', 'commented', 'downloaded', etc.
+  target TEXT,          -- Sheet title or object
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -183,8 +181,6 @@ CREATE TABLE IF NOT EXISTS public.sheet_history (
 CREATE INDEX IF NOT EXISTS idx_sheet_history_sheet ON public.sheet_history(sheet_id);
 CREATE INDEX IF NOT EXISTS idx_sheet_history_user ON public.sheet_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_sheet_history_created_at ON public.sheet_history(created_at);
-CREATE INDEX IF NOT EXISTS idx_sheet_history_org ON public.sheet_history(organization_id);
-CREATE INDEX IF NOT EXISTS idx_sheet_history_actor ON public.sheet_history(actor_id);
 
 CREATE INDEX IF NOT EXISTS idx_sheets_created_at ON public.sheets(created_at);
 CREATE INDEX IF NOT EXISTS idx_sheets_updated_at ON public.sheets(updated_at);
@@ -228,4 +224,40 @@ ADD COLUMN IF NOT EXISTS text_wrap BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.columns
 DROP COLUMN IF EXISTS text_wrap_enabled;
 
-
+
+ALTER TABLE public.sheet_history
+ADD COLUMN IF NOT EXISTS actor_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+ADD COLUMN IF NOT EXISTS organization_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_sheet_history_org
+ON public.sheet_history(organization_id);
+
+
+ALTER TABLE public.sheet_history
+ADD CONSTRAINT fk_actor
+FOREIGN KEY (actor_id) REFERENCES public.profiles(id);
+
+
+ALTER TABLE public.sheet_history
+DROP CONSTRAINT IF EXISTS sheet_history_user_id_fkey;
+
+ALTER TABLE public.sheet_history
+ADD CONSTRAINT sheet_history_user_id_fkey
+FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+-- 2. Add actor index (if missing)
+CREATE INDEX IF NOT EXISTS idx_sheet_history_actor 
+ON public.sheet_history(actor_id);
+
+
+ALTER TABLE sheets ADD COLUMN last_opened_at TIMESTAMPTZ;
+
+-- ============================================================
+-- Select List Column Feature
+-- Adds a JSONB column to store dropdown options for "select" type columns.
+-- Example: ["computer", "laptop", "mobile", "PC"]
+-- Each column of type "select" can define its own list of options.
+-- Users can still type custom values not in the list.
+-- ============================================================
+ALTER TABLE public.columns
+ADD COLUMN IF NOT EXISTS select_options JSONB DEFAULT NULL;

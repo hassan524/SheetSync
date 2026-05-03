@@ -24,7 +24,7 @@ import {
   Palette,
   ChevronDown,
 } from "lucide-react";
-import { CellFormat } from "@/types/sheet.types";
+import { CellFormat } from "@/types";
 
 interface FormattingToolbarProps {
   currentFormat?: CellFormat;
@@ -84,7 +84,7 @@ export default function FormattingToolbar({
             disabled={disabled}
           >
             <Type className="h-3.5 w-3.5" />
-           <span className="text-xs">{currentFormat?.fontSize || 12}</span>
+            <span className="text-xs">{currentFormat?.fontSize || 12}</span>
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>

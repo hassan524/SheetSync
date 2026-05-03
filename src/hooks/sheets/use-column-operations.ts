@@ -1,7 +1,7 @@
 // hooks/sheets/use-column-operations.ts
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import type { SheetRow, ColumnDef } from "@/types/sheet.types";
+import type { SheetRow, ColumnDef } from "@/types";
 
 export function useColumnOperations(
   rows: SheetRow[],
@@ -39,6 +39,7 @@ export function useColumnOperations(
         else if (type === "status") updatedRow[newKey] = "Not Started";
         else if (type === "date")
           updatedRow[newKey] = new Date().toISOString().split("T")[0];
+        else if (type === "select") updatedRow[newKey] = "";
         else updatedRow[newKey] = "";
         return updatedRow;
       });
@@ -96,6 +97,7 @@ export function useColumnOperations(
           newType === "progress"
         )
           updatedRow[colKey] = 0;
+        else if (newType === "select") updatedRow[colKey] = "";
         else updatedRow[colKey] = String(updatedRow[colKey] || "");
         return updatedRow;
       });

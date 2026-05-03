@@ -45,6 +45,11 @@ export async function loadSheet(sheetId: string) {
         type: col.type,
         width: col.width,
         position: col.position,
+        selectOptions: col.select_options
+          ? typeof col.select_options === "string"
+            ? JSON.parse(col.select_options)
+            : col.select_options
+          : undefined,
       })) ?? [],
 
     rows:

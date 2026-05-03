@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Role } from "@/types/organization.types";
+import { Role } from "@/types";
 
 const roleColors: Record<Role, string> = {
   owner: "bg-primary/10 text-primary border-primary/20",
@@ -25,6 +25,7 @@ interface OrganizationCardProps {
   role: Role;
   membersCount?: number;
   sheetsCount?: number;
+  activeNow?: number;
   recentMembers?: { initials: string }[];
 }
 
@@ -34,6 +35,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
   role,
   membersCount = 0,
   sheetsCount = 0,
+  activeNow = 0,
   recentMembers = [],
 }) => {
   const router = useRouter();
@@ -73,6 +75,12 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
           <span className="flex items-center gap-1.5">
             <Users className="h-4 w-4" />
             {membersCount} members
+            {activeNow > 0 && (
+              <span className="flex items-center gap-1 ml-1 text-emerald-600 font-medium">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                {activeNow} online
+              </span>
+            )}
           </span>
           <span className="flex items-center gap-1.5">
             <FileSpreadsheet className="h-4 w-4" />

@@ -27,7 +27,7 @@ import {
   Globe,
   Circle,
 } from "lucide-react";
-import { Sheet } from "@/types/types";
+import { Sheet } from "@/types";
 
 interface SheetsTableProps {
   sheets: Sheet[];
@@ -47,6 +47,7 @@ const visibilityLabels = {
 };
 
 const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
+  console.log("sheets", sheets);
   return (
     <div className="border rounded-lg overflow-hidden animate-fade-in">
       <Table>
@@ -101,8 +102,18 @@ const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className="gap-1 text-xs">
-                  {visibilityIcons[sheet.visibility]}
-                  {visibilityLabels[sheet.visibility]}
+                  {
+                    visibilityIcons[
+                      (sheet.visibility ??
+                        "private") as keyof typeof visibilityIcons
+                    ]
+                  }
+                  {
+                    visibilityLabels[
+                      (sheet.visibility ??
+                        "private") as keyof typeof visibilityLabels
+                    ]
+                  }
                 </Badge>
               </TableCell>
               <TableCell>
@@ -119,7 +130,7 @@ const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
                 </div>
               </TableCell>
               <TableCell className="text-center">
-                {sheet?.activeEditors > 0 ? (
+                {(sheet?.activeEditors ?? 0) > 0 ? (
                   <div className="flex items-center justify-center gap-1.5">
                     <Circle className="h-2 w-2 fill-emerald-500 text-emerald-500" />
                     <span className="text-sm font-medium text-emerald-600">

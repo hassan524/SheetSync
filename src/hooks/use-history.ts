@@ -1,6 +1,6 @@
 // hooks/useHistory.ts
 import { useState, useCallback } from "react";
-import { HistoryEntry } from "@/types/sheet.types";
+// types are imported from @/types when needed
 
 export function useHistory<T>(initialState: T) {
   const [currentState, setCurrentState] = useState<T>(initialState);

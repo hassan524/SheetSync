@@ -1,29 +1,45 @@
-import { TrendingUp, Crown, Calendar, Lock, Users, FileSpreadsheet, PenLine, UserCheck } from "lucide-react";
+import {
+  TrendingUp,
+  Crown,
+  Calendar,
+  Lock,
+  Users,
+  FileSpreadsheet,
+  PenLine,
+  UserCheck,
+} from "lucide-react";
 import { Organization } from "@/types";
 
 export function OrgBottomStrip({ org }: { org: Organization }) {
   const stats = org.weeklyStats;
 
   const createdAt = new Date(org.created_at).toLocaleDateString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 
   const createdDaysAgo = Math.floor(
-    (Date.now() - new Date(org.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    // eslint-disable-next-line react-hooks/purity
+    (Date.now() - new Date(org.created_at).getTime()) / (1000 * 60 * 60 * 24),
   );
 
   const ageLabel =
-    createdDaysAgo === 0 ? "Today" :
-    createdDaysAgo === 1 ? "Yesterday" :
-    createdDaysAgo < 30  ? `${createdDaysAgo} days ago` :
-    createdDaysAgo < 365 ? `${Math.floor(createdDaysAgo / 30)} months ago` :
-                           `${Math.floor(createdDaysAgo / 365)} yr ago`;
+    createdDaysAgo === 0
+      ? "Today"
+      : createdDaysAgo === 1
+        ? "Yesterday"
+        : createdDaysAgo < 30
+          ? `${createdDaysAgo} days ago`
+          : createdDaysAgo < 365
+            ? `${Math.floor(createdDaysAgo / 30)} months ago`
+            : `${Math.floor(createdDaysAgo / 365)} yr ago`;
 
-  const owner   = org.members?.find(m => m.role === "owner");
-  const admins  = org.members?.filter(m => m.role === "admin").length  ?? 0;
-  const editors = org.members?.filter(m => m.role === "editor").length ?? 0;
-  const viewers = org.members?.filter(m => m.role === "viewer").length ?? 0;
-  const total   = org.members?.length ?? 0;
+  const owner = org.members?.find((m) => m.role === "owner");
+  const admins = org.members?.filter((m) => m.role === "admin").length ?? 0;
+  const editors = org.members?.filter((m) => m.role === "editor").length ?? 0;
+  const viewers = org.members?.filter((m) => m.role === "viewer").length ?? 0;
+  const total = org.members?.length ?? 0;
 
   const weekStats = [
     {
@@ -48,7 +64,7 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
       icon: UserCheck,
       label: "Contributors",
       sublabel: "Active members",
-      value: org.members?.filter(m => m.status === "online").length ?? 0,
+      value: org.members?.filter((m) => m.status === "online").length ?? 0,
       color: "text-emerald-600",
       iconBg: "bg-emerald-50 border-emerald-100",
       iconColor: "text-emerald-500",
@@ -56,14 +72,13 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
   ];
 
   const roleRows = [
-    { label: "Admin",  count: admins,  color: "bg-purple-500" },
-    { label: "Editor", count: editors, color: "bg-blue-500"   },
-    { label: "Viewer", count: viewers, color: "bg-slate-400"  },
-  ].filter(r => r.count > 0);
+    { label: "Admin", count: admins, color: "bg-purple-500" },
+    { label: "Editor", count: editors, color: "bg-blue-500" },
+    { label: "Viewer", count: viewers, color: "bg-slate-400" },
+  ].filter((r) => r.count > 0);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-
       {/* ── Weekly Activity ── */}
       <div className="border rounded-xl bg-card px-5 py-4 flex flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -82,7 +97,9 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
               key={i}
               className={`flex flex-col gap-2 ${i > 0 ? "pl-4" : ""} ${i < 2 ? "pr-4" : ""}`}
             >
-              <div className={`h-7 w-7 rounded-lg border ${s.iconBg} flex items-center justify-center`}>
+              <div
+                className={`h-7 w-7 rounded-lg border ${s.iconBg} flex items-center justify-center`}
+              >
                 <s.icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
               </div>
               <div>
@@ -137,7 +154,9 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
                 <Calendar className="h-3 w-3 text-muted-foreground" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium leading-tight truncate">{createdAt}</p>
+                <p className="text-xs font-medium leading-tight truncate">
+                  {createdAt}
+                </p>
                 <p className="text-[10px] text-muted-foreground">{ageLabel}</p>
               </div>
             </div>
@@ -167,11 +186,15 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
             <div className="flex flex-col gap-1.5">
               {roleRows.map((r) => (
                 <div key={r.label} className="flex items-center gap-2.5">
-                  <span className="text-[11px] text-muted-foreground w-10 shrink-0">{r.label}</span>
+                  <span className="text-[11px] text-muted-foreground w-10 shrink-0">
+                    {r.label}
+                  </span>
                   <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full ${r.color} transition-all duration-500`}
-                      style={{ width: total ? `${(r.count / total) * 100}%` : "0%" }}
+                      style={{
+                        width: total ? `${(r.count / total) * 100}%` : "0%",
+                      }}
                     />
                   </div>
                   <span className="text-[11px] font-medium text-foreground w-3 text-right shrink-0">
@@ -181,11 +204,12 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
               ))}
             </div>
           ) : (
-            <p className="text-[11px] text-muted-foreground">No role data yet.</p>
+            <p className="text-[11px] text-muted-foreground">
+              No role data yet.
+            </p>
           )}
         </div>
       </div>
-
     </div>
   );
 }

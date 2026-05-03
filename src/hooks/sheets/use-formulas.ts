@@ -84,36 +84,53 @@ function columnIndexToLetter(index: number): string {
 
 function splitTopLevelArgs(str: string): string[] {
   const args: string[] = [];
-  let depth = 0, inStr = false, strChar = "", cur = "";
+  let depth = 0,
+    inStr = false,
+    strChar = "",
+    cur = "";
   for (let i = 0; i < str.length; i++) {
     const ch = str[i];
     if (inStr) {
       cur += ch;
       if (ch === strChar && str[i - 1] !== "\\") inStr = false;
     } else if (ch === '"' || ch === "'") {
-      inStr = true; strChar = ch; cur += ch;
-    } else if (ch === "(") { depth++; cur += ch; }
-    else if (ch === ")") { depth--; cur += ch; }
-    else if (ch === "," && depth === 0) { args.push(cur.trim()); cur = ""; }
-    else { cur += ch; }
+      inStr = true;
+      strChar = ch;
+      cur += ch;
+    } else if (ch === "(") {
+      depth++;
+      cur += ch;
+    } else if (ch === ")") {
+      depth--;
+      cur += ch;
+    } else if (ch === "," && depth === 0) {
+      args.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
   }
   if (cur.trim()) args.push(cur.trim());
   return args;
 }
 
 function stripQuotes(s: string): string {
-  if (s.length >= 2 &&
+  if (
+    s.length >= 2 &&
     ((s.startsWith('"') && s.endsWith('"')) ||
-      (s.startsWith("'") && s.endsWith("'")))) {
+      (s.startsWith("'") && s.endsWith("'")))
+  ) {
     return s.slice(1, -1);
   }
   return s;
 }
 
 function isStringLiteral(s: string): boolean {
-  return s.length >= 2 &&
+  return (
+    s.length >= 2 &&
     ((s.startsWith('"') && s.endsWith('"')) ||
-      (s.startsWith("'") && s.endsWith("'")));
+      (s.startsWith("'") && s.endsWith("'")))
+  );
 }
 
 function isNumericLiteral(s: string): boolean {
@@ -126,12 +143,12 @@ function isNumericLiteral(s: string): boolean {
 
 interface ResolvedArg {
   raw: string;
-  value: any;          // the resolved scalar value
-  isCol: boolean;      // true = was a column-name ref (whole-col semantics)
-  colIdx: number;      // valid when isCol=true OR isA1=true
-  colKey: string;      // valid when isCol=true OR isA1=true
-  isA1: boolean;       // true = was an A1-style ref
-  a1Row: number;       // 0-based row when isA1=true
+  value: any; // the resolved scalar value
+  isCol: boolean; // true = was a column-name ref (whole-col semantics)
+  colIdx: number; // valid when isCol=true OR isA1=true
+  colKey: string; // valid when isCol=true OR isA1=true
+  isA1: boolean; // true = was an A1-style ref
+  a1Row: number; // 0-based row when isA1=true
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -171,19 +188,29 @@ function resolveAggCol(arg: ResolvedArg, ctx: FormulaContext): number {
   return ctx.findColumnIndex(String(arg.value));
 }
 
-function resolveAggStart(arg: ResolvedArg | undefined, ctx: FormulaContext): number {
+function resolveAggStart(
+  arg: ResolvedArg | undefined,
+  ctx: FormulaContext,
+): number {
   if (!arg) return 0;
   if (arg.isA1) return arg.a1Row;
   return Number(arg.value) || 0;
 }
 
-function resolveAggEnd(arg: ResolvedArg | undefined, ctx: FormulaContext): number {
+function resolveAggEnd(
+  arg: ResolvedArg | undefined,
+  ctx: FormulaContext,
+): number {
   if (!arg) return ctx.rows.length - 1;
   if (arg.isA1) return arg.a1Row;
   return Number(arg.value) ?? ctx.rows.length - 1;
 }
 
-function numVals(args: ResolvedArg[], ctx: FormulaContext, colArgIdx: number): number[] {
+function numVals(
+  args: ResolvedArg[],
+  ctx: FormulaContext,
+  colArgIdx: number,
+): number[] {
   const colArg = args[colArgIdx];
   if (!colArg) return [];
   const ci = resolveAggCol(colArg, ctx);
@@ -193,7 +220,11 @@ function numVals(args: ResolvedArg[], ctx: FormulaContext, colArgIdx: number): n
   return ctx.getColValues(ci, start, end);
 }
 
-function rawVals(args: ResolvedArg[], ctx: FormulaContext, colArgIdx: number): any[] {
+function rawVals(
+  args: ResolvedArg[],
+  ctx: FormulaContext,
+  colArgIdx: number,
+): any[] {
   const colArg = args[colArgIdx];
   if (!colArg) return [];
   const ci = resolveAggCol(colArg, ctx);
@@ -230,17 +261,37 @@ function rawVals(args: ResolvedArg[], ctx: FormulaContext, colArgIdx: number): a
 // ─────────────────────────────────────────────────────────────
 
 const FORMULA_IMPL: Record<string, FormulaFn> = {
-
   // ── MATH AGGREGATE ────────────────────────────────────────
-  SUM: (args, ctx) => { const v = numVals(args, ctx, 0); return v.reduce((a, b) => a + b, 0); },
-  AVG: (args, ctx) => { const v = numVals(args, ctx, 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; },
+  SUM: (args, ctx) => {
+    const v = numVals(args, ctx, 0);
+    return v.reduce((a, b) => a + b, 0);
+  },
+  AVG: (args, ctx) => {
+    const v = numVals(args, ctx, 0);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+  },
   AVERAGE: (args, ctx) => FORMULA_IMPL.AVG(args, ctx),
   COUNT: (args, ctx) => numVals(args, ctx, 0).length,
-  COUNTA: (args, ctx) => rawVals(args, ctx, 0).filter(v => v !== "" && v !== null && v !== undefined).length,
-  COUNTBLANK: (args, ctx) => rawVals(args, ctx, 0).filter(v => v === "" || v === null || v === undefined).length,
-  MAX: (args, ctx) => { const v = numVals(args, ctx, 0); return v.length ? Math.max(...v) : 0; },
-  MIN: (args, ctx) => { const v = numVals(args, ctx, 0); return v.length ? Math.min(...v) : 0; },
-  RANGE: (args, ctx) => { const v = numVals(args, ctx, 0); return v.length ? Math.max(...v) - Math.min(...v) : 0; },
+  COUNTA: (args, ctx) =>
+    rawVals(args, ctx, 0).filter(
+      (v) => v !== "" && v !== null && v !== undefined,
+    ).length,
+  COUNTBLANK: (args, ctx) =>
+    rawVals(args, ctx, 0).filter(
+      (v) => v === "" || v === null || v === undefined,
+    ).length,
+  MAX: (args, ctx) => {
+    const v = numVals(args, ctx, 0);
+    return v.length ? Math.max(...v) : 0;
+  },
+  MIN: (args, ctx) => {
+    const v = numVals(args, ctx, 0);
+    return v.length ? Math.min(...v) : 0;
+  },
+  RANGE: (args, ctx) => {
+    const v = numVals(args, ctx, 0);
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  },
   MEDIAN: (args, ctx) => {
     const v = [...numVals(args, ctx, 0)].sort((a, b) => a - b);
     if (!v.length) return 0;
@@ -251,7 +302,7 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const v = numVals(args, ctx, 0);
     if (!v.length) return 0;
     const freq: Record<number, number> = {};
-    v.forEach(n => freq[n] = (freq[n] || 0) + 1);
+    v.forEach((n) => (freq[n] = (freq[n] || 0) + 1));
     return Number(Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0]);
   },
   STDEV: (args, ctx) => {
@@ -360,9 +411,14 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     return vals.length ? Math.min(...vals) : 0;
   },
   UNIQUE_COUNT: (args, ctx) => new Set(rawVals(args, ctx, 0).map(String)).size,
-  FIRST: (args, ctx) => rawVals(args, ctx, 0).find(v => v !== "" && v !== null && v !== undefined) ?? "",
+  FIRST: (args, ctx) =>
+    rawVals(args, ctx, 0).find(
+      (v) => v !== "" && v !== null && v !== undefined,
+    ) ?? "",
   LAST: (args, ctx) => {
-    const v = rawVals(args, ctx, 0).filter(v => v !== "" && v !== null && v !== undefined);
+    const v = rawVals(args, ctx, 0).filter(
+      (v) => v !== "" && v !== null && v !== undefined,
+    );
     return v.length ? v[v.length - 1] : "";
   },
   GROWTH: (args, ctx) => {
@@ -382,19 +438,28 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   },
   NORMALIZE: (args, ctx) => {
     const ci = resolveAggCol(args[0], ctx);
-    const rowIdx = args[1] ? (args[1].isA1 ? args[1].a1Row : Number(args[1].value)) : ctx.currentRowIdx;
+    const rowIdx = args[1]
+      ? args[1].isA1
+        ? args[1].a1Row
+        : Number(args[1].value)
+      : ctx.currentRowIdx;
     const start = resolveAggStart(args[2], ctx);
     const end = resolveAggEnd(args[3], ctx);
     if (ci === -1) return 0;
     const key = ctx.columns[ci].key;
     const val = Number(ctx.rows[rowIdx]?.[key] ?? 0);
     const v = ctx.getColValues(ci, start, end);
-    const mn = Math.min(...v), mx = Math.max(...v);
+    const mn = Math.min(...v),
+      mx = Math.max(...v);
     return mx === mn ? 0 : Math.round(((val - mn) / (mx - mn)) * 1000) / 1000;
   },
   RANK: (args, ctx) => {
     const ci = resolveAggCol(args[0], ctx);
-    const rowIdx = args[1] ? (args[1].isA1 ? args[1].a1Row : Number(args[1].value)) : ctx.currentRowIdx;
+    const rowIdx = args[1]
+      ? args[1].isA1
+        ? args[1].a1Row
+        : Number(args[1].value)
+      : ctx.currentRowIdx;
     const start = resolveAggStart(args[2], ctx);
     const end = resolveAggEnd(args[3], ctx);
     if (ci === -1) return 0;
@@ -411,7 +476,8 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const key = ctx.columns[ci].key;
     const val = Number(ctx.rows[ctx.currentRowIdx]?.[key] ?? 0);
     const v = ctx.getColValues(ci, start, end);
-    const mn = Math.min(...v), mx = Math.max(...v);
+    const mn = Math.min(...v),
+      mx = Math.max(...v);
     return mx === mn ? 0 : Math.round(((val - mn) / (mx - mn)) * 100);
   },
 
@@ -435,13 +501,20 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   FLOOR: (args) => Math.floor(Number(args[0]?.value ?? 0)),
   ABS: (args) => Math.abs(Number(args[0]?.value ?? 0)),
   SQRT: (args) => Math.sqrt(Number(args[0]?.value ?? 0)),
-  POWER: (args) => Math.pow(Number(args[0]?.value ?? 0), Number(args[1]?.value ?? 2)),
+  POWER: (args) =>
+    Math.pow(Number(args[0]?.value ?? 0), Number(args[1]?.value ?? 2)),
   MOD: (args) => Number(args[0]?.value ?? 0) % Number(args[1]?.value ?? 1),
-  LOG: (args) => Math.log(Number(args[0]?.value ?? 1)) / Math.log(Number(args[1]?.value ?? 10)),
+  LOG: (args) =>
+    Math.log(Number(args[0]?.value ?? 1)) /
+    Math.log(Number(args[1]?.value ?? 10)),
   LOG10: (args) => Math.log10(Number(args[0]?.value ?? 1)),
   EXP: (args) => Math.exp(Number(args[0]?.value ?? 0)),
   SIGN: (args) => Math.sign(Number(args[0]?.value ?? 0)),
-  CLAMP: (args) => Math.min(Math.max(Number(args[0]?.value ?? 0), Number(args[1]?.value ?? 0)), Number(args[2]?.value ?? 100)),
+  CLAMP: (args) =>
+    Math.min(
+      Math.max(Number(args[0]?.value ?? 0), Number(args[1]?.value ?? 0)),
+      Number(args[2]?.value ?? 100),
+    ),
 
   // ── ARITHMETIC SCALAR ─────────────────────────────────────
   //
@@ -478,13 +551,21 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   // regardless of whether user passed B1, a column key, or a literal.
   UPPER: (args) => String(args[0]?.value ?? "").toUpperCase(),
   LOWER: (args) => String(args[0]?.value ?? "").toLowerCase(),
-  PROPER: (args) => String(args[0]?.value ?? "").replace(/\b\w/g, c => c.toUpperCase()),
+  PROPER: (args) =>
+    String(args[0]?.value ?? "").replace(/\b\w/g, (c) => c.toUpperCase()),
   TRIM: (args) => String(args[0]?.value ?? "").trim(),
   LEN: (args) => String(args[0]?.value ?? "").length,
-  CONCAT: (args) => args.map(a => String(a.value ?? "")).join(""),
-  JOIN: (args) => [String(args[0]?.value ?? ""), String(args[1]?.value ?? "")].join(String(args[2]?.value ?? " ")),
-  LEFT: (args) => String(args[0]?.value ?? "").slice(0, Number(args[1]?.value ?? 1)),
-  RIGHT: (args) => { const s = String(args[0]?.value ?? ""); return s.slice(-Math.max(1, Number(args[1]?.value ?? 1))); },
+  CONCAT: (args) => args.map((a) => String(a.value ?? "")).join(""),
+  JOIN: (args) =>
+    [String(args[0]?.value ?? ""), String(args[1]?.value ?? "")].join(
+      String(args[2]?.value ?? " "),
+    ),
+  LEFT: (args) =>
+    String(args[0]?.value ?? "").slice(0, Number(args[1]?.value ?? 1)),
+  RIGHT: (args) => {
+    const s = String(args[0]?.value ?? "");
+    return s.slice(-Math.max(1, Number(args[1]?.value ?? 1)));
+  },
   MID: (args) => {
     const s = String(args[0]?.value ?? "");
     const start = Number(args[1]?.value ?? 1) - 1;
@@ -501,22 +582,79 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const text = String(args[0]?.value ?? "");
     const start = Number(args[1]?.value ?? 1) - 1;
     const len = Number(args[2]?.value ?? 0);
-    return text.slice(0, start) + String(args[3]?.value ?? "") + text.slice(start + len);
+    return (
+      text.slice(0, start) +
+      String(args[3]?.value ?? "") +
+      text.slice(start + len)
+    );
   },
-  REPEAT: (args) => String(args[0]?.value ?? "").repeat(Math.max(0, Number(args[1]?.value ?? 1))),
-  SPLIT: (args) => String(args[0]?.value ?? "").split(String(args[1]?.value ?? " "))[Number(args[2]?.value ?? 0)] ?? "",
-  CONTAINS: (args) => String(args[0]?.value ?? "").toLowerCase().includes(String(args[1]?.value ?? "").toLowerCase()) ? "✓" : "✗",
-  STARTSWITH: (args) => String(args[0]?.value ?? "").toLowerCase().startsWith(String(args[1]?.value ?? "").toLowerCase()) ? "✓" : "✗",
-  ENDSWITH: (args) => String(args[0]?.value ?? "").toLowerCase().endsWith(String(args[1]?.value ?? "").toLowerCase()) ? "✓" : "✗",
-  INDEXOF: (args) => String(args[0]?.value ?? "").indexOf(String(args[1]?.value ?? "")),
-  WORDCOUNT: (args) => String(args[0]?.value ?? "").trim().split(/\s+/).filter(Boolean).length,
-  REVERSE: (args) => String(args[0]?.value ?? "").split("").reverse().join(""),
-  PAD: (args) => String(args[0]?.value ?? "").padStart(Number(args[1]?.value ?? 0), String(args[2]?.value ?? " ")),
-  PADLEFT: (args) => String(args[0]?.value ?? "").padStart(Number(args[1]?.value ?? 0), String(args[2]?.value ?? " ")),
-  PADRIGHT: (args) => String(args[0]?.value ?? "").padEnd(Number(args[1]?.value ?? 0), String(args[2]?.value ?? " ")),
-  EXTRACTNUMBER: (args) => (String(args[0]?.value ?? "").match(/[\d.]+/g) || []).join(""),
-  SLUGIFY: (args) => String(args[0]?.value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
-  INITIALS: (args) => String(args[0]?.value ?? "").split(/\s+/).map((w: string) => w[0]).filter(Boolean).join("").toUpperCase(),
+  REPEAT: (args) =>
+    String(args[0]?.value ?? "").repeat(
+      Math.max(0, Number(args[1]?.value ?? 1)),
+    ),
+  SPLIT: (args) =>
+    String(args[0]?.value ?? "").split(String(args[1]?.value ?? " "))[
+      Number(args[2]?.value ?? 0)
+    ] ?? "",
+  CONTAINS: (args) =>
+    String(args[0]?.value ?? "")
+      .toLowerCase()
+      .includes(String(args[1]?.value ?? "").toLowerCase())
+      ? "✓"
+      : "✗",
+  STARTSWITH: (args) =>
+    String(args[0]?.value ?? "")
+      .toLowerCase()
+      .startsWith(String(args[1]?.value ?? "").toLowerCase())
+      ? "✓"
+      : "✗",
+  ENDSWITH: (args) =>
+    String(args[0]?.value ?? "")
+      .toLowerCase()
+      .endsWith(String(args[1]?.value ?? "").toLowerCase())
+      ? "✓"
+      : "✗",
+  INDEXOF: (args) =>
+    String(args[0]?.value ?? "").indexOf(String(args[1]?.value ?? "")),
+  WORDCOUNT: (args) =>
+    String(args[0]?.value ?? "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length,
+  REVERSE: (args) =>
+    String(args[0]?.value ?? "")
+      .split("")
+      .reverse()
+      .join(""),
+  PAD: (args) =>
+    String(args[0]?.value ?? "").padStart(
+      Number(args[1]?.value ?? 0),
+      String(args[2]?.value ?? " "),
+    ),
+  PADLEFT: (args) =>
+    String(args[0]?.value ?? "").padStart(
+      Number(args[1]?.value ?? 0),
+      String(args[2]?.value ?? " "),
+    ),
+  PADRIGHT: (args) =>
+    String(args[0]?.value ?? "").padEnd(
+      Number(args[1]?.value ?? 0),
+      String(args[2]?.value ?? " "),
+    ),
+  EXTRACTNUMBER: (args) =>
+    (String(args[0]?.value ?? "").match(/[\d.]+/g) || []).join(""),
+  SLUGIFY: (args) =>
+    String(args[0]?.value ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, ""),
+  INITIALS: (args) =>
+    String(args[0]?.value ?? "")
+      .split(/\s+/)
+      .map((w: string) => w[0])
+      .filter(Boolean)
+      .join("")
+      .toUpperCase(),
   MASK: (args) => {
     const s = String(args[0]?.value ?? "");
     const n = Number(args[1]?.value ?? 4);
@@ -529,8 +667,20 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     return s.length > max ? s.slice(0, max) + suf : s;
   },
   ENCODE: (args) => encodeURIComponent(String(args[0]?.value ?? "")),
-  DECODE: (args) => { try { return decodeURIComponent(String(args[0]?.value ?? "")); } catch { return String(args[0]?.value ?? ""); } },
-  BASE64: (args) => { try { return btoa(String(args[0]?.value ?? "")); } catch { return ""; } },
+  DECODE: (args) => {
+    try {
+      return decodeURIComponent(String(args[0]?.value ?? ""));
+    } catch {
+      return String(args[0]?.value ?? "");
+    }
+  },
+  BASE64: (args) => {
+    try {
+      return btoa(String(args[0]?.value ?? ""));
+    } catch {
+      return "";
+    }
+  },
 
   // ── LOGIC ─────────────────────────────────────────────────
   IF: (args) => {
@@ -538,49 +688,99 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
       // Standard 3-arg: IF(condition, trueResult, falseResult)
       // condition can be: A1 ref, column key, nested formula, or literal
       const cond = args[0]?.value;
-      const isTruthy = cond && cond !== 0 && cond !== "0" && cond !== false && cond !== "false" && cond !== "";
+      const isTruthy =
+        cond &&
+        cond !== 0 &&
+        cond !== "0" &&
+        cond !== false &&
+        cond !== "false" &&
+        cond !== "";
       return isTruthy ? args[1]?.value : args[2]?.value;
     }
     // 4-arg: IF(value, matchValue, trueResult, falseResult)
-    return String(args[0]?.value ?? "").toLowerCase() === String(args[1]?.value ?? "").toLowerCase()
-      ? args[2]?.value : args[3]?.value;
+    return String(args[0]?.value ?? "").toLowerCase() ===
+      String(args[1]?.value ?? "").toLowerCase()
+      ? args[2]?.value
+      : args[3]?.value;
   },
-  IFN: (args) => args[0]?.value ? args[1]?.value : args[2]?.value,
+  IFN: (args) => (args[0]?.value ? args[1]?.value : args[2]?.value),
   IFERROR: (args) => {
     const v = args[0]?.value;
-    return (v === null || v === undefined || v === "" || String(v).startsWith("#")) ? args[1]?.value : v;
+    return v === null ||
+      v === undefined ||
+      v === "" ||
+      String(v).startsWith("#")
+      ? args[1]?.value
+      : v;
   },
-  IFEMPTY: (args) => (args[0]?.value === null || args[0]?.value === undefined || args[0]?.value === "") ? args[1]?.value : args[0]?.value,
+  IFEMPTY: (args) =>
+    args[0]?.value === null ||
+    args[0]?.value === undefined ||
+    args[0]?.value === ""
+      ? args[1]?.value
+      : args[0]?.value,
   SWITCH: (args) => {
     const cellVal = String(args[0]?.value ?? "").toLowerCase();
     for (let i = 1; i + 1 < args.length; i += 2) {
-      if (cellVal === String(args[i]?.value ?? "").toLowerCase()) return args[i + 1]?.value;
+      if (cellVal === String(args[i]?.value ?? "").toLowerCase())
+        return args[i + 1]?.value;
     }
     return args.length % 2 === 0 ? args[args.length - 1]?.value : "";
   },
-  AND: (args) => args.every(a => !!a.value) ? "✓" : "✗",
-  OR: (args) => args.some(a => !!a.value) ? "✓" : "✗",
-  NOT: (args) => !args[0]?.value ? "✓" : "✗",
-  XOR: (args) => (!!args[0]?.value !== !!args[1]?.value) ? "✓" : "✗",
-  GT: (args) => Number(args[0]?.value ?? 0) > Number(args[1]?.value ?? 0) ? "✓" : "✗",
-  LT: (args) => Number(args[0]?.value ?? 0) < Number(args[1]?.value ?? 0) ? "✓" : "✗",
-  GTE: (args) => Number(args[0]?.value ?? 0) >= Number(args[1]?.value ?? 0) ? "✓" : "✗",
-  LTE: (args) => Number(args[0]?.value ?? 0) <= Number(args[1]?.value ?? 0) ? "✓" : "✗",
-  EQ: (args) => String(args[0]?.value ?? "").toLowerCase() === String(args[1]?.value ?? "").toLowerCase() ? "✓" : "✗",
-  NEQ: (args) => String(args[0]?.value ?? "").toLowerCase() !== String(args[1]?.value ?? "").toLowerCase() ? "✓" : "✗",
+  AND: (args) => (args.every((a) => !!a.value) ? "✓" : "✗"),
+  OR: (args) => (args.some((a) => !!a.value) ? "✓" : "✗"),
+  NOT: (args) => (!args[0]?.value ? "✓" : "✗"),
+  XOR: (args) => (!!args[0]?.value !== !!args[1]?.value ? "✓" : "✗"),
+  GT: (args) =>
+    Number(args[0]?.value ?? 0) > Number(args[1]?.value ?? 0) ? "✓" : "✗",
+  LT: (args) =>
+    Number(args[0]?.value ?? 0) < Number(args[1]?.value ?? 0) ? "✓" : "✗",
+  GTE: (args) =>
+    Number(args[0]?.value ?? 0) >= Number(args[1]?.value ?? 0) ? "✓" : "✗",
+  LTE: (args) =>
+    Number(args[0]?.value ?? 0) <= Number(args[1]?.value ?? 0) ? "✓" : "✗",
+  EQ: (args) =>
+    String(args[0]?.value ?? "").toLowerCase() ===
+    String(args[1]?.value ?? "").toLowerCase()
+      ? "✓"
+      : "✗",
+  NEQ: (args) =>
+    String(args[0]?.value ?? "").toLowerCase() !==
+    String(args[1]?.value ?? "").toLowerCase()
+      ? "✓"
+      : "✗",
   BETWEEN: (args) => {
     const v = Number(args[0]?.value ?? 0);
-    return v >= Number(args[1]?.value ?? 0) && v <= Number(args[2]?.value ?? 100) ? "✓" : "✗";
+    return v >= Number(args[1]?.value ?? 0) &&
+      v <= Number(args[2]?.value ?? 100)
+      ? "✓"
+      : "✗";
   },
 
   // ── TYPE CHECK ────────────────────────────────────────────
-  ISNUMBER: (args) => !isNaN(Number(args[0]?.value)) && String(args[0]?.value).trim() !== "" ? "✓" : "✗",
-  ISEMPTY: (args) => (args[0]?.value === "" || args[0]?.value == null) ? "✓" : "✗",
-  ISNOTEMPTY: (args) => (args[0]?.value !== "" && args[0]?.value != null) ? "✓" : "✗",
-  ISBOOL: (args) => typeof args[0]?.value === "boolean" ? "✓" : "✗",
-  ISTEXT: (args) => isNaN(Number(args[0]?.value)) && typeof args[0]?.value === "string" ? "✓" : "✗",
-  ISURL: (args) => { try { new URL(String(args[0]?.value ?? "")); return "✓"; } catch { return "✗"; } },
-  ISEMAIL: (args) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(args[0]?.value ?? "")) ? "✓" : "✗",
+  ISNUMBER: (args) =>
+    !isNaN(Number(args[0]?.value)) && String(args[0]?.value).trim() !== ""
+      ? "✓"
+      : "✗",
+  ISEMPTY: (args) =>
+    args[0]?.value === "" || args[0]?.value == null ? "✓" : "✗",
+  ISNOTEMPTY: (args) =>
+    args[0]?.value !== "" && args[0]?.value != null ? "✓" : "✗",
+  ISBOOL: (args) => (typeof args[0]?.value === "boolean" ? "✓" : "✗"),
+  ISTEXT: (args) =>
+    isNaN(Number(args[0]?.value)) && typeof args[0]?.value === "string"
+      ? "✓"
+      : "✗",
+  ISURL: (args) => {
+    try {
+      new URL(String(args[0]?.value ?? ""));
+      return "✓";
+    } catch {
+      return "✗";
+    }
+  },
+  ISEMAIL: (args) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(args[0]?.value ?? "")) ? "✓" : "✗",
   TYPEOF: (args) => {
     const v = args[0]?.value;
     if (v === "" || v == null) return "empty";
@@ -589,8 +789,12 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     return "text";
   },
   TOTEXT: (args) => String(args[0]?.value ?? ""),
-  TONUMBER: (args) => Number((String(args[0]?.value ?? "").match(/[\d.]+/) || ["0"])[0]),
-  TOBOOL: (args) => ["true", "1", "yes", "on"].includes(String(args[0]?.value ?? "").toLowerCase()),
+  TONUMBER: (args) =>
+    Number((String(args[0]?.value ?? "").match(/[\d.]+/) || ["0"])[0]),
+  TOBOOL: (args) =>
+    ["true", "1", "yes", "on"].includes(
+      String(args[0]?.value ?? "").toLowerCase(),
+    ),
 
   // ── DATE ──────────────────────────────────────────────────
   TODAY: () => new Date().toISOString().slice(0, 10),
@@ -600,55 +804,130 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   DAY: (args) => new Date(String(args[0]?.value ?? "")).getDate(),
   HOUR: (args) => new Date(String(args[0]?.value ?? "")).getHours(),
   MINUTE: (args) => new Date(String(args[0]?.value ?? "")).getMinutes(),
-  WEEKDAY: (args) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(String(args[0]?.value ?? "")).getDay()],
+  WEEKDAY: (args) =>
+    ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+      new Date(String(args[0]?.value ?? "")).getDay()
+    ],
   WEEKNUM: (args) => {
     const d = new Date(String(args[0]?.value ?? ""));
     const start = new Date(d.getFullYear(), 0, 1);
-    return Math.ceil(((d.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);
+    return Math.ceil(
+      ((d.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7,
+    );
   },
-  QUARTER: (args) => Math.ceil((new Date(String(args[0]?.value ?? "")).getMonth() + 1) / 3),
-  DATEDIFF: (args) => Math.round((new Date(String(args[1]?.value ?? "")).getTime() - new Date(String(args[0]?.value ?? "")).getTime()) / 86400000),
-  DATEADD: (args) => { const d = new Date(String(args[0]?.value ?? "")); d.setDate(d.getDate() + Number(args[1]?.value ?? 0)); return d.toISOString().slice(0, 10); },
-  MONTHSADD: (args) => { const d = new Date(String(args[0]?.value ?? "")); d.setMonth(d.getMonth() + Number(args[1]?.value ?? 0)); return d.toISOString().slice(0, 10); },
-  YEARSADD: (args) => { const d = new Date(String(args[0]?.value ?? "")); d.setFullYear(d.getFullYear() + Number(args[1]?.value ?? 0)); return d.toISOString().slice(0, 10); },
+  QUARTER: (args) =>
+    Math.ceil((new Date(String(args[0]?.value ?? "")).getMonth() + 1) / 3),
+  DATEDIFF: (args) =>
+    Math.round(
+      (new Date(String(args[1]?.value ?? "")).getTime() -
+        new Date(String(args[0]?.value ?? "")).getTime()) /
+        86400000,
+    ),
+  DATEADD: (args) => {
+    const d = new Date(String(args[0]?.value ?? ""));
+    d.setDate(d.getDate() + Number(args[1]?.value ?? 0));
+    return d.toISOString().slice(0, 10);
+  },
+  MONTHSADD: (args) => {
+    const d = new Date(String(args[0]?.value ?? ""));
+    d.setMonth(d.getMonth() + Number(args[1]?.value ?? 0));
+    return d.toISOString().slice(0, 10);
+  },
+  YEARSADD: (args) => {
+    const d = new Date(String(args[0]?.value ?? ""));
+    d.setFullYear(d.getFullYear() + Number(args[1]?.value ?? 0));
+    return d.toISOString().slice(0, 10);
+  },
   AGE: (args) => {
-    const d = new Date(String(args[0]?.value ?? "")), now = new Date();
+    const d = new Date(String(args[0]?.value ?? "")),
+      now = new Date();
     let age = now.getFullYear() - d.getFullYear();
-    if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age--;
+    if (
+      now.getMonth() < d.getMonth() ||
+      (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())
+    )
+      age--;
     return age;
   },
   BUSINESSDAYS: (args) => {
-    const d1 = new Date(String(args[0]?.value ?? "")), d2 = new Date(String(args[1]?.value ?? ""));
-    let count = 0, cur = new Date(d1);
-    while (cur <= d2) { const day = cur.getDay(); if (day !== 0 && day !== 6) count++; cur.setDate(cur.getDate() + 1); }
+    const d1 = new Date(String(args[0]?.value ?? "")),
+      d2 = new Date(String(args[1]?.value ?? ""));
+    let count = 0;
+    const cur = new Date(d1);
+    while (cur <= d2) {
+      const day = cur.getDay();
+      if (day !== 0 && day !== 6) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
     return count;
   },
   FORMATDATE: (args) => {
-    const d = new Date(String(args[0]?.value ?? "")), fmt = String(args[1]?.value ?? "iso").toLowerCase();
-    if (fmt === "long") return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-    if (fmt === "medium") return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    const d = new Date(String(args[0]?.value ?? "")),
+      fmt = String(args[1]?.value ?? "iso").toLowerCase();
+    if (fmt === "long")
+      return d.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    if (fmt === "medium")
+      return d.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
     if (fmt === "short") return d.toLocaleDateString("en-US");
     if (fmt === "time") return d.toLocaleTimeString("en-US");
     return d.toISOString().slice(0, 10);
   },
-  ISWEEKEND: (args) => { const d = new Date(String(args[0]?.value ?? "")).getDay(); return (d === 0 || d === 6) ? "✓" : "✗"; },
-  ISWEEKDAY: (args) => { const d = new Date(String(args[0]?.value ?? "")).getDay(); return (d >= 1 && d <= 5) ? "✓" : "✗"; },
-  ISLEAPYEAR: (args) => { const y = new Date(String(args[0]?.value ?? "")).getFullYear(); return (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)) ? "✓" : "✗"; },
-  DAYSINMONTH: (args) => { const d = new Date(String(args[0]?.value ?? "")); return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); },
-  FROMUNIX: (args) => new Date(Number(args[0]?.value ?? 0) * 1000).toISOString().slice(0, 10),
-  TOUNIX: (args) => Math.floor(new Date(String(args[0]?.value ?? "")).getTime() / 1000),
+  ISWEEKEND: (args) => {
+    const d = new Date(String(args[0]?.value ?? "")).getDay();
+    return d === 0 || d === 6 ? "✓" : "✗";
+  },
+  ISWEEKDAY: (args) => {
+    const d = new Date(String(args[0]?.value ?? "")).getDay();
+    return d >= 1 && d <= 5 ? "✓" : "✗";
+  },
+  ISLEAPYEAR: (args) => {
+    const y = new Date(String(args[0]?.value ?? "")).getFullYear();
+    return y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0) ? "✓" : "✗";
+  },
+  DAYSINMONTH: (args) => {
+    const d = new Date(String(args[0]?.value ?? ""));
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  },
+  FROMUNIX: (args) =>
+    new Date(Number(args[0]?.value ?? 0) * 1000).toISOString().slice(0, 10),
+  TOUNIX: (args) =>
+    Math.floor(new Date(String(args[0]?.value ?? "")).getTime() / 1000),
 
   // ── DISPLAY ───────────────────────────────────────────────
-  CURRENCY: (args) => Number(args[0]?.value ?? 0).toLocaleString("en-US", { style: "currency", currency: String(args[1]?.value ?? "USD") }),
-  PERCENT: (args) => `${Number(args[0]?.value ?? 0).toFixed(Number(args[1]?.value ?? 1))}%`,
-  NUMFORMAT: (args) => Number(args[0]?.value ?? 0).toLocaleString("en-US", { minimumFractionDigits: Number(args[1]?.value ?? 0), maximumFractionDigits: Number(args[1]?.value ?? 0) }),
-  EMOJI_BOOL: (args) => args[0]?.value ? "✅" : "❌",
-  TRAFFIC_LIGHT: (args) => { const v = Number(args[0]?.value ?? 0); return v >= 70 ? "🟢" : v >= 40 ? "🟡" : "🔴"; },
-  GRADE: (args) => { const v = Number(args[0]?.value ?? 0); return v >= 90 ? "A" : v >= 80 ? "B" : v >= 70 ? "C" : v >= 60 ? "D" : "F"; },
+  CURRENCY: (args) =>
+    Number(args[0]?.value ?? 0).toLocaleString("en-US", {
+      style: "currency",
+      currency: String(args[1]?.value ?? "USD"),
+    }),
+  PERCENT: (args) =>
+    `${Number(args[0]?.value ?? 0).toFixed(Number(args[1]?.value ?? 1))}%`,
+  NUMFORMAT: (args) =>
+    Number(args[0]?.value ?? 0).toLocaleString("en-US", {
+      minimumFractionDigits: Number(args[1]?.value ?? 0),
+      maximumFractionDigits: Number(args[1]?.value ?? 0),
+    }),
+  EMOJI_BOOL: (args) => (args[0]?.value ? "✅" : "❌"),
+  TRAFFIC_LIGHT: (args) => {
+    const v = Number(args[0]?.value ?? 0);
+    return v >= 70 ? "🟢" : v >= 40 ? "🟡" : "🔴";
+  },
+  GRADE: (args) => {
+    const v = Number(args[0]?.value ?? 0);
+    return v >= 90 ? "A" : v >= 80 ? "B" : v >= 70 ? "C" : v >= 60 ? "D" : "F";
+  },
   LABEL: (args, ctx) => {
     const v = Number(args[0]?.value ?? 0);
     const vals = numVals(args, ctx, 0);
-    const mn = Math.min(...vals), mx = Math.max(...vals);
+    const mn = Math.min(...vals),
+      mx = Math.max(...vals);
     const pct = mx === mn ? 0 : (v - mn) / (mx - mn);
     return pct >= 0.67 ? "High" : pct >= 0.33 ? "Medium" : "Low";
   },
@@ -656,11 +935,16 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const bars = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
     const vals = numVals(args, ctx, 0);
     if (!vals.length) return "";
-    const mn = Math.min(...vals), mx = Math.max(...vals);
-    return vals.map(v => bars[mx === mn ? 3 : Math.floor(((v - mn) / (mx - mn)) * 7)]).join("");
+    const mn = Math.min(...vals),
+      mx = Math.max(...vals);
+    return vals
+      .map((v) => bars[mx === mn ? 3 : Math.floor(((v - mn) / (mx - mn)) * 7)])
+      .join("");
   },
   STARS: (args) => {
-    const n = Math.round(Math.min(Number(args[0]?.value ?? 0), Number(args[1]?.value ?? 5)));
+    const n = Math.round(
+      Math.min(Number(args[0]?.value ?? 0), Number(args[1]?.value ?? 5)),
+    );
     const max = Number(args[1]?.value ?? 5);
     return "★".repeat(n) + "☆".repeat(max - n);
   },
@@ -672,11 +956,19 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   TREND: (args, ctx) => {
     const vals = numVals(args, ctx, 0);
     if (vals.length < 2) return "→";
-    return vals[vals.length - 1] > vals[0] ? "↑" : vals[vals.length - 1] < vals[0] ? "↓" : "→";
+    return vals[vals.length - 1] > vals[0]
+      ? "↑"
+      : vals[vals.length - 1] < vals[0]
+        ? "↓"
+        : "→";
   },
   OUTLIER: (args, ctx) => {
     const ci = resolveAggCol(args[0], ctx);
-    const rowIdx = args[1] ? (args[1].isA1 ? args[1].a1Row : Number(args[1].value)) : ctx.currentRowIdx;
+    const rowIdx = args[1]
+      ? args[1].isA1
+        ? args[1].a1Row
+        : Number(args[1].value)
+      : ctx.currentRowIdx;
     const start = resolveAggStart(args[2], ctx);
     const end = resolveAggEnd(args[3], ctx);
     if (ci === -1) return "";
@@ -684,10 +976,15 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const val = Number(ctx.rows[rowIdx]?.[key] ?? 0);
     const v = ctx.getColValues(ci, start, end);
     const mean = v.reduce((a, b) => a + b, 0) / v.length;
-    const std = Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length);
+    const std = Math.sqrt(
+      v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length,
+    );
     return Math.abs(val - mean) > 2 * std ? "⚠️" : "";
   },
-  PLURALIZE: (args) => Number(args[0]?.value ?? 0) === 1 ? `1 ${args[1]?.value}` : `${args[0]?.value} ${args[2]?.value}`,
+  PLURALIZE: (args) =>
+    Number(args[0]?.value ?? 0) === 1
+      ? `1 ${args[1]?.value}`
+      : `${args[0]?.value} ${args[2]?.value}`,
   ORDINAL: (args) => {
     const n = Number(args[0]?.value ?? 0);
     const s = ["th", "st", "nd", "rd"];
@@ -697,16 +994,36 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   HEATCOLOR: (args, ctx) => {
     const v = Number(args[0]?.value ?? 0);
     const vals = numVals(args, ctx, 0);
-    const mn = Math.min(...vals), mx = Math.max(...vals);
+    const mn = Math.min(...vals),
+      mx = Math.max(...vals);
     const pct = mx === mn ? 0 : (v - mn) / (mx - mn);
     return pct >= 0.67 ? "high" : pct >= 0.33 ? "medium" : "low";
   },
   ROMANIZE: (args) => {
     let n = Number(args[0]?.value ?? 0);
     const val = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
-    const sym = ["M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"];
+    const sym = [
+      "M",
+      "CM",
+      "D",
+      "CD",
+      "C",
+      "XC",
+      "L",
+      "XL",
+      "X",
+      "IX",
+      "V",
+      "IV",
+      "I",
+    ];
     let r = "";
-    for (let i = 0; i < val.length; i++) { while (n >= val[i]) { r += sym[i]; n -= val[i]; } }
+    for (let i = 0; i < val.length; i++) {
+      while (n >= val[i]) {
+        r += sym[i];
+        n -= val[i];
+      }
+    }
     return r;
   },
 
@@ -718,9 +1035,11 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const start = resolveAggStart(args[3], ctx);
     const end = resolveAggEnd(args[4], ctx);
     if (lookCi === -1 || retCi === -1) return "#N/A";
-    const lookKey = ctx.columns[lookCi].key, retKey = ctx.columns[retCi].key;
+    const lookKey = ctx.columns[lookCi].key,
+      retKey = ctx.columns[retCi].key;
     for (let r = start; r <= Math.min(end, ctx.rows.length - 1); r++) {
-      if (String(ctx.rows[r]?.[lookKey] ?? "").toLowerCase() === lookVal) return ctx.rows[r]?.[retKey] ?? "";
+      if (String(ctx.rows[r]?.[lookKey] ?? "").toLowerCase() === lookVal)
+        return ctx.rows[r]?.[retKey] ?? "";
     }
     return "#N/A";
   },
@@ -739,15 +1058,23 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   },
   INDEX: (args, ctx) => {
     const ci = resolveAggCol(args[0], ctx);
-    const rowIdx = args[1] ? (args[1].isA1 ? args[1].a1Row : Number(args[1].value)) : ctx.currentRowIdx;
+    const rowIdx = args[1]
+      ? args[1].isA1
+        ? args[1].a1Row
+        : Number(args[1].value)
+      : ctx.currentRowIdx;
     if (ci === -1) return "";
     return ctx.rows[rowIdx]?.[ctx.columns[ci].key] ?? "";
   },
   RELATED: (args, ctx) => FORMULA_IMPL.COLVAL(args, ctx),
 
   // ── ARRAY / SET ───────────────────────────────────────────
-  VALUES: (args, ctx) => rawVals(args, ctx, 0).filter(v => v !== "" && v != null).join(", "),
-  UNIQUE: (args, ctx) => [...new Set(rawVals(args, ctx, 0).map(String))].join(", "),
+  VALUES: (args, ctx) =>
+    rawVals(args, ctx, 0)
+      .filter((v) => v !== "" && v != null)
+      .join(", "),
+  UNIQUE: (args, ctx) =>
+    [...new Set(rawVals(args, ctx, 0).map(String))].join(", "),
   FILTERVALS: (args, ctx) => {
     const sumCi = resolveAggCol(args[0], ctx);
     const condCi = resolveAggCol(args[1], ctx);
@@ -755,10 +1082,12 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const start = resolveAggStart(args[3], ctx);
     const end = resolveAggEnd(args[4], ctx);
     if (sumCi === -1 || condCi === -1) return "";
-    const sumKey = ctx.columns[sumCi].key, condKey = ctx.columns[condCi].key;
+    const sumKey = ctx.columns[sumCi].key,
+      condKey = ctx.columns[condCi].key;
     const results: any[] = [];
     for (let r = start; r <= Math.min(end, ctx.rows.length - 1); r++) {
-      if (String(ctx.rows[r]?.[condKey] ?? "").toLowerCase() === crit) results.push(ctx.rows[r]?.[sumKey] ?? "");
+      if (String(ctx.rows[r]?.[condKey] ?? "").toLowerCase() === crit)
+        results.push(ctx.rows[r]?.[sumKey] ?? "");
     }
     return results.join(", ");
   },
@@ -768,7 +1097,10 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const start = resolveAggStart(args[2], ctx);
     const end = resolveAggEnd(args[3], ctx);
     if (ci === -1) return "";
-    return [...ctx.getColValues(ci, start, end)].sort((a, b) => b - a).slice(0, n).join(", ");
+    return [...ctx.getColValues(ci, start, end)]
+      .sort((a, b) => b - a)
+      .slice(0, n)
+      .join(", ");
   },
   BOTTOM: (args, ctx) => {
     const ci = resolveAggCol(args[0], ctx);
@@ -776,58 +1108,98 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const start = resolveAggStart(args[2], ctx);
     const end = resolveAggEnd(args[3], ctx);
     if (ci === -1) return "";
-    return [...ctx.getColValues(ci, start, end)].sort((a, b) => a - b).slice(0, n).join(", ");
+    return [...ctx.getColValues(ci, start, end)]
+      .sort((a, b) => a - b)
+      .slice(0, n)
+      .join(", ");
   },
-  FLATTEN: (args, ctx) => [...new Set(numVals(args, ctx, 0))].sort((a, b) => a - b).join(", "),
+  FLATTEN: (args, ctx) =>
+    [...new Set(numVals(args, ctx, 0))].sort((a, b) => a - b).join(", "),
 
   // ── FINANCIAL ─────────────────────────────────────────────
   ROI: (args) => {
-    const gain = Number(args[0]?.value ?? 0), cost = Number(args[1]?.value ?? 1);
+    const gain = Number(args[0]?.value ?? 0),
+      cost = Number(args[1]?.value ?? 1);
     return cost === 0 ? 0 : Math.round(((gain - cost) / cost) * 10000) / 100;
   },
   MARGIN: (args) => {
-    const rev = Number(args[0]?.value ?? 0), cost = Number(args[1]?.value ?? 0);
+    const rev = Number(args[0]?.value ?? 0),
+      cost = Number(args[1]?.value ?? 0);
     return rev === 0 ? 0 : Math.round(((rev - cost) / rev) * 10000) / 100;
   },
   MARKUP: (args) => {
-    const cost = Number(args[0]?.value ?? 0), price = Number(args[1]?.value ?? 0);
+    const cost = Number(args[0]?.value ?? 0),
+      price = Number(args[1]?.value ?? 0);
     return cost === 0 ? 0 : Math.round(((price - cost) / cost) * 10000) / 100;
   },
   CAGR: (args) => {
-    const s = Number(args[0]?.value ?? 0), e = Number(args[1]?.value ?? 0), y = Number(args[2]?.value ?? 1);
-    return s === 0 || y === 0 ? 0 : Math.round((Math.pow(e / s, 1 / y) - 1) * 10000) / 100;
+    const s = Number(args[0]?.value ?? 0),
+      e = Number(args[1]?.value ?? 0),
+      y = Number(args[2]?.value ?? 1);
+    return s === 0 || y === 0
+      ? 0
+      : Math.round((Math.pow(e / s, 1 / y) - 1) * 10000) / 100;
   },
   PMT: (args) => {
     const rate = Number(args[0]?.value ?? 0) / 100 / 12;
-    const n = Number(args[1]?.value ?? 1), pv = Number(args[2]?.value ?? 0);
+    const n = Number(args[1]?.value ?? 1),
+      pv = Number(args[2]?.value ?? 0);
     if (rate === 0) return pv / n;
-    return Math.round((pv * rate / (1 - Math.pow(1 + rate, -n))) * 100) / 100;
+    return Math.round(((pv * rate) / (1 - Math.pow(1 + rate, -n))) * 100) / 100;
   },
   COMPOUND: (args) => {
-    const p = Number(args[0]?.value ?? 0), r = Number(args[1]?.value ?? 0) / 100, y = Number(args[2]?.value ?? 1);
+    const p = Number(args[0]?.value ?? 0),
+      r = Number(args[1]?.value ?? 0) / 100,
+      y = Number(args[2]?.value ?? 1);
     return Math.round(p * Math.pow(1 + r, y) * 100) / 100;
   },
   SIMPLE_INTEREST: (args) => {
-    const p = Number(args[0]?.value ?? 0), r = Number(args[1]?.value ?? 0) / 100, y = Number(args[2]?.value ?? 1);
+    const p = Number(args[0]?.value ?? 0),
+      r = Number(args[1]?.value ?? 0) / 100,
+      y = Number(args[2]?.value ?? 1);
     return Math.round(p * r * y * 100) / 100;
   },
   DEPRECIATION: (args) => {
-    const cost = Number(args[0]?.value ?? 0), salvage = Number(args[1]?.value ?? 0), life = Number(args[2]?.value ?? 1);
+    const cost = Number(args[0]?.value ?? 0),
+      salvage = Number(args[1]?.value ?? 0),
+      life = Number(args[2]?.value ?? 1);
     return life === 0 ? 0 : Math.round(((cost - salvage) / life) * 100) / 100;
   },
   BREAKEVEN: (args) => {
-    const fixed = Number(args[0]?.value ?? 0), price = Number(args[1]?.value ?? 0), varCost = Number(args[2]?.value ?? 0);
+    const fixed = Number(args[0]?.value ?? 0),
+      price = Number(args[1]?.value ?? 0),
+      varCost = Number(args[2]?.value ?? 0);
     return price === varCost ? Infinity : Math.ceil(fixed / (price - varCost));
   },
-  TAX: (args) => Math.round(Number(args[0]?.value ?? 0) * Number(args[1]?.value ?? 0) / 100 * 100) / 100,
-  AFTERTAX: (args) => Math.round(Number(args[0]?.value ?? 0) * (1 - Number(args[1]?.value ?? 0) / 100) * 100) / 100,
+  TAX: (args) =>
+    Math.round(
+      ((Number(args[0]?.value ?? 0) * Number(args[1]?.value ?? 0)) / 100) * 100,
+    ) / 100,
+  AFTERTAX: (args) =>
+    Math.round(
+      Number(args[0]?.value ?? 0) *
+        (1 - Number(args[1]?.value ?? 0) / 100) *
+        100,
+    ) / 100,
 
   // ── UTILITY ───────────────────────────────────────────────
   RANDOM: () => Math.random(),
-  RANDOMINT: (args) => { const mn = Number(args[0]?.value ?? 0), mx = Number(args[1]?.value ?? 100); return Math.floor(Math.random() * (mx - mn + 1)) + mn; },
-  UUID: () => (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  RANDOMINT: (args) => {
+    const mn = Number(args[0]?.value ?? 0),
+      mx = Number(args[1]?.value ?? 100);
+    return Math.floor(Math.random() * (mx - mn + 1)) + mn;
+  },
+  UUID: () =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   ROW: (_, ctx) => ctx.currentRowIdx + 1,
-  HASH: (args) => { let h = 0; for (const c of String(args[0]?.value ?? "")) h = Math.imul(31, h) + c.charCodeAt(0) | 0; return Math.abs(h).toString(16); },
+  HASH: (args) => {
+    let h = 0;
+    for (const c of String(args[0]?.value ?? ""))
+      h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
+    return Math.abs(h).toString(16);
+  },
   BINARY: (args) => (Number(args[0]?.value ?? 0) >>> 0).toString(2),
   HEX: (args) => (Number(args[0]?.value ?? 0) >>> 0).toString(16).toUpperCase(),
   OCTAL: (args) => (Number(args[0]?.value ?? 0) >>> 0).toString(8),
@@ -835,22 +1207,43 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   CHAR: (args) => String.fromCharCode(Number(args[0]?.value ?? 65)),
 
   // ── CONVERSIONS ───────────────────────────────────────────
-  CELSIUSTOFAHRENHEIT: (args) => Math.round((Number(args[0]?.value ?? 0) * 9 / 5 + 32) * 10) / 10,
-  FAHRENHEITTOCELSIUS: (args) => Math.round(((Number(args[0]?.value ?? 0) - 32) * 5 / 9) * 10) / 10,
-  KGTOLBS: (args) => Math.round(Number(args[0]?.value ?? 0) * 2.20462 * 100) / 100,
-  LBSTOKG: (args) => Math.round(Number(args[0]?.value ?? 0) / 2.20462 * 100) / 100,
-  KMTOMI: (args) => Math.round(Number(args[0]?.value ?? 0) * 0.621371 * 100) / 100,
-  MITOKM: (args) => Math.round(Number(args[0]?.value ?? 0) * 1.60934 * 100) / 100,
-  LTOGAL: (args) => Math.round(Number(args[0]?.value ?? 0) * 0.264172 * 100) / 100,
-  GALTOL: (args) => Math.round(Number(args[0]?.value ?? 0) * 3.78541 * 100) / 100,
+  CELSIUSTOFAHRENHEIT: (args) =>
+    Math.round(((Number(args[0]?.value ?? 0) * 9) / 5 + 32) * 10) / 10,
+  FAHRENHEITTOCELSIUS: (args) =>
+    Math.round((((Number(args[0]?.value ?? 0) - 32) * 5) / 9) * 10) / 10,
+  KGTOLBS: (args) =>
+    Math.round(Number(args[0]?.value ?? 0) * 2.20462 * 100) / 100,
+  LBSTOKG: (args) =>
+    Math.round((Number(args[0]?.value ?? 0) / 2.20462) * 100) / 100,
+  KMTOMI: (args) =>
+    Math.round(Number(args[0]?.value ?? 0) * 0.621371 * 100) / 100,
+  MITOKM: (args) =>
+    Math.round(Number(args[0]?.value ?? 0) * 1.60934 * 100) / 100,
+  LTOGAL: (args) =>
+    Math.round(Number(args[0]?.value ?? 0) * 0.264172 * 100) / 100,
+  GALTOL: (args) =>
+    Math.round(Number(args[0]?.value ?? 0) * 3.78541 * 100) / 100,
   MSTOKPH: (args) => Math.round(Number(args[0]?.value ?? 0) * 3.6 * 100) / 100,
-  KPHTOMS: (args) => Math.round(Number(args[0]?.value ?? 0) / 3.6 * 100) / 100,
-  BMI: (args) => { const w = Number(args[0]?.value ?? 0), h = Number(args[1]?.value ?? 1); return h === 0 ? 0 : Math.round(w / (h * h) * 10) / 10; },
+  KPHTOMS: (args) =>
+    Math.round((Number(args[0]?.value ?? 0) / 3.6) * 100) / 100,
+  BMI: (args) => {
+    const w = Number(args[0]?.value ?? 0),
+      h = Number(args[1]?.value ?? 1);
+    return h === 0 ? 0 : Math.round((w / (h * h)) * 10) / 10;
+  },
   DISTANCE: (args) => {
-    const [lat1, lon1, lat2, lon2] = args.map(a => Number(a.value ?? 0) * Math.PI / 180);
-    const R = 6371, dLat = lat2 - lat1, dLon = lon2 - lon1;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+    const [lat1, lon1, lat2, lon2] = args.map(
+      (a) => (Number(a.value ?? 0) * Math.PI) / 180,
+    );
+    const R = 6371,
+      dLat = lat2 - lat1,
+      dLon = lon2 - lon1;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return (
+      Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10
+    );
   },
 };
 
@@ -859,33 +1252,42 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
 //  =B1*C1, =price*1.1, =B1+revenue, =A1-B1
 // ─────────────────────────────────────────────────────────────
 
-const JS_RESERVED = new Set(["true", "false", "null", "undefined", "Infinity", "NaN"]);
+const JS_RESERVED = new Set([
+  "true",
+  "false",
+  "null",
+  "undefined",
+  "Infinity",
+  "NaN",
+]);
 
 function evaluateArithmetic(
   expr: string,
   rowIdx: number,
   rows: SheetRow[],
   columns: ColumnDef[],
-  findColumnIndex: (n: string) => number
+  findColumnIndex: (n: string) => number,
 ): any {
   // 1. Protect string literals
   const literals: string[] = [];
-  let safe = expr.replace(/"([^"\\]|\\.)*"|'([^'\\]|\\.)*'/g, m => {
-    literals.push(m); return `__S${literals.length - 1}__`;
+  let safe = expr.replace(/"([^"\\]|\\.)*"|'([^'\\]|\\.)*'/g, (m) => {
+    literals.push(m);
+    return `__S${literals.length - 1}__`;
   });
 
   // 2. Replace A1 refs FIRST (they match [A-Z]+\d+, must come before col name replace)
-  safe = safe.replace(/\b([A-Z]+\d+)\b/gi, match => {
+  safe = safe.replace(/\b([A-Z]+\d+)\b/gi, (match) => {
     if (/^__S\d+__$/.test(match)) return match;
     const ref = parseA1Ref(match);
-    if (!ref || ref.colIdx >= columns.length || ref.rowIdx >= rows.length) return "0";
+    if (!ref || ref.colIdx >= columns.length || ref.rowIdx >= rows.length)
+      return "0";
     const val = rows[ref.rowIdx]?.[columns[ref.colIdx]?.key];
     const num = Number(val);
     return isNaN(num) ? `"${String(val ?? "")}"` : String(num);
   });
 
   // 3. Replace column name identifiers (not followed by '(')
-  safe = safe.replace(/\b([A-Za-z_][A-Za-z0-9_]*)(?!\s*\()\b/g, match => {
+  safe = safe.replace(/\b([A-Za-z_][A-Za-z0-9_]*)(?!\s*\()\b/g, (match) => {
     if (/^__S\d+__$/.test(match)) return match;
     if (JS_RESERVED.has(match)) return match;
     const ci = findColumnIndex(match);
@@ -901,7 +1303,6 @@ function evaluateArithmetic(
   safe = safe.replace(/__S(\d+)__/g, (_, i) => literals[parseInt(i, 10)]);
 
   try {
-    // eslint-disable-next-line no-new-func
     return Function(`"use strict"; return (${safe})`)();
   } catch {
     return "#EXPR!";
@@ -924,10 +1325,16 @@ function resolveArg(
   columnFormulas: Record<string, string>,
   evaluating: Set<string>,
   findColumnIndex: (n: string) => number,
-  evalFn: (expr: string, rIdx: number) => any
+  evalFn: (expr: string, rIdx: number) => any,
 ): ResolvedArg {
   const t = raw.trim();
-  const blank: Omit<ResolvedArg, "raw" | "value"> = { isCol: false, colIdx: -1, colKey: "", isA1: false, a1Row: -1 };
+  const blank: Omit<ResolvedArg, "raw" | "value"> = {
+    isCol: false,
+    colIdx: -1,
+    colKey: "",
+    isA1: false,
+    a1Row: -1,
+  };
 
   // Quoted string literal — strip quotes so value is the bare string
   if (isStringLiteral(t)) return { ...blank, raw: t, value: stripQuotes(t) };
@@ -962,7 +1369,15 @@ function resolveArg(
           val = rows[ref.rowIdx]?.[colDef.key];
         }
         // value is the cell's actual value — ready to use
-        return { raw: t, value: val, isCol: false, colIdx: ref.colIdx, colKey: colDef.key, isA1: true, a1Row: ref.rowIdx };
+        return {
+          raw: t,
+          value: val,
+          isCol: false,
+          colIdx: ref.colIdx,
+          colKey: colDef.key,
+          isA1: true,
+          a1Row: ref.rowIdx,
+        };
       }
     }
     // A1 ref out of bounds → 0
@@ -985,7 +1400,15 @@ function resolveArg(
       val = rows[rowIdx]?.[colKey];
     }
     // value is the current row's value in this column — ready to use
-    return { raw: t, value: val, isCol: true, colIdx: ci, colKey, isA1: false, a1Row: -1 };
+    return {
+      raw: t,
+      value: val,
+      isCol: true,
+      colIdx: ci,
+      colKey,
+      isA1: false,
+      a1Row: -1,
+    };
   }
 
   // Unknown identifier — treat as empty string
@@ -1004,12 +1427,21 @@ function parseAndEval(
   formulas: Record<string, string>,
   columnFormulas: Record<string, string>,
   evaluating: Set<string>,
-  findColumnIndex: (n: string) => number
+  findColumnIndex: (n: string) => number,
 ): any {
   expr = expr.trim();
 
   const evalSub = (sub: string, rIdx: number) =>
-    parseAndEval(sub, rIdx, rows, columns, formulas, columnFormulas, evaluating, findColumnIndex);
+    parseAndEval(
+      sub,
+      rIdx,
+      rows,
+      columns,
+      formulas,
+      columnFormulas,
+      evaluating,
+      findColumnIndex,
+    );
 
   // Bare A1 ref  e.g. =B3
   if (isA1Token(expr)) {
@@ -1039,19 +1471,35 @@ function parseAndEval(
     if (!impl) return `#NAME? '${fnName}'`;
 
     const rawArgList = splitTopLevelArgs(fnMatch[2]);
-    const resolved = rawArgList.map(raw =>
-      resolveArg(raw.trim(), rowIdx, rows, columns, formulas, columnFormulas, evaluating, findColumnIndex, evalSub)
+    const resolved = rawArgList.map((raw) =>
+      resolveArg(
+        raw.trim(),
+        rowIdx,
+        rows,
+        columns,
+        formulas,
+        columnFormulas,
+        evaluating,
+        findColumnIndex,
+        evalSub,
+      ),
     );
 
     const ctx: FormulaContext = {
-      rows, columns, currentRowIdx: rowIdx,
+      rows,
+      columns,
+      currentRowIdx: rowIdx,
       evaluateFormula: (f, r) => evalSub(f.startsWith("=") ? f.slice(1) : f, r),
       findColumnIndex,
       getColValues: (ci, start, end) => {
         if (ci < 0 || ci >= columns.length) return [];
         const key = columns[ci].key;
         const vals: number[] = [];
-        for (let r = Math.max(0, start); r <= Math.min(end, rows.length - 1); r++) {
+        for (
+          let r = Math.max(0, start);
+          r <= Math.min(end, rows.length - 1);
+          r++
+        ) {
           const n = Number(rows[r]?.[key]);
           if (!isNaN(n)) vals.push(n);
         }
@@ -1061,14 +1509,21 @@ function parseAndEval(
         if (ci < 0 || ci >= columns.length) return [];
         const key = columns[ci].key;
         const vals: any[] = [];
-        for (let r = Math.max(0, start); r <= Math.min(end, rows.length - 1); r++)
+        for (
+          let r = Math.max(0, start);
+          r <= Math.min(end, rows.length - 1);
+          r++
+        )
           vals.push(rows[r]?.[key]);
         return vals;
       },
     };
 
-    try { return impl(resolved, ctx); }
-    catch (e: any) { return `#ERR! ${e?.message ?? ""}`; }
+    try {
+      return impl(resolved, ctx);
+    } catch (e: any) {
+      return `#ERR! ${e?.message ?? ""}`;
+    }
   }
 
   // Arithmetic expression  e.g. B1*C1, price*1.1, B1+revenue
@@ -1081,7 +1536,9 @@ function parseAndEval(
 
 export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
   const [formulas, setFormulas] = useState<Record<string, string>>({});
-  const [columnFormulas, setColumnFormulas] = useState<Record<string, string>>({});
+  const [columnFormulas, setColumnFormulas] = useState<Record<string, string>>(
+    {},
+  );
 
   const rowsRef = useRef(rows);
   const columnsRef = useRef(columns);
@@ -1105,31 +1562,48 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
     if (isA1Token(nameOrKey)) return -1;
     const lower = nameOrKey.toLowerCase().trim();
     return columnsRef.current.findIndex(
-      c => c.key.toLowerCase() === lower || c.name.toLowerCase() === lower
+      (c) => c.key.toLowerCase() === lower || c.name.toLowerCase() === lower,
     );
   }, []);
 
   // hot-formula-parser — only used for range syntax like SUM(A1:A10)
   const parser = useMemo(() => {
     const p = new Parser();
+    // eslint-disable-next-line react-hooks/refs
     p.on("callCellValue", (cellCoord: any, done: any) => {
-      const rIdx = cellCoord.row.index, cIdx = cellCoord.column.index;
+      const rIdx = cellCoord.row.index,
+        cIdx = cellCoord.column.index;
       const colDef = columnsRef.current[cIdx];
-      if (!colDef || rIdx < 0 || rIdx >= rowsRef.current.length) { done(""); return; }
+      if (!colDef || rIdx < 0 || rIdx >= rowsRef.current.length) {
+        done("");
+        return;
+      }
       const val = rowsRef.current[rIdx][colDef.key];
       const num = Number(val);
-      done(!isNaN(num) && val !== "" && val !== null && val !== undefined ? num : (val ?? ""));
+      done(
+        !isNaN(num) && val !== "" && val !== null && val !== undefined
+          ? num
+          : (val ?? ""),
+      );
     });
+    // eslint-disable-next-line react-hooks/refs
     p.on("callRangeValue", (startCoord: any, endCoord: any, done: any) => {
       const fragment: any[][] = [];
       for (let r = startCoord.row.index; r <= endCoord.row.index; r++) {
         const rowData: any[] = [];
         for (let c = startCoord.column.index; c <= endCoord.column.index; c++) {
           const colDef = columnsRef.current[c];
-          if (!colDef || r < 0 || r >= rowsRef.current.length) { rowData.push(""); continue; }
+          if (!colDef || r < 0 || r >= rowsRef.current.length) {
+            rowData.push("");
+            continue;
+          }
           const val = rowsRef.current[r][colDef.key];
           const num = Number(val);
-          rowData.push(!isNaN(num) && val !== "" && val !== null && val !== undefined ? num : (val ?? ""));
+          rowData.push(
+            !isNaN(num) && val !== "" && val !== null && val !== undefined
+              ? num
+              : (val ?? ""),
+          );
         }
         fragment.push(rowData);
       }
@@ -1151,20 +1625,31 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
       }
 
       return parseAndEval(
-        expr, currentRowIdx,
-        rowsRef.current, columnsRef.current,
-        formulasRef.current, columnFormulasRef.current,
-        evaluatingRef.current, findColumnIndex
+        expr,
+        currentRowIdx,
+        rowsRef.current,
+        columnsRef.current,
+        formulasRef.current,
+        columnFormulasRef.current,
+        evaluatingRef.current,
+        findColumnIndex,
       );
     },
-    [parser, findColumnIndex]
+    [parser, findColumnIndex],
   );
 
   const getFormula = useCallback(
     (rowIdx: number, colKey: string): string | undefined =>
       formulas[`${rowIdx}-${colKey}`] ?? columnFormulas[colKey],
-    [formulas, columnFormulas]
+    [formulas, columnFormulas],
   );
 
-  return { formulas, setFormulas, columnFormulas, setColumnFormulas, evaluateFormula, getFormula };
+  return {
+    formulas,
+    setFormulas,
+    columnFormulas,
+    setColumnFormulas,
+    evaluateFormula,
+    getFormula,
+  };
 }

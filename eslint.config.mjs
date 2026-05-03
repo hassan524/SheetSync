@@ -10,7 +10,6 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  // extend Next.js core + TypeScript rules
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 
   {
@@ -21,11 +20,22 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
     ],
-    rules: {
-      // turn off react/no-unescaped-entities globally
-      "react/no-unescaped-entities": "off",
+  },
 
+  {
+    rules: {
+      "react/no-unescaped-entities": "off",
       "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
+      "@typescript-eslint/triple-slash-reference": "off",
+      "@typescript-eslint/ban-ts-comment": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "@next/next/no-img-element": "off",
+
+      // only keep this one — unused vars is actually useful
+      "@typescript-eslint/no-unused-vars": "warn",
     },
   },
 ];

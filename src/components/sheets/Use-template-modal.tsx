@@ -20,11 +20,11 @@ import { createSheet } from "@/lib/querys/sheets/sheets";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { toast } from "sonner";
 
-interface UseTemplateModalProps {
+export interface UseTemplateModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   templateId: string;
-  folders: any[];
+  folders?: any[];
   organizations?: any[];
 }
 
@@ -41,7 +41,7 @@ const UseTemplateModal = ({
   const [selectedFolder, setSelectedFolder] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  const router = useRouter()
+  const router = useRouter();
 
   const template = SHEET_TEMPLATES.find((t) => t.id === templateId);
   const Icon = template?.icon;
@@ -77,13 +77,11 @@ const UseTemplateModal = ({
         sheetId: createdSheet.id,
         organizationId: isOrg ? selectedOrg : null,
         action: "created sheet",
-        target: isOrg
-          ? `${createdSheet.name} (Org)`
-          : createdSheet.name,
+        target: isOrg ? `${createdSheet.name} (Org)` : createdSheet.name,
       });
 
       toast.success(`Sheet "${sheetName}" created`);
-      router.refresh()
+      router.refresh();
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Failed to create sheet");
@@ -92,17 +90,17 @@ const UseTemplateModal = ({
     }
   };
 
-  const canCreate =
-    !!sheetName.trim() && (saveToOrg ? !!selectedOrg : true);
+  const canCreate = !!sheetName.trim() && (saveToOrg ? !!selectedOrg : true);
 
   if (!template) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden rounded-2xl border border-zinc-200/80 shadow-xl [&>button]:hidden">
-
         {/* HEADER */}
-        <div className={`relative h-[152px] overflow-hidden bg-gradient-to-br ${accent?.from}`}>
+        <div
+          className={`relative h-[152px] overflow-hidden bg-gradient-to-br ${accent?.from}`}
+        >
           <button
             onClick={() => onOpenChange(false)}
             className="absolute top-3.5 right-3.5 h-7 w-7 rounded-full bg-black/5 hover:bg-black/10 border flex items-center justify-center"
@@ -175,10 +173,7 @@ const UseTemplateModal = ({
 
             {/* PERSONAL FOLDER */}
             {!saveToOrg && (
-              <Select
-                value={selectedFolder}
-                onValueChange={setSelectedFolder}
-              >
+              <Select value={selectedFolder} onValueChange={setSelectedFolder}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select folder..." />
                 </SelectTrigger>
@@ -204,10 +199,7 @@ const UseTemplateModal = ({
             Cancel
           </Button>
 
-          <Button
-            onClick={handleCreateSheet}
-            disabled={!canCreate || loading}
-          >
+          <Button onClick={handleCreateSheet} disabled={!canCreate || loading}>
             {loading ? "Creating..." : "Create"}
           </Button>
         </div>

@@ -1,6 +1,6 @@
 // hooks/sheets/use-keyboard-shortcuts.ts
 import { useEffect } from "react";
-import type { CellFormat } from "@/types/sheet.types";
+import type { CellFormat } from "@/types";
 
 interface UseKeyboardShortcutsProps {
   selectedCell: { row: number; col: string } | null;

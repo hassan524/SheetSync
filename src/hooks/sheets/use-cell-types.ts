@@ -1,7 +1,7 @@
 // hooks/sheets/use-cell-types.ts
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import type { SheetRow, ColumnDef } from "@/types/sheet.types";
+import type { SheetRow, ColumnDef } from "@/types";
 
 export function useCellTypes(
   rows: SheetRow[],

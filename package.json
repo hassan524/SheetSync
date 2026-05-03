@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "format:staged": "lint-staged",
-    "prepare": "husky",
+    "prepare": "husky install",
     "shadcn": "shadcn"
   },
   "dependencies": {

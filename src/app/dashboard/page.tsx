@@ -1,12 +1,7 @@
 import DashboardLayout from "@/components/layout/Dashboard-layout";
 import StatsCard from "@/components/common/Stats-card";
 import DashboardPanel from "@/components/common/Dashboard-panel";
-import {
-  FileSpreadsheet,
-  Users,
-  Building2,
-  TrendingUp
-} from "lucide-react";
+import { FileSpreadsheet, Users, Building2, TrendingUp } from "lucide-react";
 import QuickActions from "@/components/individual/dashboard/Quick-actions";
 import DashboardWelcome from "@/components/individual/dashboard/Dashboard-welcome";
 import TemplatePicker from "@/components/individual/dashboard/Template-picker";
@@ -40,8 +35,8 @@ const Index = async () => {
             icon={<Building2 className="h-5 w-5 text-primary" />}
           />
           <StatsCard
-            title="Est. Hours Saved"
-            value={String(stats.hoursSaved)}
+            title="Starred Sheets"
+            value={String(stats.starredSheets)}
             icon={<TrendingUp className="h-5 w-5 text-primary" />}
           />
         </section>

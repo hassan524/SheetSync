@@ -22,7 +22,7 @@ import {
   Redo2,
   ChevronDown,
 } from "lucide-react";
-import { ColumnDef } from "@/types/sheet.types";
+import { ColumnDef } from "@/types";
 
 interface DataToolbarProps {
   onInsertRow: () => void;

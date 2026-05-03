@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from "react";
 import {
@@ -75,7 +75,10 @@ const InviteTeamModal = ({
   const handleAddEmail = () => {
     const trimmed = email.trim();
     if (!trimmed) return;
-    if (!isValidEmail(trimmed)) { setEmailError(true); return; }
+    if (!isValidEmail(trimmed)) {
+      setEmailError(true);
+      return;
+    }
     if (!invitedEmails.includes(trimmed)) {
       setInvitedEmails((prev) => [...prev, trimmed]);
       setEmail("");
@@ -87,7 +90,10 @@ const InviteTeamModal = ({
     setInvitedEmails((prev) => prev.filter((x) => x !== e));
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") { e.preventDefault(); handleAddEmail(); }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddEmail();
+    }
   };
 
   const handleInvite = async () => {
@@ -104,7 +110,8 @@ const InviteTeamModal = ({
       if (data?.results) {
         data.results.forEach((r: any) => {
           if (r.status === "sent") toast.success(`Invite sent to ${r.email}`);
-          if (r.status === "skipped" || r.status === "failed") toast.error(r.error);
+          if (r.status === "skipped" || r.status === "failed")
+            toast.error(r.error);
         });
       }
       setInvitedEmails([]);
@@ -113,7 +120,11 @@ const InviteTeamModal = ({
       onOpenChange(false);
       if (onInvited) onInvited();
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || err?.message || "Failed to send invitation");
+      toast.error(
+        err?.response?.data?.error ||
+          err?.message ||
+          "Failed to send invitation",
+      );
     } finally {
       setSending(false);
     }
@@ -131,7 +142,6 @@ const InviteTeamModal = ({
 
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden gap-0 rounded-xl border border-border shadow-xl">
-
           {/* Header */}
           <div className="px-6 pt-6 pb-5 border-b border-border">
             <DialogHeader>
@@ -153,10 +163,12 @@ const InviteTeamModal = ({
 
           {/* Body */}
           <div className="px-6 py-5 space-y-5">
-
             {/* Email input */}
             <div className="space-y-1.5">
-              <Label htmlFor="invite-email" className="text-xs font-medium text-muted-foreground">
+              <Label
+                htmlFor="invite-email"
+                className="text-xs font-medium text-muted-foreground"
+              >
                 Email address
               </Label>
               <div className="flex gap-2">
@@ -167,7 +179,10 @@ const InviteTeamModal = ({
                     type="email"
                     placeholder="colleague@company.com"
                     value={email}
-                    onChange={(e) => { setEmail(e.target.value); setEmailError(false); }}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError(false);
+                    }}
                     onKeyDown={handleKeyDown}
                     className={`pl-9 h-9 text-sm${emailError ? " border-destructive focus-visible:ring-destructive/30" : ""}`}
                     disabled={sending}
@@ -186,8 +201,19 @@ const InviteTeamModal = ({
 
               {emailError && (
                 <p className="text-xs text-destructive flex items-center gap-1">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                   Enter a valid email address
                 </p>
@@ -215,16 +241,22 @@ const InviteTeamModal = ({
               ) : !emailError ? (
                 <p className="text-xs text-muted-foreground">
                   Press{" "}
-                  <kbd className="px-1 py-0.5 text-[10px] font-mono rounded border bg-muted">Enter</kbd>{" "}
+                  <kbd className="px-1 py-0.5 text-[10px] font-mono rounded border bg-muted">
+                    Enter
+                  </kbd>{" "}
                   or click + to add multiple
                 </p>
               ) : null}
             </div>
 
             {/* Role + Org (org selector only shown when multiple orgs exist) */}
-            <div className={`grid gap-3 ${showOrgSelect ? "grid-cols-2" : "grid-cols-1"}`}>
+            <div
+              className={`grid gap-3 ${showOrgSelect ? "grid-cols-2" : "grid-cols-1"}`}
+            >
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">Role</Label>
+                <Label className="text-xs font-medium text-muted-foreground">
+                  Role
+                </Label>
                 <Select value={role} onValueChange={setRole} disabled={sending}>
                   <SelectTrigger className="h-9 text-sm">
                     <SelectValue />
@@ -235,16 +267,22 @@ const InviteTeamModal = ({
                     <SelectItem value="viewer">Viewer</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground leading-tight">{ROLES_DESC[role]}</p>
+                <p className="text-[11px] text-muted-foreground leading-tight">
+                  {ROLES_DESC[role]}
+                </p>
               </div>
 
               {showOrgSelect && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">Organization</Label>
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    Organization
+                  </Label>
                   <Select
                     value={organization?.id || ""}
                     onValueChange={(id) =>
-                      setOrganization((organizations ?? []).find((o) => o.id === id) || null)
+                      setOrganization(
+                        (organizations ?? []).find((o) => o.id === id) || null,
+                      )
                     }
                     disabled={sending}
                   >
@@ -271,7 +309,17 @@ const InviteTeamModal = ({
                 "Permissions can be changed or revoked anytime",
               ].map((txt, i) => (
                 <div key={i} className="flex items-start gap-2">
-                  <svg className="mt-0.5 shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    className="mt-0.5 shrink-0"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                   <span className="text-xs text-muted-foreground">{txt}</span>
@@ -288,13 +336,20 @@ const InviteTeamModal = ({
                 : `${invitedEmails.length} recipient${invitedEmails.length > 1 ? "s" : ""}`}
             </span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={sending}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+                disabled={sending}
+              >
                 Cancel
               </Button>
               <Button
                 size="sm"
                 onClick={handleInvite}
-                disabled={invitedEmails.length === 0 || !organization || sending}
+                disabled={
+                  invitedEmails.length === 0 || !organization || sending
+                }
               >
                 {sending
                   ? "Sending…"

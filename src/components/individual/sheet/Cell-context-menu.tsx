@@ -19,7 +19,7 @@ import {
   Link,
   AlertCircle,
 } from "lucide-react";
-import { ColumnDef } from "@/types/sheet.types";
+import { ColumnDef } from "@/types";
 
 interface CellContextMenuProps {
   children: React.ReactNode;

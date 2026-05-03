@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import DashboardLayout from "@/components/layout/Dashboard-layout";
-import PersonCard from "@/components/people/PersonCard";
+import PersonCard from "@/components/people/Person-card";
 import PeopleTable from "@/components/tables/People-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

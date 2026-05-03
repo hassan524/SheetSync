@@ -61,10 +61,13 @@ const starredSheets = [
 ];
 
 const cardData = starredSheets.map((s) => ({
+  id: s.id,
   title: s.title,
   lastEdited: s.lastModified,
   isStarred: s.isStarred,
   sharedWith: s.collaborators,
+  templateId: "f628aed8-bca7-4f51-b687-6db9f932be34",
+  fileSizeKb: parseInt(s.size) || 100,
 }));
 
 const StarredPage = () => {
@@ -126,7 +129,7 @@ const StarredPage = () => {
 
         {/* Content */}
         {viewMode === "table" ? (
-          <SheetsTable sheets={starredSheets} />
+          <SheetsTable sheets={starredSheets as any} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {cardData.map((sheet, index) => (

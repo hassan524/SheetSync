@@ -1,4 +1,3 @@
-import UserInfo from "./UserInfo";
 import BreadCrumbs from "./BreadCrumbs";
 
 const Header = () => {
@@ -14,7 +13,7 @@ const Header = () => {
           onClick={() => alert("Notifications clicked")}
           className="cursor-pointer hover:opacity-80 transition"
         >
-          <UserInfo />
+          <span className="text-sm text-muted-foreground">User</span>
         </div>
       </div>
     </header>

@@ -28,6 +28,8 @@ import {
   BarChart2,
   Sigma,
   X,
+  ListChecks,
+  Plus,
 } from "lucide-react";
 import { ColumnDef } from "@/types";
 
@@ -41,6 +43,8 @@ interface ColumnHeaderMenuProps {
   columnFormula?: string;
   onApplyColumnFormula?: (formula: string) => void;
   onRemoveColumnFormula?: () => void;
+  selectOptions?: string[];
+  onUpdateSelectOptions?: (options: string[]) => void;
 }
 
 const COLUMN_TYPES = [
@@ -53,6 +57,7 @@ const COLUMN_TYPES = [
   { type: "priority" as const, label: "Priority", icon: AlertCircle },
   { type: "status" as const, label: "Status", icon: AlertCircle },
   { type: "progress" as const, label: "Progress", icon: BarChart2 },
+  { type: "select" as const, label: "Select List", icon: ListChecks },
 ];
 
 export default function ColumnHeaderMenu({
@@ -65,10 +70,13 @@ export default function ColumnHeaderMenu({
   columnFormula,
   onApplyColumnFormula,
   onRemoveColumnFormula,
+  selectOptions,
+  onUpdateSelectOptions,
 }: ColumnHeaderMenuProps) {
   const [renameValue, setRenameValue] = useState(column.name);
   const [open, setOpen] = useState(false);
   const [colFormulaValue, setColFormulaValue] = useState(columnFormula || "");
+  const [newOptionValue, setNewOptionValue] = useState("");
 
   const handleRenameSubmit = () => {
     if (renameValue.trim() && onRename) {
@@ -203,6 +211,71 @@ export default function ColumnHeaderMenu({
                 </button>
               </div>
             )}
+          </>
+        )}
+
+        {/* ── Select Options Management ── */}
+        {column.type === "select" && onUpdateSelectOptions && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider pb-1 flex items-center gap-1">
+              <ListChecks className="h-3 w-3" /> Select Options
+            </DropdownMenuLabel>
+            <div className="px-2 pb-1 space-y-1 max-h-32 overflow-y-auto">
+              {(selectOptions ?? []).map((opt, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  <span className="flex-1 text-[11px] truncate px-1.5 py-0.5 rounded bg-gray-50 border border-gray-200">
+                    {opt}
+                  </span>
+                  <button
+                    className="h-5 w-5 flex items-center justify-center rounded hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUpdateSelectOptions(
+                        (selectOptions ?? []).filter((_, idx) => idx !== i),
+                      );
+                    }}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="px-2 pb-2 flex items-center gap-1.5">
+              <input
+                className="flex-1 h-7 px-2 text-xs rounded border border-gray-200 bg-gray-50 outline-none focus:border-primary focus:bg-white"
+                value={newOptionValue}
+                onChange={(e) => setNewOptionValue(e.target.value)}
+                placeholder="Add option…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newOptionValue.trim()) {
+                    onUpdateSelectOptions([
+                      ...(selectOptions ?? []),
+                      newOptionValue.trim(),
+                    ]);
+                    setNewOptionValue("");
+                  }
+                  e.stopPropagation();
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <button
+                className="h-7 w-7 flex items-center justify-center rounded bg-primary text-white hover:opacity-90 shrink-0 disabled:opacity-40"
+                disabled={!newOptionValue.trim()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (newOptionValue.trim()) {
+                    onUpdateSelectOptions([
+                      ...(selectOptions ?? []),
+                      newOptionValue.trim(),
+                    ]);
+                    setNewOptionValue("");
+                  }
+                }}
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </div>
           </>
         )}
 
