@@ -95,12 +95,15 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
     () => allSheets.filter((s) => s.is_starred).length,
     [allSheets],
   );
+  // Add this above the useMemo that uses it
+  const [now] = useState(() => Date.now());
+
   const recentCount = useMemo(() => {
-    const threeDaysAgo = Date.now() - 1000 * 60 * 60 * 72;
+    const threeDaysAgo = now - 1000 * 60 * 60 * 72;
     return allSheets.filter(
       (s) => s.updated_at && new Date(s.updated_at).getTime() > threeDaysAgo,
     ).length;
-  }, [allSheets]);
+  }, [allSheets, now]); // add now to the dependency array
 
   const handleCreateFolder = async (name: string) => {
     try {

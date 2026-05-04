@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -12,10 +14,11 @@ import {
   Circle,
   LogOut,
   Settings,
-  Eye,
-  Sheet,
+  ExternalLink,
+  UserPlus,
 } from "lucide-react";
 import { OrganizationTableData, Role } from "@/types";
+import { useRouter } from "next/navigation";
 
 const roleVariants: Record<Role, "default" | "secondary" | "outline"> = {
   owner: "default",
@@ -122,20 +125,39 @@ export const organizationColumns = [
   },
 ];
 
-export const organizationAction = {
-  render: (org: OrganizationTableData) => (
+export function OrganizationActionMenu({ org }: { org: OrganizationTableData }) {
+  const router = useRouter();
+
+  return (
     <>
-      <DropdownMenuItem className="text-xs gap-2">
-        <Eye className="h-3.5 w-3.5" /> View Details
+      <DropdownMenuItem
+        className="text-xs gap-2"
+        onClick={() => router.push(`/organizations/${org.id}`)}
+      >
+        <ExternalLink className="h-3.5 w-3.5" /> Open Dashboard
       </DropdownMenuItem>
-      <DropdownMenuItem className="text-xs gap-2">
-        <Sheet className="h-3.5 w-3.5" /> View Sheets
+      <DropdownMenuItem
+        className="text-xs gap-2"
+        onClick={() => router.push(`/organizations/${org.id}?tab=sheets`)}
+      >
+        <FileSpreadsheet className="h-3.5 w-3.5" /> View Sheets
       </DropdownMenuItem>
-      <DropdownMenuItem className="text-xs gap-2">
+      <DropdownMenuItem
+        className="text-xs gap-2"
+        onClick={() => router.push(`/organizations/${org.id}?tab=members`)}
+      >
         <Users className="h-3.5 w-3.5" /> Manage Members
       </DropdownMenuItem>
+      {(org.role === "admin" || org.role === "owner") && (
+        <DropdownMenuItem className="text-xs gap-2">
+          <UserPlus className="h-3.5 w-3.5" /> Invite People
+        </DropdownMenuItem>
+      )}
       <DropdownMenuSeparator />
-      <DropdownMenuItem className="text-xs gap-2">
+      <DropdownMenuItem
+        className="text-xs gap-2"
+        onClick={() => router.push(`/organizations/${org.id}?tab=settings`)}
+      >
         <Settings className="h-3.5 w-3.5" /> Settings
       </DropdownMenuItem>
       {org.role !== "admin" && org.role !== "owner" && (
@@ -147,7 +169,11 @@ export const organizationAction = {
         </>
       )}
     </>
-  ),
+  );
+}
+
+export const organizationAction = {
+  render: (org: OrganizationTableData) => <OrganizationActionMenu org={org} />,
 };
 
 export function NoOrganizationsIcon() {
@@ -159,99 +185,17 @@ export function NoOrganizationsIcon() {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect
-        x="10"
-        y="8"
-        width="52"
-        height="56"
-        rx="7"
-        fill="currentColor"
-        className="text-muted/30"
-      />
-      <rect
-        x="10"
-        y="8"
-        width="52"
-        height="56"
-        rx="7"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        className="text-border"
-      />
-      <rect
-        x="18"
-        y="20"
-        width="16"
-        height="14"
-        rx="3"
-        fill="currentColor"
-        className="text-muted/40"
-      />
-      <rect
-        x="38"
-        y="20"
-        width="16"
-        height="14"
-        rx="3"
-        fill="currentColor"
-        className="text-muted/40"
-      />
-      <rect
-        x="28"
-        y="38"
-        width="16"
-        height="14"
-        rx="3"
-        fill="currentColor"
-        className="text-muted/40"
-      />
-      <line
-        x1="26"
-        y1="27"
-        x2="38"
-        y2="27"
-        stroke="currentColor"
-        strokeWidth="1"
-        className="text-border/60"
-      />
-      <line
-        x1="36"
-        y1="27"
-        x2="36"
-        y2="38"
-        stroke="currentColor"
-        strokeWidth="1"
-        className="text-border/60"
-      />
+      <rect x="10" y="8" width="52" height="56" rx="7" fill="currentColor" className="text-muted/30" />
+      <rect x="10" y="8" width="52" height="56" rx="7" stroke="currentColor" strokeWidth="1.5" className="text-border" />
+      <rect x="18" y="20" width="16" height="14" rx="3" fill="currentColor" className="text-muted/40" />
+      <rect x="38" y="20" width="16" height="14" rx="3" fill="currentColor" className="text-muted/40" />
+      <rect x="28" y="38" width="16" height="14" rx="3" fill="currentColor" className="text-muted/40" />
+      <line x1="26" y1="27" x2="38" y2="27" stroke="currentColor" strokeWidth="1" className="text-border/60" />
+      <line x1="36" y1="27" x2="36" y2="38" stroke="currentColor" strokeWidth="1" className="text-border/60" />
       <circle cx="54" cy="54" r="11" fill="hsl(var(--background))" />
-      <circle
-        cx="54"
-        cy="54"
-        r="11"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        className="text-border"
-      />
-      <line
-        x1="50"
-        y1="54"
-        x2="58"
-        y2="54"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        className="text-muted-foreground/60"
-      />
-      <line
-        x1="54"
-        y1="50"
-        x2="54"
-        y2="58"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        className="text-muted-foreground/60"
-      />
+      <circle cx="54" cy="54" r="11" stroke="currentColor" strokeWidth="1.5" className="text-border" />
+      <line x1="50" y1="54" x2="58" y2="54" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-muted-foreground/60" />
+      <line x1="54" y1="50" x2="54" y2="58" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-muted-foreground/60" />
     </svg>
   );
 }

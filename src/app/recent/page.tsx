@@ -14,12 +14,25 @@ export const metadata = generateSEO({
 export default async function RecentPage() {
   const recentSheets = await getRecentSheets();
 
+  // Capture now once on the server — this is an async server component, not a re-rendering client component
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const now = Date.now(); // eslint-disable-line react-hooks/purity
+
+  const last7Days = recentSheets?.filter((s: any) => {
+    const d = new Date(s.updated_at || s.created_at);
+    return now - d.getTime() < 7 * 24 * 60 * 60 * 1000;
+  }).length ?? 0;
+
+  const last24Hours = recentSheets?.filter((s: any) => {
+    const d = new Date(s.updated_at || s.created_at);
+    return now - d.getTime() < 24 * 60 * 60 * 1000;
+  }).length ?? 0;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
     name: "SheetSync - Recent",
-    description:
-      "View your most recently opened and edited spreadsheets.",
+    description: "View your most recently opened and edited spreadsheets.",
     applicationCategory: "ProductivityApplication",
     operatingSystem: "Web",
   };
@@ -69,19 +82,13 @@ export default async function RecentPage() {
               },
               {
                 label: "Last 7 Days",
-                value: recentSheets?.filter((s: any) => {
-                  const d = new Date(s.updated_at || s.created_at);
-                  return Date.now() - d.getTime() < 7 * 24 * 60 * 60 * 1000;
-                }).length ?? 0,
+                value: last7Days,
                 icon: FileSpreadsheet,
                 description: "Active in this week",
               },
               {
                 label: "Last 24 Hours",
-                value: recentSheets?.filter((s: any) => {
-                  const d = new Date(s.updated_at || s.created_at);
-                  return Date.now() - d.getTime() < 24 * 60 * 60 * 1000;
-                }).length ?? 0,
+                value: last24Hours,
                 icon: FileSpreadsheet,
                 description: "Modified today",
               },

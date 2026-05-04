@@ -13,6 +13,11 @@ export const metadata = generateSEO({
   ogImage: "/og/organizations-og.png",
 });
 
+// Generate stable storage value outside render using org id as seed
+function seededStorage(index: number): number {
+  return parseFloat(((((index * 9301 + 49297) % 233280) / 233280) * 4 + 1).toFixed(1));
+}
+
 export default async function OrganizationsPage() {
   const organizations = await getAllOrganizations();
 
@@ -23,7 +28,7 @@ export default async function OrganizationsPage() {
     members: org.membersCount ?? 0,
     sheets: org.sheetsCount ?? 0,
     activeNow: org.activeNow ?? 0,
-    storageUsed: parseFloat((Math.random() * 4 + 1).toFixed(1)),
+    storageUsed: seededStorage(index),
     storageLimit: 10,
     lastModified: org.updated_at ? timeAgo(org.updated_at) : "Recently",
     createdAt: org.created_at

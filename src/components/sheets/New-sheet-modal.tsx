@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Folder, FolderPlus, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Folder, FolderPlus, ChevronRight } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -20,7 +20,7 @@ import CreateFolderDialog from "../individual/Personalsheets/Create-folder-dialo
 import { createFolder } from "@/lib/querys/folder/folders";
 import { createSheet } from "@/lib/querys/sheets/sheets";
 import { logActivity } from "@/lib/querys/activity/activity";
-import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
+import { SHEET_TEMPLATES, ICON_MAP } from "@/constants/Sheet-templates";
 import { FolderWithSheets, Sheet } from "@/types";
 
 interface Props {
@@ -73,7 +73,7 @@ const NewSheetModal = ({
   }, [open]);
 
   const activeTemplate = SHEET_TEMPLATES[activeIndex];
-  const Icon = activeTemplate.icon;
+  const Icon = ICON_MAP[activeTemplate.iconName];
 
   const scrollTo = (index: number) => {
     const next =
@@ -168,15 +168,6 @@ const NewSheetModal = ({
               <X className="h-3.5 w-3.5 text-zinc-500" />
             </button>
 
-            {/* Prev arrow — always visible, wraps around */}
-            {/* <button
-              onClick={() => scrollTo(activeIndex - 1)}
-              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 h-7 w-7 rounded-full bg-white/80 hover:bg-white border shadow-sm flex items-center justify-center"
-            >
-              <ChevronLeft className="h-3.5 w-3.5 text-zinc-600" />
-            </button> */}
-
-            {/* Next arrow — always visible, wraps around */}
             <button
               onClick={() => scrollTo(activeIndex + 1)}
               className="absolute cursor-pointer right-10 top-1/2 -translate-y-1/2 z-10 h-7 w-7 rounded-full bg-white/80 hover:bg-white border shadow-sm flex items-center justify-center"
@@ -189,7 +180,7 @@ const NewSheetModal = ({
                 <div
                   className={`h-7 w-7 rounded-lg border flex items-center justify-center ${activeTemplate.accent.iconRing}`}
                 >
-                  <Icon className="h-3.5 w-3.5 text-zinc-600" />
+                  {Icon && <Icon className="h-3.5 w-3.5 text-zinc-600" />}
                 </div>
                 <span className="text-[10.5px] font-semibold uppercase text-zinc-400 tracking-wide">
                   {activeTemplate.title}
@@ -206,11 +197,10 @@ const NewSheetModal = ({
                   <button
                     key={i}
                     onClick={() => scrollTo(i)}
-                    className={`h-1.5 rounded-full transition-all duration-200 ${
-                      i === activeIndex
+                    className={`h-1.5 rounded-full transition-all duration-200 ${i === activeIndex
                         ? "w-4 bg-zinc-500"
                         : "w-1.5 bg-zinc-300"
-                    }`}
+                      }`}
                   />
                 ))}
               </div>

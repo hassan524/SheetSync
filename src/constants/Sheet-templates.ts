@@ -1,19 +1,41 @@
-import { FileSpreadsheet, Calculator, Calendar, BarChart3 } from "lucide-react";
+import { FileSpreadsheet, Calculator, Calendar, BarChart3, type LucideIcon } from "lucide-react";
 
-export const SHEET_TEMPLATES = [
+export type SheetTemplate = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  iconName: string;
+  color: string;
+  features: string[];
+  accent: {
+    from: string;
+    bubble1: string;
+    bubble2: string;
+    iconRing: string;
+  };
+  copy: {
+    tagline: string;
+    body: string;
+  };
+};
+
+export const ICON_MAP: Record<string, LucideIcon> = {
+  FileSpreadsheet,
+  Calculator,
+  Calendar,
+  BarChart3,
+};
+
+export const SHEET_TEMPLATES: SheetTemplate[] = [
   {
     id: "f628aed8-bca7-4f51-b687-6db9f932be34",
     title: "Blank Sheet",
     description: "Start fresh with a clean spreadsheet",
     category: "General",
-    icon: FileSpreadsheet,
+    iconName: "FileSpreadsheet",
     color: "bg-slate-700",
-    features: [
-      "100+ columns",
-      "10,000+ rows",
-      "All formulas",
-      "Custom styling",
-    ],
+    features: ["100+ columns", "10,000+ rows", "All formulas", "Custom styling"],
     accent: {
       from: "from-slate-50 to-slate-100/60",
       bubble1: "#94a3b8",
@@ -30,7 +52,7 @@ export const SHEET_TEMPLATES = [
     title: "Finance Tracker",
     description: "Track income, expenses, and savings",
     category: "Finance",
-    icon: Calculator,
+    iconName: "Calculator",
     color: "bg-emerald-700",
     features: ["Auto-sum", "Monthly breakdown", "Categories", "Savings goals"],
     accent: {
@@ -49,7 +71,7 @@ export const SHEET_TEMPLATES = [
     title: "Project Tracker",
     description: "Plan project milestones",
     category: "Project Management",
-    icon: Calendar,
+    iconName: "Calendar",
     color: "bg-blue-700",
     features: ["Gantt", "Milestones", "Assignments", "Alerts"],
     accent: {
@@ -68,7 +90,7 @@ export const SHEET_TEMPLATES = [
     title: "QA Tracker",
     description: "Track testing and bugs",
     category: "Engineering",
-    icon: BarChart3,
+    iconName: "BarChart3",
     color: "bg-purple-700",
     features: ["Bugs", "Status", "Priority", "Reports"],
     accent: {

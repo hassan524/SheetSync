@@ -1,8 +1,13 @@
+"use client";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FileText, Users, Clock, Star } from "lucide-react";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Edit3, Share2, Download, Trash2 } from "lucide-react";
+import { Edit3, Share2, Download, Trash2, StarOff } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { updateSheetStarred } from "@/lib/querys/sheet/sheet";
+import { toast } from "sonner";
 
 export interface SheetRow {
   id: string;
@@ -12,7 +17,7 @@ export interface SheetRow {
     name?: string;
     email?: string;
     initials?: string;
-    avatar?: string; // added avatar
+    avatar?: string;
   };
   collaborators?: number;
   lastModified?: string;
@@ -124,10 +129,15 @@ export const sheetColumns = [
   },
 ];
 
-export const sheetAction = {
-  render: (s: SheetRow) => (
+function SheetActionMenu({ sheet }: { sheet: SheetRow }) {
+  const router = useRouter();
+
+  return (
     <>
-      <DropdownMenuItem className="text-xs gap-2">
+      <DropdownMenuItem
+        className="text-xs gap-2"
+        onClick={() => router.push(`/sheet/${sheet.id}`)}
+      >
         <Edit3 className="h-3.5 w-3.5" /> Open & Edit
       </DropdownMenuItem>
       <DropdownMenuItem className="text-xs gap-2">
@@ -136,16 +146,35 @@ export const sheetAction = {
       <DropdownMenuItem className="text-xs gap-2">
         <Download className="h-3.5 w-3.5" /> Download
       </DropdownMenuItem>
-      <DropdownMenuItem className="text-xs gap-2">
-        <Star className="h-3.5 w-3.5" /> {s.is_starred ? "Unstar" : "Star"}
+      <DropdownMenuItem
+        className="text-xs gap-2"
+        onClick={async () => {
+          try {
+            await updateSheetStarred(sheet.id, !sheet.is_starred);
+            toast.success(sheet.is_starred ? "Removed from starred" : "Added to starred");
+          } catch {
+            toast.error("Failed to update star");
+          }
+        }}
+      >
+        {sheet.is_starred ? (
+          <><StarOff className="h-3.5 w-3.5" /> Unstar</>
+        ) : (
+          <><Star className="h-3.5 w-3.5" /> Star</>
+        )}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem className="text-xs gap-2 text-red-600 focus:text-red-600">
         <Trash2 className="h-3.5 w-3.5" /> Delete
       </DropdownMenuItem>
     </>
-  ),
+  );
+}
+
+export const sheetAction = {
+  render: (s: SheetRow) => <SheetActionMenu sheet={s} />,
 };
+
 export function NoSheetsIcon() {
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">

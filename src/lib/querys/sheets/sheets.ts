@@ -202,6 +202,54 @@ export async function getRecentSheets(limit?: number) {
       folder: folder ? { id: folder.id, name: folder.name } : null,
       rowsCount: sheet.rows?.length ?? 0,
       colsCount: sheet.columns?.length ?? 0,
+      isStarred: !!sheet.is_starred,
+    };
+  });
+}
+
+
+export async function getStarredSheets() {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  const { data, error } = await supabase
+    .from("sheets")
+    .select(`
+      id, title, template_id, is_starred,
+      created_at, updated_at, last_opened_at,
+      organization_id, folder_id, size_mb,
+      folders ( id, name ),
+      organizations ( id, name, organization_members ( id ) ),
+      rows ( id ),
+      columns ( id )
+    `)
+    .eq("owner_id", user.id)
+    .eq("is_starred", true)
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((sheet: any) => {
+    const org = sheet.organizations?.[0] ?? null;
+    const folder = sheet.folders?.[0] ?? null;
+
+    return {
+      id: sheet.id,
+      title: sheet.title,
+      templateId: sheet.template_id,
+      lastEdited: sheet.updated_at,
+      createdAt: sheet.created_at,
+      isOrganization: !!sheet.organization_id,
+      organization: org ? {
+        id: org.id,
+        name: org.name,
+        membersCount: org.organization_members?.length ?? 0,
+      } : null,
+      folder: folder ? { id: folder.id, name: folder.name } : null,
+      rowsCount: sheet.rows?.length ?? 0,
+      colsCount: sheet.columns?.length ?? 0,
+      isStarred: true,
     };
   });
 }

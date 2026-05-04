@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   FileSpreadsheet,
@@ -10,7 +10,6 @@ import {
   Users,
   Upload,
   LayoutTemplate,
-  Plus,
   ChevronDown,
   Star,
   Clock,
@@ -34,11 +33,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SettingsDialog from "@/components/header/Settings-dialog";
 import { useAuth } from "@/context/AuthContext";
-import JoinOrgModal from "@/components/modals/Join-org-modal";
+import { getAllOrganizations } from "@/lib/querys/organization/organization";
 
 const mainNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
@@ -58,20 +56,29 @@ const toolsItems = [
   { title: "Templates", url: "/templates", icon: LayoutTemplate },
 ];
 
-const organizations = [
-  { name: "Acme Corp", role: "Admin", members: 24 },
-  { name: "Design Team", role: "Member", members: 8 },
-  { name: "Marketing", role: "Viewer", members: 15 },
-];
-
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const [orgsOpen, setOrgsOpen] = useState(true);
-  const [joinOrgOpen, setJoinOrgOpen] = useState(false);
+  const [organizations, setOrganizations] = useState<any[]>([]);
   const { user } = useAuth();
 
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    async function fetchOrgs() {
+      try {
+        const orgs = await getAllOrganizations();
+        setOrganizations(orgs);
+      } catch (error) {
+        console.error("Failed to fetch organizations for sidebar:", error);
+      }
+    }
+    if (user) {
+      fetchOrgs();
+    }
+  }, [user]);
 
   const isActive = (path: string) => pathname === path;
 
@@ -101,14 +108,6 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-4">
-        {/* New Sheet Button */}
-        <div className="px-2 mb-4">
-          <Button className="w-full justify-start gap-2" size="sm">
-            <Plus className="h-4 w-4" />
-            {!collapsed && "New Sheet"}
-          </Button>
-        </div>
-
         {/* Main Navigation */}
         <SidebarGroup>
           {!collapsed && (
@@ -174,7 +173,8 @@ export function AppSidebar() {
               <div className="space-y-1 mt-1">
                 {organizations.map((org) => (
                   <button
-                    key={org.name}
+                    key={org.id}
+                    onClick={() => router.push(`/organizations/${org.id}`)}
                     className="flex items-center justify-between w-full px-3 py-2 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors group"
                   >
                     <div className="flex items-center gap-2">
@@ -183,18 +183,11 @@ export function AppSidebar() {
                       </div>
                       <span className="truncate">{org.name}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity capitalize">
                       {org.role}
                     </span>
                   </button>
                 ))}
-                <button
-                  onClick={() => setJoinOrgOpen(true)}
-                  className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm text-primary hover:bg-sidebar-accent transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Join Organization</span>
-                </button>
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -268,8 +261,6 @@ export function AppSidebar() {
           {!collapsed && <SettingsDialog />}
         </div>
       </SidebarFooter>
-
-      <JoinOrgModal open={joinOrgOpen} onOpenChange={setJoinOrgOpen} />
     </Sidebar>
   );
 }
