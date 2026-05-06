@@ -261,3 +261,32 @@ ALTER TABLE sheets ADD COLUMN last_opened_at TIMESTAMPTZ;
 -- ============================================================
 ALTER TABLE public.columns
 ADD COLUMN IF NOT EXISTS select_options JSONB DEFAULT NULL;
+
+-- ============================================================
+-- Column Features: Freeze, Hide, Conditional, Group, Validate
+-- Adds columns to support advanced column-level features
+-- ============================================================
+ALTER TABLE public.columns
+ADD COLUMN IF NOT EXISTS frozen BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS conditional_formatting JSONB DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS group_id UUID DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS validation_rules JSONB DEFAULT NULL;
+
+-- ============================================================
+-- Sheet Charts
+-- Adds a JSONB column to store chart configurations for sheets
+-- ============================================================
+ALTER TABLE public.sheets
+ADD COLUMN IF NOT EXISTS charts JSONB DEFAULT NULL;
+
+-- ============================================================
+-- Forking Feature
+-- Adds columns to track sheet provenance and fork history.
+-- ============================================================
+ALTER TABLE public.sheets
+ADD COLUMN IF NOT EXISTS forked_from_sheet_id uuid REFERENCES public.sheets(id) ON DELETE SET NULL,
+ADD COLUMN IF NOT EXISTS forked_from_snapshot_label text,
+ADD COLUMN IF NOT EXISTS forked_at timestamptz,
+ADD COLUMN IF NOT EXISTS forked_by_user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
+

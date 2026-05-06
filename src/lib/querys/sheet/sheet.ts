@@ -37,6 +37,10 @@ export async function loadSheet(sheetId: string) {
     size: sheet.data.size_mb,
     created_at: sheet.data.created_at,
     updated_at: sheet.data.updated_at,
+    forked_from_sheet_id: sheet.data.forked_from_sheet_id,
+    forked_from_snapshot_label: sheet.data.forked_from_snapshot_label,
+    forked_at: sheet.data.forked_at,
+    forked_by_user_id: sheet.data.forked_by_user_id,
 
     columns:
       columns.data?.map((col) => ({

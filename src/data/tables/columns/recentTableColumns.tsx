@@ -1,7 +1,10 @@
 "use client";
 
 import { FileText, Clock, Folder, Building2, Users } from "lucide-react";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Edit3, Share2, Download, Trash2, Star, StarOff } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +34,12 @@ export const recentColumns = [
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium truncate max-w-[200px] block">{s.title}</span>
-            {s.isStarred && <Star className="h-3 w-3 text-amber-400 fill-amber-400 shrink-0" />}
+            <span className="text-sm font-medium truncate max-w-[200px] block">
+              {s.title}
+            </span>
+            {s.isStarred && (
+              <Star className="h-3 w-3 text-amber-400 fill-amber-400 shrink-0" />
+            )}
           </div>
         </div>
       </div>
@@ -47,20 +54,29 @@ export const recentColumns = [
       if (s.isOrganization && s.organization) {
         return (
           <div className="flex flex-col gap-0.5">
-            <Badge variant="outline" className="font-normal text-xs gap-1 py-0 px-2 h-5 w-fit">
+            <Badge
+              variant="outline"
+              className="font-normal text-xs gap-1 py-0 px-2 h-5 w-fit"
+            >
               <Building2 className="h-3 w-3 text-muted-foreground" />
-              <span className="truncate max-w-[120px]">{s.organization.name}</span>
+              <span className="truncate max-w-[120px]">
+                {s.organization.name}
+              </span>
             </Badge>
             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
               <Users className="h-3 w-3" />
-              {s.organization.membersCount} {s.organization.membersCount === 1 ? "member" : "members"}
+              {s.organization.membersCount}{" "}
+              {s.organization.membersCount === 1 ? "member" : "members"}
             </span>
           </div>
         );
       }
       if (s.folder) {
         return (
-          <Badge variant="outline" className="font-normal text-xs gap-1 py-0 px-2 h-5 bg-primary/5 border-primary/10">
+          <Badge
+            variant="outline"
+            className="font-normal text-xs gap-1 py-0 px-2 h-5 bg-primary/5 border-primary/10"
+          >
             <Folder className="h-3 w-3 text-primary/60" />
             <span className="truncate max-w-[120px]">{s.folder.name}</span>
           </Badge>
@@ -86,14 +102,22 @@ export const recentColumns = [
     key: "rows",
     header: "Rows",
     width: "80px",
-    render: (s: RecentSheetRow) => <span className="text-xs text-muted-foreground">{s.rowsCount ?? "—"}</span>,
+    render: (s: RecentSheetRow) => (
+      <span className="text-xs text-muted-foreground">
+        {s.rowsCount ?? "—"}
+      </span>
+    ),
   },
 
   {
     key: "columns",
     header: "Columns",
     width: "80px",
-    render: (s: RecentSheetRow) => <span className="text-xs text-muted-foreground">{s.colsCount ?? "—"}</span>,
+    render: (s: RecentSheetRow) => (
+      <span className="text-xs text-muted-foreground">
+        {s.colsCount ?? "—"}
+      </span>
+    ),
   },
 ];
 
@@ -116,9 +140,13 @@ function RecentActionMenu({ sheet }: { sheet: RecentSheetRow }) {
       </DropdownMenuItem>
       <DropdownMenuItem className="text-xs gap-2">
         {sheet.isStarred ? (
-          <><StarOff className="h-3.5 w-3.5" /> Unstar</>
+          <>
+            <StarOff className="h-3.5 w-3.5" /> Unstar
+          </>
         ) : (
-          <><Star className="h-3.5 w-3.5" /> Star</>
+          <>
+            <Star className="h-3.5 w-3.5" /> Star
+          </>
         )}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
@@ -135,10 +163,40 @@ export const recentAction = {
 
 export function NoRecentSheetsIcon() {
   return (
-    <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="10" y="8" width="52" height="56" rx="7" fill="currentColor" className="text-muted/30" />
-      <rect x="10" y="8" width="52" height="56" rx="7" stroke="currentColor" strokeWidth="1.5" className="text-border" />
-      <path d="M36 28V44M36 28L28 36M36 28L44 36" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/60" />
+    <svg
+      width="72"
+      height="72"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect
+        x="10"
+        y="8"
+        width="52"
+        height="56"
+        rx="7"
+        fill="currentColor"
+        className="text-muted/30"
+      />
+      <rect
+        x="10"
+        y="8"
+        width="52"
+        height="56"
+        rx="7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        className="text-border"
+      />
+      <path
+        d="M36 28V44M36 28L28 36M36 28L44 36"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-muted-foreground/60"
+      />
     </svg>
   );
 }

@@ -21,8 +21,13 @@ const StatsCard = ({
   className,
 }: StatsCardProps) => {
   const getTrendIcon = () => {
-    if (change === undefined || change === 0) return <Minus className="h-3 w-3" />;
-    return change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />;
+    if (change === undefined || change === 0)
+      return <Minus className="h-3 w-3" />;
+    return change > 0 ? (
+      <TrendingUp className="h-3 w-3" />
+    ) : (
+      <TrendingDown className="h-3 w-3" />
+    );
   };
 
   const getTrendColor = () => {
@@ -33,28 +38,37 @@ const StatsCard = ({
   return (
     <div
       className={cn(
-        "bg-card border border-border rounded-xl p-4 sm:p-5 transition-all duration-300 hover:shadow-sm hover:border-primary/20 animate-fade-in",
+        "bg-card border border-border rounded-xl p-3 sm:p-4 transition-all duration-300 hover:shadow-sm hover:border-primary/20 animate-fade-in",
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="space-y-0.5 min-w-0">
-          <p className="text-xs sm:text-sm text-muted-foreground font-medium leading-tight">{title}</p>
-          <p className="text-xl sm:text-2xl font-bold tracking-tight">{value}</p>
-          {description && (
-            <p className="text-[11px] text-muted-foreground leading-tight hidden sm:block">{description}</p>
-          )}
-        </div>
+      <div className="flex items-center gap-3">
         {icon && (
-          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
             {icon}
           </div>
         )}
+        <div className="min-w-0">
+          <p className="text-lg font-bold leading-none">{value}</p>
+          <p className="text-xs font-medium text-foreground mt-0.5 truncate">
+            {title}
+          </p>
+          {description && (
+            <p className="text-[10px] text-muted-foreground hidden sm:block truncate">
+              {description}
+            </p>
+          )}
+        </div>
       </div>
 
       {change !== undefined && (
         <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border text-xs">
-          <span className={cn("flex items-center gap-0.5 font-medium", getTrendColor())}>
+          <span
+            className={cn(
+              "flex items-center gap-0.5 font-medium",
+              getTrendColor(),
+            )}
+          >
             {getTrendIcon()}
             {Math.abs(change)}%
           </span>

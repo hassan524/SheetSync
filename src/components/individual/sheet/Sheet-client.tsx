@@ -56,6 +56,7 @@ import {
   CheckSquare,
   Square,
   GripVertical,
+  GitBranch,
   Calendar,
   Plus,
   Trash2,
@@ -113,6 +114,7 @@ import {
   Activity,
   ListChecks,
   ChevronUp,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import FormattingToolbar from "@/components/individual/sheet/Formatting-toolbar";
@@ -148,7 +150,7 @@ import {
 } from "@/lib/querys/sheet/formulas";
 import { protectCell, unprotectCell } from "@/lib/querys/sheet/protection";
 import { logActivity } from "@/lib/querys/activity/activity";
-import PlaybackModal from "./panels/Playback-panel";
+
 import KeyboardShortcutsDialog from "./dialogs/Keyboard-shortcuts-dialog";
 import ShareDialog from "./dialogs/Share-dialog";
 import RightPanel from "./Right-panel";
@@ -177,6 +179,9 @@ import {
   type SheetComment,
 } from "@/lib/querys/sheet/firebase-realtime";
 import "@/app/sheet.css";
+import TimeTravelPanel from "@/components/individual/sheet/panels/TimeTravel-panel";
+import { useTimeTravel } from "@/hooks/use-time-travel";
+import { maybeAutoSnapshot } from "@/lib/querys/sheet/snapshots";
 
 // ── Member helpers ──────────────────────────────────────────────────────────
 const MEMBER_COLORS = [
@@ -206,10 +211,11 @@ const getMemberInitials = (name: string) => {
 // ── Types ───────────────────────────────────────────────────────────────────
 type RightPanelType =
   | "comments"
-  | "history"
   | "collaborators"
   | "developer"
+  | "timetravel"
   | null;
+
 interface SheetState {
   title: string;
   isOrgSheet: boolean;
@@ -222,6 +228,11 @@ interface SheetState {
   starred: boolean;
   rows: SheetRow[];
   columns: ColumnDef[];
+  forkedFromSheetId?: string | null;
+  forkedFromSnapshotLabel?: string | null;
+  forkedAt?: string | null;
+  forkedByUserId?: string | null;
+  userRole?: "owner" | "editor" | "viewer";
 }
 
 // ── Small UI components ─────────────────────────────────────────────────────
@@ -290,7 +301,7 @@ function IconBtn({
         <button
           onClick={onClick}
           disabled={disabled}
-          className={`sheet-icon-btn relative flex items-center justify-center h-7 w-7 rounded-md transition-all duration-100 ${active ? "sheet-icon-btn--active" : ""} ${danger ? "sheet-icon-btn--danger" : ""} ${disabled ? "opacity-35 cursor-not-allowed" : "cursor-pointer"}`}
+          className={`sheet-icon-btn relative flex items-center justify-center h-7 w-7 rounded-md transition-all duration-100 flex-shrink-0 ${active ? "sheet-icon-btn--active" : ""} ${danger ? "sheet-icon-btn--danger" : ""} ${disabled ? "opacity-35 cursor-not-allowed" : "cursor-pointer"}`}
         >
           <Icon className="h-3.5 w-3.5" />
           {badge != null && badge > 0 && (
@@ -315,7 +326,9 @@ function IconBtn({
 }
 
 function ToolSep() {
-  return <div className="sheet-tool-sep mx-1 h-5 w-px self-center" />;
+  return (
+    <div className="sheet-tool-sep mx-1 h-5 w-px self-center flex-shrink-0" />
+  );
 }
 
 // ── Dropdown style helper ───────────────────────────────────────────────────
@@ -355,20 +368,30 @@ function FormulaDialog({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-2xl sheet-dialog"
-        style={{ background: d ? "#0f1117" : "#fff", color: d ? "#e2e8f0" : "#1a1d23", borderColor: d ? "#1e2330" : "#e8eaed" }}
+        className="max-w-2xl w-[95vw] sheet-dialog"
+        style={{
+          background: d ? "#0f1117" : "#fff",
+          color: d ? "#e2e8f0" : "#1a1d23",
+          borderColor: d ? "#1e2330" : "#e8eaed",
+        }}
       >
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold flex items-center gap-2">
             <Sigma className="h-4 w-4 text-primary" /> Formula Reference
           </DialogTitle>
-          <DialogDescription style={{ color: d ? "#8892a4" : "#6b7280" }} className="text-xs">
+          <DialogDescription
+            style={{ color: d ? "#8892a4" : "#6b7280" }}
+            className="text-xs"
+          >
             Type a formula into any cell starting with <code>=</code>. Click a
             formula to see details and insert it.
           </DialogDescription>
         </DialogHeader>
         <div className="relative mb-3">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: d ? "#4a5568" : "#9ca3af" }} />
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5"
+            style={{ color: d ? "#4a5568" : "#9ca3af" }}
+          />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -381,13 +404,20 @@ function FormulaDialog({
             className="w-full h-8 pl-8 pr-3 text-xs rounded-md border outline-none focus:border-primary"
           />
         </div>
-        <div className="flex gap-3 h-72">
-          <div className="w-48 overflow-y-auto border rounded-md" style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}>
+        <div className="flex gap-3 h-60 sm:h-72">
+          <div
+            className="w-36 sm:w-48 overflow-y-auto border rounded-md flex-shrink-0"
+            style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}
+          >
             {categories.map((cat) => (
               <div key={cat}>
                 <div
                   className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider border-b sticky top-0"
-                  style={{ background: d ? "#131620" : "#f9fafb", color: d ? "#4a5568" : "#9ca3af", borderColor: d ? "#1e2330" : "#e5e7eb" }}
+                  style={{
+                    background: d ? "#131620" : "#f9fafb",
+                    color: d ? "#4a5568" : "#9ca3af",
+                    borderColor: d ? "#1e2330" : "#e5e7eb",
+                  }}
                 >
                   {cat}
                 </div>
@@ -398,8 +428,14 @@ function FormulaDialog({
                       key={f.name}
                       onClick={() => setSelected(f)}
                       style={{
-                        background: selected?.name === f.name ? undefined : "transparent",
-                        color: selected?.name === f.name ? undefined : (d ? "#8892a4" : "#374151"),
+                        background:
+                          selected?.name === f.name ? undefined : "transparent",
+                        color:
+                          selected?.name === f.name
+                            ? undefined
+                            : d
+                              ? "#8892a4"
+                              : "#374151",
                         borderColor: d ? "#1e2330" : "#f3f4f6",
                       }}
                       className={`w-full text-left px-2.5 py-1.5 text-[11px] font-mono border-b transition-colors ${selected?.name === f.name ? "bg-primary/10 text-primary font-semibold" : ""}`}
@@ -410,74 +446,123 @@ function FormulaDialog({
               </div>
             ))}
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-w-0">
             {selected ? (
               <div className="space-y-3 p-1">
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-bold" style={{ color: d ? "#e2e8f0" : "#111827" }}>
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span
+                      className="text-sm font-bold"
+                      style={{ color: d ? "#e2e8f0" : "#111827" }}
+                    >
                       {selected.name}
                     </span>
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                      style={{ background: d ? "#1e2330" : "#f3f4f6", color: d ? "#8892a4" : "#6b7280" }}
+                      style={{
+                        background: d ? "#1e2330" : "#f3f4f6",
+                        color: d ? "#8892a4" : "#6b7280",
+                      }}
                     >
                       {selected.category}
                     </span>
                   </div>
-                  <p className="text-xs leading-relaxed" style={{ color: d ? "#8892a4" : "#4b5563" }}>
+                  <p
+                    className="text-xs leading-relaxed"
+                    style={{ color: d ? "#8892a4" : "#4b5563" }}
+                  >
                     {selected.description}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: d ? "#4a5568" : "#9ca3af" }}>
+                  <p
+                    className="text-[10px] font-semibold uppercase tracking-wider mb-1"
+                    style={{ color: d ? "#4a5568" : "#9ca3af" }}
+                  >
                     Syntax
                   </p>
-                  <code className="block text-xs bg-gray-900 text-green-400 px-3 py-2 rounded font-mono">
+                  <code className="block text-xs bg-gray-900 text-green-400 px-3 py-2 rounded font-mono break-all">
                     {selected.syntax}
                   </code>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: d ? "#4a5568" : "#9ca3af" }}>
+                  <p
+                    className="text-[10px] font-semibold uppercase tracking-wider mb-1"
+                    style={{ color: d ? "#4a5568" : "#9ca3af" }}
+                  >
                     Example
                   </p>
                   <code
-                    className="block text-xs px-3 py-2 rounded font-mono border"
-                    style={{ background: d ? "rgba(37,99,235,0.1)" : "#eff6ff", color: d ? "#93c5fd" : "#1d4ed8", borderColor: d ? "rgba(59,130,246,0.2)" : "#bfdbfe" }}
+                    className="block text-xs px-3 py-2 rounded font-mono border break-all"
+                    style={{
+                      background: d ? "rgba(37,99,235,0.1)" : "#eff6ff",
+                      color: d ? "#93c5fd" : "#1d4ed8",
+                      borderColor: d ? "rgba(59,130,246,0.2)" : "#bfdbfe",
+                    }}
                   >
                     {selected.example}
                   </code>
                 </div>
                 <div
                   className="rounded-md p-2.5"
-                  style={{ background: d ? "rgba(245,158,11,0.08)" : "#fffbeb", borderColor: d ? "rgba(245,158,11,0.2)" : "#fde68a", border: "1px solid" }}
+                  style={{
+                    background: d ? "rgba(245,158,11,0.08)" : "#fffbeb",
+                    borderColor: d ? "rgba(245,158,11,0.2)" : "#fde68a",
+                    border: "1px solid",
+                  }}
                 >
-                  <p className="text-[10px] font-semibold mb-0.5" style={{ color: d ? "#fbbf24" : "#92400e" }}>
+                  <p
+                    className="text-[10px] font-semibold mb-0.5"
+                    style={{ color: d ? "#fbbf24" : "#92400e" }}
+                  >
                     💡 How to use
                   </p>
-                  <p className="text-[11px] leading-relaxed" style={{ color: d ? "#fcd34d" : "#92400e" }}>
+                  <p
+                    className="text-[11px] leading-relaxed"
+                    style={{ color: d ? "#fcd34d" : "#92400e" }}
+                  >
                     Select a cell, type{" "}
-                    <code className="px-1 rounded" style={{ background: d ? "rgba(245,158,11,0.15)" : "#fef3c7" }}>= </code>{" "}
+                    <code
+                      className="px-1 rounded"
+                      style={{
+                        background: d ? "rgba(245,158,11,0.15)" : "#fef3c7",
+                      }}
+                    >
+                      ={" "}
+                    </code>{" "}
                     followed by the formula above.
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center gap-2" style={{ color: d ? "#2d3748" : "#d1d5db" }}>
+              <div
+                className="h-full flex flex-col items-center justify-center gap-2"
+                style={{ color: d ? "#2d3748" : "#d1d5db" }}
+              >
                 <Sigma className="h-8 w-8" />
                 <p className="text-xs">Select a formula to see details</p>
               </div>
             )}
           </div>
         </div>
-        <DialogFooter className="flex items-center gap-2 pt-2 border-t" style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}>
-          <p className="text-[10px] flex-1" style={{ color: d ? "#4a5568" : "#9ca3af" }}>
+        <DialogFooter
+          className="flex items-center gap-2 pt-2 border-t flex-wrap"
+          style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}
+        >
+          <p
+            className="text-[10px] flex-1 min-w-0"
+            style={{ color: d ? "#4a5568" : "#9ca3af" }}
+          >
             Formulas update automatically when referenced cells change.
           </p>
           <button
             onClick={onClose}
             className="text-xs px-3 py-1.5 rounded border transition-colors"
-            style={{ borderColor: d ? "#1e2330" : "#e5e7eb", color: d ? "#8892a4" : "#374151", background: "transparent" }}
+            style={{
+              borderColor: d ? "#1e2330" : "#e5e7eb",
+              color: d ? "#8892a4" : "#374151",
+              background: "transparent",
+            }}
           >
             Close
           </button>
@@ -540,17 +625,27 @@ function SelectOptionsSetupDialog({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-sm sheet-dialog"
-        style={{ background: d ? "#0f1117" : "#fff", color: d ? "#e2e8f0" : "#1a1d23", borderColor: d ? "#1e2330" : "#e8eaed" }}
+        className="max-w-sm w-[92vw] sheet-dialog"
+        style={{
+          background: d ? "#0f1117" : "#fff",
+          color: d ? "#e2e8f0" : "#1a1d23",
+          borderColor: d ? "#1e2330" : "#e8eaed",
+        }}
       >
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold flex items-center gap-2">
             <ListChecks className="h-4 w-4 text-primary" />
             Set Select Options
           </DialogTitle>
-          <DialogDescription style={{ color: d ? "#8892a4" : "#6b7280" }} className="text-xs">
+          <DialogDescription
+            style={{ color: d ? "#8892a4" : "#6b7280" }}
+            className="text-xs"
+          >
             Enter options separated by commas. e.g.{" "}
-            <code style={{ background: d ? "#1e2330" : "#f3f4f6" }} className="px-1 rounded">
+            <code
+              style={{ background: d ? "#1e2330" : "#f3f4f6" }}
+              className="px-1 rounded"
+            >
               Laptop, Phone, iPad
             </code>
           </DialogDescription>
@@ -574,10 +669,12 @@ function SelectOptionsSetupDialog({
             }}
           />
 
-          {/* Live preview */}
           {parsedOptions.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: d ? "#4a5568" : "#9ca3af" }}>
+              <p
+                className="text-[10px] font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: d ? "#4a5568" : "#9ca3af" }}
+              >
                 Preview
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -585,7 +682,10 @@ function SelectOptionsSetupDialog({
                   <span
                     key={i}
                     className="sheet-badge-pill text-[11px]"
-                    style={{ color: d ? "#93c5fd" : "#1e40af", backgroundColor: d ? "rgba(37,99,235,0.15)" : "#dbeafe" }}
+                    style={{
+                      color: d ? "#93c5fd" : "#1e40af",
+                      backgroundColor: d ? "rgba(37,99,235,0.15)" : "#dbeafe",
+                    }}
                   >
                     {opt}
                   </span>
@@ -595,11 +695,17 @@ function SelectOptionsSetupDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2 pt-1 border-t" style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}>
+        <DialogFooter
+          className="gap-2 pt-1 border-t"
+          style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}
+        >
           <button
             onClick={onClose}
             className="text-xs px-3 py-1.5 rounded border transition-colors"
-            style={{ borderColor: d ? "#1e2330" : "#e5e7eb", color: d ? "#8892a4" : "#374151" }}
+            style={{
+              borderColor: d ? "#1e2330" : "#e5e7eb",
+              color: d ? "#8892a4" : "#374151",
+            }}
           >
             Cancel
           </button>
@@ -678,6 +784,10 @@ export default function SheetClient() {
     starred: false,
     rows: [],
     columns: [],
+    forkedFromSheetId: null,
+    forkedFromSnapshotLabel: null,
+    forkedAt: null,
+    forkedByUserId: null,
   });
   const {
     title,
@@ -687,6 +797,10 @@ export default function SheetClient() {
     rows,
     columns,
     organizationId,
+    forkedFromSheetId,
+    forkedFromSnapshotLabel,
+    forkedAt,
+    forkedByUserId,
   } = sheetState;
 
   const [isLoading, setIsLoading] = useState(true);
@@ -701,9 +815,6 @@ export default function SheetClient() {
   const [showFilters, setShowFilters] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
-  const [showPlayback, setShowPlayback] = useState(false);
-  const [playbackIndex, setPlaybackIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [filterValue, setFilterValue] = useState("");
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showFormulaDialog, setShowFormulaDialog] = useState(false);
@@ -729,8 +840,24 @@ export default function SheetClient() {
   );
   const [newCommentText, setNewCommentText] = useState("");
   const [replyText, setReplyText] = useState<Record<string, string>>({});
+  const [forks, setForks] = useState<
+    { id: string; title: string; forked_at: string | null }[]
+  >([]);
 
-  // ── Select Options Setup Dialog state ──────────────────────────────────────
+  // Fetch forks for this sheet
+  useEffect(() => {
+    if (!sheetId) return;
+    const fetchForks = async () => {
+      const { data } = await supabase
+        .from("sheets")
+        .select("id, title, forked_at")
+        .eq("forked_from_sheet_id", sheetId)
+        .order("forked_at", { ascending: false });
+      if (data) setForks(data);
+    };
+    fetchForks();
+  }, [sheetId]);
+
   const [selectSetupDialog, setSelectSetupDialog] = useState<{
     open: boolean;
     colKey: string | null;
@@ -745,7 +872,6 @@ export default function SheetClient() {
   const playbackTimer = useRef<NodeJS.Timeout | undefined>(undefined);
   const activityLogTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
 
-  // Debounced activity log for cell edits (max once per 30s per sheet)
   const logCellEditActivity = useCallback(
     (sheetTitle: string) => {
       clearTimeout(activityLogTimeout.current);
@@ -776,6 +902,20 @@ export default function SheetClient() {
   const cellTypes = useCellTypes(rows, rowsHistory, () => {});
   const formulas = useFormulas(rows, columns);
 
+  const [timeTravelState, timeTravelActions] = useTimeTravel({
+    sheetId,
+    currentRows: rows,
+    currentColumns: columns,
+    historyEntries: history,
+    currentUserId: currentUser?.id,
+    currentUserName: currentUser?.name,
+    organizationId: isOrgSheet ? organizationId : null,
+    onBranch: (newSheetId, label) => {
+      toast.success(`Branched! Opening "${label}"…`, { duration: 3000 });
+      router.push(`/sheet/${newSheetId}`);
+    },
+  });
+
   useEffect(() => {
     startTransition(() =>
       setSheetState((p) => ({ ...p, rows: rowsHistory.currentState })),
@@ -796,7 +936,6 @@ export default function SheetClient() {
     return rightPanel;
   }, [isOrgSheet, rightPanel]);
 
-  // ── Load sheet ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!sheetId) return;
     queueMicrotask(() => setIsLoading(true));
@@ -825,6 +964,14 @@ export default function SheetClient() {
           if (wrapSet.size > 0) textWrap.setTextWrapColumns(wrapSet);
           rowsHistory.pushState(data.rows);
           columnsHistory.pushState(data.columns);
+          const userRole =
+            sheetIsOrg && currentUser
+              ? data.ownerId === currentUser.id
+                ? "owner"
+                : orgMembers.find((m) => m.id === currentUser.id)?.role ||
+                  "viewer"
+              : "owner";
+
           setSheetState({
             title: data.title,
             isOrgSheet: sheetIsOrg,
@@ -837,6 +984,11 @@ export default function SheetClient() {
             starred: data.isStarred,
             rows: data.rows,
             columns: data.columns,
+            forkedFromSheetId: data.forked_from_sheet_id,
+            forkedFromSnapshotLabel: data.forked_from_snapshot_label,
+            forkedAt: data.forked_at,
+            forkedByUserId: data.forked_by_user_id,
+            userRole: userRole as "owner" | "editor" | "viewer",
           });
         } else {
           const td = getTemplateData(templateId);
@@ -891,9 +1043,6 @@ export default function SheetClient() {
       .catch(console.error);
   }, [sheetId, isOrgSheet]);
 
-  useEffect(() => {
-    setPlaybackIndex(0);
-  }, [history.length]);
   useEffect(() => {
     if (!sheetId) return;
     return subscribeToHistory(sheetId, setHistory);
@@ -1121,7 +1270,6 @@ export default function SheetClient() {
     title,
   ]);
 
-  // ── Insert Column — shows setup dialog for "select" type ──────────────────
   const handleInsertColumn = useCallback(
     async (type: ColumnDef["type"]) => {
       if (type === "select") {
@@ -1197,7 +1345,6 @@ export default function SheetClient() {
     ],
   );
 
-  // ── Change Column Type — shows setup dialog for "select" type ─────────────
   const handleChangeColumnType = useCallback(
     async (colKey: string, newType: ColumnDef["type"]) => {
       if (newType === "select") {
@@ -1224,17 +1371,14 @@ export default function SheetClient() {
     ],
   );
 
-  // ── Confirm handler for Select Options Setup Dialog ───────────────────────
   const handleSelectSetupConfirm = useCallback(
     async (options: string[]) => {
       const { colKey, mode } = selectSetupDialog;
 
       if (mode === "insert") {
-        // Insert the column first (type: select), then attach options
         colOps.insertColumn("select");
         setTimeout(async () => {
           markSaving();
-          // The newly inserted column is always the last one in currentState
           const updatedCols = columnsHistory.currentState;
           const newCol = updatedCols[updatedCols.length - 1];
           if (newCol) {
@@ -1259,7 +1403,6 @@ export default function SheetClient() {
           markSaved();
         }, 50);
       } else if (mode === "change" && colKey) {
-        // Change existing column type to select and attach options
         colOps.changeColumnType(colKey, "select");
         setTimeout(async () => {
           markSaving();
@@ -1339,6 +1482,62 @@ export default function SheetClient() {
       markSaved,
     ],
   );
+
+  const handleFreezeColumn = useCallback(async () => {
+    if (!selectedCell) {
+      toast.info("Select a cell in the column to freeze");
+      return;
+    }
+    const col = columns.find((c) => c.key === selectedCell.col);
+    if (!col) return;
+
+    const updatedColumns = columns.map((c) =>
+      c.key === selectedCell.col ? { ...c, frozen: !c.frozen } : c,
+    );
+    setSheetState((p) => ({ ...p, columns: updatedColumns }));
+    columnsHistory.pushState(updatedColumns);
+
+    markSaving();
+    await saveAllColumns(sheetId, updatedColumns);
+    markSaved();
+
+    toast.success(col.frozen ? "Column unfrozen" : "Column frozen");
+  }, [selectedCell, columns, sheetId, columnsHistory, markSaving, markSaved]);
+
+  const handleHideColumn = useCallback(async () => {
+    if (!isOrgSheet || sheetState.ownerId !== currentUser?.id) {
+      toast.info("Only the sheet owner can hide columns");
+      return;
+    }
+    if (!selectedCell) {
+      toast.info("Select a cell in the column to hide");
+      return;
+    }
+    const col = columns.find((c) => c.key === selectedCell.col);
+    if (!col) return;
+
+    const updatedColumns = columns.map((c) =>
+      c.key === selectedCell.col ? { ...c, hidden: !c.hidden } : c,
+    );
+    setSheetState((p) => ({ ...p, columns: updatedColumns }));
+    columnsHistory.pushState(updatedColumns);
+
+    markSaving();
+    await saveAllColumns(sheetId, updatedColumns);
+    markSaved();
+
+    toast.success(col.hidden ? "Column shown" : "Column hidden");
+  }, [
+    selectedCell,
+    columns,
+    sheetId,
+    columnsHistory,
+    markSaving,
+    markSaved,
+    isOrgSheet,
+    sheetState.ownerId,
+    currentUser,
+  ]);
 
   const handleTextWrapToggle = useCallback(async () => {
     if (!selectedCell) return;
@@ -1589,29 +1788,6 @@ export default function SheetClient() {
     [isOrgSheet],
   );
 
-  const isPlayingRef = useRef(false);
-  const handleSetIsPlaying = useCallback(
-    (playing: boolean) => {
-      isPlayingRef.current = playing;
-      setIsPlaying(playing);
-      if (playing) {
-        playbackTimer.current = setInterval(() => {
-          setPlaybackIndex((i) => {
-            const n = i + 1;
-            if (n >= history.length) {
-              isPlayingRef.current = false;
-              setIsPlaying(false);
-              clearInterval(playbackTimer.current);
-              return i;
-            }
-            return n;
-          });
-        }, 800);
-      } else clearInterval(playbackTimer.current);
-    },
-    [history.length],
-  );
-
   // ── Cell renderer ─────────────────────────────────────────────────────────
   const renderCellByType = useCallback(
     (
@@ -1619,8 +1795,9 @@ export default function SheetClient() {
       props: RenderCellProps<SheetRow>,
       colKey: string,
     ) => {
+      const activeRows = timeTravelState.previewRows || rows;
       const { row } = props;
-      const rowIdx = rows.findIndex((r) => r.id === row.id);
+      const rowIdx = activeRows.findIndex((r) => r.id === row.id);
       const cellStyle = formatting.getCellStyle(
         rowIdx,
         colKey,
@@ -1820,6 +1997,7 @@ export default function SheetClient() {
     },
     [
       rows,
+      timeTravelState.previewRows,
       columns,
       isOrgSheet,
       liveTracking,
@@ -1865,7 +2043,12 @@ export default function SheetClient() {
           }
         });
       });
-      if (hadChange) logCellEditActivity(title);
+      if (hadChange) {
+        logCellEditActivity(title);
+        maybeAutoSnapshot(sheetId, updatedRows, columns, currentUser?.id).catch(
+          () => {},
+        );
+      }
     },
     [
       rows,
@@ -1881,6 +2064,8 @@ export default function SheetClient() {
 
   // ── Grid columns ──────────────────────────────────────────────────────────
   const gridColumns = useMemo<Column<SheetRow>[]>(() => {
+    const activeRows = timeTravelState.previewRows || rows;
+    const activeCols = timeTravelState.previewColumns || columns;
     const rowNumberCol: Column<SheetRow> = {
       key: "row-number",
       name: "",
@@ -1893,17 +2078,21 @@ export default function SheetClient() {
             type="checkbox"
             className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer"
             style={{ accentColor: "var(--primary)" }}
-            checked={selectedRows.size === rows.length && rows.length > 0}
+            checked={
+              selectedRows.size === activeRows.length && activeRows.length > 0
+            }
             onChange={(e) =>
               setSelectedRows(
-                e.target.checked ? new Set(rows.map((r) => r.id)) : new Set(),
+                e.target.checked
+                  ? new Set(activeRows.map((r) => r.id))
+                  : new Set(),
               )
             }
           />
         </div>
       ),
       renderCell(props: RenderCellProps<SheetRow>) {
-        const rowIdx = rows.findIndex((r) => r.id === props.row.id);
+        const rowIdx = activeRows.findIndex((r) => r.id === props.row.id);
         const isSel = selectedRows.has(props.row.id);
         return (
           <div
@@ -1930,284 +2119,322 @@ export default function SheetClient() {
       },
     };
 
-    const dataCols = columns.map(
-      (col): Column<SheetRow> => ({
-        key: col.key,
-        name: col.name,
-        width: col.width || 160,
-        resizable: true,
-        renderHeaderCell: () => (
-          <div
-            className="h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer"
-            draggable
-            onDragStart={() => colOps.handleColumnDragStart(col.key)}
-            onDragOver={(e) =>
-              colOps.handleColumnDragOver(
-                e,
-                col.key,
-                (u: React.SetStateAction<ColumnDef[]>) =>
-                  setSheetState((p) => ({
-                    ...p,
-                    columns: typeof u === "function" ? u(p.columns) : u,
-                  })),
-              )
-            }
-            onDragEnd={handleColumnDragEnd}
-          >
-            <GripVertical className="h-3 w-3 text-gray-300 flex-shrink-0 cursor-move opacity-0 group-hover/header:opacity-100 transition-opacity" />
-            <span className="flex-1 sheet-col-label truncate">{col.name}</span>
-            {[...textWrap.textWrapColumns].some((k) =>
-              k.endsWith(`-${col.key}`),
-            ) && (
-              <WrapText className="h-3 w-3 text-primary flex-shrink-0 opacity-60" />
-            )}
-            <ColumnHeaderMenu
-              column={col}
-              onChangeType={(t) => handleChangeColumnType(col.key, t)}
-              onDelete={() => handleDeleteColumn(col.key)}
-              onRename={(newName) => {
-                colOps.renameColumn(col.key, newName);
-                setTimeout(async () => {
-                  markSaving();
-                  await saveAllColumns(sheetId, columnsHistory.currentState);
-                  if (isOrgSheet) logColumnRename(sheetId, col.name, newName);
-                  markSaved();
-                }, 50);
-              }}
-              onToggleTextWrap={handleTextWrapToggle}
-              textWrapEnabled={textWrap.textWrapColumns.has(col.key)}
-              columnFormula={formulas.columnFormulas[col.key]}
-              onApplyColumnFormula={(f) =>
-                handleApplyFormulaToColumn(col.key, f)
+    const dataCols = columns
+      .filter((col) => !col.hidden)
+      .map(
+        (col): Column<SheetRow> => ({
+          key: col.key,
+          name: col.name,
+          width: col.width || 160,
+          resizable: true,
+          renderHeaderCell: () => (
+            <div
+              className="h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer"
+              draggable
+              onDragStart={() => colOps.handleColumnDragStart(col.key)}
+              onDragOver={(e) =>
+                colOps.handleColumnDragOver(
+                  e,
+                  col.key,
+                  (u: React.SetStateAction<ColumnDef[]>) =>
+                    setSheetState((p) => ({
+                      ...p,
+                      columns: typeof u === "function" ? u(p.columns) : u,
+                    })),
+                )
               }
-              onRemoveColumnFormula={() => handleRemoveColumnFormula(col.key)}
-              selectOptions={col.selectOptions}
-              onUpdateSelectOptions={(opts) =>
-                handleUpdateSelectOptions(col.key, opts)
-              }
-            />
-          </div>
-        ),
-        renderCell(props: RenderCellProps<SheetRow>) {
-          const rowIdx = rows.findIndex((r) => r.id === props.row.id);
-          return renderCellByType(
-            cellTypes.getCellType(rowIdx, col.key, col.type || "text"),
-            props,
-            col.key,
-          );
-        },
-        renderEditCell(props: RenderEditCellProps<SheetRow>) {
-          const { row, column, onRowChange } = props;
-          const rowIdx = rows.findIndex((r) => r.id === row.id);
-          const cellType = cellTypes.getCellType(
-            rowIdx,
-            col.key,
-            col.type || "text",
-          );
-          const cellStyle = formatting.getCellStyle(
-            rowIdx,
-            column.key,
-            textWrap.textWrapColumns,
-          );
-          const cellKey = protection.getCellKey(rowIdx, col.key);
-          const isTextWrap = textWrap.textWrapColumns.has(col.key);
-          const isProtected = protection.isCellProtected(rowIdx, col.key);
-          const editVal =
-            formulas.formulas[cellKey] ??
-            formulas.columnFormulas[col.key] ??
-            String(row[column.key] ?? "");
-
-          const onTextChange = (v: string) => {
-            if (v.startsWith("="))
-              formulas.setFormulas((p) => ({ ...p, [cellKey]: v }));
-            else {
-              formulas.setFormulas((p) => {
-                const n = { ...p };
-                delete n[cellKey];
-                return n;
-              });
-              onRowChange({ ...row, [column.key]: v });
-            }
-          };
-          const onNumChange = (v: string) => {
-            if (v.startsWith("="))
-              formulas.setFormulas((p) => ({ ...p, [cellKey]: v }));
-            else {
-              formulas.setFormulas((p) => {
-                const n = { ...p };
-                delete n[cellKey];
-                return n;
-              });
-              const num = v === "" ? 0 : Number(v);
-              if (!isNaN(num)) onRowChange({ ...row, [column.key]: num });
-            }
-          };
-          const onBlurSave = async () => {
-            const f = formulas.formulas[cellKey];
-            if (f) await saveFormula(sheetId, cellKey, f);
-            else await deleteFormula(sheetId, cellKey).catch(() => {});
-          };
-
-          if (isProtected) {
-            toast.error("This cell is protected");
-            return (
-              <div className="h-full w-full flex items-center px-2.5 text-xs bg-gray-50 text-gray-400 gap-1.5">
-                <Lock className="h-3 w-3" />
-                Protected
-              </div>
-            );
-          }
-          if (cellType === "priority" || cellType === "status") {
-            const opts =
-              cellType === "priority" ? PRIORITY_OPTIONS : STATUS_OPTIONS;
-            return (
-              <Select
-                value={row[column.key] as string}
-                onValueChange={(v) => onRowChange({ ...row, [column.key]: v })}
-              >
-                <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0 focus:ring-offset-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {opts.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      <span
-                        className="sheet-badge-pill"
-                        style={{ color: o.color, backgroundColor: o.bgColor }}
-                      >
-                        {o.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            );
-          }
-          if (
-            cellType === "date" ||
-            col.key === "start" ||
-            col.key === "due" ||
-            col.key === "date"
-          )
-            return (
-              <input
-                className="w-full h-full px-2.5 text-xs bg-white outline-none border-0"
-                style={cellStyle}
-                type={formulas.formulas[cellKey] ? "text" : "date"}
-                autoFocus
-                value={editVal}
-                onChange={(e) => onTextChange(e.target.value)}
-                onBlur={onBlurSave}
-              />
-            );
-          if (cellType === "checkbox")
-            return (
-              <div
-                className="h-full flex items-center justify-center cursor-pointer"
-                onClick={() =>
-                  onRowChange({ ...row, [column.key]: !row[column.key] })
+              onDragEnd={handleColumnDragEnd}
+            >
+              <GripVertical className="h-3 w-3 text-gray-300 flex-shrink-0 cursor-move opacity-0 group-hover/header:opacity-100 transition-opacity" />
+              <span className="flex-1 sheet-col-label truncate">
+                {col.name}
+              </span>
+              {[...textWrap.textWrapColumns].some((k) =>
+                k.endsWith(`-${col.key}`),
+              ) && (
+                <WrapText className="h-3 w-3 text-primary flex-shrink-0 opacity-60" />
+              )}
+              <ColumnHeaderMenu
+                column={col}
+                onChangeType={(t) => handleChangeColumnType(col.key, t)}
+                onDelete={() => handleDeleteColumn(col.key)}
+                onRename={(newName) => {
+                  colOps.renameColumn(col.key, newName);
+                  setTimeout(async () => {
+                    markSaving();
+                    await saveAllColumns(sheetId, columnsHistory.currentState);
+                    if (isOrgSheet) logColumnRename(sheetId, col.name, newName);
+                    markSaved();
+                  }, 50);
+                }}
+                onToggleTextWrap={handleTextWrapToggle}
+                textWrapEnabled={textWrap.textWrapColumns.has(col.key)}
+                columnFormula={formulas.columnFormulas[col.key]}
+                onApplyColumnFormula={(f) =>
+                  handleApplyFormulaToColumn(col.key, f)
                 }
-              >
-                {row[column.key] ? (
-                  <CheckSquare className="h-4 w-4 text-primary" />
-                ) : (
-                  <Square className="h-4 w-4 text-gray-300" />
-                )}
-              </div>
+                onRemoveColumnFormula={() => handleRemoveColumnFormula(col.key)}
+                selectOptions={col.selectOptions}
+                onUpdateSelectOptions={(opts) =>
+                  handleUpdateSelectOptions(col.key, opts)
+                }
+              />
+            </div>
+          ),
+          renderCell(props: RenderCellProps<SheetRow>) {
+            const rowIdx = rows.findIndex((r) => r.id === props.row.id);
+            return renderCellByType(
+              cellTypes.getCellType(rowIdx, col.key, col.type || "text"),
+              props,
+              col.key,
             );
-          if (cellType === "progress")
-            return (
-              <input
-                className="w-full h-full px-2.5 text-xs bg-white outline-none border-0 text-right tabular-nums font-mono"
-                style={cellStyle}
-                type="text"
-                autoFocus
-                placeholder="0–100 or =formula"
-                value={editVal}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v.startsWith("=")) onNumChange(v);
-                  else {
-                    const n =
-                      v === "" ? 0 : Math.min(100, Math.max(0, Number(v)));
-                    if (!isNaN(n)) onRowChange({ ...row, [column.key]: n });
+          },
+          renderEditCell(props: RenderEditCellProps<SheetRow>) {
+            const { row, column, onRowChange } = props;
+            const rowIdx = rows.findIndex((r) => r.id === row.id);
+            const cellType = cellTypes.getCellType(
+              rowIdx,
+              col.key,
+              col.type || "text",
+            );
+            const cellStyle = formatting.getCellStyle(
+              rowIdx,
+              column.key,
+              textWrap.textWrapColumns,
+            );
+            const cellKey = protection.getCellKey(rowIdx, col.key);
+            const isTextWrap = textWrap.textWrapColumns.has(col.key);
+            const isProtected = protection.isCellProtected(rowIdx, col.key);
+            const editVal =
+              formulas.formulas[cellKey] ??
+              formulas.columnFormulas[col.key] ??
+              String(row[column.key] ?? "");
+
+            const onTextChange = (v: string) => {
+              if (v.startsWith("="))
+                formulas.setFormulas((p) => ({ ...p, [cellKey]: v }));
+              else {
+                formulas.setFormulas((p) => {
+                  const n = { ...p };
+                  delete n[cellKey];
+                  return n;
+                });
+                onRowChange({ ...row, [column.key]: v });
+              }
+            };
+            const onNumChange = (v: string) => {
+              if (v.startsWith("="))
+                formulas.setFormulas((p) => ({ ...p, [cellKey]: v }));
+              else {
+                formulas.setFormulas((p) => {
+                  const n = { ...p };
+                  delete n[cellKey];
+                  return n;
+                });
+                const num = v === "" ? 0 : Number(v);
+                if (!isNaN(num)) onRowChange({ ...row, [column.key]: num });
+              }
+            };
+            const onBlurSave = async () => {
+              const f = formulas.formulas[cellKey];
+              if (f) await saveFormula(sheetId, cellKey, f);
+              else await deleteFormula(sheetId, cellKey).catch(() => {});
+            };
+
+            if (isProtected) {
+              toast.error("This cell is protected");
+              return (
+                <div className="h-full w-full flex items-center px-2.5 text-xs bg-gray-50 text-gray-400 gap-1.5">
+                  <Lock className="h-3 w-3" />
+                  Protected
+                </div>
+              );
+            }
+            if (cellType === "priority" || cellType === "status") {
+              const opts =
+                cellType === "priority" ? PRIORITY_OPTIONS : STATUS_OPTIONS;
+              return (
+                <Select
+                  value={row[column.key] as string}
+                  onValueChange={(v) =>
+                    onRowChange({ ...row, [column.key]: v })
                   }
-                }}
-                onBlur={onBlurSave}
-              />
-            );
-          if (cellType === "number" || cellType === "currency")
+                >
+                  <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0 focus:ring-offset-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent style={selStyle}>
+                    {opts.map((o) => (
+                      <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        style={ddItemStyle(isDark)}
+                      >
+                        <span
+                          className="sheet-badge-pill"
+                          style={{ color: o.color, backgroundColor: o.bgColor }}
+                        >
+                          {o.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              );
+            }
+            if (
+              cellType === "date" ||
+              col.key === "start" ||
+              col.key === "due" ||
+              col.key === "date"
+            )
+              return (
+                <input
+                  className="w-full h-full px-2.5 text-xs outline-none border-0"
+                  style={{
+                    ...cellStyle,
+                    background: isDark ? "#131620" : "#ffffff",
+                    color: isDark ? "#e2e8f0" : "#1a1d23",
+                  }}
+                  type={formulas.formulas[cellKey] ? "text" : "date"}
+                  autoFocus
+                  value={editVal}
+                  onChange={(e) => onTextChange(e.target.value)}
+                  onBlur={onBlurSave}
+                />
+              );
+            if (cellType === "checkbox")
+              return (
+                <div
+                  className="h-full flex items-center justify-center cursor-pointer"
+                  onClick={() =>
+                    onRowChange({ ...row, [column.key]: !row[column.key] })
+                  }
+                >
+                  {row[column.key] ? (
+                    <CheckSquare className="h-4 w-4 text-primary" />
+                  ) : (
+                    <Square className="h-4 w-4 text-gray-300" />
+                  )}
+                </div>
+              );
+            if (cellType === "progress")
+              return (
+                <input
+                  className="w-full h-full px-2.5 text-xs outline-none border-0 text-right tabular-nums font-mono"
+                  style={{
+                    ...cellStyle,
+                    background: isDark ? "#131620" : "#ffffff",
+                    color: isDark ? "#e2e8f0" : "#1a1d23",
+                  }}
+                  type="text"
+                  autoFocus
+                  placeholder="0–100 or =formula"
+                  value={editVal}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v.startsWith("=")) onNumChange(v);
+                    else {
+                      const n =
+                        v === "" ? 0 : Math.min(100, Math.max(0, Number(v)));
+                      if (!isNaN(n)) onRowChange({ ...row, [column.key]: n });
+                    }
+                  }}
+                  onBlur={onBlurSave}
+                />
+              );
+            if (cellType === "number" || cellType === "currency")
+              return (
+                <input
+                  className="w-full h-full px-2.5 text-xs outline-none border-0 text-right tabular-nums font-mono"
+                  style={{
+                    ...cellStyle,
+                    background: isDark ? "#131620" : "#ffffff",
+                    color: isDark ? "#e2e8f0" : "#1a1d23",
+                  }}
+                  type="text"
+                  autoFocus
+                  value={editVal}
+                  onChange={(e) => onNumChange(e.target.value)}
+                  onBlur={onBlurSave}
+                />
+              );
+
+            if (cellType === "select") {
+              const selectOpts = col.selectOptions ?? [];
+              return (
+                <Select
+                  value={String(row[column.key] ?? "")}
+                  onValueChange={(v) =>
+                    onRowChange({ ...row, [column.key]: v })
+                  }
+                >
+                  <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0 focus:ring-offset-0">
+                    <SelectValue placeholder="Select…" />
+                  </SelectTrigger>
+                  <SelectContent style={selStyle}>
+                    {selectOpts.map((opt) => (
+                      <SelectItem
+                        key={opt}
+                        value={opt}
+                        style={ddItemStyle(isDark)}
+                      >
+                        <span
+                          className="sheet-badge-pill"
+                          style={{
+                            color: "#1e40af",
+                            backgroundColor: "#dbeafe",
+                          }}
+                        >
+                          {opt}
+                        </span>
+                      </SelectItem>
+                    ))}
+                    {selectOpts.length === 0 && (
+                      <div className="px-2.5 py-2 text-[11px] text-gray-400 italic">
+                        No options — edit column to add some.
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+              );
+            }
+
+            if (isTextWrap)
+              return (
+                <textarea
+                  className="w-full h-full px-2.5 py-2 text-xs outline-none border-0 resize-none"
+                  style={{
+                    ...cellStyle,
+                    background: isDark ? "#131620" : "#ffffff",
+                    color: isDark ? "#e2e8f0" : "#1a1d23",
+                  }}
+                  autoFocus
+                  value={editVal}
+                  onChange={(e) => onTextChange(e.target.value)}
+                  onBlur={onBlurSave}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
+                  }}
+                />
+              );
             return (
               <input
-                className="w-full h-full px-2.5 text-xs bg-white outline-none border-0 text-right tabular-nums font-mono"
-                style={cellStyle}
-                type="text"
-                autoFocus
-                value={editVal}
-                onChange={(e) => onNumChange(e.target.value)}
-                onBlur={onBlurSave}
-              />
-            );
-
-          // ── Select type: exactly like status/priority ──────────────────────
-          if (cellType === "select") {
-            const selectOpts = col.selectOptions ?? [];
-            return (
-              <Select
-                value={String(row[column.key] ?? "")}
-                onValueChange={(v) => onRowChange({ ...row, [column.key]: v })}
-              >
-                <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0 focus:ring-offset-0">
-                  <SelectValue placeholder="Select…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectOpts.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      <span
-                        className="sheet-badge-pill"
-                        style={{ color: "#1e40af", backgroundColor: "#dbeafe" }}
-                      >
-                        {opt}
-                      </span>
-                    </SelectItem>
-                  ))}
-                  {selectOpts.length === 0 && (
-                    <div className="px-2.5 py-2 text-[11px] text-gray-400 italic">
-                      No options — edit column to add some.
-                    </div>
-                  )}
-                </SelectContent>
-              </Select>
-            );
-          }
-
-          if (isTextWrap)
-            return (
-              <textarea
-                className="w-full h-full px-2.5 py-2 text-xs bg-white outline-none border-0 resize-none"
-                style={cellStyle}
+                className="w-full h-full px-2.5 text-xs outline-none border-0"
+                style={{
+                  ...cellStyle,
+                  background: isDark ? "#131620" : "#ffffff",
+                  color: isDark ? "#e2e8f0" : "#1a1d23",
+                }}
                 autoFocus
                 value={editVal}
                 onChange={(e) => onTextChange(e.target.value)}
                 onBlur={onBlurSave}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
-                }}
               />
             );
-          return (
-            <input
-              className="w-full h-full px-2.5 text-xs bg-white outline-none border-0"
-              style={cellStyle}
-              autoFocus
-              value={editVal}
-              onChange={(e) => onTextChange(e.target.value)}
-              onBlur={onBlurSave}
-            />
-          );
-        },
-      }),
-    );
+          },
+        }),
+      );
 
     return [rowNumberCol, ...dataCols];
   }, [
@@ -2241,15 +2468,24 @@ export default function SheetClient() {
   ]);
 
   const filteredRows = useMemo<SheetRow[]>(() => {
+    const activeRows = timeTravelState.previewRows || rows;
+    const activeCols = timeTravelState.previewColumns || columns;
     const q = searchQuery || filterValue;
-    if (!q) return rows;
-    return rows.filter((row) =>
-      columns.some((col) => {
+    if (!q) return activeRows;
+    return activeRows.filter((row) =>
+      activeCols.some((col) => {
         const v = row[col.key];
         return v && String(v).toLowerCase().includes(q.toLowerCase());
       }),
     );
-  }, [rows, searchQuery, filterValue, columns]);
+  }, [
+    rows,
+    columns,
+    timeTravelState.previewRows,
+    timeTravelState.previewColumns,
+    searchQuery,
+    filterValue,
+  ]);
 
   const selectedCellType = useMemo(() => {
     if (!selectedCell) return null;
@@ -2281,7 +2517,6 @@ export default function SheetClient() {
   }, [comments, isOrgSheet]);
   const activeCollaborators = useMemo(() => orgMembers, [orgMembers]);
 
-  // ── Select style helper ───────────────────────────────────────────────────
   const selStyle = ddStyle(isDark);
 
   return (
@@ -2289,9 +2524,15 @@ export default function SheetClient() {
       <div
         className={`sheet-root h-screen flex flex-col select-none overflow-hidden ${isDark ? "sheet-dark" : "sheet-light"}`}
       >
-        {/* TITLE BAR */}
-        <header className="sheet-titlebar flex items-center justify-between px-2 sm:px-3 shrink-0 border-b" style={{ minHeight: "44px" }}>
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+        {/* ═══════════════════════════════════════════════════════════════
+            TITLE BAR — fully scrollable on mobile
+        ════════════════════════════════════════════════════════════════ */}
+        <header
+          className="sheet-titlebar flex items-center justify-between px-2 shrink-0 border-b"
+          style={{ minHeight: "44px" }}
+        >
+          {/* Left: back + icon + title + star + save */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -2309,11 +2550,11 @@ export default function SheetClient() {
             <div className="sheet-app-icon h-6 w-6 rounded-md flex items-center justify-center shrink-0">
               <FileSpreadsheet className="h-3.5 w-3.5 text-primary-foreground" />
             </div>
-            <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+            <div className="flex items-center gap-1 min-w-0 overflow-hidden">
               <Input
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                className="sheet-title-input h-7 border-0 bg-transparent font-semibold text-[13px] sm:text-[13.5px] focus-visible:ring-1 px-1 sm:px-1.5 rounded-md w-28 sm:w-44 md:w-52"
+                className="sheet-title-input h-7 border-0 bg-transparent font-semibold text-[13px] focus-visible:ring-1 px-1 rounded-md w-24 sm:w-44 md:w-52 min-w-0"
               />
               <button
                 onClick={handleStarredToggle}
@@ -2323,6 +2564,7 @@ export default function SheetClient() {
                   className={`h-3.5 w-3.5 transition-colors ${starred ? "fill-amber-400 text-amber-400" : "text-gray-300 hover:text-amber-400"}`}
                 />
               </button>
+              {/* Save indicator */}
               <div className="sheet-save-status hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium shrink-0">
                 {saveStatus === "saving" ? (
                   <>
@@ -2336,19 +2578,96 @@ export default function SheetClient() {
                   </>
                 )}
               </div>
-              {/* Mobile-only save dot */}
-              <span className="sm:hidden h-1.5 w-1.5 rounded-full shrink-0" style={{ background: saveStatus === "saving" ? "#f59e0b" : "#10b981" }} />
+              {/* Mobile save dot */}
+              <span
+                className="sm:hidden h-1.5 w-1.5 rounded-full shrink-0"
+                style={{
+                  background: saveStatus === "saving" ? "#f59e0b" : "#10b981",
+                }}
+              />
               {isOrgSheet && (
                 <div className="sheet-org-badge hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0">
                   <Globe className="h-2.5 w-2.5" />
                   ORG
                 </div>
               )}
+              {forkedFromSheetId && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
+                      onClick={() => router.push(`/sheet/${forkedFromSheetId}`)}
+                    >
+                      <GitBranch className="h-2.5 w-2.5" />
+                      Fork
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="text-xs text-center sheet-tooltip"
+                  >
+                    Forked from snapshot:
+                    <br />
+                    <strong>{forkedFromSnapshotLabel || "Auto-save"}</strong>
+                    {forkedAt && (
+                      <>
+                        <br />
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(forkedAt).toLocaleString([], {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {forks.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 text-[10px] font-semibold shrink-0 cursor-pointer transition-colors">
+                      <GitBranch className="h-2.5 w-2.5" />
+                      {forks.length} Fork{forks.length !== 1 ? "s" : ""}
+                    </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-48 sheet-tooltip"
+                    style={ddStyle(isDark)}
+                  >
+                    <DropdownMenuLabel
+                      className="text-[10px] uppercase tracking-wider"
+                      style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                    >
+                      Forks of this sheet
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator
+                      style={{ background: isDark ? "#1e2330" : "#e8eaed" }}
+                    />
+                    {forks.map((f) => (
+                      <DropdownMenuItem
+                        key={f.id}
+                        onClick={() => router.push(`/sheet/${f.id}`)}
+                        className="text-xs"
+                        style={ddItemStyle(isDark)}
+                      >
+                        <FileSpreadsheet className="h-3 w-3 opacity-50" />
+                        <span className="truncate">{f.title}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+
+          {/* Right: members + export + share — horizontally scrollable on mobile */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-1 overflow-x-auto no-scrollbar">
             {isOrgSheet && liveTracking && (
-              <div className="sheet-live-pill hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold">
+              <div className="sheet-live-pill hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 {activeCollaborators.length} member
                 {activeCollaborators.length !== 1 ? "s" : ""}
@@ -2356,7 +2675,7 @@ export default function SheetClient() {
             )}
             {isOrgSheet ? (
               <>
-                <div className="hidden sm:flex -space-x-2">
+                <div className="hidden sm:flex -space-x-2 shrink-0">
                   {orgMembers.slice(0, 3).map((c) => (
                     <Tooltip key={c.id}>
                       <TooltipTrigger>
@@ -2375,14 +2694,14 @@ export default function SheetClient() {
                   ))}
                   {orgMembers.length > 3 && (
                     <div
-                      className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold cursor-pointer border-2 bg-gray-200 text-gray-600"
+                      className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold cursor-pointer border-2 bg-gray-200 text-gray-600 shrink-0"
                       style={{ borderColor: "var(--sheet-titlebar-bg)" }}
                     >
                       +{orgMembers.length - 3}
                     </div>
                   )}
                 </div>
-                <div className="sheet-vdiv h-5 w-px mx-0.5 hidden sm:block" />
+                <div className="sheet-vdiv h-5 w-px mx-0.5 hidden sm:block shrink-0" />
                 <IconBtn
                   icon={Bell}
                   tooltip="Notifications"
@@ -2403,7 +2722,7 @@ export default function SheetClient() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="sheet-btn-secondary flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-2.5 rounded-md text-[11.5px] font-medium transition-all">
+                <button className="sheet-btn-secondary flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-2.5 rounded-md text-[11.5px] font-medium transition-all shrink-0">
                   <Download className="h-3.5 w-3.5 shrink-0" />
                   <span className="hidden sm:inline">Export</span>
                   <ChevronDown className="h-3 w-3 opacity-50 hidden sm:block" />
@@ -2434,7 +2753,7 @@ export default function SheetClient() {
                   <DropdownMenuItem
                     key={fmt}
                     onClick={() => handleExport(fmt)}
-                    className="text-xs gap-2"
+                    className="text-xs"
                     style={ddItemStyle(isDark)}
                   >
                     <Icon className="h-3 w-3" />
@@ -2446,7 +2765,7 @@ export default function SheetClient() {
 
             {isOrgSheet && (
               <button
-                className="sheet-btn-primary flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-3 rounded-md text-[11.5px] font-semibold transition-all"
+                className="sheet-btn-primary flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-3 rounded-md text-[11.5px] font-semibold transition-all shrink-0"
                 onClick={() => setShowShareDialog(true)}
               >
                 <Share2 className="h-3.5 w-3.5 shrink-0" />
@@ -2456,230 +2775,260 @@ export default function SheetClient() {
           </div>
         </header>
 
-        {/* FORMATTING TOOLBAR */}
-        <div className="sheet-toolbar sheet-formatting-bar h-10 border-b flex items-center px-3 gap-0.5 shrink-0">
-          <IconBtn
-            icon={Undo2}
-            tooltip="Undo"
-            shortcut="Ctrl+Z"
-            onClick={() => rowsHistory.undo()}
-            disabled={!rowsHistory.canUndo}
-          />
-          <IconBtn
-            icon={Redo2}
-            tooltip="Redo"
-            shortcut="Ctrl+Y"
-            onClick={() => rowsHistory.redo()}
-            disabled={!rowsHistory.canRedo}
-          />
-          <ToolSep />
-          <Select
-            value={String(zoomLevel)}
-            onValueChange={(v) => handleZoomChange(Number(v))}
-          >
-            <SelectTrigger
-              className="sheet-select h-7 w-[72px] text-[11px] rounded-md px-2 border"
-              style={selStyle}
+        {/* ═══════════════════════════════════════════════════════════════
+            FORMATTING TOOLBAR — horizontally scrollable on mobile
+        ════════════════════════════════════════════════════════════════ */}
+        <div
+          className="sheet-toolbar sheet-formatting-bar border-b shrink-0"
+          style={{ height: "40px" }}
+        >
+          {/* Scrollable inner container */}
+          <div className="h-full flex items-center px-2 gap-0.5 overflow-x-auto no-scrollbar min-w-0">
+            <IconBtn
+              icon={Undo2}
+              tooltip="Undo"
+              shortcut="Ctrl+Z"
+              onClick={() => rowsHistory.undo()}
+              disabled={!rowsHistory.canUndo}
+            />
+            <IconBtn
+              icon={Redo2}
+              tooltip="Redo"
+              shortcut="Ctrl+Y"
+              onClick={() => rowsHistory.redo()}
+              disabled={!rowsHistory.canRedo}
+            />
+            <ToolSep />
+            <Select
+              value={String(zoomLevel)}
+              onValueChange={(v) => handleZoomChange(Number(v))}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent style={selStyle}>
-              {[50, 75, 90, 100, 110, 125, 150, 200].map((z) => (
-                <SelectItem
-                  key={z}
-                  value={String(z)}
-                  className="text-xs"
-                  style={ddItemStyle(isDark)}
-                >
-                  {z}%
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <ToolSep />
-          <IconBtn
-            icon={Copy}
-            tooltip="Copy"
-            shortcut="Ctrl+C"
-            onClick={() => clipboard.copyCellOrRange(selectedCell)}
-          />
-          <IconBtn
-            icon={Scissors}
-            tooltip="Cut"
-            shortcut="Ctrl+X"
-            onClick={() => clipboard.cutCellOrRange(selectedCell)}
-          />
-          <IconBtn
-            icon={Clipboard}
-            tooltip="Paste"
-            shortcut="Ctrl+V"
-            onClick={handlePaste}
-          />
-          <ToolSep />
-          <Select value={fontFamily} onValueChange={handleFontFamilyChange}>
-            <SelectTrigger
-              className="sheet-select h-7 w-[108px] text-[11px] rounded-md px-2 border"
-              style={selStyle}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent style={selStyle}>
-              {[
-                "Arial",
-                "Verdana",
-                "Helvetica",
-                "Times New Roman",
-                "Georgia",
-                "Courier New",
-                "Trebuchet MS",
-              ].map((f) => (
-                <SelectItem
-                  key={f}
-                  value={f}
-                  className="text-xs"
-                  style={{ ...ddItemStyle(isDark), fontFamily: f }}
-                >
-                  {f}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={fontSize} onValueChange={handleFontSizeChange}>
-            <SelectTrigger
-              className="sheet-select h-7 w-[58px] text-[11px] rounded-md px-2 border ml-1"
-              style={selStyle}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent style={selStyle}>
-              {["8", "9", "10", "11", "12", "14", "16", "18", "24", "36"].map(
-                (s) => (
+              <SelectTrigger
+                className="sheet-select h-7 w-[68px] text-[11px] rounded-md px-2 border shrink-0"
+                style={selStyle}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent style={selStyle}>
+                {[50, 75, 90, 100, 110, 125, 150, 200].map((z) => (
                   <SelectItem
-                    key={s}
-                    value={s}
+                    key={z}
+                    value={String(z)}
                     className="text-xs"
                     style={ddItemStyle(isDark)}
                   >
-                    {s}
+                    {z}%
                   </SelectItem>
-                ),
-              )}
-            </SelectContent>
-          </Select>
-          <ToolSep />
-          {selectedCell && selectedCellType && (
-            <>
-              <CellTypeSelector
-                currentType={selectedCellType}
-                onChangeType={(t) =>
-                  cellTypes.changeCellType(
-                    selectedCell.row,
-                    selectedCell.col,
-                    t,
-                  )
-                }
-              />
-              <ToolSep />
-            </>
-          )}
-          <FormattingToolbar
-            currentFormat={formatting.getCurrentCellFormat(selectedCell)}
-            onFormatChange={handleFormatChange}
-            disabled={!selectedCell}
-          />
-          <ToolSep />
-          <IconBtn
-            icon={WrapText}
-            tooltip="Text Wrap"
-            onClick={handleTextWrapToggle}
-            disabled={!selectedCell}
-            active={isSelectedColumnWrapped}
-          />
-          <IconBtn
-            icon={
-              selectedCell &&
-              protection.isCellProtected(selectedCell.row, selectedCell.col)
-                ? Lock
-                : Unlock
-            }
-            tooltip="Protect Cell"
-            onClick={handleProtectionToggle}
-            disabled={!selectedCell}
-            active={
-              !!(
+                ))}
+              </SelectContent>
+            </Select>
+            <ToolSep />
+            <IconBtn
+              icon={Copy}
+              tooltip="Copy"
+              shortcut="Ctrl+C"
+              onClick={() => clipboard.copyCellOrRange(selectedCell)}
+            />
+            <IconBtn
+              icon={Scissors}
+              tooltip="Cut"
+              shortcut="Ctrl+X"
+              onClick={() => clipboard.cutCellOrRange(selectedCell)}
+            />
+            <IconBtn
+              icon={Clipboard}
+              tooltip="Paste"
+              shortcut="Ctrl+V"
+              onClick={handlePaste}
+            />
+            <ToolSep />
+            <Select value={fontFamily} onValueChange={handleFontFamilyChange}>
+              <SelectTrigger
+                className="sheet-select h-7 w-[100px] text-[11px] rounded-md px-2 border shrink-0"
+                style={selStyle}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent style={selStyle}>
+                {[
+                  "Arial",
+                  "Verdana",
+                  "Helvetica",
+                  "Times New Roman",
+                  "Georgia",
+                  "Courier New",
+                  "Trebuchet MS",
+                ].map((f) => (
+                  <SelectItem
+                    key={f}
+                    value={f}
+                    className="text-xs"
+                    style={{ ...ddItemStyle(isDark), fontFamily: f }}
+                  >
+                    {f}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={fontSize} onValueChange={handleFontSizeChange}>
+              <SelectTrigger
+                className="sheet-select h-7 w-[54px] text-[11px] rounded-md px-2 border ml-1 shrink-0"
+                style={selStyle}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent style={selStyle}>
+                {["8", "9", "10", "11", "12", "14", "16", "18", "24", "36"].map(
+                  (s) => (
+                    <SelectItem
+                      key={s}
+                      value={s}
+                      className="text-xs"
+                      style={ddItemStyle(isDark)}
+                    >
+                      {s}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectContent>
+            </Select>
+            <ToolSep />
+            {selectedCell && selectedCellType && (
+              <>
+                <CellTypeSelector
+                  currentType={selectedCellType}
+                  onChangeType={(t) =>
+                    cellTypes.changeCellType(
+                      selectedCell.row,
+                      selectedCell.col,
+                      t,
+                    )
+                  }
+                />
+                <ToolSep />
+              </>
+            )}
+            <FormattingToolbar
+              currentFormat={formatting.getCurrentCellFormat(selectedCell)}
+              onFormatChange={handleFormatChange}
+              disabled={!selectedCell}
+            />
+            <ToolSep />
+            <IconBtn
+              icon={WrapText}
+              tooltip="Text Wrap"
+              onClick={handleTextWrapToggle}
+              disabled={!selectedCell}
+              active={isSelectedColumnWrapped}
+            />
+            <IconBtn
+              icon={
                 selectedCell &&
                 protection.isCellProtected(selectedCell.row, selectedCell.col)
-              )
-            }
-          />
-          <ToolSep />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setShowFormulaDialog(true)}
-                className="sheet-formula-btn flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium transition-all"
-              >
-                <Sigma className="h-3.5 w-3.5" />
-                <span>Formulas</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
-              Browse and insert formulas
-            </TooltipContent>
-          </Tooltip>
-          <IconBtn
-            icon={Paintbrush}
-            tooltip="Format painter (coming soon)"
-            onClick={() => toast.info("Format painter coming soon")}
-          />
-          <div className="flex-1" />
-          {showSearch ? (
-            <div className="flex items-center gap-1">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
-                <input
-                  autoFocus
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search cells…"
-                  className="sheet-search-input h-7 w-44 pl-6 pr-2 text-[11px] rounded-md"
-                />
-                {searchQuery && (
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
-                    {filteredRows.length}
-                  </span>
-                )}
-              </div>
-              <button
-                className="sheet-icon-btn h-7 w-7 rounded flex items-center justify-center"
-                onClick={() => {
-                  setShowSearch(false);
-                  setSearchQuery("");
-                }}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ) : (
-            <IconBtn
-              icon={Search}
-              tooltip="Search"
-              shortcut="Ctrl+F"
-              onClick={() => setShowSearch(true)}
+                  ? Lock
+                  : Unlock
+              }
+              tooltip="Protect Cell"
+              onClick={handleProtectionToggle}
+              disabled={!selectedCell}
+              active={
+                !!(
+                  selectedCell &&
+                  protection.isCellProtected(selectedCell.row, selectedCell.col)
+                )
+              }
             />
-          )}
+            <ToolSep />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setShowFormulaDialog(true)}
+                  className="sheet-formula-btn flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium transition-all shrink-0"
+                >
+                  <Sigma className="h-3.5 w-3.5" />
+                  <span>Formulas</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                className="sheet-tooltip text-[11px]"
+              >
+                Browse and insert formulas
+              </TooltipContent>
+            </Tooltip>
+            <IconBtn
+              icon={Paintbrush}
+              tooltip="Format painter (coming soon)"
+              onClick={() => toast.info("Format painter coming soon")}
+            />
+            <ToolSep />
+            {/* Search — always visible in toolbar scroll area */}
+            {showSearch ? (
+              <div className="flex items-center gap-1 shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+                  <input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search…"
+                    className="sheet-search-input h-7 w-32 sm:w-44 pl-6 pr-2 text-[11px] rounded-md"
+                  />
+                  {searchQuery && (
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+                      {filteredRows.length}
+                    </span>
+                  )}
+                </div>
+                <button
+                  className="sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0"
+                  onClick={() => {
+                    setShowSearch(false);
+                    setSearchQuery("");
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <IconBtn
+                icon={Search}
+                tooltip="Search"
+                shortcut="Ctrl+F"
+                onClick={() => setShowSearch(true)}
+              />
+            )}
+          </div>
         </div>
 
-        {/* FORMULA BAR */}
-        <div className="sheet-toolbar h-8 border-b flex items-center px-3 gap-2 shrink-0" style={{ background: "var(--sh-toolbar)" }}>
-          <div className="flex items-center justify-center h-5 px-2 font-mono text-[11px] rounded border" style={{ background: "var(--sh-head-bg)", color: "var(--sh-col-label)", borderColor: "var(--sh-border)" }}>
+        {/* ═══════════════════════════════════════════════════════════════
+            FORMULA BAR
+        ════════════════════════════════════════════════════════════════ */}
+        <div
+          className="sheet-toolbar h-8 border-b flex items-center px-3 gap-2 shrink-0"
+          style={{ background: "var(--sh-toolbar)" }}
+        >
+          <div
+            className="flex items-center justify-center h-5 px-2 font-mono text-[11px] rounded border shrink-0"
+            style={{
+              background: "var(--sh-head-bg)",
+              color: "var(--sh-col-label)",
+              borderColor: "var(--sh-border)",
+              minWidth: "36px",
+            }}
+          >
             {selectedCell
               ? `${String.fromCharCode(65 + columns.findIndex((c) => c.key === selectedCell.col))}${selectedCell.row + 1}`
               : ""}
           </div>
-          <div className="font-serif italic font-bold" style={{ color: "var(--sh-muted)" }}>fx</div>
+          <div
+            className="font-serif italic font-bold shrink-0"
+            style={{ color: "var(--sh-muted)" }}
+          >
+            fx
+          </div>
           <input
-            className="flex-1 h-full bg-transparent border-0 outline-none text-[12px] font-mono"
+            className="flex-1 h-full bg-transparent border-0 outline-none text-[12px] font-mono min-w-0"
             style={{ color: "var(--sh-text)", caretColor: "var(--sh-text)" }}
             placeholder={selectedCell ? "Enter a formula starting with =" : ""}
             value={
@@ -2735,112 +3084,244 @@ export default function SheetClient() {
           />
         </div>
 
-        {/* ACTION BAR */}
-        <div className="sheet-actionbar h-9 border-b flex items-center px-3 gap-0.5 shrink-0">
-          <button
-            className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium"
-            onClick={handleInsertRow}
-          >
-            <Plus className="h-3 w-3" />
-            Row
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium">
-                <Plus className="h-3 w-3" />
-                Column
-                <ChevronDown className="h-2.5 w-2.5 opacity-50 ml-0.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-44"
-              style={ddStyle(isDark)}
-            >
-              <DropdownMenuLabel
-                className="text-[10px] uppercase tracking-wider"
-                style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
-              >
-                Column type
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator
-                style={{ background: isDark ? "#1e2330" : "#e8eaed" }}
-              />
-              {(
-                [
-                  "text",
-                  "number",
-                  "currency",
-                  "date",
-                  "checkbox",
-                  "status",
-                  "priority",
-                  "url",
-                  "select",
-                ] as ColumnDef["type"][]
-              ).map((t) => (
-                <DropdownMenuItem
-                  key={t}
-                  className="text-xs capitalize"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => handleInsertColumn(t)}
-                >
-                  {t === "select" ? "Select List" : t}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <button
-            disabled={selectedRows.size === 0}
-            onClick={handleDeleteRow}
-            className={`sheet-action-btn sheet-action-btn--danger flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium ${selectedRows.size === 0 ? "opacity-35 cursor-not-allowed" : ""}`}
-          >
-            <Trash2 className="h-3 w-3" />
-            {selectedRows.size > 0 ? `Delete (${selectedRows.size})` : "Delete"}
-          </button>
-          <ToolSep />
-          <button
-            className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium"
-            onClick={() => handleSort("asc")}
-          >
-            <ArrowDownAZ className="h-3.5 w-3.5" />A → Z
-          </button>
-          <button
-            className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium"
-            onClick={() => handleSort("desc")}
-          >
-            <ArrowUpAZ className="h-3.5 w-3.5" />Z → A
-          </button>
-          <button
-            className={`sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium ${showFilters ? "sheet-action-btn--active" : ""}`}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Filter
-            {filterValue && (
-              <span className="h-1.5 w-1.5 rounded-full bg-primary ml-0.5" />
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTION BAR — horizontally scrollable on mobile
+        ════════════════════════════════════════════════════════════════ */}
+        <div
+          className="sheet-actionbar border-b shrink-0"
+          style={{ height: "36px" }}
+        >
+          <div className="h-full flex items-center px-2 gap-0.5 overflow-x-auto no-scrollbar">
+            {sheetState.userRole !== "viewer" && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0"
+                      onClick={handleInsertRow}
+                    >
+                      <Plus className="h-3 w-3" />
+                      Row
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="sheet-tooltip text-[11px]"
+                  >
+                    Insert a new row at the bottom
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0">
+                          <Plus className="h-3 w-3" />
+                          Column
+                          <ChevronDown className="h-2.5 w-2.5 opacity-50 ml-0.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="bottom"
+                        className="sheet-tooltip text-[11px]"
+                      >
+                        Insert a new column
+                      </TooltipContent>
+                    </Tooltip>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-44"
+                    style={ddStyle(isDark)}
+                  >
+                    <DropdownMenuLabel
+                      className="text-[10px] uppercase tracking-wider"
+                      style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                    >
+                      Column type
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator
+                      style={{ background: isDark ? "#1e2330" : "#e8eaed" }}
+                    />
+                    {(
+                      [
+                        "text",
+                        "number",
+                        "currency",
+                        "date",
+                        "checkbox",
+                        "status",
+                        "priority",
+                        "url",
+                        "select",
+                      ] as ColumnDef["type"][]
+                    ).map((t) => (
+                      <DropdownMenuItem
+                        key={t}
+                        className="text-xs capitalize"
+                        onClick={() => handleInsertColumn(t)}
+                        style={ddItemStyle(isDark)}
+                      >
+                        {t === "select" ? "Select List" : t}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      disabled={selectedRows.size === 0}
+                      onClick={handleDeleteRow}
+                      className={`sheet-action-btn sheet-action-btn--danger flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0 ${selectedRows.size === 0 ? "opacity-35 cursor-not-allowed" : ""}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      {selectedRows.size > 0
+                        ? `Delete (${selectedRows.size})`
+                        : "Delete"}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="sheet-tooltip text-[11px]"
+                  >
+                    Delete selected rows
+                  </TooltipContent>
+                </Tooltip>
+                <ToolSep />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0"
+                      onClick={() => handleSort("asc")}
+                    >
+                      <ArrowDownAZ className="h-3.5 w-3.5" />
+                      A→Z
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="sheet-tooltip text-[11px]"
+                  >
+                    Sort selected column A to Z
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0"
+                      onClick={() => handleSort("desc")}
+                    >
+                      <ArrowUpAZ className="h-3.5 w-3.5" />
+                      Z→A
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="sheet-tooltip text-[11px]"
+                  >
+                    Sort selected column Z to A
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className={`sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0 ${showFilters ? "sheet-action-btn--active" : ""}`}
+                      onClick={() => setShowFilters(!showFilters)}
+                    >
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      Filter
+                      {filterValue && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary ml-0.5" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="sheet-tooltip text-[11px]"
+                  >
+                    Filter rows by column values
+                  </TooltipContent>
+                </Tooltip>
+                <ToolSep />
+                {[
+                  selectedCell &&
+                  columns.find((c) => c.key === selectedCell.col)?.hidden
+                    ? {
+                        icon: EyeOff,
+                        label: "Show",
+                        action: handleHideColumn,
+                        tooltip: "Show hidden column (owner only)",
+                        ownerOnly: true,
+                      }
+                    : {
+                        icon: Eye,
+                        label: "Hide",
+                        action: handleHideColumn,
+                        tooltip: "Hide column from view (owner only)",
+                        ownerOnly: true,
+                      },
+                  {
+                    icon: Snowflake,
+                    label: "Freeze",
+                    action: handleFreezeColumn,
+                    tooltip:
+                      "Freeze column in place so it stays visible while scrolling",
+                  },
+                  {
+                    icon: Paintbrush,
+                    label: "Conditional",
+                    action: () =>
+                      toast.info("Conditional formatting coming soon"),
+                    tooltip:
+                      "Apply conditional formatting rules based on cell values",
+                  },
+                  {
+                    icon: Layers,
+                    label: "Group",
+                    action: () => toast.info("Group coming soon"),
+                    tooltip: "Group columns together for organization",
+                  },
+                  {
+                    icon: Check,
+                    label: "Validate",
+                    action: () => toast.info("Validation coming soon"),
+                    tooltip: "Set validation rules for cell input",
+                  },
+                  {
+                    icon: BarChart3,
+                    label: "Chart",
+                    action: () => toast.info("Charts coming soon"),
+                    tooltip: "Create charts from sheet data",
+                  },
+                ]
+                  .filter(
+                    ({ ownerOnly }) =>
+                      !ownerOnly ||
+                      (isOrgSheet && sheetState.ownerId === currentUser?.id),
+                  )
+                  .map(({ icon: Icon, label, action, tooltip }) => (
+                    <Tooltip key={label}>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0"
+                          onClick={action}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {label}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="bottom"
+                        className="sheet-tooltip text-[11px]"
+                      >
+                        {tooltip}
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                <ToolSep />
+              </>
             )}
-          </button>
-          <ToolSep />
-          {[
-            { icon: Snowflake, label: "Freeze" },
-            { icon: Eye, label: "Hide" },
-            { icon: Paintbrush, label: "Conditional" },
-            { icon: Layers, label: "Group" },
-            { icon: Check, label: "Validate" },
-            { icon: BarChart3, label: "Chart" },
-          ].map(({ icon: Icon, label }) => (
-            <button
-              key={label}
-              className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium"
-              onClick={() => toast.info(`${label} coming soon`)}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
-          <div className="flex-1" />
-          <div className="flex items-center gap-0.5">
+            {/* Panel toggles always accessible via scroll */}
             {isOrgSheet && (
               <>
                 <IconBtn
@@ -2859,22 +3340,20 @@ export default function SheetClient() {
               </>
             )}
             <IconBtn
-              icon={History}
-              tooltip="Version history"
-              onClick={() => toggleRightPanel("history")}
-              active={effectiveRightPanel === "history"}
+              icon={Clock}
+              tooltip="Time Travel — replay & branch"
+              onClick={() => {
+                toggleRightPanel("timetravel");
+                if (rightPanel !== "timetravel") timeTravelActions.openPanel();
+                else timeTravelActions.closePanel();
+              }}
+              active={effectiveRightPanel === "timetravel"}
             />
             <IconBtn
               icon={Code2}
               tooltip="Developer tools"
               onClick={() => toggleRightPanel("developer")}
               active={effectiveRightPanel === "developer"}
-            />
-            <ToolSep />
-            <IconBtn
-              icon={Play}
-              tooltip="Playback history"
-              onClick={() => setShowPlayback(true)}
             />
             <IconBtn
               icon={isDark ? Sun : Moon}
@@ -2889,29 +3368,31 @@ export default function SheetClient() {
           </div>
         </div>
 
-        {/* FILTER BAR */}
+        {/* ═══════════════════════════════════════════════════════════════
+            FILTER BAR
+        ════════════════════════════════════════════════════════════════ */}
         {showFilters && (
-          <div className="sheet-filterbar h-9 border-b flex items-center px-4 gap-3 shrink-0">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700">
+          <div className="sheet-filterbar h-9 border-b flex items-center px-3 gap-2 sm:gap-3 shrink-0 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 shrink-0">
               <SlidersHorizontal className="h-3 w-3" />
               Filter
             </div>
-            <div className="relative">
+            <div className="relative shrink-0">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
               <input
                 value={filterValue}
                 onChange={(e) => setFilterValue(e.target.value)}
-                placeholder="Filter across all columns…"
-                className="sheet-filter-input h-6 w-56 pl-6 pr-2 text-[11px] rounded-md border"
+                placeholder="Filter columns…"
+                className="sheet-filter-input h-6 w-40 sm:w-56 pl-6 pr-2 text-[11px] rounded-md border"
               />
             </div>
             {filterValue && (
-              <span className="text-[11px] text-amber-600 font-medium">
-                {filteredRows.length} of {rows.length} rows
+              <span className="text-[11px] text-amber-600 font-medium shrink-0">
+                {filteredRows.length}/{rows.length} rows
               </span>
             )}
             <button
-              className="sheet-clear-filter flex items-center gap-1 text-[11px] font-medium px-2 h-6 rounded"
+              className="sheet-clear-filter flex items-center gap-1 text-[11px] font-medium px-2 h-6 rounded shrink-0"
               onClick={() => {
                 setFilterValue("");
                 setShowFilters(false);
@@ -2923,91 +3404,130 @@ export default function SheetClient() {
           </div>
         )}
 
-        {/* MAIN BODY */}
-        <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-hidden relative">
-            <DataGrid
-              columns={gridColumns}
-              rows={filteredRows}
-              rowKeyGetter={(row: SheetRow) => row.id}
-              onRowsChange={handleRowsChange}
-              selectedRows={selectedRows}
-              onSelectedRowsChange={setSelectedRows}
-              onColumnResize={(idx, width) => {
-                const col = columns[idx - 1];
-                if (col) handleColumnResize(col.key, width);
+        {/* ═══════════════════════════════════════════════════════════════
+            MAIN BODY — grid + optional right panel
+        ════════════════════════════════════════════════════════════════ */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Grid wrapper — zoom applied via CSS transform */}
+          <div
+            className="flex-1 overflow-hidden"
+            style={
+              {
+                /* On mobile apply a slight zoom-out so more columns are visible */
+              }
+            }
+          >
+            <div
+              className="h-full w-full"
+              style={{
+                transform: `scale(${zoomLevel / 100})`,
+                transformOrigin: "top left",
+                width: `${(100 * 100) / zoomLevel}%`,
+                height: `${(100 * 100) / zoomLevel}%`,
               }}
-              rowHeight={(row) => {
-                if (textWrap.textWrapColumns.size === 0) return 32;
-                let max = 1;
-                const ri = rows.findIndex((r) => r.id === row.id);
-                const wk = new Set(
-                  [...textWrap.textWrapColumns]
-                    .filter((k) => k.startsWith(`${ri}-`))
-                    .map((k) => k.replace(`${ri}-`, "")),
-                );
-                wk.forEach((ck) => {
-                  const v = String(row[ck] || "");
-                  if (!v) return;
-                  const cd = columns.find((c) => c.key === ck);
-                  const cpl = Math.floor(((cd?.width || 160) - 20) / 7);
-                  const tl = v
-                    .split("\n")
-                    .reduce((a, l) => a + (Math.ceil(l.length / cpl) || 1), 0);
-                  if (tl > max) max = tl;
-                });
-                return Math.max(32, 8 + max * 20);
-              }}
-              headerRowHeight={33}
-              className={`rdg-sheet fill-grid ${isDark ? "rdg-dark" : "rdg-light"}`}
-            />
-          </div>
-          {effectiveRightPanel &&
-            (rightPanel === "history" ||
-              rightPanel === "developer" ||
-              isOrgSheet) && (
-              <RightPanel
-                rightPanel={effectiveRightPanel}
-                isDark={isDark}
-                setRightPanel={setRightPanel}
-                comments={groupedCommentsForPanel}
-                activeCommentCell={activeCommentCell}
-                newCommentText={newCommentText}
-                replyText={replyText}
-                setNewCommentText={setNewCommentText}
-                handleAddComment={handleAddComment}
-                handleReply={handleReply}
-                handleResolveComment={handleResolveComment}
-                setReplyText={setReplyText}
-                history={history}
-                setShowPlayback={setShowPlayback}
-                liveTracking={liveTracking}
-                isOrganizationSheet={isOrgSheet}
-                setLiveTracking={(v) =>
-                  setSheetState((p) => ({ ...p, liveTracking: v }))
-                }
-                setShowShareDialog={setShowShareDialog}
-                sheetId={sheetId}
-                rows={rows}
-                columns={columns}
-                totalComments={totalComments}
-                members={orgMembers}
+            >
+              <DataGrid
+                columns={gridColumns}
+                rows={filteredRows}
+                rowKeyGetter={(row: SheetRow) => row.id}
+                onRowsChange={handleRowsChange}
+                selectedRows={selectedRows}
+                onSelectedRowsChange={setSelectedRows}
+                onColumnResize={(idx, width) => {
+                  const col = columns[idx - 1];
+                  if (col) handleColumnResize(col.key, width);
+                }}
+                rowHeight={(row) => {
+                  if (textWrap.textWrapColumns.size === 0) return 32;
+                  let max = 1;
+                  const ri = rows.findIndex((r) => r.id === row.id);
+                  const wk = new Set(
+                    [...textWrap.textWrapColumns]
+                      .filter((k) => k.startsWith(`${ri}-`))
+                      .map((k) => k.replace(`${ri}-`, "")),
+                  );
+                  wk.forEach((ck) => {
+                    const v = String(row[ck] || "");
+                    if (!v) return;
+                    const cd = columns.find((c) => c.key === ck);
+                    const cpl = Math.floor(((cd?.width || 160) - 20) / 7);
+                    const tl = v
+                      .split("\n")
+                      .reduce(
+                        (a, l) => a + (Math.ceil(l.length / cpl) || 1),
+                        0,
+                      );
+                    if (tl > max) max = tl;
+                  });
+                  return Math.max(32, 8 + max * 20);
+                }}
+                headerRowHeight={33}
+                className={`rdg-sheet fill-grid ${isDark ? "rdg-dark" : "rdg-light"}`}
               />
+            </div>
+          </div>
+
+          {/* Right panel — overlays on mobile, pushes on desktop */}
+          {effectiveRightPanel &&
+            // (rightPanel === "history" ||
+            (rightPanel === "developer" ||
+              rightPanel === "timetravel" ||
+              isOrgSheet) && (
+              <>
+                {/* Mobile backdrop */}
+                <div
+                  className="fixed inset-0 bg-black/30 z-20 sm:hidden"
+                  onClick={() => setRightPanel(null)}
+                />
+                {/* Panel */}
+                <div className="fixed right-0 top-0 bottom-0 z-30 sm:static sm:z-auto w-[85vw] sm:w-auto">
+                  <RightPanel
+                    rightPanel={effectiveRightPanel}
+                    isDark={isDark}
+                    setRightPanel={setRightPanel}
+                    comments={groupedCommentsForPanel}
+                    activeCommentCell={activeCommentCell}
+                    newCommentText={newCommentText}
+                    replyText={replyText}
+                    setNewCommentText={setNewCommentText}
+                    handleAddComment={handleAddComment}
+                    handleReply={handleReply}
+                    handleResolveComment={handleResolveComment}
+                    setReplyText={setReplyText}
+                    // history={history}
+                    liveTracking={liveTracking}
+                    isOrganizationSheet={isOrgSheet}
+                    setLiveTracking={(v) =>
+                      setSheetState((p) => ({ ...p, liveTracking: v }))
+                    }
+                    setShowShareDialog={setShowShareDialog}
+                    sheetId={sheetId}
+                    rows={rows}
+                    columns={columns}
+                    totalComments={totalComments}
+                    members={orgMembers}
+                    timeTravelState={timeTravelState}
+                    timeTravelActions={timeTravelActions}
+                  />
+                </div>
+              </>
             )}
         </div>
 
-        {/* STATUS BAR */}
-        <div className="sheet-statusbar h-5 border-t flex items-center px-4 gap-4 shrink-0">
-          <span className="sheet-status-text tabular-nums">
-            {rows.length} rows · {columns.length} cols
+        {/* ═══════════════════════════════════════════════════════════════
+            STATUS BAR
+        ════════════════════════════════════════════════════════════════ */}
+        <div className="sheet-statusbar h-5 border-t flex items-center px-3 gap-3 shrink-0 overflow-x-auto no-scrollbar">
+          <span className="sheet-status-text tabular-nums shrink-0">
+            {rows.length}r · {columns.length}c
           </span>
           {selectedRows.size > 0 && (
-            <span className="sheet-status-highlight">
-              {selectedRows.size} selected
+            <span className="sheet-status-highlight shrink-0">
+              {selectedRows.size} sel
             </span>
           )}
           {selectedCell && (
-            <span className="sheet-status-cell font-mono">
+            <span className="sheet-status-cell font-mono shrink-0">
               {String.fromCharCode(
                 65 + columns.findIndex((c) => c.key === selectedCell.col) + 1,
               )}
@@ -3016,18 +3536,18 @@ export default function SheetClient() {
           )}
           <div className="flex-1" />
           {filterValue && (
-            <span className="text-[10px] text-amber-500 font-medium">
-              {filteredRows.length}/{rows.length} rows
+            <span className="text-[10px] text-amber-500 font-medium shrink-0">
+              {filteredRows.length}/{rows.length}
             </span>
           )}
           {isOrgSheet && liveTracking && (
-            <span className="sheet-status-text flex items-center gap-1">
+            <span className="sheet-status-text flex items-center gap-1 shrink-0">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Live
             </span>
           )}
           <button
-            className="sheet-status-text flex items-center gap-1 hover:opacity-80"
+            className="sheet-status-text hidden sm:flex items-center gap-1 hover:opacity-80 shrink-0"
             onClick={() => setShowKeyboardShortcuts(true)}
           >
             <Keyboard className="h-2.5 w-2.5" />
@@ -3035,16 +3555,9 @@ export default function SheetClient() {
           </button>
         </div>
 
-        {/* MODALS */}
-        <PlaybackModal
-          showPlayback={showPlayback}
-          setShowPlayback={setShowPlayback}
-          playbackIndex={playbackIndex}
-          setPlaybackIndex={setPlaybackIndex}
-          isPlaying={isPlaying}
-          setIsPlaying={handleSetIsPlaying}
-          history={history}
-        />
+        {/* ═══════════════════════════════════════════════════════════════
+            MODALS
+        ════════════════════════════════════════════════════════════════ */}
         {isOrgSheet && (
           <ShareDialog
             showShareDialog={showShareDialog}
@@ -3063,8 +3576,6 @@ export default function SheetClient() {
           onInsert={handleFormulaInsert}
           isDark={isDark}
         />
-
-        {/* SELECT OPTIONS SETUP DIALOG */}
         <SelectOptionsSetupDialog
           open={selectSetupDialog.open}
           onClose={() => setSelectSetupDialog((p) => ({ ...p, open: false }))}
@@ -3078,8 +3589,21 @@ export default function SheetClient() {
           }
         />
 
-        {/* STYLES */}
-        <style jsx global>{``}</style>
+        {/* ── Global mobile scroll helper ── */}
+        <style jsx global>{`
+          .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          .no-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          @media (max-width: 640px) {
+            .rdg-sheet {
+              font-size: 11px !important;
+            }
+          }
+        `}</style>
       </div>
     </TooltipProvider>
   );

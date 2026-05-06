@@ -91,7 +91,7 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
       <TrackActive organizationId={id} />
 
       <DashboardLayout breadcrumbItems={["Organizations", org.name]}>
-        <div className="w-full py-5 space-y-5">
+        <div className="w-full space-y-10 md:space-y-12">
           <OrgHeader org={org} />
 
           {/* Stat cards */}

@@ -3,6 +3,7 @@
 import { ReactNode, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import GlobalLoader from "@/components/common/Global-loader";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -23,7 +24,7 @@ export default function ProtectedRoute({
   }, [user, loading, router, redirectTo]);
 
   if (loading || !user) {
-    return null;
+    return <GlobalLoader />;
   }
 
   return <>{children}</>;

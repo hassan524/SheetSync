@@ -79,7 +79,11 @@ export const peopleColumns = [
     render: (person: PersonData) => {
       const orgs = person.organizations ?? [];
       if (orgs.length === 0) {
-        return <span className="text-xs text-muted-foreground">No organizations</span>;
+        return (
+          <span className="text-xs text-muted-foreground">
+            No organizations
+          </span>
+        );
       }
       return (
         <div className="flex flex-col gap-1.5">
@@ -89,7 +93,9 @@ export const peopleColumns = [
                 <Building2 className="h-3 w-3 shrink-0" />
                 <span className="truncate max-w-[120px]">{org}</span>
               </div>
-              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ROLE_STYLE[person.role] ?? ROLE_STYLE["Viewer"]}`}>
+              <span
+                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ROLE_STYLE[person.role] ?? ROLE_STYLE["Viewer"]}`}
+              >
                 {person.role}
               </span>
             </div>
@@ -132,7 +138,9 @@ export const peopleColumns = [
     render: (person: PersonData) => (
       <div className="flex items-center gap-1.5">
         <FileSpreadsheet className="h-3 w-3 text-muted-foreground" />
-        <span className="text-xs font-medium tabular-nums">{person.sheetsAccess}</span>
+        <span className="text-xs font-medium tabular-nums">
+          {person.sheetsAccess}
+        </span>
       </div>
     ),
   },
@@ -182,7 +190,9 @@ function PeopleActionMenu({ person }: { person: PersonData }) {
               <Shield className="h-3 w-3" />
               {role}
               {currentRole === role && (
-                <span className="ml-auto text-[10px] text-muted-foreground">current</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">
+                  current
+                </span>
               )}
             </DropdownMenuItem>
           ))}
@@ -192,7 +202,9 @@ function PeopleActionMenu({ person }: { person: PersonData }) {
       <DropdownMenuSeparator />
       <DropdownMenuItem
         className="text-xs gap-2 text-red-600 focus:text-red-600"
-        onClick={() => toast.info(`Remove ${person.name}'s access — coming soon`)}
+        onClick={() =>
+          toast.info(`Remove ${person.name}'s access — coming soon`)
+        }
       >
         <UserMinus className="h-3.5 w-3.5" /> Remove Access
       </DropdownMenuItem>
@@ -213,14 +225,68 @@ export function NoPeopleIcon() {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect x="10" y="8" width="52" height="56" rx="7" fill="currentColor" className="text-muted/30" />
-      <rect x="10" y="8" width="52" height="56" rx="7" stroke="currentColor" strokeWidth="1.5" className="text-border" />
-      <circle cx="36" cy="28" r="7" fill="currentColor" className="text-muted/50" />
-      <path d="M24 46c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke="currentColor" strokeWidth="1.5" fill="currentColor" className="text-muted/40" />
+      <rect
+        x="10"
+        y="8"
+        width="52"
+        height="56"
+        rx="7"
+        fill="currentColor"
+        className="text-muted/30"
+      />
+      <rect
+        x="10"
+        y="8"
+        width="52"
+        height="56"
+        rx="7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        className="text-border"
+      />
+      <circle
+        cx="36"
+        cy="28"
+        r="7"
+        fill="currentColor"
+        className="text-muted/50"
+      />
+      <path
+        d="M24 46c0-6.627 5.373-12 12-12s12 5.373 12 12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        fill="currentColor"
+        className="text-muted/40"
+      />
       <circle cx="54" cy="54" r="11" fill="hsl(var(--background))" />
-      <circle cx="54" cy="54" r="11" stroke="currentColor" strokeWidth="1.5" className="text-border" />
-      <line x1="50" y1="54" x2="58" y2="54" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-muted-foreground/60" />
-      <line x1="54" y1="50" x2="54" y2="58" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-muted-foreground/60" />
+      <circle
+        cx="54"
+        cy="54"
+        r="11"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        className="text-border"
+      />
+      <line
+        x1="50"
+        y1="54"
+        x2="58"
+        y2="54"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        className="text-muted-foreground/60"
+      />
+      <line
+        x1="54"
+        y1="50"
+        x2="54"
+        y2="58"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        className="text-muted-foreground/60"
+      />
     </svg>
   );
 }

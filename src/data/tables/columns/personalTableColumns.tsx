@@ -2,7 +2,10 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FileText, Users, Clock, Star } from "lucide-react";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Edit3, Share2, Download, Trash2, StarOff } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -38,8 +41,12 @@ export const sheetColumns = [
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium truncate max-w-[200px] block">{s.title}</span>
-            {s.is_starred && <Star className="h-3 w-3 text-amber-400 fill-amber-400 shrink-0" />}
+            <span className="text-sm font-medium truncate max-w-[200px] block">
+              {s.title}
+            </span>
+            {s.is_starred && (
+              <Star className="h-3 w-3 text-amber-400 fill-amber-400 shrink-0" />
+            )}
           </div>
         </div>
       </div>
@@ -62,8 +69,14 @@ export const sheetColumns = [
           )}
         </Avatar>
         <div className="flex flex-col">
-          <span className="text-xs text-muted-foreground truncate">{s.owner?.name ?? "You"}</span>
-          {s.owner?.email && <span className="text-[11px] text-muted-foreground truncate">{s.owner.email}</span>}
+          <span className="text-xs text-muted-foreground truncate">
+            {s.owner?.name ?? "You"}
+          </span>
+          {s.owner?.email && (
+            <span className="text-[11px] text-muted-foreground truncate">
+              {s.owner.email}
+            </span>
+          )}
         </div>
       </div>
     ),
@@ -75,7 +88,8 @@ export const sheetColumns = [
     width: "140px",
     render: (s: SheetRow) => {
       const count = s.collaborators ?? 0;
-      if (count === 0) return <span className="text-xs text-muted-foreground">Only you</span>;
+      if (count === 0)
+        return <span className="text-xs text-muted-foreground">Only you</span>;
       return (
         <span className="text-xs text-muted-foreground">
           {count} {count === 1 ? "person" : "people"}
@@ -111,21 +125,27 @@ export const sheetColumns = [
     key: "size",
     header: "Size",
     width: "100px",
-    render: (s: SheetRow) => <span className="text-xs text-muted-foreground">{s.size ?? "—"}</span>,
+    render: (s: SheetRow) => (
+      <span className="text-xs text-muted-foreground">{s.size ?? "—"}</span>
+    ),
   },
 
   {
     key: "rows",
     header: "Rows",
     width: "90px",
-    render: (s: SheetRow) => <span className="text-xs text-muted-foreground">{s.rows ?? "—"}</span>,
+    render: (s: SheetRow) => (
+      <span className="text-xs text-muted-foreground">{s.rows ?? "—"}</span>
+    ),
   },
 
   {
     key: "columns",
     header: "Columns",
     width: "90px",
-    render: (s: SheetRow) => <span className="text-xs text-muted-foreground">{s.columns ?? "—"}</span>,
+    render: (s: SheetRow) => (
+      <span className="text-xs text-muted-foreground">{s.columns ?? "—"}</span>
+    ),
   },
 ];
 
@@ -151,16 +171,22 @@ function SheetActionMenu({ sheet }: { sheet: SheetRow }) {
         onClick={async () => {
           try {
             await updateSheetStarred(sheet.id, !sheet.is_starred);
-            toast.success(sheet.is_starred ? "Removed from starred" : "Added to starred");
+            toast.success(
+              sheet.is_starred ? "Removed from starred" : "Added to starred",
+            );
           } catch {
             toast.error("Failed to update star");
           }
         }}
       >
         {sheet.is_starred ? (
-          <><StarOff className="h-3.5 w-3.5" /> Unstar</>
+          <>
+            <StarOff className="h-3.5 w-3.5" /> Unstar
+          </>
         ) : (
-          <><Star className="h-3.5 w-3.5" /> Star</>
+          <>
+            <Star className="h-3.5 w-3.5" /> Star
+          </>
         )}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
@@ -177,14 +203,62 @@ export const sheetAction = {
 
 export function NoSheetsIcon() {
   return (
-    <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="10" y="8" width="52" height="56" rx="7" fill="currentColor" className="text-muted/30" />
-      <rect x="10" y="8" width="52" height="56" rx="7" stroke="currentColor" strokeWidth="1.5" className="text-border" />
+    <svg
+      width="72"
+      height="72"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect
+        x="10"
+        y="8"
+        width="52"
+        height="56"
+        rx="7"
+        fill="currentColor"
+        className="text-muted/30"
+      />
+      <rect
+        x="10"
+        y="8"
+        width="52"
+        height="56"
+        rx="7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        className="text-border"
+      />
       {/* plus badge */}
       <circle cx="54" cy="54" r="11" fill="hsl(var(--background))" />
-      <circle cx="54" cy="54" r="11" stroke="currentColor" strokeWidth="1.5" className="text-border" />
-      <line x1="50" y1="54" x2="58" y2="54" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-muted-foreground/60" />
-      <line x1="54" y1="50" x2="54" y2="58" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-muted-foreground/60" />
+      <circle
+        cx="54"
+        cy="54"
+        r="11"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        className="text-border"
+      />
+      <line
+        x1="50"
+        y1="54"
+        x2="58"
+        y2="54"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        className="text-muted-foreground/60"
+      />
+      <line
+        x1="54"
+        y1="50"
+        x2="54"
+        y2="58"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        className="text-muted-foreground/60"
+      />
     </svg>
   );
 }

@@ -155,7 +155,9 @@ export async function getOrganizationById(
             id,
             name,
             avatar_url
-          )
+          ),
+          rows ( id ),
+          columns ( id )
         ),
         organization_members (
           id,
@@ -188,29 +190,34 @@ export async function getOrganizationById(
 
   /* ---------------- SHEETS ---------------- */
   const sheets: Sheet[] =
-    org.sheets?.map((sheet: any) => ({
-      id: sheet.id,
-      title: sheet.title,
-      folder_id: sheet.folder_id ?? null,
-      owner_id: sheet.owner_id,
-      organization_id: sheet.organization_id,
-      template_id: sheet.template_id ?? "",
-      is_starred: sheet.is_starred,
-      is_personal: sheet.is_personal ?? true,
-      created_at: sheet.created_at,
-      updated_at: sheet.updated_at,
-      owner: {
-        name: sheet.owner?.name || "Unknown",
-        initials: getInitials(sheet.owner?.name || "U"),
-        avatar: sheet.owner?.avatar_url,
-      },
-      visibility: sheet.organization_id ? "team" : "private",
-      lastModified: timeAgo(sheet.updated_at),
-      lastModifiedBy: sheet.lastEditor?.name || sheet.owner?.name || "Unknown",
-      collaborators: org.organization_members?.length || 1, // All org members have access
-      activeEditors: 0,
-      size: sheet.size_mb?.toString() || "0",
-    })) ?? [];
+    org.sheets
+      ?.filter((s: any) => !s.forked_from_sheet_id)
+      .map((sheet: any) => ({
+        id: sheet.id,
+        title: sheet.title,
+        folder_id: sheet.folder_id ?? null,
+        owner_id: sheet.owner_id,
+        organization_id: sheet.organization_id,
+        template_id: sheet.template_id ?? "",
+        is_starred: sheet.is_starred,
+        is_personal: sheet.is_personal ?? true,
+        created_at: sheet.created_at,
+        updated_at: sheet.updated_at,
+        owner: {
+          name: sheet.owner?.name || "Unknown",
+          initials: getInitials(sheet.owner?.name || "U"),
+          avatar: sheet.owner?.avatar_url,
+        },
+        visibility: sheet.organization_id ? "team" : "private",
+        lastModified: timeAgo(sheet.updated_at),
+        lastModifiedBy:
+          sheet.lastEditor?.name || sheet.owner?.name || "Unknown",
+        collaborators: org.organization_members?.length || 1, // All org members have access
+        activeEditors: 0,
+        size: sheet.size_mb?.toString() || "0",
+        rows: sheet.rows?.length ?? 0,
+        columns: sheet.columns?.length ?? 0,
+      })) ?? [];
 
   /* ---------------- MEMBERS ---------------- */
   const members: Member[] =

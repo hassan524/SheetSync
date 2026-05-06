@@ -13,8 +13,7 @@ const Index = async () => {
 
   return (
     <DashboardLayout breadcrumbItems={["SheetSync", "Dashboard"]}>
-      <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
-
+      <div className="max-w-7xl mx-auto space-y-8 md:space-y-10">
         {/* Welcome */}
         <DashboardWelcome />
 
@@ -80,12 +79,15 @@ const Index = async () => {
               Pro tip: Use templates to get started faster
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              SheetSync offers pre-built templates for budgets, CRM, project management, and more. Browse them under{" "}
-              <span className="text-primary font-medium">Tools → Templates</span> in the sidebar.
+              SheetSync offers pre-built templates for budgets, CRM, project
+              management, and more. Browse them under{" "}
+              <span className="text-primary font-medium">
+                Tools → Templates
+              </span>{" "}
+              in the sidebar.
             </p>
           </div>
         </div>
-
       </div>
     </DashboardLayout>
   );

@@ -36,15 +36,18 @@ export default async function StarredPage() {
       <DashboardLayout breadcrumbItems={["SheetSync", "Starred"]}>
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Page Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center flex-shrink-0">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-5 min-w-0">
+              <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center flex-shrink-0">
                 <Star className="h-5 w-5 text-amber-500 fill-amber-400" />
               </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight">Starred</h1>
-                <p className="text-sm text-muted-foreground">
-                  Sheets you&apos;ve marked as important — quick access to what matters most
+              <div className="space-y-0.5 truncate">
+                <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
+                  Starred
+                </h1>
+                <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
+                  Sheets you&apos;ve marked as important — quick access to what
+                  matters most
                 </p>
               </div>
             </div>
@@ -54,12 +57,14 @@ export default async function StarredPage() {
           <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Star any sheet from the sheet editor or right-click menu to pin it here. Starred sheets appear across your personal folders and organizations.
+              Star any sheet from the sheet editor or right-click menu to pin it
+              here. Starred sheets appear across your personal folders and
+              organizations.
             </p>
           </div>
 
           {/* Stats strip */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[
               {
                 label: "Starred Total",
@@ -82,15 +87,19 @@ export default async function StarredPage() {
             ].map(({ label, value, icon: Icon, description }) => (
               <div
                 key={label}
-                className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3"
+                className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3"
               >
-                <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
                   <Icon className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-lg font-bold leading-none">{value}</p>
-                  <p className="text-xs font-medium text-foreground mt-0.5">{label}</p>
-                  <p className="text-[11px] text-muted-foreground">{description}</p>
+                  <p className="text-xs font-medium text-foreground mt-0.5 truncate">
+                    {label}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground hidden sm:block truncate">
+                    {description}
+                  </p>
                 </div>
               </div>
             ))}

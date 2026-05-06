@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
         "*.pike.replit.dev:*",
         "*.repl.co",
         "*.repl.co:*",
+        "why-latrine-swizzle.ngrok-free.dev",
       ],
     },
   },
@@ -19,6 +20,7 @@ const nextConfig: NextConfig = {
     "*.replit.dev",
     "*.pike.replit.dev",
     "*.repl.co",
+    "why-latrine-swizzle.ngrok-free.dev",
   ],
 };
 

@@ -16,16 +16,11 @@ export async function generateMetadata({
   };
 }
 
+import GlobalLoader from "@/components/common/Global-loader";
+
 // Loading fallback component
 function SheetLoading() {
-  return (
-    <div className="h-screen w-full flex items-center justify-center bg-white">
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-        <p className="text-sm text-gray-600">Loading sheet...</p>
-      </div>
-    </div>
-  );
+  return <GlobalLoader />;
 }
 
 // Server component

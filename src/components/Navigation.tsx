@@ -18,6 +18,7 @@ const navLinks = [
 export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
   const router = useRouter();
   const { user, loginWithGoogle } = useAuth();
 
@@ -38,6 +39,7 @@ export default function Navigation() {
   };
 
   const handleGetStarted = async () => {
+    setIsNavigating(true);
     if (user) {
       router.push("/dashboard");
       return;
@@ -45,11 +47,14 @@ export default function Navigation() {
     const error = await loginWithGoogle();
     if (error) {
       alert("Login failed: " + error.message);
+      setIsNavigating(false);
       return;
     }
     const session = await supabase.auth.getSession();
     if (session.data.session?.user) {
       router.push("/dashboard");
+    } else {
+      setIsNavigating(false);
     }
   };
 
@@ -65,7 +70,6 @@ export default function Navigation() {
       >
         <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-[60px]">
-
             {/* Brand */}
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
@@ -94,24 +98,18 @@ export default function Navigation() {
 
             {/* Desktop CTA */}
             <div className="hidden lg:flex items-center gap-2.5">
-              {user && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push("/dashboard")}
-                  className="text-gray-600 gap-1.5 text-[13px] h-8"
-                >
-                  <LayoutDashboard className="h-3.5 w-3.5" />
-                  Dashboard
-                </Button>
-              )}
               <Button
                 onClick={handleGetStarted}
+                disabled={isNavigating}
                 size="sm"
                 className="h-8 px-4 text-[13px] font-semibold gap-1.5 bg-primary hover:bg-primary/90"
               >
-                {user ? "Go to App" : "Get Started Free"}
-                <ChevronRight className="h-3.5 w-3.5" />
+                {isNavigating
+                  ? "Redirecting..."
+                  : user
+                    ? "Go to App"
+                    : "Get Started Free"}
+                {!isNavigating && <ChevronRight className="h-3.5 w-3.5" />}
               </Button>
             </div>
 
@@ -154,28 +152,19 @@ export default function Navigation() {
             ))}
 
             <div className="pt-3 space-y-2 border-t border-gray-100 mt-2">
-              {user && (
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 font-medium"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    router.push("/dashboard");
-                  }}
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Go to Dashboard
-                </Button>
-              )}
               <Button
+                disabled={isNavigating}
                 className="w-full gap-2 font-semibold bg-primary hover:bg-primary/90"
                 onClick={() => {
-                  setMobileMenuOpen(false);
                   handleGetStarted();
                 }}
               >
-                {user ? "Open App" : "Get Started Free"}
-                <ChevronRight className="h-4 w-4" />
+                {isNavigating
+                  ? "Redirecting..."
+                  : user
+                    ? "Go to App"
+                    : "Get Started Free"}
+                {!isNavigating && <ChevronRight className="h-4 w-4" />}
               </Button>
             </div>
           </div>

@@ -14,7 +14,9 @@ const TemplatePicker = () => {
   const router = useRouter();
 
   const [templateModalOpen, setTemplateModalOpen] = React.useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = React.useState<
+    string | null
+  >(null);
   const [folders, setFolders] = React.useState<any[]>([]);
   const [organizations, setOrganizations] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -45,29 +47,33 @@ const TemplatePicker = () => {
 
   return (
     <section className="animate-fade-in">
-      {/* Header — stacks on mobile, side-by-side on sm+ */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
-        <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <LayoutTemplate className="h-4 w-4 text-primary" />
+      {/* Header */}
+      <div className="flex items-start justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <LayoutTemplate className="h-5 w-5 text-primary" />
           </div>
-          <div>
-            <h2 className="text-base font-semibold leading-tight">Start with a template</h2>
-            <p className="text-xs text-muted-foreground">
-              Pre-built sheets ready in seconds
-            </p>
+          <div className="flex flex-col">
+            <h2 className="text-base font-bold text-foreground leading-tight flex items-center gap-2">
+              Start with a template
+            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-0.5">
+              <p className="text-xs text-muted-foreground">
+                Pre-built sheets ready in seconds
+              </p>
+              <span className="hidden sm:inline text-muted-foreground/40 text-[10px]">
+                •
+              </span>
+              <button
+                onClick={() => router.push("/templates")}
+                className="flex items-center text-xs font-semibold text-primary hover:text-primary/80 transition-colors group w-fit"
+              >
+                View all templates
+                <ArrowRight className="h-3 w-3 ml-1 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
           </div>
         </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full sm:w-auto text-primary border-primary/30 hover:bg-primary/5"
-          onClick={() => router.push("/templates")}
-        >
-          View all templates
-          <ArrowRight className="h-4 w-4 ml-1" />
-        </Button>
       </div>
 
       {/* Templates — 1 col on mobile, 2 on sm, 4 on lg */}

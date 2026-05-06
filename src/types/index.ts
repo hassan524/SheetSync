@@ -109,6 +109,11 @@ export interface Sheet {
   rows?: number;
   columns?: number;
   size_mb?: number;
+
+  forked_from_sheet_id?: string | null;
+  forked_from_snapshot_label?: string | null;
+  forked_at?: string | null;
+  forked_by_user_id?: string | null;
 }
 
 /* ============================================================
@@ -157,6 +162,11 @@ export interface ColumnDef {
     | "select"; // ✅ ADDED (Antigravity feature)
 
   selectOptions?: string[]; // ✅ ADDED (dropdown values)
+  frozen?: boolean; // Freeze column in place
+  hidden?: boolean; // Hide column from view
+  conditional_formatting?: any; // Conditional formatting rules
+  group_id?: string; // Group ID for column grouping
+  validation_rules?: any; // Validation rules for column
 }
 
 /* ============================================================

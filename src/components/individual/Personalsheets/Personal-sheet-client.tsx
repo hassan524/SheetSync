@@ -138,14 +138,16 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
     >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Page Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-5 min-w-0">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
               <FileSpreadsheet className="h-5 w-5 text-primary" />
             </div>
-            <div className="space-y-0.5">
-              <h1 className="text-2xl font-semibold tracking-tight">Personal Sheets</h1>
-              <p className="text-sm text-muted-foreground">
+            <div className="space-y-0.5 truncate">
+              <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
+                Personal Sheets
+              </h1>
+              <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
                 Manage and organize all your personal spreadsheets
               </p>
             </div>
@@ -155,19 +157,18 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
               onClick={() => setNewFolderOpen(true)}
               variant="outline"
               size="sm"
-              className="h-9 px-3 gap-1.5 hidden sm:flex"
+              className="h-9 w-9 p-0 sm:w-auto sm:px-3 gap-1.5"
             >
               <FolderPlus className="h-4 w-4" />
-              New Folder
+              <span className="hidden sm:inline">New Folder</span>
             </Button>
             <Button
               onClick={() => setNewSheetOpen(true)}
               size="sm"
-              className="h-9 px-3 gap-1.5"
+              className="h-9 w-9 p-0 sm:w-auto sm:px-3 gap-1.5"
             >
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">New Sheet</span>
-              <span className="sm:hidden">New</span>
             </Button>
           </div>
         </div>
@@ -176,12 +177,14 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
         <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
           <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
           <p className="text-xs text-muted-foreground">
-            Personal sheets are organized into folders. Select a folder below to view and edit its sheets. You can star sheets to mark them as important and find them quickly later.
+            Personal sheets are organized into folders. Select a folder below to
+            view and edit its sheets. You can star sheets to mark them as
+            important and find them quickly later.
           </p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[
             {
               label: "Total Sheets",
@@ -222,7 +225,7 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
               >
                 <div
                   className={cn(
-                    "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
+                    "h-8 w-8 sm:h-8 sm:w-8 rounded-lg flex items-center justify-center shrink-0",
                     isActive ? "bg-primary/15" : "bg-muted",
                   )}
                 >
@@ -236,14 +239,18 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
                 <div className="min-w-0">
                   <p
                     className={cn(
-                      "text-lg font-bold leading-none",
+                      "text-lg sm:text-lg font-bold leading-none",
                       isActive ? "text-primary" : "",
                     )}
                   >
                     {value}
                   </p>
-                  <p className="text-xs font-medium text-foreground mt-0.5">{label}</p>
-                  <p className="text-[10px] text-muted-foreground hidden sm:block">{description}</p>
+                  <p className="text-xs font-medium text-foreground mt-0.5">
+                    {label}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground hidden sm:block">
+                    {description}
+                  </p>
                 </div>
               </button>
             );
@@ -256,7 +263,8 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
             <div>
               <h2 className="text-sm font-semibold">Folders</h2>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                {folders.length} folder{folders.length !== 1 ? "s" : ""} · select one to view sheets
+                {folders.length} folder{folders.length !== 1 ? "s" : ""} ·
+                select one to view sheets
               </p>
             </div>
             <button
@@ -298,7 +306,10 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
                 )}
               </div>
 
-              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
+              <Tabs
+                value={viewMode}
+                onValueChange={(v) => setViewMode(v as any)}
+              >
                 <TabsList className="h-9 p-0.5">
                   <TabsTrigger value="grid" className="h-8 w-9 p-0">
                     <Grid3X3 className="h-3.5 w-3.5" />

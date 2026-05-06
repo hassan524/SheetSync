@@ -95,10 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Google login
   // -----------------------
   const loginWithGoogle = async (): Promise<AuthError | null> => {
-    const redirectUrl =
-      process.env.NODE_ENV === "development"
-        ? "http://localhost:3000/dashboard"
-        : "https://your-production-site.com/dashboard";
+    const redirectUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`;
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",

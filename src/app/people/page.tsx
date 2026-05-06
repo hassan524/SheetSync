@@ -32,7 +32,7 @@ export default async function PeoplePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <DashboardLayout breadcrumbItems={["SheetSync", "People"]}>
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto space-y-10 md:space-y-12">
           <PeopleStatsRow people={people} organizations={organizations} />
           <PeopleList people={people} organizations={organizations} />
         </div>
