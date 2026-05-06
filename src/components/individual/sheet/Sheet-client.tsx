@@ -182,31 +182,19 @@ import "@/app/sheet.css";
 import TimeTravelPanel from "@/components/individual/sheet/panels/TimeTravel-panel";
 import { useTimeTravel } from "@/hooks/use-time-travel";
 import { maybeAutoSnapshot } from "@/lib/querys/sheet/snapshots";
-
-// ── Member helpers ──────────────────────────────────────────────────────────
-const MEMBER_COLORS = [
-  "#0d7c5f",
-  "#f59e0b",
-  "#10b981",
-  "#ef4444",
-  "#6366f1",
-  "#ec4899",
-  "#14b8a6",
-  "#f97316",
-  "#8b5cf6",
-  "#06b6d4",
-];
-const getMemberColor = (id: string) =>
-  MEMBER_COLORS[
-    Math.abs([...id].reduce((h, c) => c.charCodeAt(0) + ((h << 5) - h), 0)) %
-      MEMBER_COLORS.length
-  ];
-const getMemberInitials = (name: string) => {
-  const p = name.trim().split(" ");
-  return p.length === 1
-    ? p[0][0].toUpperCase()
-    : (p[0][0] + p[p.length - 1][0]).toUpperCase();
-};
+import {
+  CommentDot,
+  CollabCursor,
+  IconBtn,
+  ToolSep,
+  SheetAvatar,
+  ddStyle,
+  ddItemStyle,
+  getMemberColor,
+  getMemberInitials,
+} from "./sheet-ui-helpers";
+import FormulaDialogComponent from "./dialogs/Formula-dialog";
+import SelectOptionsDialog from "./dialogs/Select-options-dialog";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 type RightPanelType =
@@ -235,533 +223,8 @@ interface SheetState {
   userRole?: "owner" | "editor" | "viewer";
 }
 
-// ── Small UI components ─────────────────────────────────────────────────────
-function CommentDot({ count }: { count: number }) {
-  return (
-    <div
-      className="sheet-comment-dot absolute top-0 right-0 z-10"
-      style={{
-        width: 0,
-        height: 0,
-        borderLeft: "8px solid transparent",
-        borderTop: "8px solid #f59e0b",
-      }}
-    >
-      {count > 1 && (
-        <span
-          className="absolute -top-4 -right-0.5 text-[7px] text-white font-bold leading-none"
-          style={{ textShadow: "0 1px 2px rgba(0,0,0,.4)" }}
-        >
-          {count}
-        </span>
-      )}
-    </div>
-  );
-}
 
-function CollabCursor({ name, color }: { name: string; color: string }) {
-  return (
-    <div className="absolute -top-5 left-0 z-50 pointer-events-none flex items-center gap-1">
-      <div
-        className="w-0.5 h-5 rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      <span
-        className="text-[10px] font-semibold text-white px-1.5 py-0.5 rounded whitespace-nowrap"
-        style={{ backgroundColor: color, boxShadow: `0 1px 4px ${color}55` }}
-      >
-        {name.split(" ")[0]}
-      </span>
-    </div>
-  );
-}
-
-function IconBtn({
-  icon: Icon,
-  tooltip,
-  onClick,
-  active,
-  disabled,
-  shortcut,
-  danger = false,
-  badge,
-}: {
-  icon: any;
-  tooltip: string;
-  onClick?: () => void;
-  active?: boolean;
-  disabled?: boolean;
-  shortcut?: string;
-  danger?: boolean;
-  badge?: number;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          onClick={onClick}
-          disabled={disabled}
-          className={`sheet-icon-btn relative flex items-center justify-center h-7 w-7 rounded-md transition-all duration-100 flex-shrink-0 ${active ? "sheet-icon-btn--active" : ""} ${danger ? "sheet-icon-btn--danger" : ""} ${disabled ? "opacity-35 cursor-not-allowed" : "cursor-pointer"}`}
-        >
-          <Icon className="h-3.5 w-3.5" />
-          {badge != null && badge > 0 && (
-            <span
-              className="sheet-badge absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full text-[8px] font-bold flex items-center justify-center text-white"
-              style={{ backgroundColor: danger ? "#ef4444" : "var(--primary)" }}
-            >
-              {badge > 9 ? "9+" : badge}
-            </span>
-          )}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent
-        side="bottom"
-        className="sheet-tooltip text-[11px] flex items-center gap-2"
-      >
-        {tooltip}
-        {shortcut && <kbd className="sheet-kbd">{shortcut}</kbd>}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function ToolSep() {
-  return (
-    <div className="sheet-tool-sep mx-1 h-5 w-px self-center flex-shrink-0" />
-  );
-}
-
-// ── Dropdown style helper ───────────────────────────────────────────────────
-const ddStyle = (dark: boolean) => ({
-  background: dark ? "#131620" : "#ffffff",
-  border: `1px solid ${dark ? "#1e2330" : "#e8eaed"}`,
-  color: dark ? "#e2e8f0" : "#1a1d23",
-});
-const ddItemStyle = (dark: boolean) => ({
-  color: dark ? "#e2e8f0" : "#1a1d23",
-});
-
-// ── Formula Dialog ──────────────────────────────────────────────────────────
-function FormulaDialog({
-  open,
-  onClose,
-  onInsert,
-  isDark = false,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onInsert: (f: string) => void;
-  isDark?: boolean;
-}) {
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<
-    (typeof FORMULA_REFERENCE)[0] | null
-  >(null);
-  const filtered = FORMULA_REFERENCE.filter(
-    (f) =>
-      f.name.toLowerCase().includes(search.toLowerCase()) ||
-      f.category.toLowerCase().includes(search.toLowerCase()) ||
-      f.description.toLowerCase().includes(search.toLowerCase()),
-  );
-  const categories = [...new Set(filtered.map((f) => f.category))];
-  const d = isDark;
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent
-        className="max-w-2xl w-[95vw] sheet-dialog"
-        style={{
-          background: d ? "#0f1117" : "#fff",
-          color: d ? "#e2e8f0" : "#1a1d23",
-          borderColor: d ? "#1e2330" : "#e8eaed",
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-            <Sigma className="h-4 w-4 text-primary" /> Formula Reference
-          </DialogTitle>
-          <DialogDescription
-            style={{ color: d ? "#8892a4" : "#6b7280" }}
-            className="text-xs"
-          >
-            Type a formula into any cell starting with <code>=</code>. Click a
-            formula to see details and insert it.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="relative mb-3">
-          <Search
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5"
-            style={{ color: d ? "#4a5568" : "#9ca3af" }}
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search formulas…"
-            style={{
-              background: d ? "#131620" : "#f9fafb",
-              borderColor: d ? "#1e2330" : "#e5e7eb",
-              color: d ? "#e2e8f0" : "#1a1d23",
-            }}
-            className="w-full h-8 pl-8 pr-3 text-xs rounded-md border outline-none focus:border-primary"
-          />
-        </div>
-        <div className="flex gap-3 h-60 sm:h-72">
-          <div
-            className="w-36 sm:w-48 overflow-y-auto border rounded-md flex-shrink-0"
-            style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}
-          >
-            {categories.map((cat) => (
-              <div key={cat}>
-                <div
-                  className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider border-b sticky top-0"
-                  style={{
-                    background: d ? "#131620" : "#f9fafb",
-                    color: d ? "#4a5568" : "#9ca3af",
-                    borderColor: d ? "#1e2330" : "#e5e7eb",
-                  }}
-                >
-                  {cat}
-                </div>
-                {filtered
-                  .filter((f) => f.category === cat)
-                  .map((f) => (
-                    <button
-                      key={f.name}
-                      onClick={() => setSelected(f)}
-                      style={{
-                        background:
-                          selected?.name === f.name ? undefined : "transparent",
-                        color:
-                          selected?.name === f.name
-                            ? undefined
-                            : d
-                              ? "#8892a4"
-                              : "#374151",
-                        borderColor: d ? "#1e2330" : "#f3f4f6",
-                      }}
-                      className={`w-full text-left px-2.5 py-1.5 text-[11px] font-mono border-b transition-colors ${selected?.name === f.name ? "bg-primary/10 text-primary font-semibold" : ""}`}
-                    >
-                      {f.name}
-                    </button>
-                  ))}
-              </div>
-            ))}
-          </div>
-          <div className="flex-1 overflow-y-auto min-w-0">
-            {selected ? (
-              <div className="space-y-3 p-1">
-                <div>
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span
-                      className="text-sm font-bold"
-                      style={{ color: d ? "#e2e8f0" : "#111827" }}
-                    >
-                      {selected.name}
-                    </span>
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                      style={{
-                        background: d ? "#1e2330" : "#f3f4f6",
-                        color: d ? "#8892a4" : "#6b7280",
-                      }}
-                    >
-                      {selected.category}
-                    </span>
-                  </div>
-                  <p
-                    className="text-xs leading-relaxed"
-                    style={{ color: d ? "#8892a4" : "#4b5563" }}
-                  >
-                    {selected.description}
-                  </p>
-                </div>
-                <div>
-                  <p
-                    className="text-[10px] font-semibold uppercase tracking-wider mb-1"
-                    style={{ color: d ? "#4a5568" : "#9ca3af" }}
-                  >
-                    Syntax
-                  </p>
-                  <code className="block text-xs bg-gray-900 text-green-400 px-3 py-2 rounded font-mono break-all">
-                    {selected.syntax}
-                  </code>
-                </div>
-                <div>
-                  <p
-                    className="text-[10px] font-semibold uppercase tracking-wider mb-1"
-                    style={{ color: d ? "#4a5568" : "#9ca3af" }}
-                  >
-                    Example
-                  </p>
-                  <code
-                    className="block text-xs px-3 py-2 rounded font-mono border break-all"
-                    style={{
-                      background: d ? "rgba(37,99,235,0.1)" : "#eff6ff",
-                      color: d ? "#93c5fd" : "#1d4ed8",
-                      borderColor: d ? "rgba(59,130,246,0.2)" : "#bfdbfe",
-                    }}
-                  >
-                    {selected.example}
-                  </code>
-                </div>
-                <div
-                  className="rounded-md p-2.5"
-                  style={{
-                    background: d ? "rgba(245,158,11,0.08)" : "#fffbeb",
-                    borderColor: d ? "rgba(245,158,11,0.2)" : "#fde68a",
-                    border: "1px solid",
-                  }}
-                >
-                  <p
-                    className="text-[10px] font-semibold mb-0.5"
-                    style={{ color: d ? "#fbbf24" : "#92400e" }}
-                  >
-                    💡 How to use
-                  </p>
-                  <p
-                    className="text-[11px] leading-relaxed"
-                    style={{ color: d ? "#fcd34d" : "#92400e" }}
-                  >
-                    Select a cell, type{" "}
-                    <code
-                      className="px-1 rounded"
-                      style={{
-                        background: d ? "rgba(245,158,11,0.15)" : "#fef3c7",
-                      }}
-                    >
-                      ={" "}
-                    </code>{" "}
-                    followed by the formula above.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div
-                className="h-full flex flex-col items-center justify-center gap-2"
-                style={{ color: d ? "#2d3748" : "#d1d5db" }}
-              >
-                <Sigma className="h-8 w-8" />
-                <p className="text-xs">Select a formula to see details</p>
-              </div>
-            )}
-          </div>
-        </div>
-        <DialogFooter
-          className="flex items-center gap-2 pt-2 border-t flex-wrap"
-          style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}
-        >
-          <p
-            className="text-[10px] flex-1 min-w-0"
-            style={{ color: d ? "#4a5568" : "#9ca3af" }}
-          >
-            Formulas update automatically when referenced cells change.
-          </p>
-          <button
-            onClick={onClose}
-            className="text-xs px-3 py-1.5 rounded border transition-colors"
-            style={{
-              borderColor: d ? "#1e2330" : "#e5e7eb",
-              color: d ? "#8892a4" : "#374151",
-              background: "transparent",
-            }}
-          >
-            Close
-          </button>
-          {selected && (
-            <button
-              onClick={() => {
-                onInsert(selected.example);
-                onClose();
-              }}
-              className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-90 transition-opacity font-medium"
-            >
-              Insert example
-            </button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Select Options Setup Dialog ─────────────────────────────────────────────
-function SelectOptionsSetupDialog({
-  open,
-  onClose,
-  onConfirm,
-  initialOptions = [],
-  isDark = false,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onConfirm: (options: string[]) => void;
-  initialOptions?: string[];
-  isDark?: boolean;
-}) {
-  const [input, setInput] = useState(initialOptions.join(", "));
-
-  useEffect(() => {
-    if (open) setInput(initialOptions.join(", "));
-  }, [open, initialOptions]);
-
-  const parsedOptions = useMemo(
-    () =>
-      input
-        .split(",")
-        .map((o) => o.trim())
-        .filter(Boolean),
-    [input],
-  );
-
-  const handleConfirm = () => {
-    if (parsedOptions.length === 0) {
-      toast.error("Add at least one option");
-      return;
-    }
-    onConfirm(parsedOptions);
-    onClose();
-  };
-
-  const d = isDark;
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent
-        className="max-w-sm w-[92vw] sheet-dialog"
-        style={{
-          background: d ? "#0f1117" : "#fff",
-          color: d ? "#e2e8f0" : "#1a1d23",
-          borderColor: d ? "#1e2330" : "#e8eaed",
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-            <ListChecks className="h-4 w-4 text-primary" />
-            Set Select Options
-          </DialogTitle>
-          <DialogDescription
-            style={{ color: d ? "#8892a4" : "#6b7280" }}
-            className="text-xs"
-          >
-            Enter options separated by commas. e.g.{" "}
-            <code
-              style={{ background: d ? "#1e2330" : "#f3f4f6" }}
-              className="px-1 rounded"
-            >
-              Laptop, Phone, iPad
-            </code>
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3 py-1">
-          <textarea
-            autoFocus
-            style={{
-              background: d ? "#131620" : "#f9fafb",
-              borderColor: d ? "#1e2330" : "#e5e7eb",
-              color: d ? "#e2e8f0" : "#1a1d23",
-            }}
-            className="w-full h-24 px-3 py-2 text-xs rounded-md border outline-none focus:border-primary resize-none font-mono"
-            placeholder="Laptop, Phone, iPad, Monitor…"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey))
-                handleConfirm();
-            }}
-          />
-
-          {parsedOptions.length > 0 && (
-            <div>
-              <p
-                className="text-[10px] font-semibold uppercase tracking-wider mb-1.5"
-                style={{ color: d ? "#4a5568" : "#9ca3af" }}
-              >
-                Preview
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {parsedOptions.map((opt, i) => (
-                  <span
-                    key={i}
-                    className="sheet-badge-pill text-[11px]"
-                    style={{
-                      color: d ? "#93c5fd" : "#1e40af",
-                      backgroundColor: d ? "rgba(37,99,235,0.15)" : "#dbeafe",
-                    }}
-                  >
-                    {opt}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter
-          className="gap-2 pt-1 border-t"
-          style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}
-        >
-          <button
-            onClick={onClose}
-            className="text-xs px-3 py-1.5 rounded border transition-colors"
-            style={{
-              borderColor: d ? "#1e2330" : "#e5e7eb",
-              color: d ? "#8892a4" : "#374151",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-90 font-medium transition-opacity"
-          >
-            Save Options
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Avatar Component ────────────────────────────────────────────────────────
-const Avatar = ({
-  member,
-  showOnline = false,
-}: {
-  member: {
-    id: string;
-    name: string;
-    avatar_url: string | null;
-    email?: string;
-    role?: string;
-  };
-  showOnline?: boolean;
-}) => {
-  const color = getMemberColor(member.id);
-  return (
-    <div
-      className="sheet-avatar h-6 w-6 rounded-full relative border-2 flex-shrink-0 overflow-hidden"
-      style={{ borderColor: "var(--sheet-titlebar-bg)" }}
-    >
-      {member.avatar_url ? (
-        <img
-          src={member.avatar_url}
-          alt={member.name}
-          referrerPolicy="no-referrer"
-          className="absolute inset-0 h-full w-full rounded-full object-cover"
-        />
-      ) : (
-        <div
-          className="absolute inset-0 h-full w-full rounded-full flex items-center justify-center text-[9px] font-bold text-white"
-          style={{ backgroundColor: color }}
-        >
-          {getMemberInitials(member.name)}
-        </div>
-      )}
-      {showOnline && (
-        <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 bg-emerald-500 rounded-full border border-white" />
-      )}
-    </div>
-  );
-};
+const Avatar = SheetAvatar;
 
 // ── Main Component ──────────────────────────────────────────────────────────
 export default function SheetClient() {
@@ -3467,20 +2930,19 @@ export default function SheetClient() {
             </div>
           </div>
 
-          {/* Right panel — overlays on mobile, pushes on desktop */}
+          {/* Right panel — slides in from right on mobile, static on desktop */}
           {effectiveRightPanel &&
-            // (rightPanel === "history" ||
             (rightPanel === "developer" ||
               rightPanel === "timetravel" ||
               isOrgSheet) && (
               <>
                 {/* Mobile backdrop */}
                 <div
-                  className="fixed inset-0 bg-black/30 z-20 sm:hidden"
+                  className="fixed inset-0 bg-black/40 z-20 sm:hidden backdrop-blur-[1px]"
                   onClick={() => setRightPanel(null)}
                 />
-                {/* Panel */}
-                <div className="fixed right-0 top-0 bottom-0 z-30 sm:static sm:z-auto w-[85vw] sm:w-auto">
+                {/* Panel — fixed right sidebar on mobile, static on desktop */}
+                <div className="fixed right-0 top-0 bottom-0 z-30 sm:static sm:z-auto w-80 max-w-[88vw] shadow-2xl sm:shadow-none transition-transform duration-200 ease-out">
                   <RightPanel
                     rightPanel={effectiveRightPanel}
                     isDark={isDark}
@@ -3570,13 +3032,13 @@ export default function SheetClient() {
           showKeyboardShortcuts={showKeyboardShortcuts}
           setShowKeyboardShortcuts={setShowKeyboardShortcuts}
         />
-        <FormulaDialog
+        <FormulaDialogComponent
           open={showFormulaDialog}
           onClose={() => setShowFormulaDialog(false)}
           onInsert={handleFormulaInsert}
           isDark={isDark}
         />
-        <SelectOptionsSetupDialog
+        <SelectOptionsDialog
           open={selectSetupDialog.open}
           onClose={() => setSelectSetupDialog((p) => ({ ...p, open: false }))}
           onConfirm={handleSelectSetupConfirm}

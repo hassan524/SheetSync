@@ -383,9 +383,14 @@
     border-bottom: 1px solid var(--rdg-border-color);
     padding: 0 !important;
     background-color: var(--rdg-background-color);
-    cursor: pointer;
+    cursor: cell;
     overflow: hidden;
     contain: layout style;
+    transition: background-color 0.06s ease;
+}
+
+.rdg-cell:hover {
+    cursor: pointer;
 }
 
 .rdg-header-row {
@@ -420,6 +425,45 @@
 
 .rdg-row:hover .rdg-cell {
     background: var(--rdg-row-hover-background-color) !important;
+}
+
+/* ── Dark mode: force cell backgrounds so react-data-grid's built-in white   */
+/* stylesheet cannot bleed through the custom dark theme.                     */
+.rdg-dark .rdg-cell {
+    background-color: #0f1117 !important;
+    color: #e2e8f0 !important;
+    border-right-color: #1e2330 !important;
+    border-bottom-color: #1e2330 !important;
+}
+
+.rdg-dark .rdg-header-row {
+    background-color: #131620 !important;
+    border-bottom-color: #1e2330 !important;
+}
+
+.rdg-dark .rdg-header-cell {
+    background-color: #131620 !important;
+    color: #8892a4 !important;
+    border-right-color: #1e2330 !important;
+}
+
+.rdg-dark .rdg-cell:first-child,
+.rdg-dark .rdg-header-cell:first-child {
+    background-color: #131620 !important;
+}
+
+.rdg-dark .rdg-row:hover .rdg-cell {
+    background-color: #0f1a17 !important;
+}
+
+.rdg-dark .rdg-cell[aria-selected="true"] {
+    background-color: rgba(13, 124, 95, 0.08) !important;
+    outline-color: var(--primary) !important;
+}
+
+/* Smooth cursor on non-editing cells */
+.rdg-cell > * {
+    cursor: inherit;
 }
 
 /* ─── Popover / Dropdown (Radix portals) ─────────────────────────────────── */

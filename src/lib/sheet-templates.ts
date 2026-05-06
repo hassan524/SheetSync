@@ -240,7 +240,7 @@ export const getTemplateData = (
       return {
         title: "Project Tracker",
         columns: [...templateCols, ...buildExtraColumns(templateCols.length)],
-        rows: makeRows(50, allKeys, [], PROJECT_DEFAULTS),
+        rows: makeRows(100, allKeys, [], PROJECT_DEFAULTS),
       };
     }
 
@@ -297,7 +297,7 @@ export const getTemplateData = (
       return {
         title: "Finance Tracker",
         columns: [...templateCols, ...buildExtraColumns(templateCols.length)],
-        rows: makeRows(50, allKeys, [], FINANCE_DEFAULTS),
+        rows: makeRows(100, allKeys, [], FINANCE_DEFAULTS),
       };
     }
 
@@ -374,7 +374,7 @@ export const getTemplateData = (
       return {
         title: "QA Tracker",
         columns: [...templateCols, ...buildExtraColumns(templateCols.length)],
-        rows: makeRows(50, allKeys, [], QA_DEFAULTS),
+        rows: makeRows(100, allKeys, [], QA_DEFAULTS),
       };
     }
 
@@ -393,7 +393,7 @@ export const getTemplateData = (
       return {
         title: "Blank Sheet",
         columns: blankCols,
-        rows: Array.from({ length: 50 }, (_, i) => {
+        rows: Array.from({ length: 100 }, (_, i) => {
           const row: SheetRow = { id: String(i + 1) };
           blankCols.forEach((c) => {
             row[c.key] = "";

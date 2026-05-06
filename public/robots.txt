@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sheetsync.app/sitemap.xml
+
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /sheet/
+Disallow: /sheets/
+Disallow: /organizations/
+Disallow: /people/
+Disallow: /files/
+Disallow: /starred/
+Disallow: /recent/
+Disallow: /templates/
+Disallow: /import/
+Disallow: /invite/

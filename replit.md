@@ -1,6 +1,6 @@
 # SheetSync
 
-A cloud spreadsheet platform with real-time collaboration, 100+ formulas, templates, team organizations, and full import/export — all in one workspace.
+A cloud spreadsheet platform with real-time collaboration, 100+ formulas, templates, team organizations, and full import/export — all in one workspace. Installable as a PWA.
 
 ## Run & Operate
 
@@ -15,19 +15,30 @@ A cloud spreadsheet platform with real-time collaboration, 100+ formulas, templa
 - TypeScript 5
 - Supabase (auth + database)
 - Tailwind CSS v4 + shadcn/ui
-- AG Grid + hot-formula-parser (sheet engine)
+- AG Grid (react-data-grid) + hot-formula-parser (sheet engine)
 - Yarn (package manager)
 
 ## Where things live
 
 - `src/app/` — Next.js App Router pages and layouts
+- `src/app/layout.tsx` — root layout with full SEO metadata + PWA manifest link
+- `src/app/not-found.tsx` — custom 404 page
+- `src/app/sitemap.ts` — auto-generated sitemap for SEO
+- `src/app/sheet.css` — sheet dark mode tokens and DataGrid overrides (inc. dark cell !important rules)
 - `src/components/` — React components (UI, sheet editor, navigation)
+- `src/components/individual/sheet/Sheet-client.tsx` — main sheet editor (~3072 lines, uses extracted helpers)
+- `src/components/individual/sheet/sheet-ui-helpers.tsx` — extracted: IconBtn, ToolSep, CommentDot, CollabCursor, SheetAvatar, ddStyle, getMemberColor etc.
+- `src/components/individual/sheet/dialogs/` — Formula-dialog, Select-options-dialog, Keyboard-shortcuts-dialog, Share-dialog
 - `src/context/AuthContext.tsx` — Supabase auth context
 - `src/lib/supabase/` — Supabase client (browser + server)
 - `src/hooks/sheets/` — formula engine and sheet hooks
 - `src/data/` — static data (FAQs, templates, etc.)
+- `src/lib/sheet-templates.ts` — template data; all templates default to **100 rows**
 - `middleware.ts` — route protection (redirect unauthenticated users to `/`)
 - `next.config.ts` — Next.js config with Replit-compatible settings
+- `public/manifest.json` — PWA manifest
+- `public/sw.js` — service worker (PWA install + push notifications)
+- `public/robots.txt` — search engine crawl rules
 
 ## Architecture decisions
 
@@ -36,10 +47,14 @@ A cloud spreadsheet platform with real-time collaboration, 100+ formulas, templa
 - **Middleware** protects all routes except `/` — redirects logged-out users to landing page
 - **NEXT_PUBLIC_*** env vars are Replit secrets, injected at runtime in dev mode
 - **allowedDevOrigins** includes `*.pike.replit.dev` for HMR to work through the Replit proxy
+- **Sheet component extraction**: UI helpers in `sheet-ui-helpers.tsx`, dialogs in `dialogs/` — Sheet-client.tsx is the main orchestrator
+- **PWA**: `public/sw.js` service worker handles push notifications and offline caching; registered in layout.tsx via `next/script afterInteractive`
+- **Dark mode cells**: `!important` overrides in `sheet.css` ensure react-data-grid's built-in white background cannot bleed through the dark theme
+- **Kebab-case naming convention**: all component files use kebab-case (e.g., `App-sidebar.tsx`) — PascalCase duplicates deleted
 
 ## Product
 
-Landing page + authenticated spreadsheet app. Users sign in with Google OAuth via Supabase. Features: real-time collaboration, formula engine (100+ functions), templates, organizations/teams, Excel/CSV import-export, activity history.
+Landing page + authenticated spreadsheet app. Users sign in with Google OAuth via Supabase. Features: real-time collaboration, formula engine (100+ functions), templates (100 default rows), organizations/teams, Excel/CSV import-export, activity history, PWA installable, push notifications ready.
 
 ## User preferences
 
@@ -54,6 +69,8 @@ Landing page + authenticated spreadsheet app. Users sign in with Google OAuth vi
 - Chunks are large (2.7MB+); `compress: true` in next.config.ts is critical for the Replit proxy
 - Port 3000 can be occupied by lingering processes — run `fuser -k 3000/tcp` before restarting
 - `NEXT_PUBLIC_*` vars must be set as Replit secrets for both server and client to work
+- Deleting a file that Next.js has cached requires a full workflow restart (not just Fast Refresh)
+- All components follow kebab-case naming — never create PascalCase duplicates
 
 ## Pointers
 
