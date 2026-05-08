@@ -1,7 +1,12 @@
+import dynamic from "next/dynamic";
 import { generateSEO } from "@/lib/seo/metadata";
 import { getStarredSheets } from "@/lib/querys/sheets/sheets";
-import DashboardLayout from "@/components/layout/Dashboard-layout";
-import StarredList from "@/components/individual/starred/Starred-list";
+const DashboardLayout = dynamic(
+  () => import("@/components/layout/Dashboard-layout"),
+);
+const StarredList = dynamic(
+  () => import("@/components/individual/starred/Starred-list"),
+);
 import { Star, FileSpreadsheet, Building2, Info } from "lucide-react";
 
 export const metadata = generateSEO({

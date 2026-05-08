@@ -25,6 +25,8 @@ import {
   Clock,
   Circle,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { OrganizationTableData, Role } from "@/types/organization.types";
 
 interface OrganizationsTableProps {
@@ -39,6 +41,7 @@ const roleVariants: Record<Role, "default" | "secondary" | "outline"> = {
 };
 
 const OrganizationsTable = ({ organizations }: OrganizationsTableProps) => {
+  const router = useRouter();
   return (
     <div className="border rounded-lg overflow-hidden animate-fade-in">
       <Table>
@@ -124,15 +127,44 @@ const OrganizationsTable = ({ organizations }: OrganizationsTableProps) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>View Details</DropdownMenuItem>
-                    <DropdownMenuItem>View Sheets</DropdownMenuItem>
-                    <DropdownMenuItem>Manage Members</DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/organizations/${org.id}`)}
+                    >
+                      View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        router.push(`/organizations/${org.id}?tab=sheets`)
+                      }
+                    >
+                      View Sheets
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        router.push(`/organizations/${org.id}?tab=members`)
+                      }
+                    >
+                      Manage Members
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Settings</DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        router.push(`/organizations/${org.id}?tab=settings`)
+                      }
+                    >
+                      Settings
+                    </DropdownMenuItem>
                     {org.role !== "Admin" && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() =>
+                            toast.info(
+                              "Leave organization flow will be connected here",
+                            )
+                          }
+                        >
                           Leave Organization
                         </DropdownMenuItem>
                       </>

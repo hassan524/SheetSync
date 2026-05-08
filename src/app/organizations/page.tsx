@@ -1,8 +1,15 @@
+import dynamic from "next/dynamic";
 import { generateSEO } from "@/lib/seo/metadata";
 import { getAllOrganizations } from "@/lib/querys/organization/organization";
-import DashboardLayout from "@/components/layout/Dashboard-layout";
-import StatsRow from "@/components/individual/organization/Stats-row";
-import OrganizationList from "@/components/individual/organization/Organization-list";
+const DashboardLayout = dynamic(
+  () => import("@/components/layout/Dashboard-layout"),
+);
+const StatsRow = dynamic(
+  () => import("@/components/individual/organization/Stats-row"),
+);
+const OrganizationList = dynamic(
+  () => import("@/components/individual/organization/Organization-list"),
+);
 import { timeAgo } from "@/lib/utils";
 
 export const metadata = generateSEO({
@@ -15,7 +22,9 @@ export const metadata = generateSEO({
 
 // Generate stable storage value outside render using org id as seed
 function seededStorage(index: number): number {
-  return parseFloat(((((index * 9301 + 49297) % 233280) / 233280) * 4 + 1).toFixed(1));
+  return parseFloat(
+    ((((index * 9301 + 49297) % 233280) / 233280) * 4 + 1).toFixed(1),
+  );
 }
 
 export default async function OrganizationsPage() {

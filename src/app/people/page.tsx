@@ -1,8 +1,15 @@
+import dynamic from "next/dynamic";
 import { generateSEO } from "@/lib/seo/metadata";
 import { getAllPeople } from "@/lib/querys/people/people";
-import DashboardLayout from "@/components/layout/Dashboard-layout";
-import PeopleStatsRow from "@/components/individual/people/People-stats-row";
-import PeopleList from "@/components/individual/people/People-list";
+const DashboardLayout = dynamic(
+  () => import("@/components/layout/Dashboard-layout"),
+);
+const PeopleStatsRow = dynamic(
+  () => import("@/components/individual/people/People-stats-row"),
+);
+const PeopleList = dynamic(
+  () => import("@/components/individual/people/People-list"),
+);
 
 export const metadata = generateSEO({
   title: "People | SheetSync",

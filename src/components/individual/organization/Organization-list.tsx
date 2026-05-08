@@ -9,7 +9,7 @@ import {
   organizationColumns,
   organizationAction,
   NoOrganizationsIcon,
-} from "@/data/tables/personalSheets/organizationTableColumns";
+} from "@/data/tables/columns/organizationTableColumns";
 import { Search, Grid3X3, List, X } from "lucide-react";
 import { OrganizationTableData, Organization } from "@/types";
 

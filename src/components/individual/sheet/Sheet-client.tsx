@@ -130,6 +130,14 @@ import { useColumnOperations } from "@/hooks/sheets/use-column-operations";
 import { useCellTypes } from "@/hooks/sheets/use-cell-types";
 import { useFormulas } from "@/hooks/sheets/use-formulas";
 import { useKeyboardShortcuts } from "@/hooks/sheets/use-keyboard-shortcuts";
+
+// ── NEW CHART SYSTEM ────────────────────────────────────────
+// import { useCharts } from "@/hooks/sheets/use-charts";
+import { useCharts } from "@/hooks/sheets/use-charts";
+import ChartPicker from "./Charts-picker";
+import ChartWidget from "./Charts-widget";
+// ───────────────────────────────────────────────────────────
+
 import {
   SheetRow,
   ColumnDef,
@@ -154,7 +162,12 @@ import { logActivity } from "@/lib/querys/activity/activity";
 import KeyboardShortcutsDialog from "./dialogs/Keyboard-shortcuts-dialog";
 import ShareDialog from "./dialogs/Share-dialog";
 import RightPanel from "./Right-panel";
+import type { RightPanelType } from "./Right-panel";
 import { loadSheet } from "@/lib/querys/sheet/sheet";
+import {
+  updateSheetCharts,
+  updateSheetRowHeights,
+} from "@/lib/querys/sheet/sheet";
 import { exportSheet, ExportFormat } from "@/lib/querys/export";
 import { FORMULA_REFERENCE } from "@/data/formulaRefrence";
 import {
@@ -197,12 +210,6 @@ import FormulaDialogComponent from "./dialogs/Formula-dialog";
 import SelectOptionsDialog from "./dialogs/Select-options-dialog";
 
 // ── Types ───────────────────────────────────────────────────────────────────
-type RightPanelType =
-  | "comments"
-  | "collaborators"
-  | "developer"
-  | "timetravel"
-  | null;
 
 interface SheetState {
   title: string;
@@ -222,7 +229,6 @@ interface SheetState {
   forkedByUserId?: string | null;
   userRole?: "owner" | "editor" | "viewer";
 }
-
 
 const Avatar = SheetAvatar;
 
@@ -306,20 +312,29 @@ export default function SheetClient() {
   const [forks, setForks] = useState<
     { id: string; title: string; forked_at: string | null }[]
   >([]);
+  const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
+  const chartsHydratedRef = useRef(false);
+  const rowResizeRef = useRef<{
+    rowId: string;
+    startY: number;
+    startH: number;
+    pointerId: number;
+  } | null>(null);
 
-  // Fetch forks for this sheet
+  // ── CHART SYSTEM ──────────────────────────────────────────
+  // DB is the source of truth; localStorage is only fallback.
+  const charts = useCharts({
+    storageKey: sheetId ? `sheetsync:${sheetId}:charts` : null,
+  });
+  // Ref for the Chart button — picker anchors near it
+  const chartBtnRef = useRef<HTMLButtonElement | null>(null);
+  // ─────────────────────────────────────────────────────────
+
+  // Make Radix portal dropdowns follow sheet dark mode tokens
   useEffect(() => {
-    if (!sheetId) return;
-    const fetchForks = async () => {
-      const { data } = await supabase
-        .from("sheets")
-        .select("id, title, forked_at")
-        .eq("forked_from_sheet_id", sheetId)
-        .order("forked_at", { ascending: false });
-      if (data) setForks(data);
-    };
-    fetchForks();
-  }, [sheetId]);
+    if (typeof document === "undefined") return;
+    document.body.dataset.sheetDark = isDark ? "true" : "false";
+  }, [isDark]);
 
   const [selectSetupDialog, setSelectSetupDialog] = useState<{
     open: boolean;
@@ -332,7 +347,6 @@ export default function SheetClient() {
   const titleSaveTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const rowSaveTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const columnResizeTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
-  const playbackTimer = useRef<NodeJS.Timeout | undefined>(undefined);
   const activityLogTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const logCellEditActivity = useCallback(
@@ -399,8 +413,16 @@ export default function SheetClient() {
     return rightPanel;
   }, [isOrgSheet, rightPanel]);
 
+  // ── When a chart becomes active, open the charts panel ───
+  useEffect(() => {
+    if (charts.activeChartId) {
+      setRightPanel("charts");
+    }
+  }, [charts.activeChartId]);
+
   useEffect(() => {
     if (!sheetId) return;
+    chartsHydratedRef.current = false;
     queueMicrotask(() => setIsLoading(true));
     loadSheet(sheetId)
       .then(async (data) => {
@@ -453,6 +475,18 @@ export default function SheetClient() {
             forkedByUserId: data.forked_by_user_id,
             userRole: userRole as "owner" | "editor" | "viewer",
           });
+
+          // Hydrate charts + row heights from DB (fallback to localStorage hook state if null)
+          if (Array.isArray((data as any).charts)) {
+            charts.replaceAll((data as any).charts);
+          }
+          chartsHydratedRef.current = true;
+          if (
+            (data as any).rowHeights &&
+            typeof (data as any).rowHeights === "object"
+          ) {
+            setRowHeights((data as any).rowHeights as Record<string, number>);
+          }
         } else {
           const td = getTemplateData(templateId);
           rowsHistory.pushState(td.rows);
@@ -468,6 +502,7 @@ export default function SheetClient() {
             saveAllRows(sheetId, td.rows),
             saveAllColumns(sheetId, td.columns),
           ]);
+          chartsHydratedRef.current = true;
         }
         await trackSheetOpen(sheetId);
       })
@@ -476,7 +511,62 @@ export default function SheetClient() {
         toast.error("Failed to load sheet. Please refresh.");
       })
       .finally(() => setIsLoading(false));
-  }, [sheetId]);
+  }, [sheetId, charts.replaceAll]);
+
+  // Persist row heights to DB (debounced)
+  useEffect(() => {
+    if (!sheetId) return;
+    const t = setTimeout(() => {
+      updateSheetRowHeights(sheetId, rowHeights).catch((e) => {
+        console.error(e);
+      });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [rowHeights, sheetId]);
+
+  // Persist charts to DB (debounced)
+  useEffect(() => {
+    if (!sheetId) return;
+    if (!chartsHydratedRef.current) return;
+    const t = setTimeout(() => {
+      updateSheetCharts(sheetId, charts.charts).catch((e) => {
+        console.error(e);
+      });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [charts.charts, sheetId]);
+
+  const beginRowResize = useCallback(
+    (rowId: string, e: React.PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const base = rowHeights[rowId] ?? 32;
+      rowResizeRef.current = {
+        rowId,
+        startY: e.clientY,
+        startH: base,
+        pointerId: e.pointerId,
+      };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [rowHeights],
+  );
+
+  const onRowResizeMove = useCallback((e: React.PointerEvent) => {
+    const st = rowResizeRef.current;
+    if (!st) return;
+    if (st.pointerId !== e.pointerId) return;
+    const dy = e.clientY - st.startY;
+    const next = Math.max(24, Math.min(260, st.startH + dy));
+    setRowHeights((p) => ({ ...p, [st.rowId]: next }));
+  }, []);
+
+  const endRowResize = useCallback((e: React.PointerEvent) => {
+    const st = rowResizeRef.current;
+    if (!st) return;
+    if (st.pointerId !== e.pointerId) return;
+    rowResizeRef.current = null;
+  }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -837,7 +927,6 @@ export default function SheetClient() {
   const handleSelectSetupConfirm = useCallback(
     async (options: string[]) => {
       const { colKey, mode } = selectSetupDialog;
-
       if (mode === "insert") {
         colOps.insertColumn("select");
         setTimeout(async () => {
@@ -953,17 +1042,14 @@ export default function SheetClient() {
     }
     const col = columns.find((c) => c.key === selectedCell.col);
     if (!col) return;
-
     const updatedColumns = columns.map((c) =>
       c.key === selectedCell.col ? { ...c, frozen: !c.frozen } : c,
     );
     setSheetState((p) => ({ ...p, columns: updatedColumns }));
     columnsHistory.pushState(updatedColumns);
-
     markSaving();
     await saveAllColumns(sheetId, updatedColumns);
     markSaved();
-
     toast.success(col.frozen ? "Column unfrozen" : "Column frozen");
   }, [selectedCell, columns, sheetId, columnsHistory, markSaving, markSaved]);
 
@@ -978,17 +1064,14 @@ export default function SheetClient() {
     }
     const col = columns.find((c) => c.key === selectedCell.col);
     if (!col) return;
-
     const updatedColumns = columns.map((c) =>
       c.key === selectedCell.col ? { ...c, hidden: !c.hidden } : c,
     );
     setSheetState((p) => ({ ...p, columns: updatedColumns }));
     columnsHistory.pushState(updatedColumns);
-
     markSaving();
     await saveAllColumns(sheetId, updatedColumns);
     markSaved();
-
     toast.success(col.hidden ? "Column shown" : "Column hidden");
   }, [
     selectedCell,
@@ -1060,6 +1143,107 @@ export default function SheetClient() {
       toast.success(`Sorted ${dir === "asc" ? "A → Z" : "Z → A"}`);
     },
     [selectedCell, rows, rowsHistory.pushState],
+  );
+
+  const handleSortByColumn = useCallback(
+    (colKey: string, dir: "asc" | "desc") => {
+      const sorted = [...rows].sort((a, b) => {
+        const va = String(a[colKey] ?? "");
+        const vb = String(b[colKey] ?? "");
+        return dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+      rowsHistory.pushState(sorted);
+      toast.success(`Sorted ${dir === "asc" ? "A → Z" : "Z → A"}`);
+    },
+    [rows, rowsHistory.pushState],
+  );
+
+  const insertColumnAt = useCallback(
+    (
+      index: number,
+      base?: ColumnDef | null,
+      mode: "blank" | "duplicate" = "blank",
+    ) => {
+      const newKey = `col_${Date.now()}`;
+      const type = base?.type ?? "text";
+      const newCol: ColumnDef = {
+        key: newKey,
+        name:
+          mode === "duplicate" && base?.name
+            ? `${base.name} copy`
+            : `Column ${columns.length + 1}`,
+        width: base?.width ?? 150,
+        editable: true,
+        resizable: true,
+        type,
+        ...(type === "currency"
+          ? { currencyCode: base?.currencyCode ?? "USD" }
+          : {}),
+        ...(type === "select" && base?.selectOptions
+          ? { selectOptions: base.selectOptions }
+          : {}),
+      };
+
+      const nextCols = [...columns];
+      nextCols.splice(Math.max(0, Math.min(nextCols.length, index)), 0, newCol);
+      columnsHistory.pushState(nextCols);
+      setSheetState((p) => ({ ...p, columns: nextCols }));
+
+      const nextRows = rows.map((r) => {
+        const nr: any = { ...r };
+        if (mode === "duplicate" && base) {
+          nr[newKey] = r[base.key];
+        } else {
+          if (type === "checkbox") nr[newKey] = false;
+          else if (
+            type === "number" ||
+            type === "currency" ||
+            type === "progress"
+          )
+            nr[newKey] = 0;
+          else if (type === "image") nr[newKey] = "";
+          else if (type === "priority") nr[newKey] = "Medium";
+          else if (type === "status") nr[newKey] = "Not Started";
+          else if (type === "date")
+            nr[newKey] = new Date().toISOString().split("T")[0];
+          else nr[newKey] = "";
+        }
+        return nr;
+      });
+      rowsHistory.pushState(nextRows);
+    },
+    [columns, rows, columnsHistory, rowsHistory, setSheetState],
+  );
+
+  const clearColumnValues = useCallback(
+    (col: ColumnDef) => {
+      const type = col.type ?? "text";
+      const nextRows = rows.map((r) => {
+        const nr: any = { ...r };
+        if (type === "checkbox") nr[col.key] = false;
+        else if (
+          type === "number" ||
+          type === "currency" ||
+          type === "progress"
+        )
+          nr[col.key] = 0;
+        else nr[col.key] = "";
+        return nr;
+      });
+      rowsHistory.pushState(nextRows);
+      toast.success(`Cleared "${col.name}"`);
+      setTimeout(async () => {
+        try {
+          markSaving();
+          await saveAllRows(sheetId, rowsHistory.currentState);
+          markSaved();
+        } catch {
+          toast.error("Clear saved locally but failed to persist.");
+          setSaveStatus("saved");
+        }
+      }, 50);
+    },
+    [rows, rowsHistory, markSaving, markSaved, sheetId],
   );
 
   const handleFontFamilyChange = useCallback(
@@ -1251,7 +1435,7 @@ export default function SheetClient() {
     [isOrgSheet],
   );
 
-  // ── Cell renderer ─────────────────────────────────────────────────────────
+  // ── Cell renderer ──────────────────────────────────────────────────────────
   const renderCellByType = useCallback(
     (
       type: ColumnDef["type"],
@@ -1279,6 +1463,7 @@ export default function SheetClient() {
         ? { name: activeCollabEntry.name, color: activeCollabEntry.color }
         : null;
       let displayValue = row[colKey];
+      const colDef = columns.find((c) => c.key === colKey);
       if (formula?.startsWith("="))
         displayValue = formulas.evaluateFormula(formula, rowIdx);
 
@@ -1319,13 +1504,27 @@ export default function SheetClient() {
           case "currency":
             return displayValue ? (
               <span className="tabular-nums sheet-cell-mono">
-                $
-                {Number(displayValue).toLocaleString("en-US", {
+                {new Intl.NumberFormat("en-US", {
+                  style: "currency",
+                  currency: colDef?.currencyCode || "USD",
                   minimumFractionDigits: 2,
-                })}
+                }).format(Number(displayValue))}
               </span>
             ) : (
               ""
+            );
+          case "image":
+            return displayValue ? (
+              <img
+                src={String(displayValue)}
+                alt="Cell"
+                className="h-8 w-8 rounded object-cover border border-gray-200"
+                loading="lazy"
+              />
+            ) : (
+              <span className="text-gray-300 text-[10px] italic">
+                Image URL…
+              </span>
             );
           case "url":
             return displayValue ? (
@@ -1525,10 +1724,10 @@ export default function SheetClient() {
     ],
   );
 
-  // ── Grid columns ──────────────────────────────────────────────────────────
+  // ── Grid columns ───────────────────────────────────────────────────────────
   const gridColumns = useMemo<Column<SheetRow>[]>(() => {
     const activeRows = timeTravelState.previewRows || rows;
-    const activeCols = timeTravelState.previewColumns || columns;
+
     const rowNumberCol: Column<SheetRow> = {
       key: "row-number",
       name: "",
@@ -1559,7 +1758,7 @@ export default function SheetClient() {
         const isSel = selectedRows.has(props.row.id);
         return (
           <div
-            className={`h-full w-full flex items-center justify-center sheet-row-num border-r group/rownum ${isSel ? "sheet-row-num--selected" : ""}`}
+            className={`h-full w-full flex items-center justify-center sheet-row-num border-r group/rownum ${isSel ? "sheet-row-num--selected" : ""} relative`}
           >
             <span
               className={`${isSel ? "hidden" : "group-hover/rownum:hidden"} sheet-row-num-text`}
@@ -1576,6 +1775,15 @@ export default function SheetClient() {
                 e.target.checked ? s.add(props.row.id) : s.delete(props.row.id);
                 setSelectedRows(s);
               }}
+            />
+            {/* Row resize grabber */}
+            <div
+              className="absolute left-0 right-0 bottom-0 h-1.5 opacity-0 group-hover/rownum:opacity-100"
+              style={{ cursor: "row-resize", touchAction: "none" }}
+              onPointerDown={(e) => beginRowResize(props.row.id, e)}
+              onPointerMove={onRowResizeMove}
+              onPointerUp={endRowResize}
+              onPointerCancel={endRowResize}
             />
           </div>
         );
@@ -1641,6 +1849,69 @@ export default function SheetClient() {
                 onUpdateSelectOptions={(opts) =>
                   handleUpdateSelectOptions(col.key, opts)
                 }
+                onSetWidth={(w) => {
+                  const updated = columns.map((c) =>
+                    c.key === col.key ? { ...c, width: w } : c,
+                  );
+                  setSheetState((p) => ({ ...p, columns: updated }));
+                  columnsHistory.pushState(updated);
+                  setTimeout(async () => {
+                    markSaving();
+                    await saveAllColumns(sheetId, columnsHistory.currentState);
+                    markSaved();
+                  }, 50);
+                }}
+                onInsertLeft={() => {
+                  const idx = columns.findIndex((c) => c.key === col.key);
+                  insertColumnAt(idx, null, "blank");
+                  setTimeout(async () => {
+                    markSaving();
+                    await Promise.all([
+                      saveAllColumns(sheetId, columnsHistory.currentState),
+                      saveAllRows(sheetId, rowsHistory.currentState),
+                    ]);
+                    markSaved();
+                  }, 50);
+                }}
+                onInsertRight={() => {
+                  const idx = columns.findIndex((c) => c.key === col.key);
+                  insertColumnAt(idx + 1, null, "blank");
+                  setTimeout(async () => {
+                    markSaving();
+                    await Promise.all([
+                      saveAllColumns(sheetId, columnsHistory.currentState),
+                      saveAllRows(sheetId, rowsHistory.currentState),
+                    ]);
+                    markSaved();
+                  }, 50);
+                }}
+                onDuplicate={() => {
+                  const idx = columns.findIndex((c) => c.key === col.key);
+                  insertColumnAt(idx + 1, col, "duplicate");
+                  setTimeout(async () => {
+                    markSaving();
+                    await Promise.all([
+                      saveAllColumns(sheetId, columnsHistory.currentState),
+                      saveAllRows(sheetId, rowsHistory.currentState),
+                    ]);
+                    markSaved();
+                  }, 50);
+                }}
+                onClearColumn={() => clearColumnValues(col)}
+                onSortAsc={() => handleSortByColumn(col.key, "asc")}
+                onSortDesc={() => handleSortByColumn(col.key, "desc")}
+                onSetCurrency={(currencyCode) => {
+                  const updated = columns.map((c) =>
+                    c.key === col.key ? { ...c, currencyCode } : c,
+                  );
+                  setSheetState((p) => ({ ...p, columns: updated }));
+                  columnsHistory.pushState(updated);
+                  setTimeout(async () => {
+                    markSaving();
+                    await saveAllColumns(sheetId, columnsHistory.currentState);
+                    markSaved();
+                  }, 50);
+                }}
               />
             </div>
           ),
@@ -1708,17 +1979,19 @@ export default function SheetClient() {
               toast.error("This cell is protected");
               return (
                 <div className="h-full w-full flex items-center px-2.5 text-xs bg-gray-50 text-gray-400 gap-1.5">
-                  <Lock className="h-3 w-3" />
-                  Protected
+                  <Lock className="h-3 w-3" /> Protected
                 </div>
               );
             }
             if (cellType === "priority" || cellType === "status") {
+              // Store/display labels (e.g. "In Progress", "Medium") so they match STATUS_COLORS + templates.
               const opts =
-                cellType === "priority" ? PRIORITY_OPTIONS : STATUS_OPTIONS;
+                cellType === "priority"
+                  ? PRIORITY_OPTIONS.map((o) => ({ ...o, value: o.label }))
+                  : STATUS_OPTIONS.map((o) => ({ ...o, value: o.label }));
               return (
                 <Select
-                  value={row[column.key] as string}
+                  value={String(row[column.key] ?? "")}
                   onValueChange={(v) =>
                     onRowChange({ ...row, [column.key]: v })
                   }
@@ -1822,7 +2095,23 @@ export default function SheetClient() {
                   onBlur={onBlurSave}
                 />
               );
-
+            if (cellType === "image")
+              return (
+                <input
+                  className="w-full h-full px-2.5 text-xs outline-none border-0"
+                  style={{
+                    ...cellStyle,
+                    background: isDark ? "#131620" : "#ffffff",
+                    color: isDark ? "#e2e8f0" : "#1a1d23",
+                  }}
+                  type="url"
+                  autoFocus
+                  value={editVal}
+                  placeholder="https://example.com/image.png"
+                  onChange={(e) => onTextChange(e.target.value)}
+                  onBlur={onBlurSave}
+                />
+              );
             if (cellType === "select") {
               const selectOpts = col.selectOptions ?? [];
               return (
@@ -1862,7 +2151,6 @@ export default function SheetClient() {
                 </Select>
               );
             }
-
             if (isTextWrap)
               return (
                 <textarea
@@ -1962,6 +2250,12 @@ export default function SheetClient() {
       : null;
   }, [selectedCell, columns, cellTypes.getCellType]);
 
+  // keep a selected row for row-height tools (e.g., resize handle)
+  const selectedRowId = useMemo(() => {
+    if (selectedRows.size === 0) return null;
+    return Array.from(selectedRows)[0] ?? null;
+  }, [selectedRows]);
+
   const isSelectedColumnWrapped = useMemo(
     () =>
       selectedCell
@@ -1987,14 +2281,11 @@ export default function SheetClient() {
       <div
         className={`sheet-root h-screen flex flex-col select-none overflow-hidden ${isDark ? "sheet-dark" : "sheet-light"}`}
       >
-        {/* ═══════════════════════════════════════════════════════════════
-            TITLE BAR — fully scrollable on mobile
-        ════════════════════════════════════════════════════════════════ */}
+        {/* ═══ TITLE BAR ═══════════════════════════════════════════════════ */}
         <header
           className="sheet-titlebar flex items-center justify-between px-2 shrink-0 border-b"
           style={{ minHeight: "44px" }}
         >
-          {/* Left: back + icon + title + star + save */}
           <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -2027,7 +2318,6 @@ export default function SheetClient() {
                   className={`h-3.5 w-3.5 transition-colors ${starred ? "fill-amber-400 text-amber-400" : "text-gray-300 hover:text-amber-400"}`}
                 />
               </button>
-              {/* Save indicator */}
               <div className="sheet-save-status hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium shrink-0">
                 {saveStatus === "saving" ? (
                   <>
@@ -2041,7 +2331,6 @@ export default function SheetClient() {
                   </>
                 )}
               </div>
-              {/* Mobile save dot */}
               <span
                 className="sm:hidden h-1.5 w-1.5 rounded-full shrink-0"
                 style={{
@@ -2127,7 +2416,6 @@ export default function SheetClient() {
             </div>
           </div>
 
-          {/* Right: members + export + share — horizontally scrollable on mobile */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-1 overflow-x-auto no-scrollbar">
             {isOrgSheet && liveTracking && (
               <div className="sheet-live-pill hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0">
@@ -2238,14 +2526,11 @@ export default function SheetClient() {
           </div>
         </header>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            FORMATTING TOOLBAR — horizontally scrollable on mobile
-        ════════════════════════════════════════════════════════════════ */}
+        {/* ═══ FORMATTING TOOLBAR ══════════════════════════════════════════ */}
         <div
           className="sheet-toolbar sheet-formatting-bar border-b shrink-0"
           style={{ height: "40px" }}
         >
-          {/* Scrollable inner container */}
           <div className="h-full flex items-center px-2 gap-0.5 overflow-x-auto no-scrollbar min-w-0">
             <IconBtn
               icon={Undo2}
@@ -2315,12 +2600,18 @@ export default function SheetClient() {
               <SelectContent style={selStyle}>
                 {[
                   "Arial",
+                  "Calibri",
+                  "Inter",
+                  "DM Sans",
+                  "Geist Sans",
+                  "Roboto",
                   "Verdana",
                   "Helvetica",
                   "Times New Roman",
                   "Georgia",
                   "Courier New",
                   "Trebuchet MS",
+                  "Monaco",
                 ].map((f) => (
                   <SelectItem
                     key={f}
@@ -2376,6 +2667,309 @@ export default function SheetClient() {
               onFormatChange={handleFormatChange}
               disabled={!selectedCell}
             />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="sheet-icon-btn h-7 px-2 rounded flex items-center gap-1.5 shrink-0"
+                  disabled={!selectedCell}
+                  title="Advanced formatting"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  <span className="text-[11px]">Advanced</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-64"
+                style={ddStyle(isDark)}
+              >
+                <DropdownMenuLabel
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                >
+                  Text style
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() =>
+                    handleFormatChange({
+                      bold: !formatting.getCurrentCellFormat(selectedCell).bold,
+                    })
+                  }
+                  style={ddItemStyle(isDark)}
+                >
+                  Bold
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() =>
+                    handleFormatChange({
+                      italic:
+                        !formatting.getCurrentCellFormat(selectedCell).italic,
+                    })
+                  }
+                  style={ddItemStyle(isDark)}
+                >
+                  Italic
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() =>
+                    handleFormatChange({
+                      underline:
+                        !formatting.getCurrentCellFormat(selectedCell)
+                          .underline,
+                    })
+                  }
+                  style={ddItemStyle(isDark)}
+                >
+                  Underline
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() =>
+                    handleFormatChange({
+                      strikethrough:
+                        !formatting.getCurrentCellFormat(selectedCell)
+                          .strikethrough,
+                    })
+                  }
+                  style={ddItemStyle(isDark)}
+                >
+                  Strikethrough
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                >
+                  Alignment
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ align: "left" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Align Left
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ align: "center" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Align Center
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ align: "right" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Align Right
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                >
+                  Font size
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() =>
+                    handleFormatChange({
+                      fontSize: Math.max(
+                        8,
+                        (formatting.getCurrentCellFormat(selectedCell)
+                          .fontSize ?? 12) - 1,
+                      ),
+                    })
+                  }
+                  style={ddItemStyle(isDark)}
+                >
+                  Decrease size
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() =>
+                    handleFormatChange({
+                      fontSize: Math.min(
+                        72,
+                        (formatting.getCurrentCellFormat(selectedCell)
+                          .fontSize ?? 12) + 1,
+                      ),
+                    })
+                  }
+                  style={ddItemStyle(isDark)}
+                >
+                  Increase size
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                >
+                  Text color
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ textColor: "#000000" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Black
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ textColor: "#dc2626" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Red
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ textColor: "#2563eb" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Blue
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ textColor: "#16a34a" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Green
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                >
+                  Fill color
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ bgColor: "#ffffff" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  White
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ bgColor: "#fef3c7" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Yellow
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ bgColor: "#e5e7eb" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Gray
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ bgColor: "#dcfce7" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Green
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                >
+                  Borders
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() =>
+                    handleFormatChange({
+                      borderStyle: "solid",
+                      borderWidth: 1,
+                      borderColor: "#d1d5db",
+                    })
+                  }
+                  style={ddItemStyle(isDark)}
+                >
+                  Solid border
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() =>
+                    handleFormatChange({
+                      borderStyle: "dashed",
+                      borderWidth: 1,
+                      borderColor: "#d1d5db",
+                    })
+                  }
+                  style={ddItemStyle(isDark)}
+                >
+                  Dashed border
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() =>
+                    handleFormatChange({
+                      borderStyle: "dotted",
+                      borderWidth: 1,
+                      borderColor: "#d1d5db",
+                    })
+                  }
+                  style={ddItemStyle(isDark)}
+                >
+                  Dotted border
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleFormatChange({ borderStyle: "none" })}
+                  style={ddItemStyle(isDark)}
+                >
+                  Remove border
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                >
+                  Sheet actions
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={handleTextWrapToggle}
+                  style={ddItemStyle(isDark)}
+                >
+                  Toggle text wrap
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleSort("asc")}
+                  style={ddItemStyle(isDark)}
+                >
+                  Sort A → Z
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => handleSort("desc")}
+                  style={ddItemStyle(isDark)}
+                >
+                  Sort Z → A
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={handleFreezeColumn}
+                  style={ddItemStyle(isDark)}
+                >
+                  Freeze selected column
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={handleHideColumn}
+                  style={ddItemStyle(isDark)}
+                >
+                  Hide selected column
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ToolSep />
             <IconBtn
               icon={WrapText}
@@ -2425,7 +3019,6 @@ export default function SheetClient() {
               onClick={() => toast.info("Format painter coming soon")}
             />
             <ToolSep />
-            {/* Search — always visible in toolbar scroll area */}
             {showSearch ? (
               <div className="flex items-center gap-1 shrink-0">
                 <div className="relative">
@@ -2464,9 +3057,7 @@ export default function SheetClient() {
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            FORMULA BAR
-        ════════════════════════════════════════════════════════════════ */}
+        {/* ═══ FORMULA BAR ═════════════════════════════════════════════════ */}
         <div
           className="sheet-toolbar h-8 border-b flex items-center px-3 gap-2 shrink-0"
           style={{ background: "var(--sh-toolbar)" }}
@@ -2547,9 +3138,7 @@ export default function SheetClient() {
           />
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            ACTION BAR — horizontally scrollable on mobile
-        ════════════════════════════════════════════════════════════════ */}
+        {/* ═══ ACTION BAR ══════════════════════════════════════════════════ */}
         <div
           className="sheet-actionbar border-b shrink-0"
           style={{ height: "36px" }}
@@ -2574,6 +3163,7 @@ export default function SheetClient() {
                     Insert a new row at the bottom
                   </TooltipContent>
                 </Tooltip>
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Tooltip>
@@ -2617,6 +3207,7 @@ export default function SheetClient() {
                         "priority",
                         "url",
                         "select",
+                        "image",
                       ] as ColumnDef["type"][]
                     ).map((t) => (
                       <DropdownMenuItem
@@ -2630,6 +3221,7 @@ export default function SheetClient() {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -2651,6 +3243,7 @@ export default function SheetClient() {
                   </TooltipContent>
                 </Tooltip>
                 <ToolSep />
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -2706,6 +3299,7 @@ export default function SheetClient() {
                   </TooltipContent>
                 </Tooltip>
                 <ToolSep />
+
                 {[
                   selectedCell &&
                   columns.find((c) => c.key === selectedCell.col)?.hidden
@@ -2727,22 +3321,20 @@ export default function SheetClient() {
                     icon: Snowflake,
                     label: "Freeze",
                     action: handleFreezeColumn,
-                    tooltip:
-                      "Freeze column in place so it stays visible while scrolling",
+                    tooltip: "Freeze column in place",
                   },
                   {
                     icon: Paintbrush,
                     label: "Conditional",
                     action: () =>
                       toast.info("Conditional formatting coming soon"),
-                    tooltip:
-                      "Apply conditional formatting rules based on cell values",
+                    tooltip: "Apply conditional formatting rules",
                   },
                   {
                     icon: Layers,
                     label: "Group",
                     action: () => toast.info("Group coming soon"),
-                    tooltip: "Group columns together for organization",
+                    tooltip: "Group columns together",
                   },
                   {
                     icon: Check,
@@ -2750,19 +3342,13 @@ export default function SheetClient() {
                     action: () => toast.info("Validation coming soon"),
                     tooltip: "Set validation rules for cell input",
                   },
-                  {
-                    icon: BarChart3,
-                    label: "Chart",
-                    action: () => toast.info("Charts coming soon"),
-                    tooltip: "Create charts from sheet data",
-                  },
                 ]
                   .filter(
-                    ({ ownerOnly }) =>
+                    ({ ownerOnly }: any) =>
                       !ownerOnly ||
                       (isOrgSheet && sheetState.ownerId === currentUser?.id),
                   )
-                  .map(({ icon: Icon, label, action, tooltip }) => (
+                  .map(({ icon: Icon, label, action, tooltip }: any) => (
                     <Tooltip key={label}>
                       <TooltipTrigger asChild>
                         <button
@@ -2781,10 +3367,51 @@ export default function SheetClient() {
                       </TooltipContent>
                     </Tooltip>
                   ))}
+
+                {/* ── CHART BUTTON — opens picker ── */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      ref={chartBtnRef as any}
+                      className={`sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0 ${charts.showPicker ? "sheet-action-btn--active" : ""}`}
+                      onClick={
+                        charts.showPicker
+                          ? charts.closePicker
+                          : charts.openPicker
+                      }
+                      style={
+                        charts.charts.length > 0
+                          ? { color: "#0ea5e9" }
+                          : undefined
+                      }
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      Chart
+                      {charts.charts.length > 0 && (
+                        <span
+                          className="text-[9px] font-bold px-1 py-0.5 rounded-full ml-0.5"
+                          style={{ background: "#0ea5e920", color: "#0ea5e9" }}
+                        >
+                          {charts.charts.length}
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="sheet-tooltip text-[11px]"
+                  >
+                    {charts.showPicker
+                      ? "Close chart picker"
+                      : "Insert a chart"}
+                  </TooltipContent>
+                </Tooltip>
+
                 <ToolSep />
               </>
             )}
-            {/* Panel toggles always accessible via scroll */}
+
+            {/* Panel toggles */}
             {isOrgSheet && (
               <>
                 <IconBtn
@@ -2818,6 +3445,16 @@ export default function SheetClient() {
               onClick={() => toggleRightPanel("developer")}
               active={effectiveRightPanel === "developer"}
             />
+            {/* Charts panel toggle — shows how many charts */}
+            <IconBtn
+              icon={BarChart3}
+              tooltip="Charts panel"
+              onClick={() => toggleRightPanel("charts")}
+              active={effectiveRightPanel === "charts"}
+              badge={
+                charts.charts.length > 0 ? charts.charts.length : undefined
+              }
+            />
             <IconBtn
               icon={isDark ? Sun : Moon}
               tooltip={isDark ? "Light mode" : "Dark mode"}
@@ -2831,9 +3468,7 @@ export default function SheetClient() {
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            FILTER BAR
-        ════════════════════════════════════════════════════════════════ */}
+        {/* ═══ FILTER BAR ══════════════════════════════════════════════════ */}
         {showFilters && (
           <div className="sheet-filterbar h-9 border-b flex items-center px-3 gap-2 sm:gap-3 shrink-0 overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 shrink-0">
@@ -2867,19 +3502,10 @@ export default function SheetClient() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════
-            MAIN BODY — grid + optional right panel
-        ════════════════════════════════════════════════════════════════ */}
+        {/* ═══ MAIN BODY ════════════════════════════════════════════════════ */}
         <div className="flex-1 flex overflow-hidden relative">
-          {/* Grid wrapper — zoom applied via CSS transform */}
-          <div
-            className="flex-1 overflow-hidden"
-            style={
-              {
-                /* On mobile apply a slight zoom-out so more columns are visible */
-              }
-            }
-          >
+          {/* Grid wrapper */}
+          <div className="flex-1 overflow-hidden relative">
             <div
               className="h-full w-full"
               style={{
@@ -2901,7 +3527,8 @@ export default function SheetClient() {
                   if (col) handleColumnResize(col.key, width);
                 }}
                 rowHeight={(row) => {
-                  if (textWrap.textWrapColumns.size === 0) return 32;
+                  const manual = rowHeights[row.id];
+                  if (textWrap.textWrapColumns.size === 0) return manual ?? 32;
                   let max = 1;
                   const ri = rows.findIndex((r) => r.id === row.id);
                   const wk = new Set(
@@ -2922,26 +3549,48 @@ export default function SheetClient() {
                       );
                     if (tl > max) max = tl;
                   });
-                  return Math.max(32, 8 + max * 20);
+                  const wrapHeight = Math.max(32, 8 + max * 20);
+                  return manual ? Math.max(wrapHeight, manual) : wrapHeight;
                 }}
                 headerRowHeight={33}
                 className={`rdg-sheet fill-grid ${isDark ? "rdg-dark" : "rdg-light"}`}
               />
             </div>
+
+            {/* ── CHART WIDGETS float over the grid ── */}
+            {charts.charts.map((chart) => (
+              <ChartWidget
+                key={chart.id}
+                chart={chart}
+                isActive={charts.activeChartId === chart.id}
+                isDark={isDark}
+                rows={rows}
+                columns={columns}
+                onSelect={(id) => {
+                  charts.setActiveChart(id);
+                  setRightPanel("charts");
+                }}
+                onRemove={charts.removeChart}
+                onPositionChange={charts.updatePosition}
+                onSizeChange={charts.updateSize}
+                onMinimize={(id, val) =>
+                  charts.updateChart(id, { minimized: val })
+                }
+              />
+            ))}
           </div>
 
-          {/* Right panel — slides in from right on mobile, static on desktop */}
+          {/* Right panel */}
           {effectiveRightPanel &&
             (rightPanel === "developer" ||
               rightPanel === "timetravel" ||
+              rightPanel === "charts" ||
               isOrgSheet) && (
               <>
-                {/* Mobile backdrop */}
                 <div
                   className="fixed inset-0 bg-black/40 z-20 sm:hidden backdrop-blur-[1px]"
                   onClick={() => setRightPanel(null)}
                 />
-                {/* Panel — fixed right sidebar on mobile, static on desktop */}
                 <div className="fixed right-0 top-0 bottom-0 z-30 sm:static sm:z-auto w-80 max-w-[88vw] shadow-2xl sm:shadow-none transition-transform duration-200 ease-out">
                   <RightPanel
                     rightPanel={effectiveRightPanel}
@@ -2956,7 +3605,6 @@ export default function SheetClient() {
                     handleReply={handleReply}
                     handleResolveComment={handleResolveComment}
                     setReplyText={setReplyText}
-                    // history={history}
                     liveTracking={liveTracking}
                     isOrganizationSheet={isOrgSheet}
                     setLiveTracking={(v) =>
@@ -2970,15 +3618,27 @@ export default function SheetClient() {
                     members={orgMembers}
                     timeTravelState={timeTravelState}
                     timeTravelActions={timeTravelActions}
+                    // ── Charts props ──
+                    activeChart={charts.activeChart}
+                    chartPanelTab={charts.panelTab}
+                    setChartPanelTab={charts.setPanelTab}
+                    onUpdateChart={(patch) => {
+                      if (charts.activeChartId)
+                        charts.updateChart(charts.activeChartId, patch);
+                    }}
+                    onRemoveChart={() => {
+                      if (charts.activeChartId) {
+                        charts.removeChart(charts.activeChartId);
+                        setRightPanel(null);
+                      }
+                    }}
                   />
                 </div>
               </>
             )}
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            STATUS BAR
-        ════════════════════════════════════════════════════════════════ */}
+        {/* ═══ STATUS BAR ══════════════════════════════════════════════════ */}
         <div className="sheet-statusbar h-5 border-t flex items-center px-3 gap-3 shrink-0 overflow-x-auto no-scrollbar">
           <span className="sheet-status-text tabular-nums shrink-0">
             {rows.length}r · {columns.length}c
@@ -3008,6 +3668,17 @@ export default function SheetClient() {
               Live
             </span>
           )}
+          {charts.charts.length > 0 && (
+            <span
+              className="text-[10px] font-medium shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-80"
+              style={{ color: "#0ea5e9" }}
+              onClick={() => setRightPanel("charts")}
+            >
+              <BarChart3 className="h-2.5 w-2.5" />
+              {charts.charts.length} chart
+              {charts.charts.length !== 1 ? "s" : ""}
+            </span>
+          )}
           <button
             className="sheet-status-text hidden sm:flex items-center gap-1 hover:opacity-80 shrink-0"
             onClick={() => setShowKeyboardShortcuts(true)}
@@ -3017,9 +3688,7 @@ export default function SheetClient() {
           </button>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            MODALS
-        ════════════════════════════════════════════════════════════════ */}
+        {/* ═══ MODALS ═══════════════════════════════════════════════════════ */}
         {isOrgSheet && (
           <ShareDialog
             showShareDialog={showShareDialog}
@@ -3051,7 +3720,23 @@ export default function SheetClient() {
           }
         />
 
-        {/* ── Global mobile scroll helper ── */}
+        {/* ── CHART PICKER (floating above action bar) ── */}
+        {charts.showPicker && (
+          <ChartPicker
+            isDark={isDark}
+            anchorRef={chartBtnRef}
+            rows={rows}
+            columns={columns}
+            onSelect={(kind, preset) => {
+              charts.insertChart(kind, rows, columns, preset);
+              toast.success(
+                `${kind.charAt(0).toUpperCase() + kind.slice(1)} chart inserted — click to edit`,
+              );
+            }}
+            onClose={charts.closePicker}
+          />
+        )}
+
         <style jsx global>{`
           .no-scrollbar {
             -ms-overflow-style: none;

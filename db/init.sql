@@ -262,6 +262,10 @@ ALTER TABLE sheets ADD COLUMN last_opened_at TIMESTAMPTZ;
 ALTER TABLE public.columns
 ADD COLUMN IF NOT EXISTS select_options JSONB DEFAULT NULL;
 
+-- Currency + image column metadata
+ALTER TABLE public.columns
+ADD COLUMN IF NOT EXISTS currency_code text DEFAULT 'USD';
+
 -- ============================================================
 -- Column Features: Freeze, Hide, Conditional, Group, Validate
 -- Adds columns to support advanced column-level features
@@ -279,6 +283,20 @@ ADD COLUMN IF NOT EXISTS validation_rules JSONB DEFAULT NULL;
 -- ============================================================
 ALTER TABLE public.sheets
 ADD COLUMN IF NOT EXISTS charts JSONB DEFAULT NULL;
+
+-- Extended formatting support (borders)
+ALTER TABLE public.cell_formats
+ADD COLUMN IF NOT EXISTS border_style text DEFAULT 'none',
+ADD COLUMN IF NOT EXISTS border_color text DEFAULT '#d1d5db',
+ADD COLUMN IF NOT EXISTS border_width integer DEFAULT 1;
+
+-- ============================================================
+-- Sheet Row Heights
+-- Stores per-row height overrides (keyed by row_key) as JSONB
+-- Example: { "1715100000000": 48, "1715100000001": 72 }
+-- ============================================================
+ALTER TABLE public.sheets
+ADD COLUMN IF NOT EXISTS row_heights JSONB DEFAULT NULL;
 
 -- ============================================================
 -- Forking Feature

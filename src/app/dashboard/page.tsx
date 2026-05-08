@@ -1,12 +1,26 @@
-import DashboardLayout from "@/components/layout/Dashboard-layout";
-import StatsCard from "@/components/common/Stats-card";
-import DashboardPanel from "@/components/common/Dashboard-panel";
+import dynamic from "next/dynamic";
 import { FileSpreadsheet, Users, Building2, Star } from "lucide-react";
-import QuickActions from "@/components/individual/dashboard/Quick-actions";
-import DashboardWelcome from "@/components/individual/dashboard/Dashboard-welcome";
-import TemplatePicker from "@/components/individual/dashboard/Template-picker";
-import RecentSheets from "@/components/individual/dashboard/Recent-sheets";
 import { getDashboardStats } from "@/lib/querys/individual/dashboard/getDashboardStats";
+
+const DashboardLayout = dynamic(
+  () => import("@/components/layout/Dashboard-layout"),
+);
+const StatsCard = dynamic(() => import("@/components/common/Stats-card"));
+const DashboardPanel = dynamic(
+  () => import("@/components/common/Dashboard-panel"),
+);
+const QuickActions = dynamic(
+  () => import("@/components/individual/dashboard/Quick-actions"),
+);
+const DashboardWelcome = dynamic(
+  () => import("@/components/individual/dashboard/Dashboard-welcome"),
+);
+const TemplatePicker = dynamic(
+  () => import("@/components/individual/dashboard/Template-picker"),
+);
+const RecentSheets = dynamic(
+  () => import("@/components/individual/dashboard/Recent-sheets"),
+);
 
 const Index = async () => {
   const stats = await getDashboardStats();

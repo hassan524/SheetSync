@@ -1,13 +1,36 @@
+import dynamic from "next/dynamic";
 import { generateSEO } from "@/lib/seo/metadata";
 import { getOrganizationById } from "@/lib/querys/organization/organization";
 
-import DashboardLayout from "@/components/layout/Dashboard-layout";
-import { OrgHeader } from "@/components/individual/organization/id/Organization-header";
-import { OrgTablesPanel } from "@/components/individual/organization/id/Organization-tables-panel";
-import { OrgActivityPanel } from "@/components/individual/organization/id/Organizaion-activity-panel";
-import { OrgBottomStrip } from "@/components/individual/organization/id/Organization-bottom-strip";
-import StatsCard from "@/components/common/Stats-card";
-import { TrackActive } from "@/components/individual/organization/id/Track-active";
+const DashboardLayout = dynamic(
+  () => import("@/components/layout/Dashboard-layout"),
+);
+const OrgHeader = dynamic(() =>
+  import("@/components/individual/organization/id/Organization-header").then(
+    (m) => m.OrgHeader,
+  ),
+);
+const OrgTablesPanel = dynamic(() =>
+  import("@/components/individual/organization/id/Organization-tables-panel").then(
+    (m) => m.OrgTablesPanel,
+  ),
+);
+const OrgActivityPanel = dynamic(() =>
+  import("@/components/individual/organization/id/Organizaion-activity-panel").then(
+    (m) => m.OrgActivityPanel,
+  ),
+);
+const OrgBottomStrip = dynamic(() =>
+  import("@/components/individual/organization/id/Organization-bottom-strip").then(
+    (m) => m.OrgBottomStrip,
+  ),
+);
+const StatsCard = dynamic(() => import("@/components/common/Stats-card"));
+const TrackActive = dynamic(() =>
+  import("@/components/individual/organization/id/Track-active").then(
+    (m) => m.TrackActive,
+  ),
+);
 
 import { Users, Activity, FileSpreadsheet, HardDrive } from "lucide-react";
 import type { Organization } from "@/types";

@@ -159,9 +159,11 @@ export interface ColumnDef {
     | "priority"
     | "percent"
     | "progress"
-    | "select"; // ✅ ADDED (Antigravity feature)
+    | "select"
+    | "image"; // supports image URL rendering in-cell
 
   selectOptions?: string[]; // ✅ ADDED (dropdown values)
+  currencyCode?: string; // used when type === "currency"
   frozen?: boolean; // Freeze column in place
   hidden?: boolean; // Hide column from view
   conditional_formatting?: any; // Conditional formatting rules
@@ -187,6 +189,9 @@ export interface CellFormat {
 
   align?: "left" | "center" | "right";
   textWrap?: boolean;
+  borderStyle?: "none" | "solid" | "dashed" | "dotted";
+  borderColor?: string;
+  borderWidth?: number;
 }
 
 /* ============================================================

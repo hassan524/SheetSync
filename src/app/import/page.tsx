@@ -1,5 +1,10 @@
-import DashboardLayout from "@/components/layout/Dashboard-layout";
-import ImportDropzone from "@/components/import/Import-dropzone";
+import dynamic from "next/dynamic";
+const DashboardLayout = dynamic(
+  () => import("@/components/layout/Dashboard-layout"),
+);
+const ImportDropzone = dynamic(
+  () => import("@/components/import/Import-dropzone"),
+);
 import {
   FileSpreadsheet,
   FileText,
@@ -65,9 +70,12 @@ const ImportPage = () => {
             <Upload className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Import Spreadsheets</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Import Spreadsheets
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Upload your existing spreadsheets to start collaborating in SheetSync
+              Upload your existing spreadsheets to start collaborating in
+              SheetSync
             </p>
           </div>
         </div>
@@ -84,7 +92,9 @@ const ImportPage = () => {
               </div>
               <div>
                 <p className="text-sm font-medium">{b.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{b.description}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {b.description}
+                </p>
               </div>
             </div>
           ))}
@@ -109,8 +119,12 @@ const ImportPage = () => {
                   {format.icon}
                 </div>
                 <h3 className="font-semibold text-sm mb-1">{format.name}</h3>
-                <p className="text-xs text-primary font-medium mb-1">{format.extensions}</p>
-                <p className="text-xs text-muted-foreground">{format.description}</p>
+                <p className="text-xs text-primary font-medium mb-1">
+                  {format.extensions}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {format.description}
+                </p>
               </div>
             ))}
           </div>
@@ -120,15 +134,23 @@ const ImportPage = () => {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <HelpCircle className="h-5 w-5 text-muted-foreground" />
-            <h2 className="text-base font-semibold">Frequently Asked Questions</h2>
+            <h2 className="text-base font-semibold">
+              Frequently Asked Questions
+            </h2>
           </div>
-          <Accordion type="single" collapsible className="border rounded-xl divide-y">
+          <Accordion
+            type="single"
+            collapsible
+            className="border rounded-xl divide-y"
+          >
             <AccordionItem value="item-1" className="px-4 border-0">
               <AccordionTrigger className="hover:no-underline text-sm">
                 What happens to my original file?
               </AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground">
-                Your original file remains unchanged on your device. SheetSync creates a new copy in your workspace that you can freely edit and share.
+                Your original file remains unchanged on your device. SheetSync
+                creates a new copy in your workspace that you can freely edit
+                and share.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-2" className="px-4 border-0">
@@ -136,7 +158,9 @@ const ImportPage = () => {
                 What&apos;s the maximum file size?
               </AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground">
-                You can upload files up to 50 MB. For larger files, we recommend splitting them into smaller sheets or reaching out to support for an enterprise limit increase.
+                You can upload files up to 50 MB. For larger files, we recommend
+                splitting them into smaller sheets or reaching out to support
+                for an enterprise limit increase.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-3" className="px-4 border-0">
@@ -144,7 +168,9 @@ const ImportPage = () => {
                 Will my formulas be preserved?
               </AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground">
-                Yes — most standard formulas (SUM, AVERAGE, IF, VLOOKUP, etc.) are automatically converted to SheetSync format. Complex macros or VBA scripts may need manual adjustment.
+                Yes — most standard formulas (SUM, AVERAGE, IF, VLOOKUP, etc.)
+                are automatically converted to SheetSync format. Complex macros
+                or VBA scripts may need manual adjustment.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-4" className="px-4 border-0">
@@ -152,7 +178,12 @@ const ImportPage = () => {
                 Can I import from Google Sheets?
               </AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground">
-                Yes. In Google Sheets, go to <strong>File &rarr; Download &rarr; Microsoft Excel (.xlsx)</strong>, then upload that file here. All data and most formulas will be preserved.
+                Yes. In Google Sheets, go to{" "}
+                <strong>
+                  File &rarr; Download &rarr; Microsoft Excel (.xlsx)
+                </strong>
+                , then upload that file here. All data and most formulas will be
+                preserved.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

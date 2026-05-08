@@ -27,11 +27,15 @@ import {
   Globe,
   Circle,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Sheet } from "@/types";
 
 interface SheetsTableProps {
   sheets: Sheet[];
   onSelect?: (ids: string[]) => void;
+  onRenameSheet?: (sheetId: string, title: string) => void;
+  onDeleteSheet?: (sheetId: string) => void;
 }
 
 const visibilityIcons = {
@@ -46,8 +50,13 @@ const visibilityLabels = {
   public: "Public",
 };
 
-const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
-  console.log("sheets", sheets);
+const SheetsTable = ({
+  sheets,
+  onSelect,
+  onRenameSheet,
+  onDeleteSheet,
+}: SheetsTableProps) => {
+  const router = useRouter();
   return (
     <div className="border rounded-lg overflow-hidden animate-fade-in">
       <Table>
@@ -154,13 +163,52 @@ const SheetsTable = ({ sheets, onSelect }: SheetsTableProps) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Open</DropdownMenuItem>
-                    <DropdownMenuItem>Share</DropdownMenuItem>
-                    <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                    <DropdownMenuItem>Move</DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/sheet/${sheet.id}`)}
+                    >
+                      Open
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        const url =
+                          typeof window !== "undefined"
+                            ? `${window.location.origin}/sheet/${sheet.id}`
+                            : `/sheet/${sheet.id}`;
+                        await navigator.clipboard.writeText(url);
+                        toast.success("Sheet link copied");
+                      }}
+                    >
+                      Share
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const q = encodeURIComponent(sheet.title);
+                        router.push(`/sheet/${sheet.id}?duplicateFrom=${q}`);
+                      }}
+                    >
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        toast.info("Move sheet flow will be added here")
+                      }
+                    >
+                      Move
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Rename</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const nextTitle = prompt("Rename sheet", sheet.title);
+                        if (!nextTitle || !nextTitle.trim()) return;
+                        onRenameSheet?.(sheet.id, nextTitle.trim());
+                      }}
+                    >
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => onDeleteSheet?.(sheet.id)}
+                    >
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>

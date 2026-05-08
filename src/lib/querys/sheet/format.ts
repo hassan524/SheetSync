@@ -21,6 +21,9 @@ export async function saveCellFormat(
       bg_color: format.bgColor ?? "#ffffff",
       text_align: format.align ?? "left",
       text_wrap: format.textWrap ?? false,
+      border_style: format.borderStyle ?? "none",
+      border_color: format.borderColor ?? "#d1d5db",
+      border_width: format.borderWidth ?? 1,
     },
     { onConflict: "sheet_id,cell_key" },
   );

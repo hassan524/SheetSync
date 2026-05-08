@@ -1,10 +1,8 @@
-// app/sheets/[id]/page.tsx
-import { Suspense } from "react";
+// app/sheet/[id]/page.tsx
 import { Metadata } from "next";
-import SheetClient from "@/components/individual/sheet/Sheet-client";
-import { Loader2 } from "lucide-react";
+import dynamic from "next/dynamic";
+import GlobalLoader from "@/components/common/Global-loader";
 
-// SEO metadata
 export async function generateMetadata({
   params,
 }: {
@@ -16,18 +14,11 @@ export async function generateMetadata({
   };
 }
 
-import GlobalLoader from "@/components/common/Global-loader";
+const SheetClient = dynamic(
+  () => import("@/components/individual/sheet/Sheet-client"),
+  { loading: () => <GlobalLoader /> },
+);
 
-// Loading fallback component
-function SheetLoading() {
-  return <GlobalLoader />;
-}
-
-// Server component
 export default function SheetPage() {
-  return (
-    <Suspense fallback={<SheetLoading />}>
-      <SheetClient />
-    </Suspense>
-  );
+  return <SheetClient />;
 }

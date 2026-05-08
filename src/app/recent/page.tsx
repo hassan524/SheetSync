@@ -1,7 +1,12 @@
+import dynamic from "next/dynamic";
 import { generateSEO } from "@/lib/seo/metadata";
 import { getRecentSheets } from "@/lib/querys/sheets/sheets";
-import DashboardLayout from "@/components/layout/Dashboard-layout";
-import RecentList from "@/components/individual/recent/Recent-list";
+const DashboardLayout = dynamic(
+  () => import("@/components/layout/Dashboard-layout"),
+);
+const RecentList = dynamic(
+  () => import("@/components/individual/recent/Recent-list"),
+);
 import { Clock, FileSpreadsheet, Info } from "lucide-react";
 
 export const metadata = generateSEO({

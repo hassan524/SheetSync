@@ -2,15 +2,18 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 
 import { FolderWithSheets } from "@/types";
 import { mapFolders } from "@/lib/mappers/folder.mapper";
 
 import DashboardLayout from "@/components/layout/Dashboard-layout";
-import NewSheetModal from "@/components/sheets/New-sheet-modal";
-import FoldersList from "./Folders-list";
-import SheetsGrid from "./Sheets-grid";
-import CreateFolderDialog from "./Create-folder-dialog";
+const NewSheetModal = dynamic(
+  () => import("@/components/sheets/New-sheet-modal"),
+);
+const FoldersList = dynamic(() => import("./Folders-list"));
+const SheetsGrid = dynamic(() => import("./Sheets-grid"));
+const CreateFolderDialog = dynamic(() => import("./Create-folder-dialog"));
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +27,6 @@ import {
   FolderPlus,
   Star,
   X,
-  FileSpreadsheet,
   Clock4,
   Info,
 } from "lucide-react";
@@ -36,7 +38,7 @@ interface Props {
   initialFolders: any[];
 }
 
-const SheetsPageClient = ({ initialFolders }: Props) => {
+function SheetsPageClient({ initialFolders }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -139,36 +141,29 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Page Header */}
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-5 min-w-0">
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <FileSpreadsheet className="h-5 w-5 text-primary" />
-            </div>
-            <div className="space-y-0.5 truncate">
-              <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
-                Personal Sheets
-              </h1>
-              <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
-                Manage and organize all your personal spreadsheets
-              </p>
-            </div>
+          <div className="space-y-0.5 truncate min-w-0">
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
+              Personal Sheets
+            </h1>
+            <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
+              Manage and organize all your personal spreadsheets
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
               onClick={() => setNewFolderOpen(true)}
               variant="outline"
               size="sm"
-              className="h-9 w-9 p-0 sm:w-auto sm:px-3 gap-1.5"
+              className="h-9 w-9 p-0"
             >
               <FolderPlus className="h-4 w-4" />
-              <span className="hidden sm:inline">New Folder</span>
             </Button>
             <Button
               onClick={() => setNewSheetOpen(true)}
               size="sm"
-              className="h-9 w-9 p-0 sm:w-auto sm:px-3 gap-1.5"
+              className="h-9 w-9 p-0"
             >
               <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">New Sheet</span>
             </Button>
           </div>
         </div>
@@ -269,10 +264,10 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
             </div>
             <button
               onClick={() => setNewFolderOpen(true)}
-              className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+              className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center"
+              aria-label="New folder"
             >
               <FolderPlus className="h-3.5 w-3.5" />
-              New folder
             </button>
           </div>
 
@@ -348,6 +343,6 @@ const SheetsPageClient = ({ initialFolders }: Props) => {
       />
     </DashboardLayout>
   );
-};
+}
 
 export default SheetsPageClient;

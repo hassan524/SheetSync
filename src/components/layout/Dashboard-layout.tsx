@@ -24,12 +24,12 @@ const DashboardLayout = ({
           <AppSidebar />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {/* Top Bar */}
-            <header className="h-14 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-40 flex items-center justify-between px-3 sm:px-4 gap-3">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
+            <header className="h-14 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-40 grid grid-cols-[auto_1fr_auto] items-center px-3 sm:px-4 gap-3">
+              <div className="flex items-center gap-2 min-w-0">
                 <SidebarTrigger className="h-8 w-8 flex-shrink-0" />
-                <div className="min-w-0 overflow-hidden">
-                  <Breadcrumb items={breadcrumbItems} />
-                </div>
+              </div>
+              <div className="min-w-0 overflow-hidden flex items-center justify-center">
+                <Breadcrumb items={breadcrumbItems} />
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <HelpPopover />

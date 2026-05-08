@@ -1,23 +1,37 @@
-import { Button } from "@/components/ui/button";
-import { MessageSquare, History, Users, Code2, X, Clock } from "lucide-react";
-import CommentsPanel from "./panels/Comments-panel";
+"use client";
 
+import { Button } from "@/components/ui/button";
+import { MessageSquare, Users, Code2, X, Clock, BarChart3 } from "lucide-react";
+import CommentsPanel from "./panels/Comments-panel";
 import CollaboratorsPanel from "./panels/Collaborators-panel";
 import DeveloperPanel from "./panels/Developers-panel";
 import TimeTravelPanel from "./panels/TimeTravel-panel";
-import type { HistoryEntry } from "@/lib/querys/sheet/firebase-realtime";
+import ChartsPanel from "./panels/Charts-panel"; // ← new
 import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import type {
   TimeTravelState,
   TimeTravelActions,
 } from "@/hooks/use-time-travel";
+import type { SheetChart, ChartPanelTab } from "@/hooks/sheets/use-charts";
+import type { SheetRow, ColumnDef } from "@/types/index";
 
-type RightPanelType = "comments" | "collaborators" | "developer" | "timetravel";
+// ─────────────────────────────────────────────────────────────
+//  TYPES
+// ─────────────────────────────────────────────────────────────
+
+export type RightPanelType =
+  | "comments"
+  | "collaborators"
+  | "developer"
+  | "timetravel"
+  | "charts"
+  | null;
 
 interface RightPanelProps {
-  rightPanel: RightPanelType;
+  rightPanel: Exclude<RightPanelType, null>;
   isDark: boolean;
-  setRightPanel: (panel: RightPanelType | null) => void;
+  setRightPanel: (panel: RightPanelType) => void;
+
   // Comments
   comments: any;
   activeCommentCell: string | null;
@@ -34,21 +48,41 @@ interface RightPanelProps {
   isOrganizationSheet: boolean;
   setLiveTracking: (value: boolean) => void;
   setShowShareDialog: (value: boolean) => void;
+
   // Developer
   sheetId: string;
-  rows: any[];
-  columns: any[];
+  rows: SheetRow[];
+  columns: ColumnDef[];
   totalComments: number;
+
   // Members
   members: OrgMember[];
+
   // Time Travel
   timeTravelState?: TimeTravelState;
   timeTravelActions?: TimeTravelActions;
+
+  // Charts
+  activeChart?: SheetChart | null;
+  chartPanelTab?: ChartPanelTab;
+  setChartPanelTab?: (t: ChartPanelTab) => void;
+  onUpdateChart?: (patch: Partial<SheetChart>) => void;
+  onRemoveChart?: () => void;
 }
 
-const PANEL_TITLES = {
-  comments: { label: "Comments", icon: MessageSquare, color: "text-amber-500" },
+// ─────────────────────────────────────────────────────────────
+//  PANEL META
+// ─────────────────────────────────────────────────────────────
 
+const PANEL_META: Record<
+  Exclude<RightPanelType, null>,
+  {
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+  }
+> = {
+  comments: { label: "Comments", icon: MessageSquare, color: "text-amber-500" },
   collaborators: {
     label: "Collaborators",
     icon: Users,
@@ -56,7 +90,12 @@ const PANEL_TITLES = {
   },
   developer: { label: "Developer", icon: Code2, color: "text-sky-500" },
   timetravel: { label: "Time Travel", icon: Clock, color: "text-violet-500" },
+  charts: { label: "Charts", icon: BarChart3, color: "text-sky-400" },
 };
+
+// ─────────────────────────────────────────────────────────────
+//  COMPONENT
+// ─────────────────────────────────────────────────────────────
 
 export default function RightPanel({
   rightPanel,
@@ -82,41 +121,53 @@ export default function RightPanel({
   members,
   timeTravelState,
   timeTravelActions,
+  activeChart,
+  chartPanelTab = "data",
+  setChartPanelTab,
+  onUpdateChart,
+  onRemoveChart,
 }: RightPanelProps) {
-  const meta = PANEL_TITLES[rightPanel] ?? PANEL_TITLES.timetravel;
+  const meta = PANEL_META[rightPanel] ?? PANEL_META.developer;
   const Icon = meta.icon;
+  const d = isDark;
 
   return (
     <div
-      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${isDark ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"}`}
+      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${
+        d ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"
+      }`}
     >
-      {/* Panel header — fixed, never scrolls */}
+      {/* ── Panel header ── */}
       <div
-        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${isDark ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"}`}
+        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${
+          d ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"
+        }`}
       >
         <div className="flex items-center gap-2">
           <Icon className={`h-3.5 w-3.5 ${meta.color}`} />
           <span
-            className={`text-[12px] font-semibold ${isDark ? "text-gray-200" : "text-gray-800"}`}
+            className={`text-[12px] font-semibold ${d ? "text-gray-200" : "text-gray-800"}`}
           >
-            {meta.label}
+            {rightPanel === "charts" && activeChart
+              ? activeChart.title || "Chart Editor"
+              : meta.label}
           </span>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className={`h-6 w-6 rounded-md ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}
+          className={`h-6 w-6 rounded-md ${d ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}
           onClick={() => setRightPanel(null)}
         >
           <X className="h-3.5 w-3.5" />
         </Button>
       </div>
 
-      {/* Panel body — flex-1 so it fills remaining height, overflow-hidden so child handles scroll */}
+      {/* ── Panel body ── */}
       <div className="flex-1 overflow-hidden min-h-0">
         {rightPanel === "comments" && (
           <CommentsPanel
-            isDark={isDark}
+            isDark={d}
             comments={comments}
             activeCommentCell={activeCommentCell}
             newCommentText={newCommentText}
@@ -131,7 +182,7 @@ export default function RightPanel({
 
         {rightPanel === "collaborators" && (
           <CollaboratorsPanel
-            isDark={isDark}
+            isDark={d}
             liveTracking={liveTracking}
             isOrganizationSheet={isOrganizationSheet}
             setLiveTracking={setLiveTracking}
@@ -139,25 +190,41 @@ export default function RightPanel({
             members={members}
           />
         )}
+
         {rightPanel === "developer" && (
           <DeveloperPanel
-            isDark={isDark}
+            isDark={d}
             sheetId={sheetId}
             rows={rows}
             columns={columns}
             totalComments={totalComments}
           />
         )}
+
         {rightPanel === "timetravel" &&
           timeTravelState &&
           timeTravelActions && (
             <TimeTravelPanel
               state={timeTravelState}
               actions={timeTravelActions}
-              isDark={isDark}
+              isDark={d}
               onClose={() => setRightPanel(null)}
             />
           )}
+
+        {/* ── CHARTS PANEL ── fully wired ── */}
+        {rightPanel === "charts" && (
+          <ChartsPanel
+            isDark={d}
+            activeChart={activeChart ?? null}
+            panelTab={chartPanelTab}
+            setPanelTab={setChartPanelTab ?? (() => {})}
+            rows={rows}
+            columns={columns}
+            onUpdateChart={onUpdateChart ?? (() => {})}
+            onRemoveChart={onRemoveChart ?? (() => {})}
+          />
+        )}
       </div>
     </div>
   );

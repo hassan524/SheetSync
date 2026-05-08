@@ -1,6 +1,9 @@
+import dynamic from "next/dynamic";
 import { generateSEO } from "@/lib/seo/metadata";
 import { getAllFolders } from "@/lib/querys/folder/folders";
-import SheetsPageClient from "@/components/individual/Personalsheets/Personal-sheet-client";
+const SheetsPageClient = dynamic(
+  () => import("@/components/individual/Personalsheets/Personal-sheet-client"),
+);
 
 export const metadata = generateSEO({
   title: "Personal Sheets | SheetSync",

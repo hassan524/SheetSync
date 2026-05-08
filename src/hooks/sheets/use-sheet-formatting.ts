@@ -69,6 +69,18 @@ export function useSheetFormatting(onSave: () => void) {
           ]
             .filter(Boolean)
             .join(" ") || "inherit",
+        borderStyle:
+          format.borderStyle && format.borderStyle !== "none"
+            ? format.borderStyle
+            : undefined,
+        borderColor:
+          format.borderStyle && format.borderStyle !== "none"
+            ? format.borderColor || "#d1d5db"
+            : undefined,
+        borderWidth:
+          format.borderStyle && format.borderStyle !== "none"
+            ? `${format.borderWidth ?? 1}px`
+            : undefined,
       };
     },
     [cellFormats],

@@ -1,6 +1,11 @@
+import dynamic from "next/dynamic";
 import { generateSEO } from "@/lib/seo/metadata";
-import DashboardLayout from "@/components/layout/Dashboard-layout";
-import TemplatesList from "@/components/individual/templates/Templates-list";
+const DashboardLayout = dynamic(
+  () => import("@/components/layout/Dashboard-layout"),
+);
+const TemplatesList = dynamic(
+  () => import("@/components/individual/templates/Templates-list"),
+);
 import { LayoutTemplate, Sparkles, Info } from "lucide-react";
 import { SHEET_TEMPLATES } from "../../constants/Sheet-templates";
 

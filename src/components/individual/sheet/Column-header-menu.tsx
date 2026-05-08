@@ -30,6 +30,8 @@ import {
   X,
   ListChecks,
   Plus,
+  Copy,
+  BadgeDollarSign,
 } from "lucide-react";
 import { ColumnDef } from "@/types";
 
@@ -38,6 +40,7 @@ interface ColumnHeaderMenuProps {
   onChangeType: (type: ColumnDef["type"]) => void;
   onDelete: () => void;
   onRename?: (newName: string) => void;
+  onSetWidth?: (width: number) => void;
   onToggleTextWrap?: () => void;
   textWrapEnabled?: boolean;
   columnFormula?: string;
@@ -45,6 +48,13 @@ interface ColumnHeaderMenuProps {
   onRemoveColumnFormula?: () => void;
   selectOptions?: string[];
   onUpdateSelectOptions?: (options: string[]) => void;
+  onInsertLeft?: () => void;
+  onInsertRight?: () => void;
+  onDuplicate?: () => void;
+  onClearColumn?: () => void;
+  onSortAsc?: () => void;
+  onSortDesc?: () => void;
+  onSetCurrency?: (currencyCode: string) => void;
 }
 
 const COLUMN_TYPES = [
@@ -58,6 +68,19 @@ const COLUMN_TYPES = [
   { type: "status" as const, label: "Status", icon: AlertCircle },
   { type: "progress" as const, label: "Progress", icon: BarChart2 },
   { type: "select" as const, label: "Select List", icon: ListChecks },
+  { type: "image" as const, label: "Image URL", icon: Link },
+];
+
+const CURRENCY_CODES = [
+  "USD",
+  "EUR",
+  "GBP",
+  "PKR",
+  "INR",
+  "AED",
+  "JPY",
+  "CAD",
+  "AUD",
 ];
 
 export default function ColumnHeaderMenu({
@@ -65,6 +88,7 @@ export default function ColumnHeaderMenu({
   onChangeType,
   onDelete,
   onRename,
+  onSetWidth,
   onToggleTextWrap,
   textWrapEnabled,
   columnFormula,
@@ -72,11 +96,19 @@ export default function ColumnHeaderMenu({
   onRemoveColumnFormula,
   selectOptions,
   onUpdateSelectOptions,
+  onInsertLeft,
+  onInsertRight,
+  onDuplicate,
+  onClearColumn,
+  onSortAsc,
+  onSortDesc,
+  onSetCurrency,
 }: ColumnHeaderMenuProps) {
   const [renameValue, setRenameValue] = useState(column.name);
   const [open, setOpen] = useState(false);
   const [colFormulaValue, setColFormulaValue] = useState(columnFormula || "");
   const [newOptionValue, setNewOptionValue] = useState("");
+  const [widthValue, setWidthValue] = useState(String(column.width ?? 160));
 
   const handleRenameSubmit = () => {
     if (renameValue.trim() && onRename) {
@@ -90,6 +122,7 @@ export default function ColumnHeaderMenu({
       onOpenChange={(v) => {
         setOpen(v);
         if (v) setColFormulaValue(columnFormula || "");
+        if (v) setWidthValue(String(column.width ?? 160));
       }}
     >
       <DropdownMenuTrigger asChild>
@@ -102,18 +135,22 @@ export default function ColumnHeaderMenu({
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="start" className="w-52">
+      <DropdownMenuContent
+        align="start"
+        className="w-64 rounded-xl border border-border/70 shadow-xl p-1.5"
+      >
         {/* ── Rename section ── */}
         {onRename && (
           <>
-            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider pb-1">
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
               Column Name
             </DropdownMenuLabel>
-            <div className="px-2 pb-2 flex items-center gap-1.5">
+            <div className="px-2 pb-2">
               <input
-                className="flex-1 h-7 px-2 text-xs rounded border border-gray-200 bg-gray-50 outline-none focus:border-primary focus:bg-white"
+                className="w-full h-8 px-2.5 text-xs rounded-md border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={() => handleRenameSubmit()}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleRenameSubmit();
@@ -126,15 +163,6 @@ export default function ColumnHeaderMenu({
                 }}
                 onClick={(e) => e.stopPropagation()}
               />
-              <button
-                className="h-7 w-7 flex items-center justify-center rounded bg-primary text-white hover:opacity-90 shrink-0"
-                onClick={() => {
-                  handleRenameSubmit();
-                  setOpen(false);
-                }}
-              >
-                <Check className="h-3 w-3" />
-              </button>
             </div>
             <DropdownMenuSeparator />
           </>
@@ -162,16 +190,155 @@ export default function ColumnHeaderMenu({
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 
+        {/* ── Column width (mobile-friendly) ── */}
+        {onSetWidth && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
+              Column width
+            </DropdownMenuLabel>
+            <div className="px-2 pb-2">
+              <input
+                className="w-full h-8 px-2.5 text-xs rounded-md border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                value={widthValue}
+                inputMode="numeric"
+                onChange={(e) =>
+                  setWidthValue(e.target.value.replace(/[^\d]/g, ""))
+                }
+                onBlur={() => {
+                  const w = Math.max(
+                    60,
+                    Math.min(800, Number(widthValue || 0)),
+                  );
+                  if (!isNaN(w)) onSetWidth(w);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const w = Math.max(
+                      60,
+                      Math.min(800, Number(widthValue || 0)),
+                    );
+                    if (!isNaN(w)) onSetWidth(w);
+                    setOpen(false);
+                  }
+                  e.stopPropagation();
+                }}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="160"
+              />
+            </div>
+          </>
+        )}
+
+        {column.type === "currency" && onSetCurrency && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs gap-2">
+                <BadgeDollarSign className="h-3 w-3" />
+                Currency ({column.currencyCode || "USD"})
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {CURRENCY_CODES.map((code) => (
+                  <DropdownMenuItem
+                    key={code}
+                    onClick={() => onSetCurrency(code)}
+                    className="text-xs gap-2"
+                  >
+                    {code}
+                    {(column.currencyCode || "USD") === code && (
+                      <span className="ml-auto text-primary">✓</span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </>
+        )}
+
+        {/* ── Quick actions ── */}
+        {(onInsertLeft ||
+          onInsertRight ||
+          onDuplicate ||
+          onClearColumn ||
+          onSortAsc ||
+          onSortDesc) && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
+              Quick actions
+            </DropdownMenuLabel>
+            {onInsertLeft && (
+              <DropdownMenuItem
+                onClick={onInsertLeft}
+                className="text-xs gap-2"
+              >
+                <Plus className="h-3 w-3" />
+                Insert column left
+              </DropdownMenuItem>
+            )}
+            {onInsertRight && (
+              <DropdownMenuItem
+                onClick={onInsertRight}
+                className="text-xs gap-2"
+              >
+                <Plus className="h-3 w-3" />
+                Insert column right
+              </DropdownMenuItem>
+            )}
+            {onDuplicate && (
+              <DropdownMenuItem onClick={onDuplicate} className="text-xs gap-2">
+                <Copy className="h-3 w-3" />
+                Duplicate column
+              </DropdownMenuItem>
+            )}
+            {(onSortAsc || onSortDesc) && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="text-xs">
+                  Sort
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {onSortAsc && (
+                    <DropdownMenuItem
+                      onClick={onSortAsc}
+                      className="text-xs gap-2"
+                    >
+                      A → Z
+                    </DropdownMenuItem>
+                  )}
+                  {onSortDesc && (
+                    <DropdownMenuItem
+                      onClick={onSortDesc}
+                      className="text-xs gap-2"
+                    >
+                      Z → A
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+            {onClearColumn && (
+              <DropdownMenuItem
+                onClick={onClearColumn}
+                className="text-xs gap-2 text-amber-700 focus:text-amber-700"
+              >
+                <Trash2 className="h-3 w-3" />
+                Clear column values
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
+
         {/* ── Column Formula ── */}
         {onApplyColumnFormula && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider pb-1 flex items-center gap-1">
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2 flex items-center gap-1">
               <Sigma className="h-3 w-3" /> Column Formula
             </DropdownMenuLabel>
             <div className="px-2 pb-2 flex items-center gap-1.5">
               <input
-                className="flex-1 h-7 px-2 text-xs font-mono rounded border border-gray-200 bg-gray-50 outline-none focus:border-primary focus:bg-white"
+                className="flex-1 h-8 px-2.5 text-xs font-mono rounded-md border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
                 value={colFormulaValue}
                 onChange={(e) => setColFormulaValue(e.target.value)}
                 placeholder="=UPPER(name)"
@@ -218,13 +385,13 @@ export default function ColumnHeaderMenu({
         {column.type === "select" && onUpdateSelectOptions && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider pb-1 flex items-center gap-1">
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2 flex items-center gap-1">
               <ListChecks className="h-3 w-3" /> Select Options
             </DropdownMenuLabel>
             <div className="px-2 pb-1 space-y-1 max-h-32 overflow-y-auto">
               {(selectOptions ?? []).map((opt, i) => (
                 <div key={i} className="flex items-center gap-1">
-                  <span className="flex-1 text-[11px] truncate px-1.5 py-0.5 rounded bg-gray-50 border border-gray-200">
+                  <span className="flex-1 text-[11px] truncate px-1.5 py-0.5 rounded bg-muted/50 border border-border">
                     {opt}
                   </span>
                   <button
@@ -243,7 +410,7 @@ export default function ColumnHeaderMenu({
             </div>
             <div className="px-2 pb-2 flex items-center gap-1.5">
               <input
-                className="flex-1 h-7 px-2 text-xs rounded border border-gray-200 bg-gray-50 outline-none focus:border-primary focus:bg-white"
+                className="flex-1 h-8 px-2.5 text-xs rounded-md border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
                 value={newOptionValue}
                 onChange={(e) => setNewOptionValue(e.target.value)}
                 placeholder="Add option…"

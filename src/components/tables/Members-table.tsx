@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Circle, Mail, Shield, UserMinus } from "lucide-react";
+import { toast } from "sonner";
 
 interface Member {
   id: string;
@@ -30,6 +31,8 @@ interface Member {
 
 interface MembersTableProps {
   members: Member[];
+  onChangeRole?: (memberId: string, role: Member["role"]) => void;
+  onRemoveMember?: (memberId: string) => void;
 }
 
 const roleVariants = {
@@ -44,7 +47,11 @@ const statusColors = {
   away: "fill-amber-500 text-amber-500",
 };
 
-const MembersTable = ({ members }: MembersTableProps) => {
+const MembersTable = ({
+  members,
+  onChangeRole,
+  onRemoveMember,
+}: MembersTableProps) => {
   return (
     <div className="border rounded-lg overflow-hidden animate-fade-in">
       <Table>
@@ -112,12 +119,44 @@ const MembersTable = ({ members }: MembersTableProps) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>View Profile</DropdownMenuItem>
-                    <DropdownMenuItem>Send Message</DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        window.open(`mailto:${member.email}`, "_blank")
+                      }
+                    >
+                      View Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        window.open(`mailto:${member.email}`, "_blank")
+                      }
+                    >
+                      Send Message
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Change Role</DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onChangeRole?.(member.id, "Admin")}
+                    >
+                      Set as Admin
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onChangeRole?.(member.id, "Member")}
+                    >
+                      Set as Member
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onChangeRole?.(member.id, "Viewer")}
+                    >
+                      Set as Viewer
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive gap-2">
+                    <DropdownMenuItem
+                      className="text-destructive gap-2"
+                      onClick={() => {
+                        onRemoveMember?.(member.id);
+                        toast.success("Member removed");
+                      }}
+                    >
                       <UserMinus className="h-4 w-4" />
                       Remove from Organization
                     </DropdownMenuItem>

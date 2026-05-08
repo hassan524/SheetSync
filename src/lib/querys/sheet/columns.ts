@@ -28,6 +28,7 @@ export async function saveAllColumns(sheetId: string, columns: ColumnDef[]) {
       col.selectOptions && col.selectOptions.length > 0
         ? JSON.stringify(col.selectOptions)
         : null,
+    currency_code: col.currencyCode ?? "USD",
     // text_wrap_enabled: textWrapColumns.has(col.key),
   }));
 

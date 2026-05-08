@@ -2,19 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import NewSheetModal from "@/components/sheets/New-sheet-modal";
-import ShareDialog from "@/components/individual/sheet/dialogs/Share-dialog";
-import {
-  Building2,
-  ArrowLeft,
-  Plus,
-  UserPlus,
-  Settings,
-  Shield,
-  Zap,
-} from "lucide-react";
+const NewSheetModal = dynamic(
+  () => import("@/components/sheets/New-sheet-modal"),
+);
+const ShareDialog = dynamic(
+  () => import("@/components/individual/sheet/dialogs/Share-dialog"),
+);
+import { Plus, UserPlus, Settings, Shield, Zap } from "lucide-react";
 import type { Organization } from "@/types";
 
 interface OrgHeaderProps {
@@ -31,42 +28,36 @@ export function OrgHeader({ org }: OrgHeaderProps) {
     <>
       <div className="flex items-center justify-between gap-4 mb-6">
         {/* ─── Left: Org Info ─── */}
-        <div className="flex items-center gap-5 min-w-0">
-          <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary flex items-center justify-center shrink-0">
-            <Building2 className="h-5 w-5 text-primary-foreground" />
-          </div>
+        <div className="space-y-0.5 truncate min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
+              {org.name}
+            </h1>
 
-          <div className="space-y-0.5 truncate">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
-                {org.name}
-              </h1>
+            <Badge
+              variant="secondary"
+              className="h-5 px-1.5 text-[11px] gap-1 shrink-0"
+            >
+              <Shield className="h-2.5 w-2.5" />
+              {org.role}
+            </Badge>
 
+            {org.plan && (
               <Badge
-                variant="secondary"
+                variant="outline"
                 className="h-5 px-1.5 text-[11px] gap-1 shrink-0"
               >
-                <Shield className="h-2.5 w-2.5" />
-                {org.role}
+                <Zap className="h-2.5 w-2.5 text-yellow-500" />
+                {org.plan}
               </Badge>
-
-              {org.plan && (
-                <Badge
-                  variant="outline"
-                  className="h-5 px-1.5 text-[11px] gap-1 shrink-0"
-                >
-                  <Zap className="h-2.5 w-2.5 text-yellow-500" />
-                  {org.plan}
-                </Badge>
-              )}
-            </div>
-
-            {org.description && (
-              <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
-                {org.description}
-              </p>
             )}
           </div>
+
+          {org.description && (
+            <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
+              {org.description}
+            </p>
+          )}
         </div>
 
         {/* ─── Right: Actions ─── */}
@@ -74,20 +65,18 @@ export function OrgHeader({ org }: OrgHeaderProps) {
           <Button
             variant="outline"
             size="sm"
-            className="h-9 w-9 p-0 sm:w-auto sm:px-3 gap-1.5"
+            className="h-9 w-9 p-0"
             onClick={() => setInviteOpen(true)}
           >
             <UserPlus className="h-4 w-4" />
-            <span className="hidden sm:inline">Invite</span>
           </Button>
 
           <Button
             size="sm"
-            className="h-9 w-9 p-0 sm:w-auto sm:px-3 gap-1.5"
+            className="h-9 w-9 p-0"
             onClick={() => setNewSheetOpen(true)}
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">New Sheet</span>
           </Button>
 
           <Button

@@ -22,7 +22,11 @@ import {
   AlignRight,
   Type,
   Palette,
-  ChevronDown,
+  Square,
+  X,
+  Plus,
+  Minus,
+  Paintbrush,
 } from "lucide-react";
 import { CellFormat } from "@/types";
 
@@ -31,8 +35,6 @@ interface FormattingToolbarProps {
   onFormatChange: (format: Partial<CellFormat>) => void;
   disabled?: boolean;
 }
-
-const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32];
 
 const PRESET_COLORS = [
   "#000000",
@@ -74,39 +76,6 @@ export default function FormattingToolbar({
 }: FormattingToolbarProps) {
   return (
     <div className="flex items-center gap-1">
-      {/* Font Size */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1 px-2"
-            disabled={disabled}
-          >
-            <Type className="h-3.5 w-3.5" />
-            <span className="text-xs">{currentFormat?.fontSize || 12}</span>
-            <ChevronDown className="h-3 w-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-32 p-2">
-          <div className="grid grid-cols-2 gap-1">
-            {FONT_SIZES.map((size) => (
-              <Button
-                key={size}
-                variant="ghost"
-                size="sm"
-                className="h-7 justify-start text-xs"
-                onClick={() => onFormatChange({ fontSize: size })}
-              >
-                {size}
-              </Button>
-            ))}
-          </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <div className="w-px h-6 bg-border" />
-
       {/* Text Styling */}
       <Tooltip>
         <TooltipTrigger asChild>
@@ -117,7 +86,9 @@ export default function FormattingToolbar({
             onClick={() => onFormatChange({ bold: !currentFormat.bold })}
             disabled={disabled}
           >
-            <Bold className="h-3.5 w-3.5" />
+            <Bold
+              className={`h-3.5 w-3.5 ${currentFormat.bold ? "text-amber-600" : "text-gray-500"}`}
+            />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Bold (Ctrl+B)</TooltipContent>
@@ -132,7 +103,9 @@ export default function FormattingToolbar({
             onClick={() => onFormatChange({ italic: !currentFormat.italic })}
             disabled={disabled}
           >
-            <Italic className="h-3.5 w-3.5" />
+            <Italic
+              className={`h-3.5 w-3.5 ${currentFormat.italic ? "text-sky-600" : "text-gray-500"}`}
+            />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Italic (Ctrl+I)</TooltipContent>
@@ -149,7 +122,9 @@ export default function FormattingToolbar({
             }
             disabled={disabled}
           >
-            <Underline className="h-3.5 w-3.5" />
+            <Underline
+              className={`h-3.5 w-3.5 ${currentFormat.underline ? "text-emerald-600" : "text-gray-500"}`}
+            />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Underline (Ctrl+U)</TooltipContent>
@@ -166,13 +141,171 @@ export default function FormattingToolbar({
             }
             disabled={disabled}
           >
-            <Strikethrough className="h-3.5 w-3.5" />
+            <Strikethrough
+              className={`h-3.5 w-3.5 ${currentFormat.strikethrough ? "text-rose-600" : "text-gray-500"}`}
+            />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Strikethrough</TooltipContent>
       </Tooltip>
 
       <div className="w-px h-6 bg-border" />
+
+      {/* Quick text utilities */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() =>
+              onFormatChange({
+                fontSize: Math.min(72, (currentFormat.fontSize ?? 12) + 1),
+              })
+            }
+            disabled={disabled}
+          >
+            <Plus className="h-3.5 w-3.5 text-gray-500" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Increase Font Size</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() =>
+              onFormatChange({
+                fontSize: Math.max(8, (currentFormat.fontSize ?? 12) - 1),
+              })
+            }
+            disabled={disabled}
+          >
+            <Minus className="h-3.5 w-3.5 text-gray-500" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Decrease Font Size</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() =>
+              onFormatChange({
+                bold: false,
+                italic: false,
+                underline: false,
+                strikethrough: false,
+                textColor: "#000000",
+                bgColor: "#ffffff",
+                align: "left",
+                borderStyle: "none",
+              })
+            }
+            disabled={disabled}
+          >
+            <Paintbrush className="h-3.5 w-3.5 text-gray-500" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Clear Formatting</TooltipContent>
+      </Tooltip>
+
+      <div className="w-px h-6 bg-border" />
+
+      {/* Borders */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant={
+              currentFormat.borderStyle && currentFormat.borderStyle !== "none"
+                ? "secondary"
+                : "ghost"
+            }
+            size="sm"
+            className="h-8 w-8 p-0"
+            disabled={disabled}
+          >
+            <Square className="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56 p-3">
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-muted-foreground">
+              Cell Border
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {(["solid", "dashed", "dotted"] as const).map((style) => (
+                <Button
+                  key={style}
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 justify-start text-xs capitalize"
+                  onClick={() => onFormatChange({ borderStyle: style })}
+                >
+                  {style}
+                </Button>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 justify-start text-xs"
+                onClick={() =>
+                  onFormatChange({
+                    borderWidth: Math.min(
+                      4,
+                      (currentFormat.borderWidth ?? 1) + 1,
+                    ),
+                  })
+                }
+              >
+                Width +
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 justify-start text-xs"
+                onClick={() =>
+                  onFormatChange({
+                    borderWidth: Math.max(
+                      1,
+                      (currentFormat.borderWidth ?? 1) - 1,
+                    ),
+                  })
+                }
+              >
+                Width -
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <span className="text-xs text-muted-foreground">Color:</span>
+              <input
+                type="color"
+                className="h-8 w-16 cursor-pointer"
+                value={currentFormat.borderColor || "#d1d5db"}
+                onChange={(e) =>
+                  onFormatChange({
+                    borderColor: e.target.value,
+                    borderStyle: currentFormat.borderStyle || "solid",
+                  })
+                }
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => onFormatChange({ borderStyle: "none" })}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear
+              </Button>
+            </div>
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Text Color */}
       <DropdownMenu>
@@ -282,7 +415,9 @@ export default function FormattingToolbar({
             onClick={() => onFormatChange({ align: "left" })}
             disabled={disabled}
           >
-            <AlignLeft className="h-3.5 w-3.5" />
+            <AlignLeft
+              className={`h-3.5 w-3.5 ${currentFormat.align === "left" ? "text-violet-600" : "text-gray-500"}`}
+            />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Align Left</TooltipContent>
@@ -297,7 +432,9 @@ export default function FormattingToolbar({
             onClick={() => onFormatChange({ align: "center" })}
             disabled={disabled}
           >
-            <AlignCenter className="h-3.5 w-3.5" />
+            <AlignCenter
+              className={`h-3.5 w-3.5 ${currentFormat.align === "center" ? "text-violet-600" : "text-gray-500"}`}
+            />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Align Center</TooltipContent>
@@ -312,7 +449,9 @@ export default function FormattingToolbar({
             onClick={() => onFormatChange({ align: "right" })}
             disabled={disabled}
           >
-            <AlignRight className="h-3.5 w-3.5" />
+            <AlignRight
+              className={`h-3.5 w-3.5 ${currentFormat.align === "right" ? "text-violet-600" : "text-gray-500"}`}
+            />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Align Right</TooltipContent>

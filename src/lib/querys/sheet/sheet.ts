@@ -41,6 +41,8 @@ export async function loadSheet(sheetId: string) {
     forked_from_snapshot_label: sheet.data.forked_from_snapshot_label,
     forked_at: sheet.data.forked_at,
     forked_by_user_id: sheet.data.forked_by_user_id,
+    charts: sheet.data.charts ?? null,
+    rowHeights: sheet.data.row_heights ?? null,
 
     columns:
       columns.data?.map((col) => ({
@@ -54,6 +56,7 @@ export async function loadSheet(sheetId: string) {
             ? JSON.parse(col.select_options)
             : col.select_options
           : undefined,
+        currencyCode: col.currency_code ?? "USD",
       })) ?? [],
 
     rows:
@@ -77,6 +80,9 @@ export async function loadSheet(sheetId: string) {
           bgColor: f.bg_color ?? "#ffffff",
           align: f.text_align ?? "left",
           textWrap: f.text_wrap,
+          borderStyle: f.border_style ?? "none",
+          borderColor: f.border_color ?? "#d1d5db",
+          borderWidth: f.border_width ?? 1,
         },
       ]),
     ),
@@ -95,12 +101,27 @@ export async function loadSheet(sheetId: string) {
 
     protectedCells: new Set((protectedCells.data ?? []).map((p) => p.cell_key)),
 
-    textWrapColumns: new Set(
-      (columns.data ?? [])
-        .filter((col) => col.text_wrap_enabled)
-        .map((col) => col.column_key),
-    ),
+    textWrapColumns: new Set<string>(),
   };
+}
+
+export async function updateSheetCharts(sheetId: string, charts: any) {
+  const { error } = await supabase
+    .from("sheets")
+    .update({ charts, updated_at: new Date().toISOString() })
+    .eq("id", sheetId);
+  if (error) throw new Error(`Failed to update charts: ${error.message}`);
+}
+
+export async function updateSheetRowHeights(
+  sheetId: string,
+  rowHeights: Record<string, number> | null,
+) {
+  const { error } = await supabase
+    .from("sheets")
+    .update({ row_heights: rowHeights, updated_at: new Date().toISOString() })
+    .eq("id", sheetId);
+  if (error) throw new Error(`Failed to update row heights: ${error.message}`);
 }
 
 export async function updateSheetTitle(sheetId: string, title: string) {

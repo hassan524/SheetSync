@@ -1,7 +1,12 @@
+import dynamic from "next/dynamic";
 import { generateSEO } from "@/lib/seo/metadata";
 import { getAllSheets } from "@/lib/querys/sheets/sheets";
-import DashboardLayout from "@/components/layout/Dashboard-layout";
-import FilesList from "@/components/individual/files/Files-list";
+const DashboardLayout = dynamic(
+  () => import("@/components/layout/Dashboard-layout"),
+);
+const FilesList = dynamic(
+  () => import("@/components/individual/files/Files-list"),
+);
 import { Folder, Info, FileSpreadsheet, Star, Users } from "lucide-react";
 
 export const metadata = generateSEO({
@@ -40,7 +45,9 @@ export default async function AllFilesPage() {
                 <Folder className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight">All Files</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  All Files
+                </h1>
                 <p className="text-sm text-muted-foreground">
                   Every spreadsheet you own or have access to — in one place
                 </p>
@@ -52,7 +59,8 @@ export default async function AllFilesPage() {
           <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              All Files shows every spreadsheet you own, across personal folders and organizations. Use the search to quickly find what you need.
+              All Files shows every spreadsheet you own, across personal folders
+              and organizations. Use the search to quickly find what you need.
             </p>
           </div>
 
@@ -73,7 +81,8 @@ export default async function AllFilesPage() {
               },
               {
                 label: "Shared",
-                value: allSheets?.filter((s: any) => s.organization_id).length ?? 0,
+                value:
+                  allSheets?.filter((s: any) => s.organization_id).length ?? 0,
                 icon: Users,
                 description: "In organizations",
               },
@@ -87,8 +96,12 @@ export default async function AllFilesPage() {
                 </div>
                 <div>
                   <p className="text-lg font-bold leading-none">{value}</p>
-                  <p className="text-xs font-medium text-foreground mt-0.5">{label}</p>
-                  <p className="text-[11px] text-muted-foreground">{description}</p>
+                  <p className="text-xs font-medium text-foreground mt-0.5">
+                    {label}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {description}
+                  </p>
                 </div>
               </div>
             ))}
