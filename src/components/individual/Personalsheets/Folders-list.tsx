@@ -40,29 +40,16 @@ const FoldersList = ({
   }
 
   return (
-    <div className="relative overflow-hidden">
-      {/* right fade */}
-      <div
-        className="absolute right-0 top-0 bottom-0 w-10 z-10 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(to left, hsl(var(--background)) 10%, transparent 100%)",
-        }}
-      />
-
+    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-2">
       <div
         ref={scrollRef}
-        className="flex gap-2.5 overflow-x-auto touch-pan-x"
+        className="flex gap-2.5 overflow-x-auto touch-pan-x pb-1"
         style={{
           scrollSnapType: "x mandatory",
           WebkitOverflowScrolling: "touch",
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-          paddingBottom: "2px",
+          scrollbarWidth: "thin",
         }}
       >
-        <style>{`.__fs::-webkit-scrollbar { display: none; }`}</style>
-
         {folders.map((folder) => {
           const isActive = currentFolder === folder.id;
           const count = folder.sheets?.length ?? 0;
@@ -77,8 +64,8 @@ const FoldersList = ({
                 flexShrink: 0,
                 // ── THE gradient: card white on left, primary ~20% on right ──
                 background: isActive
-                  ? `linear-gradient(to right, hsl(var(--card)) 60%, hsl(var(--primary) / 0.18) 100%)`
-                  : `linear-gradient(to right, hsl(var(--card)) 65%, hsl(var(--primary) / 0.07) 100%)`,
+                  ? `linear-gradient(to right, hsl(var(--card)) 55%, hsl(var(--primary) / 0.16) 100%)`
+                  : `linear-gradient(to right, hsl(var(--card)) 65%, hsl(var(--muted) / 0.45) 100%)`,
               }}
               className={cn(
                 "group relative text-left rounded-xl border transition-all duration-200 focus:outline-none",

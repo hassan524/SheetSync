@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Upload,
   FileSpreadsheet,
@@ -10,17 +11,108 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { createSheet } from "@/lib/querys/sheets/sheets";
+import { saveAllColumns } from "@/lib/querys/sheet/columns";
+import { saveAllRows } from "@/lib/querys/sheet/rows";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
+import type { ColumnDef, SheetRow } from "@/types";
 
 interface ImportedFile {
   name: string;
   size: string;
   status: "uploading" | "success" | "error";
   progress: number;
+  error?: string;
+}
+
+const BLANK_TEMPLATE_ID = "f628aed8-bca7-4f51-b687-6db9f932be34";
+
+function normalizeValue(v: unknown): string | number | boolean {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return Number.isFinite(v) ? v : "";
+  const s = String(v).trim();
+  if (s === "") return "";
+  const lower = s.toLowerCase();
+  if (lower === "true") return true;
+  if (lower === "false") return false;
+  const asNum = Number(s);
+  if (!Number.isNaN(asNum) && s !== "") return asNum;
+  return s;
+}
+
+function inferType(values: Array<string | number | boolean>): ColumnDef["type"] {
+  const nonEmpty = values.filter((v) => v !== "" && v !== null && v !== undefined);
+  if (nonEmpty.length === 0) return "text";
+  const allBool = nonEmpty.every((v) => typeof v === "boolean");
+  if (allBool) return "checkbox";
+  const allNum = nonEmpty.every((v) => typeof v === "number");
+  if (allNum) return "number";
+  return "text";
+}
+
+function buildImportedSheetData(file: File, buffer: ArrayBuffer): {
+  columns: ColumnDef[];
+  rows: SheetRow[];
+  source: "csv" | "excel";
+} {
+  const wb = XLSX.read(buffer, { type: "array", cellDates: false });
+  const firstSheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[firstSheetName];
+  const matrix = XLSX.utils.sheet_to_json<(string | number | boolean)[]>(ws, {
+    header: 1,
+    raw: true,
+    blankrows: false,
+  });
+
+  if (!matrix || matrix.length === 0) {
+    throw new Error("The selected file has no data.");
+  }
+
+  const [rawHeader, ...body] = matrix;
+  const maxCols = Math.max(
+    rawHeader?.length ?? 0,
+    ...body.map((row) => row.length),
+    1,
+  );
+  const headers = Array.from({ length: maxCols }, (_, i) => {
+    const val = rawHeader?.[i];
+    const title = val ? String(val).trim() : "";
+    return title || `Column ${i + 1}`;
+  });
+
+  const columns: ColumnDef[] = headers.map((h, idx) => ({
+    key: `col${idx}`,
+    name: h,
+    width: 160,
+    editable: true,
+    type: "text",
+  }));
+
+  const rows: SheetRow[] = body.map((row, ri) => {
+    const mapped: SheetRow = { id: String(ri + 1) };
+    columns.forEach((c, ci) => {
+      mapped[c.key] = normalizeValue(row?.[ci] ?? "");
+    });
+    return mapped;
+  });
+
+  columns.forEach((c, ci) => {
+    c.type = inferType(rows.map((r) => r[c.key]));
+  });
+
+  const lower = file.name.toLowerCase();
+  const source: "csv" | "excel" =
+    lower.endsWith(".csv") ? "csv" : "excel";
+  return { columns, rows, source };
 }
 
 const ImportDropzone = () => {
+  const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<ImportedFile[]>([]);
+  const [busy, setBusy] = useState(false);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -38,70 +130,86 @@ const ImportDropzone = () => {
     return (bytes / 1048576).toFixed(1) + " MB";
   };
 
+  const importFiles = useCallback(
+    async (selectedFiles: File[]) => {
+      if (selectedFiles.length === 0) return;
+      setBusy(true);
+      const initial = selectedFiles.map((file) => ({
+        name: file.name,
+        size: formatFileSize(file.size),
+        status: "uploading" as const,
+        progress: 5,
+      }));
+      setFiles((prev) => [...prev, ...initial]);
+
+      for (const file of selectedFiles) {
+        try {
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.name === file.name ? { ...f, progress: 25 } : f,
+            ),
+          );
+          const buffer = await file.arrayBuffer();
+          const parsed = buildImportedSheetData(file, buffer);
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.name === file.name ? { ...f, progress: 55 } : f,
+            ),
+          );
+
+          const title = file.name.replace(/\.(xlsx|xls|csv)$/i, "").trim();
+          const created = await createSheet({
+            name: title.length >= 5 ? title : `Imported ${title || "Sheet"}`,
+            templateId: BLANK_TEMPLATE_ID,
+          });
+          await saveAllColumns(created.id, parsed.columns);
+          await saveAllRows(created.id, parsed.rows);
+
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.name === file.name
+                ? { ...f, progress: 100, status: "success" }
+                : f,
+            ),
+          );
+          toast.success(
+            `Imported ${parsed.source === "excel" ? "Excel" : "CSV"} file successfully.`,
+          );
+          router.push(`/sheet/${created.id}?imported=${parsed.source}`);
+          return;
+        } catch (error: any) {
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.name === file.name
+                ? {
+                    ...f,
+                    status: "error",
+                    progress: 100,
+                    error: error?.message ?? "Import failed",
+                  }
+                : f,
+            ),
+          );
+          toast.error(error?.message ?? `Failed to import "${file.name}"`);
+        }
+      }
+      setBusy(false);
+    },
+    [router],
+  );
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-
     const droppedFiles = Array.from(e.dataTransfer.files);
-    const newFiles: ImportedFile[] = droppedFiles.map((file) => ({
-      name: file.name,
-      size: formatFileSize(file.size),
-      status: "uploading",
-      progress: 0,
-    }));
-
-    setFiles((prev) => [...prev, ...newFiles]);
-
-    // Simulate upload progress
-    newFiles.forEach((file, index) => {
-      const interval = setInterval(() => {
-        setFiles((prev) =>
-          prev.map((f) => {
-            if (f.name === file.name && f.status === "uploading") {
-              const newProgress = f.progress + Math.random() * 30;
-              if (newProgress >= 100) {
-                clearInterval(interval);
-                return { ...f, progress: 100, status: "success" };
-              }
-              return { ...f, progress: newProgress };
-            }
-            return f;
-          }),
-        );
-      }, 500);
-    });
-  }, []);
+    importFiles(droppedFiles);
+  }, [importFiles]);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      const newFiles: ImportedFile[] = selectedFiles.map((file) => ({
-        name: file.name,
-        size: formatFileSize(file.size),
-        status: "uploading",
-        progress: 0,
-      }));
-
-      setFiles((prev) => [...prev, ...newFiles]);
-
-      newFiles.forEach((file) => {
-        const interval = setInterval(() => {
-          setFiles((prev) =>
-            prev.map((f) => {
-              if (f.name === file.name && f.status === "uploading") {
-                const newProgress = f.progress + Math.random() * 30;
-                if (newProgress >= 100) {
-                  clearInterval(interval);
-                  return { ...f, progress: 100, status: "success" };
-                }
-                return { ...f, progress: newProgress };
-              }
-              return f;
-            }),
-          );
-        }, 500);
-      });
+      importFiles(Array.from(e.target.files));
+      e.target.value = "";
     }
   };
 
@@ -125,10 +233,11 @@ const ImportDropzone = () => {
         <input
           type="file"
           id="file-input"
-          multiple
+          multiple={false}
           accept=".csv,.xlsx,.xls"
           onChange={handleFileInput}
           className="hidden"
+          disabled={busy}
         />
         <div className="flex flex-col items-center gap-3">
           <div
@@ -180,6 +289,11 @@ const ImportDropzone = () => {
                 </div>
                 {file.status === "uploading" && (
                   <Progress value={file.progress} className="h-1" />
+                )}
+                {file.status === "error" && file.error && (
+                  <p className="text-[11px] text-destructive mt-1 truncate">
+                    {file.error}
+                  </p>
                 )}
               </div>
               <div className="flex items-center gap-2">

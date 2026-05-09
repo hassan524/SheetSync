@@ -99,6 +99,7 @@ const addDays = (n: number) => {
 // ================= EXTRA COLUMNS =================
 
 const EXTRA_COL_COUNT = 8;
+const DEFAULT_WORKING_ROW_COUNT = 1200;
 
 const buildExtraColumns = (startIndex: number): ColumnDef[] =>
   Array.from({ length: EXTRA_COL_COUNT }, (_, i) => {
@@ -240,7 +241,7 @@ export const getTemplateData = (
       return {
         title: "Project Tracker",
         columns: [...templateCols, ...buildExtraColumns(templateCols.length)],
-        rows: makeRows(100, allKeys, [], PROJECT_DEFAULTS),
+        rows: makeRows(DEFAULT_WORKING_ROW_COUNT, allKeys, [], PROJECT_DEFAULTS),
       };
     }
 
@@ -297,7 +298,7 @@ export const getTemplateData = (
       return {
         title: "Finance Tracker",
         columns: [...templateCols, ...buildExtraColumns(templateCols.length)],
-        rows: makeRows(100, allKeys, [], FINANCE_DEFAULTS),
+        rows: makeRows(DEFAULT_WORKING_ROW_COUNT, allKeys, [], FINANCE_DEFAULTS),
       };
     }
 
@@ -374,7 +375,7 @@ export const getTemplateData = (
       return {
         title: "QA Tracker",
         columns: [...templateCols, ...buildExtraColumns(templateCols.length)],
-        rows: makeRows(100, allKeys, [], QA_DEFAULTS),
+        rows: makeRows(DEFAULT_WORKING_ROW_COUNT, allKeys, [], QA_DEFAULTS),
       };
     }
 
@@ -393,7 +394,7 @@ export const getTemplateData = (
       return {
         title: "Blank Sheet",
         columns: blankCols,
-        rows: Array.from({ length: 100 }, (_, i) => {
+        rows: Array.from({ length: DEFAULT_WORKING_ROW_COUNT }, (_, i) => {
           const row: SheetRow = { id: String(i + 1) };
           blankCols.forEach((c) => {
             row[c.key] = "";

@@ -67,7 +67,6 @@ const COLUMN_TYPES = [
   { type: "priority" as const, label: "Priority", icon: AlertCircle },
   { type: "status" as const, label: "Status", icon: AlertCircle },
   { type: "progress" as const, label: "Progress", icon: BarChart2 },
-  { type: "select" as const, label: "Select List", icon: ListChecks },
   { type: "image" as const, label: "Image URL", icon: Link },
 ];
 

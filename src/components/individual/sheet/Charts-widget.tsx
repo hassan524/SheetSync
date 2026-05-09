@@ -582,6 +582,7 @@ export default function ChartWidget({
             : "0 8px 32px rgba(0,0,0,0.1)",
         userSelect: "none",
         position: "absolute",
+        touchAction: "none",
       }}
       onClick={() => onSelect(chart.id)}
     >

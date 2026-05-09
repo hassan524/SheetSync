@@ -1,12 +1,21 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Users, Code2, X, Clock, BarChart3 } from "lucide-react";
+import {
+  MessageSquare,
+  Users,
+  Code2,
+  X,
+  Clock,
+  BarChart3,
+  Keyboard,
+} from "lucide-react";
 import CommentsPanel from "./panels/Comments-panel";
 import CollaboratorsPanel from "./panels/Collaborators-panel";
 import DeveloperPanel from "./panels/Developers-panel";
 import TimeTravelPanel from "./panels/TimeTravel-panel";
 import ChartsPanel from "./panels/Charts-panel"; // ← new
+import KeyboardShortcutsPanel from "./panels/Keyboard-shortcuts-panel";
 import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import type {
   TimeTravelState,
@@ -25,6 +34,7 @@ export type RightPanelType =
   | "developer"
   | "timetravel"
   | "charts"
+  | "shortcuts"
   | null;
 
 interface RightPanelProps {
@@ -91,6 +101,7 @@ const PANEL_META: Record<
   developer: { label: "Developer", icon: Code2, color: "text-sky-500" },
   timetravel: { label: "Time Travel", icon: Clock, color: "text-violet-500" },
   charts: { label: "Charts", icon: BarChart3, color: "text-sky-400" },
+  shortcuts: { label: "Shortcuts", icon: Keyboard, color: "text-indigo-500" },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -225,6 +236,7 @@ export default function RightPanel({
             onRemoveChart={onRemoveChart ?? (() => {})}
           />
         )}
+        {rightPanel === "shortcuts" && <KeyboardShortcutsPanel isDark={d} />}
       </div>
     </div>
   );

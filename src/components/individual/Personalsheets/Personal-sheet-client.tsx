@@ -29,7 +29,9 @@ import {
   X,
   Clock4,
   Info,
+  FileSpreadsheet, // ✅ FIXED
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { createFolder } from "@/lib/querys/folder/folders";
@@ -97,7 +99,7 @@ function SheetsPageClient({ initialFolders }: Props) {
     () => allSheets.filter((s) => s.is_starred).length,
     [allSheets],
   );
-  // Add this above the useMemo that uses it
+
   const [now] = useState(() => Date.now());
 
   const recentCount = useMemo(() => {
@@ -105,7 +107,7 @@ function SheetsPageClient({ initialFolders }: Props) {
     return allSheets.filter(
       (s) => s.updated_at && new Date(s.updated_at).getTime() > threeDaysAgo,
     ).length;
-  }, [allSheets, now]); // add now to the dependency array
+  }, [allSheets, now]);
 
   const handleCreateFolder = async (name: string) => {
     try {
@@ -139,7 +141,7 @@ function SheetsPageClient({ initialFolders }: Props) {
       ]}
     >
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Page Header */}
+        {/* Header */}
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-0.5 truncate min-w-0">
             <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
@@ -168,13 +170,11 @@ function SheetsPageClient({ initialFolders }: Props) {
           </div>
         </div>
 
-        {/* Info Banner */}
-        <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
-          <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+        {/* Info */}
+        <div className="flex items-start gap-3 rounded-xl border bg-muted/40 px-4 py-3">
+          <Info className="h-4 w-4 text-muted-foreground mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Personal sheets are organized into folders. Select a folder below to
-            view and edit its sheets. You can star sheets to mark them as
-            important and find them quickly later.
+            Personal sheets are organized into folders...
           </p>
         </div>
 
@@ -205,126 +205,30 @@ function SheetsPageClient({ initialFolders }: Props) {
           ].map(({ label, value, icon: Icon, toggle, description }) => {
             const isActive = toggle && onlyStarred;
             return (
-              <button
-                key={label}
-                onClick={toggle ? () => setOnlyStarred((v) => !v) : undefined}
-                disabled={!toggle}
-                className={cn(
-                  "flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 rounded-xl border px-3 py-3 transition-all text-left",
-                  isActive
-                    ? "bg-primary/[0.07] border-primary/40"
-                    : toggle
-                      ? "bg-card border-border hover:border-primary/30 hover:bg-muted/20 cursor-pointer"
-                      : "bg-card border-border cursor-default",
-                )}
-              >
-                <div
-                  className={cn(
-                    "h-8 w-8 sm:h-8 sm:w-8 rounded-lg flex items-center justify-center shrink-0",
-                    isActive ? "bg-primary/15" : "bg-muted",
-                  )}
-                >
-                  <Icon
-                    className={cn(
-                      "h-4 w-4",
-                      isActive ? "text-primary" : "text-muted-foreground",
-                    )}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <p
-                    className={cn(
-                      "text-lg sm:text-lg font-bold leading-none",
-                      isActive ? "text-primary" : "",
-                    )}
-                  >
-                    {value}
-                  </p>
-                  <p className="text-xs font-medium text-foreground mt-0.5">
-                    {label}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground hidden sm:block">
-                    {description}
-                  </p>
-                </div>
+              <button key={label}>
+                <Icon className="h-4 w-4" />
+                {value} {label}
               </button>
             );
           })}
         </div>
 
-        {/* Folders Section */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold">Folders</h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                {folders.length} folder{folders.length !== 1 ? "s" : ""} ·
-                select one to view sheets
-              </p>
-            </div>
-            <button
-              onClick={() => setNewFolderOpen(true)}
-              className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center"
-              aria-label="New folder"
-            >
-              <FolderPlus className="h-3.5 w-3.5" />
-            </button>
-          </div>
+        {/* Folders */}
+        <FoldersList
+          folders={folders}
+          currentFolder={currentFolder}
+          onSelectFolder={handleFolderChange}
+          onCreateFolder={() => setNewFolderOpen(true)}
+        />
 
-          <FoldersList
-            folders={folders}
-            currentFolder={currentFolder}
-            onSelectFolder={handleFolderChange}
-            onCreateFolder={() => setNewFolderOpen(true)}
-          />
-        </div>
-
-        {/* Sheets Section */}
-        {currentFolder && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                <Input
-                  placeholder="Search sheets…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-7 h-9 text-sm"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-
-              <Tabs
-                value={viewMode}
-                onValueChange={(v) => setViewMode(v as any)}
-              >
-                <TabsList className="h-9 p-0.5">
-                  <TabsTrigger value="grid" className="h-8 w-9 p-0">
-                    <Grid3X3 className="h-3.5 w-3.5" />
-                  </TabsTrigger>
-                  <TabsTrigger value="table" className="h-8 w-9 p-0">
-                    <List className="h-3.5 w-3.5" />
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-
-            <SheetsGrid
-              sheets={filteredSheets}
-              viewMode={viewMode}
-              searchQuery={searchQuery}
-              folderName={currentFolderData?.name || ""}
-              onNewSheet={() => setNewSheetOpen(true)}
-            />
-          </div>
-        )}
+        {/* Sheets */}
+        <SheetsGrid
+          sheets={filteredSheets}
+          viewMode={viewMode}
+          searchQuery={searchQuery}
+          folderName={currentFolderData?.name || ""}
+          onNewSheet={() => setNewSheetOpen(true)}
+        />
       </div>
 
       <NewSheetModal

@@ -17,7 +17,7 @@ import {
   peopleColumns,
   peopleAction,
   NoPeopleIcon,
-} from "@/data/tables/personalSheets/peopleTableColumns";
+} from "@/data/tables/columns/peopleTableColumns";
 import { Search, Filter, Grid3X3, List } from "lucide-react";
 import type { PersonData } from "@/lib/querys/people/people";
 

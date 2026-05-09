@@ -159,7 +159,6 @@ import {
 import { protectCell, unprotectCell } from "@/lib/querys/sheet/protection";
 import { logActivity } from "@/lib/querys/activity/activity";
 
-import KeyboardShortcutsDialog from "./dialogs/Keyboard-shortcuts-dialog";
 import ShareDialog from "./dialogs/Share-dialog";
 import RightPanel from "./Right-panel";
 import type { RightPanelType } from "./Right-panel";
@@ -231,6 +230,27 @@ interface SheetState {
 }
 
 const Avatar = SheetAvatar;
+const WORKING_MIN_ROWS = 1200;
+
+function buildEmptyRow(index: number, columns: ColumnDef[]): SheetRow {
+  const row: SheetRow = { id: String(index + 1) };
+  columns.forEach((c) => {
+    row[c.key] = "";
+  });
+  return row;
+}
+
+function ensureWorkingRowBuffer(
+  inputRows: SheetRow[],
+  columns: ColumnDef[],
+): SheetRow[] {
+  if (inputRows.length >= WORKING_MIN_ROWS) return inputRows;
+  const out = [...inputRows];
+  for (let i = inputRows.length; i < WORKING_MIN_ROWS; i++) {
+    out.push(buildEmptyRow(i, columns));
+  }
+  return out;
+}
 
 // ── Main Component ──────────────────────────────────────────────────────────
 export default function SheetClient() {
@@ -239,6 +259,7 @@ export default function SheetClient() {
   const router = useRouter();
   const templateId = searchParams?.get("template") || "blank";
   const isOrganizationSheet = searchParams?.get("org") === "true";
+  const importedFrom = searchParams?.get("imported");
   const sheetId = params?.id ?? "";
 
   const [sheetState, setSheetState] = useState<SheetState>({
@@ -283,7 +304,6 @@ export default function SheetClient() {
   const [showSearch, setShowSearch] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [isDark, setIsDark] = useState(false);
-  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [filterValue, setFilterValue] = useState("");
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showFormulaDialog, setShowFormulaDialog] = useState(false);
@@ -312,7 +332,20 @@ export default function SheetClient() {
   const [forks, setForks] = useState<
     { id: string; title: string; forked_at: string | null }[]
   >([]);
+  const [cellSelectOptions, setCellSelectOptions] = useState<
+    Record<string, string[]>
+  >({});
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
+  const [topMenuOpen, setTopMenuOpen] = useState<
+    null | "file" | "insert" | "view" | "extensions"
+  >(null);
+  const [showDesktopTip, setShowDesktopTip] = useState(true);
+  const [validationDialog, setValidationDialog] = useState<{
+    open: boolean;
+    scope: "cell" | "column";
+    optionsText: string;
+  }>({ open: false, scope: "column", optionsText: "" });
+  const topMenuRef = useRef<HTMLDivElement | null>(null);
   const chartsHydratedRef = useRef(false);
   const rowResizeRef = useRef<{
     rowId: string;
@@ -421,6 +454,15 @@ export default function SheetClient() {
   }, [charts.activeChartId]);
 
   useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!topMenuRef.current) return;
+      if (!topMenuRef.current.contains(e.target as Node)) setTopMenuOpen(null);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  useEffect(() => {
     if (!sheetId) return;
     chartsHydratedRef.current = false;
     queueMicrotask(() => setIsLoading(true));
@@ -437,6 +479,16 @@ export default function SheetClient() {
             );
           if (data.cellFormats && Object.keys(data.cellFormats).length > 0)
             formatting.setCellFormats(data.cellFormats);
+          if (data.cellFormats && Object.keys(data.cellFormats).length > 0) {
+            const selectByCell: Record<string, string[]> = {};
+            Object.entries(data.cellFormats).forEach(([key, fmt]) => {
+              const opts = (fmt as any)?.selectOptions;
+              if (Array.isArray(opts) && opts.length > 0) selectByCell[key] = opts;
+            });
+            if (Object.keys(selectByCell).length > 0) {
+              setCellSelectOptions(selectByCell);
+            }
+          }
           if (data.formulas && Object.keys(data.formulas).length > 0)
             formulas.setFormulas(data.formulas);
           if (
@@ -447,7 +499,8 @@ export default function SheetClient() {
           if (data.protectedCells && data.protectedCells.size > 0)
             protection.setProtectedCells(data.protectedCells);
           if (wrapSet.size > 0) textWrap.setTextWrapColumns(wrapSet);
-          rowsHistory.pushState(data.rows);
+          const bufferedRows = ensureWorkingRowBuffer(data.rows, data.columns);
+          rowsHistory.pushState(bufferedRows);
           columnsHistory.pushState(data.columns);
           const userRole =
             sheetIsOrg && currentUser
@@ -467,7 +520,7 @@ export default function SheetClient() {
             organizationId: data.organizationId ?? null,
             size: data.size,
             starred: data.isStarred,
-            rows: data.rows,
+            rows: bufferedRows,
             columns: data.columns,
             forkedFromSheetId: data.forked_from_sheet_id,
             forkedFromSnapshotLabel: data.forked_from_snapshot_label,
@@ -489,17 +542,18 @@ export default function SheetClient() {
           }
         } else {
           const td = getTemplateData(templateId);
-          rowsHistory.pushState(td.rows);
+          const bufferedRows = ensureWorkingRowBuffer(td.rows, td.columns);
+          rowsHistory.pushState(bufferedRows);
           columnsHistory.pushState(td.columns);
           setSheetState((p) => ({
             ...p,
             title: data.title || td.title,
             starred: false,
-            rows: td.rows,
+            rows: bufferedRows,
             columns: td.columns,
           }));
           await Promise.all([
-            saveAllRows(sheetId, td.rows),
+            saveAllRows(sheetId, bufferedRows),
             saveAllColumns(sheetId, td.columns),
           ]);
           chartsHydratedRef.current = true;
@@ -512,6 +566,12 @@ export default function SheetClient() {
       })
       .finally(() => setIsLoading(false));
   }, [sheetId, charts.replaceAll]);
+
+  useEffect(() => {
+    if (!importedFrom) return;
+    const label = importedFrom === "excel" ? "Excel" : "CSV";
+    toast.success(`This sheet was imported from ${label}.`);
+  }, [importedFrom]);
 
   // Persist row heights to DB (debounced)
   useEffect(() => {
@@ -1295,6 +1355,34 @@ export default function SheetClient() {
     ],
   );
 
+  const getSuggestedChartPreset = useCallback(
+    (kind: any) => {
+      const usableCols = columns.filter((c) => !c.hidden);
+      const labelCol = usableCols.find(
+        (c) =>
+          c.type === "text" ||
+          c.type === "status" ||
+          c.type === "priority" ||
+          c.type === "select" ||
+          c.type === "date",
+      );
+      const numericCols = usableCols.filter((c) =>
+        ["number", "currency", "progress", "percent"].includes(c.type ?? ""),
+      );
+      const preset: any = {};
+      if (labelCol) preset.labelColumnKey = labelCol.key;
+      if (kind === "pie" || kind === "donut" || kind === "radar") {
+        preset.aggregateMode = "count";
+        preset.seriesKeys = [];
+      } else if (numericCols.length > 0) {
+        preset.seriesKeys = [numericCols[0].key];
+        preset.aggregateMode = "none";
+      }
+      return preset;
+    },
+    [columns],
+  );
+
   const handleApplyFormulaToColumn = useCallback(
     async (columnKey: string, formula: string) => {
       if (!formula.startsWith("=")) {
@@ -1346,6 +1434,84 @@ export default function SheetClient() {
     },
     [columns, columnsHistory, sheetId, markSaving, markSaved],
   );
+
+  const openValidationDialog = useCallback(
+    (scope: "cell" | "column" = "column") => {
+      if (!selectedCell) {
+        toast.info("Select a cell first.");
+        return;
+      }
+      const seed =
+        scope === "cell"
+          ? cellSelectOptions[`${selectedCell.row}-${selectedCell.col}`]
+          : columns.find((c) => c.key === selectedCell.col)?.selectOptions;
+      setValidationDialog({
+        open: true,
+        scope,
+        optionsText: (seed ?? []).join(", "),
+      });
+    },
+    [selectedCell, columns, cellSelectOptions],
+  );
+
+  const handleValidationSetup = useCallback(async () => {
+    if (!selectedCell) {
+      toast.info("Select a cell first.");
+      return;
+    }
+    openValidationDialog("column");
+  }, [selectedCell, openValidationDialog]);
+
+  const handleValidationSave = useCallback(async () => {
+    if (!selectedCell) return;
+    const options = validationDialog.optionsText
+      .split(",")
+      .map((o) => o.trim())
+      .filter(Boolean);
+    if (options.length === 0) {
+      toast.error("Please provide at least one option.");
+      return;
+    }
+    if (validationDialog.scope === "cell") {
+      const cellKey = `${selectedCell.row}-${selectedCell.col}`;
+      cellTypes.changeCellType(selectedCell.row, selectedCell.col, "select");
+      setCellSelectOptions((prev) => ({ ...prev, [cellKey]: options }));
+      await saveCellFormat(sheetId, cellKey, {
+        ...formatting.getCurrentCellFormat(selectedCell),
+        selectOptions: options,
+      } as any);
+      setValidationDialog((p) => ({ ...p, open: false }));
+      toast.success("Single-cell dropdown added.");
+      return;
+    }
+    const updatedColumns = columns.map((c) =>
+      c.key === selectedCell.col
+        ? {
+            ...c,
+            type: "select" as ColumnDef["type"],
+            selectOptions: options,
+            validation_rules: { type: "dropdown", options },
+          }
+        : c,
+    );
+    setSheetState((p) => ({ ...p, columns: updatedColumns }));
+    columnsHistory.pushState(updatedColumns);
+    markSaving();
+    await saveAllColumns(sheetId, updatedColumns);
+    markSaved();
+    setValidationDialog((p) => ({ ...p, open: false }));
+    toast.success("Column validation dropdown configured.");
+  }, [
+    selectedCell,
+    cellTypes.changeCellType,
+    sheetId,
+    formatting.getCurrentCellFormat,
+    columns,
+    columnsHistory,
+    markSaving,
+    markSaved,
+    validationDialog,
+  ]);
 
   const groupedCommentsForPanel = useMemo(() => {
     const result: Record<string, any[]> = {};
@@ -1456,6 +1622,11 @@ export default function SheetClient() {
       const cellComments = getCellComments(rowIdx, colKey);
       const commentKey = `${rowIdx}-${colKey}`;
       const isWrapped = textWrap.textWrapColumns.has(`${rowIdx}-${colKey}`);
+      const horizontalAlign = (cellStyle.textAlign as
+        | "left"
+        | "center"
+        | "right"
+        | undefined) ?? undefined;
       const activeCollabEntry = Object.values(activeCursors).find(
         (c) => c.row === rowIdx && c.col === colKey,
       );
@@ -1490,9 +1661,13 @@ export default function SheetClient() {
           }
           case "checkbox":
             return displayValue ? (
-              <CheckSquare className="h-3.5 w-3.5 text-primary" />
+              <span className="h-6 w-6 rounded-md bg-emerald-500/15 border border-emerald-600/60 flex items-center justify-center">
+                <CheckSquare className="h-4.5 w-4.5 text-emerald-700" />
+              </span>
             ) : (
-              <Square className="h-3.5 w-3.5 text-gray-300" />
+              <span className="h-6 w-6 rounded-md bg-white border-2 border-gray-500/70 flex items-center justify-center">
+                <Square className="h-4.5 w-4.5 text-gray-400" />
+              </span>
             );
           case "date":
             return displayValue ? (
@@ -1616,7 +1791,7 @@ export default function SheetClient() {
 
       return (
         <div
-          className={`h-full w-full flex relative group/cell ${isWrapped ? "items-start pt-1.5" : "items-center"} ${type === "currency" || type === "number" ? "justify-end" : ""} ${type === "checkbox" ? "justify-center" : ""} px-2.5 py-1 gap-1.5`}
+          className={`h-full w-full flex relative group/cell ${isWrapped ? "items-start pt-1.5" : "items-center"} ${horizontalAlign === "center" ? "justify-center" : horizontalAlign === "right" ? "justify-end" : horizontalAlign === "left" ? "justify-start" : type === "currency" || type === "number" ? "justify-end" : ""} ${type === "checkbox" ? "justify-center" : ""} px-2.5 py-1 gap-1.5`}
           style={{
             color: "inherit",
             ...cellStyle,
@@ -1945,6 +2120,19 @@ export default function SheetClient() {
               String(row[column.key] ?? "");
 
             const onTextChange = (v: string) => {
+              const allowed =
+                (cellSelectOptions[cellKey] && cellSelectOptions[cellKey].length > 0
+                  ? cellSelectOptions[cellKey]
+                  : col.validation_rules?.type === "dropdown"
+                    ? (col.validation_rules?.options as string[] | undefined)
+                    : undefined) ?? [];
+              if (
+                allowed.length > 0 &&
+                v.trim() !== "" &&
+                !allowed.includes(v.trim())
+              ) {
+                return;
+              }
               if (v.startsWith("="))
                 formulas.setFormulas((p) => ({ ...p, [cellKey]: v }));
               else {
@@ -2048,9 +2236,13 @@ export default function SheetClient() {
                   }
                 >
                   {row[column.key] ? (
-                    <CheckSquare className="h-4 w-4 text-primary" />
+                    <span className="h-6 w-6 rounded-md bg-emerald-500/15 border border-emerald-600/60 flex items-center justify-center">
+                      <CheckSquare className="h-5 w-5 text-emerald-700" />
+                    </span>
                   ) : (
-                    <Square className="h-4 w-4 text-gray-300" />
+                    <span className="h-6 w-6 rounded-md bg-white border-2 border-gray-500/70 flex items-center justify-center">
+                      <Square className="h-5 w-5 text-gray-400" />
+                    </span>
                   )}
                 </div>
               );
@@ -2113,7 +2305,13 @@ export default function SheetClient() {
                 />
               );
             if (cellType === "select") {
-              const selectOpts = col.selectOptions ?? [];
+              const selectOpts =
+                cellSelectOptions[cellKey]?.length > 0
+                  ? cellSelectOptions[cellKey]
+                  : col.selectOptions ??
+                    (col.validation_rules?.type === "dropdown"
+                      ? ((col.validation_rules?.options as string[]) ?? [])
+                      : []);
               return (
                 <Select
                   value={String(row[column.key] ?? "")}
@@ -2199,6 +2397,7 @@ export default function SheetClient() {
     formulas.columnFormulas,
     formulas.setFormulas,
     formulas.getFormula,
+    cellSelectOptions,
     protection.getCellKey,
     protection.isCellProtected,
     renderCellByType,
@@ -2416,7 +2615,135 @@ export default function SheetClient() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-1 overflow-x-auto no-scrollbar">
+          <div
+            ref={topMenuRef}
+            className="relative flex items-center gap-1 sm:gap-2 shrink-0 ml-1 overflow-x-auto no-scrollbar"
+          >
+            {(["file", "insert", "view", "extensions"] as const).map((menu) => (
+              <button
+                key={menu}
+                className="h-7 px-2 text-[13px] font-medium rounded hover:bg-black/5"
+                onClick={() =>
+                  setTopMenuOpen((p) => (p === menu ? null : menu))
+                }
+              >
+                {menu.charAt(0).toUpperCase() + menu.slice(1)}
+              </button>
+            ))}
+            {topMenuOpen === "file" && (
+              <div className="absolute top-8 left-0 z-50 w-52 rounded-md border bg-white shadow-lg p-1">
+                <button
+                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
+                  onClick={() => {
+                    handleExport("xlsx");
+                    setTopMenuOpen(null);
+                  }}
+                >
+                  Download Excel
+                </button>
+                <button
+                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
+                  onClick={() => {
+                    handleExport("csv");
+                    setTopMenuOpen(null);
+                  }}
+                >
+                  Download CSV
+                </button>
+                <button
+                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
+                  onClick={() => {
+                    handleExport("pdf");
+                    setTopMenuOpen(null);
+                  }}
+                >
+                  Download PDF
+                </button>
+              </div>
+            )}
+            {topMenuOpen === "insert" && (
+              <div className="absolute top-8 left-14 z-50 w-64 rounded-md border bg-white shadow-lg p-1 max-h-[70vh] overflow-y-auto sheet-scrollbar">
+                {[
+                  { label: "Pre-built tables", icon: TableProperties, action: () => handleInsertColumn("text") },
+                  {
+                    label: "Chart",
+                    icon: BarChart3,
+                    action: () => {
+                      charts.insertChart(
+                        "column",
+                        rows,
+                        columns,
+                        getSuggestedChartPreset("column"),
+                      );
+                      setTopMenuOpen(null);
+                    },
+                  },
+                  { label: "Pivot table", icon: Layers, action: () => toast.info("Pivot table added soon") },
+                  { label: "Image", icon: FileSpreadsheet, action: () => handleInsertColumn("image") },
+                  { label: "Function", icon: Sigma, action: () => setShowFormulaDialog(true) },
+                  { label: "Link", icon: Link, action: () => handleInsertColumn("url") },
+                  {
+                    label: "Checkbox",
+                    icon: CheckSquare,
+                    action: () => {
+                      handleInsertColumn("checkbox");
+                      setTopMenuOpen(null);
+                    },
+                  },
+                  {
+                    label: "Dropdown",
+                    icon: ChevronDown,
+                    action: () => {
+                      openValidationDialog("cell");
+                      setTopMenuOpen(null);
+                    },
+                  },
+                  { label: "Comment", icon: MessageSquare, action: () => setRightPanel("comments") },
+                  { label: "Note", icon: FileSpreadsheet, action: () => toast.info("Notes support coming soon") },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded flex items-center gap-2"
+                    onClick={item.action}
+                  >
+                    <item.icon className="h-3.5 w-3.5" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {topMenuOpen === "view" && (
+              <div className="absolute top-8 left-28 z-50 w-52 rounded-md border bg-white shadow-lg p-1">
+                <button
+                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
+                  onClick={() => {
+                    setShowFilters((v) => !v);
+                    setTopMenuOpen(null);
+                  }}
+                >
+                  Toggle filter bar
+                </button>
+                <button
+                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
+                  onClick={() => {
+                    setIsDark((v) => !v);
+                    setTopMenuOpen(null);
+                  }}
+                >
+                  Toggle theme
+                </button>
+              </div>
+            )}
+            {topMenuOpen === "extensions" && (
+              <div className="absolute top-8 left-44 z-50 w-52 rounded-md border bg-white shadow-lg p-1">
+                <button
+                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
+                  onClick={() => toast.info("Extensions coming soon")}
+                >
+                  Extensions coming soon
+                </button>
+              </div>
+            )}
             {isOrgSheet && liveTracking && (
               <div className="sheet-live-pill hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -2680,7 +3007,7 @@ export default function SheetClient() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="w-64"
+                className="w-56 max-h-72 overflow-y-auto sheet-scrollbar"
                 style={ddStyle(isDark)}
               >
                 <DropdownMenuLabel
@@ -2886,7 +3213,7 @@ export default function SheetClient() {
                     handleFormatChange({
                       borderStyle: "solid",
                       borderWidth: 1,
-                      borderColor: "#d1d5db",
+                      borderColor: "#111827",
                     })
                   }
                   style={ddItemStyle(isDark)}
@@ -2899,7 +3226,7 @@ export default function SheetClient() {
                     handleFormatChange({
                       borderStyle: "dashed",
                       borderWidth: 1,
-                      borderColor: "#d1d5db",
+                      borderColor: "#111827",
                     })
                   }
                   style={ddItemStyle(isDark)}
@@ -2912,7 +3239,7 @@ export default function SheetClient() {
                     handleFormatChange({
                       borderStyle: "dotted",
                       borderWidth: 1,
-                      borderColor: "#d1d5db",
+                      borderColor: "#111827",
                     })
                   }
                   style={ddItemStyle(isDark)}
@@ -3206,7 +3533,6 @@ export default function SheetClient() {
                         "status",
                         "priority",
                         "url",
-                        "select",
                         "image",
                       ] as ColumnDef["type"][]
                     ).map((t) => (
@@ -3216,7 +3542,7 @@ export default function SheetClient() {
                         onClick={() => handleInsertColumn(t)}
                         style={ddItemStyle(isDark)}
                       >
-                        {t === "select" ? "Select List" : t}
+                        {t === "select" ? "Dropdown" : t}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -3339,7 +3665,7 @@ export default function SheetClient() {
                   {
                     icon: Check,
                     label: "Validate",
-                    action: () => toast.info("Validation coming soon"),
+                    action: handleValidationSetup,
                     tooltip: "Set validation rules for cell input",
                   },
                 ]
@@ -3463,7 +3789,8 @@ export default function SheetClient() {
             <IconBtn
               icon={Keyboard}
               tooltip="Keyboard shortcuts"
-              onClick={() => setShowKeyboardShortcuts(true)}
+              onClick={() => toggleRightPanel("shortcuts")}
+              active={effectiveRightPanel === "shortcuts"}
             />
           </div>
         </div>
@@ -3585,6 +3912,7 @@ export default function SheetClient() {
             (rightPanel === "developer" ||
               rightPanel === "timetravel" ||
               rightPanel === "charts" ||
+              rightPanel === "shortcuts" ||
               isOrgSheet) && (
               <>
                 <div
@@ -3681,7 +4009,7 @@ export default function SheetClient() {
           )}
           <button
             className="sheet-status-text hidden sm:flex items-center gap-1 hover:opacity-80 shrink-0"
-            onClick={() => setShowKeyboardShortcuts(true)}
+            onClick={() => toggleRightPanel("shortcuts")}
           >
             <Keyboard className="h-2.5 w-2.5" />
             Shortcuts
@@ -3697,10 +4025,6 @@ export default function SheetClient() {
             isDark={isDark}
           />
         )}
-        <KeyboardShortcutsDialog
-          showKeyboardShortcuts={showKeyboardShortcuts}
-          setShowKeyboardShortcuts={setShowKeyboardShortcuts}
-        />
         <FormulaDialogComponent
           open={showFormulaDialog}
           onClose={() => setShowFormulaDialog(false)}
@@ -3719,6 +4043,80 @@ export default function SheetClient() {
               : []
           }
         />
+        <Dialog
+          open={validationDialog.open}
+          onOpenChange={(open) =>
+            setValidationDialog((p) => ({ ...p, open }))
+          }
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Validation Dropdown</DialogTitle>
+              <DialogDescription>
+                Set options and choose whether this applies to the current cell
+                or whole column.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-xs">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="radio"
+                    checked={validationDialog.scope === "column"}
+                    onChange={() =>
+                      setValidationDialog((p) => ({ ...p, scope: "column" }))
+                    }
+                  />
+                  Column
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="radio"
+                    checked={validationDialog.scope === "cell"}
+                    onChange={() =>
+                      setValidationDialog((p) => ({ ...p, scope: "cell" }))
+                    }
+                  />
+                  Single cell
+                </label>
+              </div>
+              <textarea
+                className="w-full min-h-24 rounded border px-2.5 py-2 text-xs"
+                value={validationDialog.optionsText}
+                onChange={(e) =>
+                  setValidationDialog((p) => ({
+                    ...p,
+                    optionsText: e.target.value,
+                  }))
+                }
+                placeholder="New, In Progress, Done"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setValidationDialog((p) => ({ ...p, open: false }))}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleValidationSave}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={showDesktopTip} onOpenChange={setShowDesktopTip}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Tip</DialogTitle>
+              <DialogDescription>
+                This sheet experience is optimized for desktop. For the best
+                view, use desktop or landscape mode.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button onClick={() => setShowDesktopTip(false)}>Got it</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* ── CHART PICKER (floating above action bar) ── */}
         {charts.showPicker && (
@@ -3728,7 +4126,10 @@ export default function SheetClient() {
             rows={rows}
             columns={columns}
             onSelect={(kind, preset) => {
-              charts.insertChart(kind, rows, columns, preset);
+              charts.insertChart(kind, rows, columns, {
+                ...getSuggestedChartPreset(kind),
+                ...preset,
+              });
               toast.success(
                 `${kind.charAt(0).toUpperCase() + kind.slice(1)} chart inserted — click to edit`,
               );
@@ -3738,12 +4139,31 @@ export default function SheetClient() {
         )}
 
         <style jsx global>{`
+          .sheet-root *,
+          .sheet-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #c7cdd8 transparent;
+          }
+          .sheet-root *::-webkit-scrollbar,
+          .sheet-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+          }
+          .sheet-root *::-webkit-scrollbar-thumb,
+          .sheet-scrollbar::-webkit-scrollbar-thumb {
+            background: #c7cdd8;
+            border-radius: 999px;
+          }
+          .sheet-root *::-webkit-scrollbar-track,
+          .sheet-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+          }
           .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+            -ms-overflow-style: auto;
+            scrollbar-width: thin;
           }
           .no-scrollbar::-webkit-scrollbar {
-            display: none;
+            display: block;
           }
           @media (max-width: 640px) {
             .rdg-sheet {

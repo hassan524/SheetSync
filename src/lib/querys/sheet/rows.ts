@@ -2,6 +2,22 @@
 import { supabase } from "../../supabase/client";
 import type { SheetRow } from "@/types";
 
+function getLastUsedRowIndex(rows: SheetRow[]): number {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i];
+    const hasContent = Object.entries(row).some(([key, value]) => {
+      if (key === "id") return false;
+      if (value === null || value === undefined) return false;
+      if (typeof value === "string") return value.trim() !== "";
+      if (typeof value === "number") return !Number.isNaN(value);
+      if (typeof value === "boolean") return value;
+      return true;
+    });
+    if (hasContent) return i;
+  }
+  return -1;
+}
+
 export async function saveRow(
   sheetId: string,
   row: SheetRow,
@@ -36,7 +52,11 @@ export async function saveAllRows(sheetId: string, rows: SheetRow[]) {
 
   if (rows.length === 0) return;
 
-  const rowsToInsert = rows.map((row, idx) => {
+  const lastUsed = getLastUsedRowIndex(rows);
+  const effectiveRows = lastUsed >= 0 ? rows.slice(0, lastUsed + 1) : [];
+  if (effectiveRows.length === 0) return;
+
+  const rowsToInsert = effectiveRows.map((row, idx) => {
     const { id, ...data } = row;
     return {
       sheet_id: sheetId,
