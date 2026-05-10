@@ -9,6 +9,8 @@ import {
   Clock,
   BarChart3,
   Keyboard,
+  Sigma,
+  ChevronDown,
 } from "lucide-react";
 import CommentsPanel from "./panels/Comments-panel";
 import CollaboratorsPanel from "./panels/Collaborators-panel";
@@ -144,15 +146,13 @@ export default function RightPanel({
 
   return (
     <div
-      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${
-        d ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"
-      }`}
+      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${d ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"
+        }`}
     >
       {/* ── Panel header ── */}
       <div
-        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${
-          d ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"
-        }`}
+        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${d ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"
+          }`}
       >
         <div className="flex items-center gap-2">
           <Icon className={`h-3.5 w-3.5 ${meta.color}`} />
@@ -218,8 +218,8 @@ export default function RightPanel({
             <TimeTravelPanel
               state={timeTravelState}
               actions={timeTravelActions}
-              isDark={d}
-              onClose={() => setRightPanel(null)}
+              isDark={isDark}
+              orgMembers={members}   // ← add this
             />
           )}
 
@@ -229,11 +229,11 @@ export default function RightPanel({
             isDark={d}
             activeChart={activeChart ?? null}
             panelTab={chartPanelTab}
-            setPanelTab={setChartPanelTab ?? (() => {})}
+            setPanelTab={setChartPanelTab ?? (() => { })}
             rows={rows}
             columns={columns}
-            onUpdateChart={onUpdateChart ?? (() => {})}
-            onRemoveChart={onRemoveChart ?? (() => {})}
+            onUpdateChart={onUpdateChart ?? (() => { })}
+            onRemoveChart={onRemoveChart ?? (() => { })}
           />
         )}
         {rightPanel === "shortcuts" && <KeyboardShortcutsPanel isDark={d} />}

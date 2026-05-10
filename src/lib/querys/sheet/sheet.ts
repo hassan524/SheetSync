@@ -2,7 +2,7 @@
 import { supabase } from "../../supabase/client";
 
 export async function loadSheet(sheetId: string) {
-  const [sheet, columns, rows, formats, formulas, protectedCells] =
+  const [sheet, columns, rows, formats, formulas, protectedCells, forks] =
     await Promise.all([
       supabase.from("sheets").select("*").eq("id", sheetId).single(),
       supabase
@@ -18,14 +18,19 @@ export async function loadSheet(sheetId: string) {
       supabase.from("cell_formats").select("*").eq("sheet_id", sheetId),
       supabase.from("formulas").select("*").eq("sheet_id", sheetId),
       supabase.from("protected_cells").select("*").eq("sheet_id", sheetId),
+      supabase
+        .from("sheets")
+        .select("id, title, forked_at")
+        .eq("forked_from_sheet_id", sheetId)
+        .order("forked_at", { ascending: false }),
     ]);
 
-  // Surface any load errors immediately so they're not swallowed
   if (sheet.error)
     throw new Error(`Failed to load sheet: ${sheet.error.message}`);
   if (columns.error)
     throw new Error(`Failed to load columns: ${columns.error.message}`);
-  if (rows.error) throw new Error(`Failed to load rows: ${rows.error.message}`);
+  if (rows.error)
+    throw new Error(`Failed to load rows: ${rows.error.message}`);
 
   return {
     id: sheet.data.id,
@@ -43,6 +48,11 @@ export async function loadSheet(sheetId: string) {
     forked_by_user_id: sheet.data.forked_by_user_id,
     charts: sheet.data.charts ?? null,
     rowHeights: sheet.data.row_heights ?? null,
+    forks: (forks.data ?? []) as {
+      id: string;
+      title: string;
+      forked_at: string | null;
+    }[],
 
     columns:
       columns.data?.map((col) => ({
@@ -65,7 +75,6 @@ export async function loadSheet(sheetId: string) {
         ...row.data,
       })) ?? [],
 
-    // FIX: now includes fontFamily which was missing before
     cellFormats: Object.fromEntries(
       (formats.data ?? []).map((f) => [
         f.cell_key,
@@ -75,7 +84,7 @@ export async function loadSheet(sheetId: string) {
           underline: f.underline ?? false,
           strikethrough: f.strikethrough ?? false,
           fontSize: f.font_size ?? 12,
-          fontFamily: f.font_family ?? "Arial", // ← was missing
+          fontFamily: f.font_family ?? "Arial",
           textColor: f.text_color ?? "#000000",
           bgColor: f.bg_color ?? "#ffffff",
           align: f.text_align ?? "left",
@@ -99,7 +108,9 @@ export async function loadSheet(sheetId: string) {
         .map((f) => [f.cell_key.replace("col:", ""), f.formula]),
     ),
 
-    protectedCells: new Set((protectedCells.data ?? []).map((p) => p.cell_key)),
+    protectedCells: new Set(
+      (protectedCells.data ?? []).map((p) => p.cell_key),
+    ),
 
     textWrapColumns: new Set<string>(),
   };
@@ -121,7 +132,8 @@ export async function updateSheetRowHeights(
     .from("sheets")
     .update({ row_heights: rowHeights, updated_at: new Date().toISOString() })
     .eq("id", sheetId);
-  if (error) throw new Error(`Failed to update row heights: ${error.message}`);
+  if (error)
+    throw new Error(`Failed to update row heights: ${error.message}`);
 }
 
 export async function updateSheetTitle(sheetId: string, title: string) {

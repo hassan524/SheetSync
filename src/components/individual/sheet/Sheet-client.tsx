@@ -14,6 +14,7 @@ import DataGrid, {
   RenderCellProps,
   RenderEditCellProps,
 } from "react-data-grid";
+// @ts-ignore
 import "react-data-grid/lib/styles.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,7 +170,6 @@ import {
   updateSheetRowHeights,
 } from "@/lib/querys/sheet/sheet";
 import { exportSheet, ExportFormat } from "@/lib/querys/export";
-import { FORMULA_REFERENCE } from "@/data/formulaRefrence";
 import {
   getSheetOrgMembers,
   type OrgMember,
@@ -191,8 +191,9 @@ import {
   type HistoryEntry,
   type SheetComment,
 } from "@/lib/querys/sheet/firebase-realtime";
+// @ts-ignore
 import "@/app/sheet.css";
-import TimeTravelPanel from "@/components/individual/sheet/panels/TimeTravel-panel";
+import FormulaDialog from "./dialogs/Formula-dialog";
 import { useTimeTravel } from "@/hooks/use-time-travel";
 import { maybeAutoSnapshot } from "@/lib/querys/sheet/snapshots";
 import {
@@ -206,7 +207,6 @@ import {
   getMemberColor,
   getMemberInitials,
 } from "./sheet-ui-helpers";
-import FormulaDialogComponent from "./dialogs/Formula-dialog";
 import SelectOptionsDialog from "./dialogs/Select-options-dialog";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -338,11 +338,6 @@ export default function SheetClient() {
   >({});
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
   const [showDesktopTip, setShowDesktopTip] = useState(true);
-  const [validationDialog, setValidationDialog] = useState<{
-    open: boolean;
-    scope: "cell" | "column";
-    optionsText: string;
-  }>({ open: false, scope: "column", optionsText: "" });
   const chartsHydratedRef = useRef(false);
   const rowResizeRef = useRef<{
     rowId: string;
@@ -388,25 +383,25 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: "edited cells",
           target: sheetTitle || title,
-        }).catch(() => {});
+        }).catch(() => { });
       }, 30000);
     },
     [sheetId, organizationId, title],
   );
 
-  const formatting = useSheetFormatting(() => {});
-  const textWrap = useTextWrap(rows, () => {});
-  const clipboard = useClipboard(rows, rowsHistory, () => {});
-  const protection = useProtectedCells(() => {});
-  const rowOps = useRowOperations(rows, columns, rowsHistory, () => {});
+  const formatting = useSheetFormatting(() => { });
+  const textWrap = useTextWrap(rows, () => { });
+  const clipboard = useClipboard(rows, rowsHistory, () => { });
+  const protection = useProtectedCells(() => { });
+  const rowOps = useRowOperations(rows, columns, rowsHistory, () => { });
   const colOps = useColumnOperations(
     rows,
     columns,
     columnsHistory,
     rowsHistory,
-    () => {},
+    () => { },
   );
-  const cellTypes = useCellTypes(rows, rowsHistory, () => {});
+  const cellTypes = useCellTypes(rows, rowsHistory, () => { });
   const formulas = useFormulas(rows, columns);
 
   const [timeTravelState, timeTravelActions] = useTimeTravel({
@@ -495,7 +490,7 @@ export default function SheetClient() {
               ? data.ownerId === currentUser.id
                 ? "owner"
                 : orgMembers.find((m) => m.id === currentUser.id)?.role ||
-                  "viewer"
+                "viewer"
               : "owner";
 
           setSheetState({
@@ -522,6 +517,9 @@ export default function SheetClient() {
             charts.replaceAll((data as any).charts);
           }
           chartsHydratedRef.current = true;
+          if (Array.isArray((data as any).forks)) {
+            setForks((data as any).forks);
+          }
           if (
             (data as any).rowHeights &&
             typeof (data as any).rowHeights === "object"
@@ -818,7 +816,7 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: "inserted a row",
           target: title,
-        }).catch(() => {});
+        }).catch(() => { });
       } catch {
         toast.error("Row added locally but failed to persist.");
         setSaveStatus("saved");
@@ -853,7 +851,7 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: `deleted ${count} row${count > 1 ? "s" : ""}`,
           target: title,
-        }).catch(() => {});
+        }).catch(() => { });
       }, 50);
     } catch {
       toast.error("Row deleted locally but failed to persist.");
@@ -895,7 +893,7 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: `added a column (${type ?? "text"})`,
           target: title,
-        }).catch(() => {});
+        }).catch(() => { });
       }, 50);
     },
     [
@@ -929,7 +927,7 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: `deleted column "${colName}"`,
           target: title,
-        }).catch(() => {});
+        }).catch(() => { });
       }, 50);
     },
     [
@@ -998,7 +996,7 @@ export default function SheetClient() {
               organizationId: organizationId ?? undefined,
               action: "added a select column",
               target: title,
-            }).catch(() => {});
+            }).catch(() => { });
           }
           markSaved();
         }, 50);
@@ -1009,10 +1007,10 @@ export default function SheetClient() {
           const updatedCols = columnsHistory.currentState.map((c) =>
             c.key === colKey
               ? {
-                  ...c,
-                  type: "select" as ColumnDef["type"],
-                  selectOptions: options,
-                }
+                ...c,
+                type: "select" as ColumnDef["type"],
+                selectOptions: options,
+              }
               : c,
           );
           columnsHistory.pushState(updatedCols);
@@ -1082,24 +1080,6 @@ export default function SheetClient() {
       markSaved,
     ],
   );
-
-  const handleFreezeColumn = useCallback(async () => {
-    if (!selectedCell) {
-      toast.info("Select a cell in the column to freeze");
-      return;
-    }
-    const col = columns.find((c) => c.key === selectedCell.col);
-    if (!col) return;
-    const updatedColumns = columns.map((c) =>
-      c.key === selectedCell.col ? { ...c, frozen: !c.frozen } : c,
-    );
-    setSheetState((p) => ({ ...p, columns: updatedColumns }));
-    columnsHistory.pushState(updatedColumns);
-    markSaving();
-    await saveAllColumns(sheetId, updatedColumns);
-    markSaved();
-    toast.success(col.frozen ? "Column unfrozen" : "Column frozen");
-  }, [selectedCell, columns, sheetId, columnsHistory, markSaving, markSaved]);
 
   const handleHideColumn = useCallback(async () => {
     if (!isOrgSheet || sheetState.ownerId !== currentUser?.id) {
@@ -1330,6 +1310,7 @@ export default function SheetClient() {
         logFormulaSet(sheetId, `${cl}${selectedCell.row + 1}`, example);
       }
       markSaved();
+      setShowFormulaDialog(false);
       toast.success("Formula inserted — edit as needed");
     },
     [
@@ -1342,6 +1323,14 @@ export default function SheetClient() {
       columns,
     ],
   );
+
+  const openFormulaPanel = useCallback(() => {
+    if (!selectedCell) {
+      toast.info("Select a cell first.");
+      return;
+    }
+    setShowFormulaDialog(true);
+  }, [selectedCell]);
 
   const getSuggestedChartPreset = useCallback(
     (kind: any) => {
@@ -1423,92 +1412,6 @@ export default function SheetClient() {
     [columns, columnsHistory, sheetId, markSaving, markSaved],
   );
 
-  const openValidationDialog = useCallback(
-    (
-      scope: "cell" | "column" = "column",
-      anchor?: { row: number; colKey: string },
-    ) => {
-      const row = anchor?.row ?? selectedCell?.row;
-      const colKey = anchor?.colKey ?? selectedCell?.col;
-      if (row === undefined || !colKey) {
-        toast.info("Select a cell first.");
-        return;
-      }
-      if (anchor) {
-        setSelectedCell({ row: anchor.row, col: anchor.colKey });
-      }
-      const seed =
-        scope === "cell"
-          ? cellSelectOptions[`${row}-${colKey}`]
-          : columns.find((c) => c.key === colKey)?.selectOptions;
-      setValidationDialog({
-        open: true,
-        scope,
-        optionsText: (seed ?? []).join(", "),
-      });
-    },
-    [selectedCell, columns, cellSelectOptions],
-  );
-
-  const handleValidationSetup = useCallback(async () => {
-    if (!selectedCell) {
-      toast.info("Select a cell first.");
-      return;
-    }
-    openValidationDialog("column");
-  }, [selectedCell, openValidationDialog]);
-
-  const handleValidationSave = useCallback(async () => {
-    if (!selectedCell) return;
-    const options = validationDialog.optionsText
-      .split(",")
-      .map((o) => o.trim())
-      .filter(Boolean);
-    if (options.length === 0) {
-      toast.error("Please provide at least one option.");
-      return;
-    }
-    if (validationDialog.scope === "cell") {
-      const cellKey = `${selectedCell.row}-${selectedCell.col}`;
-      cellTypes.changeCellType(selectedCell.row, selectedCell.col, "select");
-      setCellSelectOptions((prev) => ({ ...prev, [cellKey]: options }));
-      await saveCellFormat(sheetId, cellKey, {
-        ...formatting.getCurrentCellFormat(selectedCell),
-        selectOptions: options,
-      } as any);
-      setValidationDialog((p) => ({ ...p, open: false }));
-      toast.success("Single-cell dropdown added.");
-      return;
-    }
-    const updatedColumns = columns.map((c) =>
-      c.key === selectedCell.col
-        ? {
-            ...c,
-            type: "select" as ColumnDef["type"],
-            selectOptions: options,
-            validation_rules: { type: "dropdown", options },
-          }
-        : c,
-    );
-    setSheetState((p) => ({ ...p, columns: updatedColumns }));
-    columnsHistory.pushState(updatedColumns);
-    markSaving();
-    await saveAllColumns(sheetId, updatedColumns);
-    markSaved();
-    setValidationDialog((p) => ({ ...p, open: false }));
-    toast.success("Column validation dropdown configured.");
-  }, [
-    selectedCell,
-    cellTypes.changeCellType,
-    sheetId,
-    formatting.getCurrentCellFormat,
-    columns,
-    columnsHistory,
-    markSaving,
-    markSaved,
-    validationDialog,
-  ]);
-
   const groupedCommentsForPanel = useMemo(() => {
     const result: Record<string, any[]> = {};
     Object.entries(comments).forEach(([cellKey, cellComments]) => {
@@ -1526,9 +1429,9 @@ export default function SheetClient() {
             createdAt: r.createdAt,
             timestamp: r.createdAt
               ? new Date(r.createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
+                hour: "2-digit",
+                minute: "2-digit",
+              })
               : "just now",
           })),
       }));
@@ -1793,9 +1696,9 @@ export default function SheetClient() {
             ...cellStyle,
             ...(activeCollab
               ? {
-                  outline: `2px solid ${activeCollab.color}`,
-                  outlineOffset: "-2px",
-                }
+                outline: `2px solid ${activeCollab.color}`,
+                outlineOffset: "-2px",
+              }
               : {}),
           }}
           onClick={() => {
@@ -1879,7 +1782,7 @@ export default function SheetClient() {
       if (hadChange) {
         logCellEditActivity(title);
         maybeAutoSnapshot(sheetId, updatedRows, columns, currentUser?.id).catch(
-          () => {},
+          () => { },
         );
       }
     },
@@ -1994,29 +1897,26 @@ export default function SheetClient() {
               {[...textWrap.textWrapColumns].some((k) =>
                 k.endsWith(`-${col.key}`),
               ) && (
-                <WrapText className="h-3 w-3 text-primary flex-shrink-0 opacity-60" />
-              )}
+                  <WrapText className="h-3 w-3 text-primary flex-shrink-0 opacity-60" />
+                )}
               <ColumnHeaderMenu
                 column={col}
                 insertExtras={{
                   onTextColumn: () => handleInsertColumn("text"),
-                  onChart: () =>
+                  onChart: () => {
                     charts.insertChart(
                       "column",
                       rows,
                       columns,
                       getSuggestedChartPreset("column"),
-                    ),
+                    );
+                    setRightPanel("charts");
+                  },
                   onPivot: () => toast.info("Pivot table added soon"),
                   onImageColumn: () => handleInsertColumn("image"),
-                  onFunction: () => setShowFormulaDialog(true),
+                  onFunction: () => openFormulaPanel(),
                   onLinkColumn: () => handleInsertColumn("url"),
                   onCheckboxColumn: () => handleInsertColumn("checkbox"),
-                  onDropdownValidation: () =>
-                    openValidationDialog("cell", {
-                      row: 0,
-                      colKey: col.key,
-                    }),
                   ...(isOrgSheet
                     ? { onComments: () => setRightPanel("comments") }
                     : {}),
@@ -2181,7 +2081,7 @@ export default function SheetClient() {
             const onBlurSave = async () => {
               const f = formulas.formulas[cellKey];
               if (f) await saveFormula(sheetId, cellKey, f);
-              else await deleteFormula(sheetId, cellKey).catch(() => {});
+              else await deleteFormula(sheetId, cellKey).catch(() => { });
             };
 
             if (isProtected) {
@@ -2330,9 +2230,9 @@ export default function SheetClient() {
                 cellSelectOptions[cellKey]?.length > 0
                   ? cellSelectOptions[cellKey]
                   : col.selectOptions ??
-                    (col.validation_rules?.type === "dropdown"
-                      ? ((col.validation_rules?.options as string[]) ?? [])
-                      : []);
+                  (col.validation_rules?.type === "dropdown"
+                    ? ((col.validation_rules?.options as string[]) ?? [])
+                    : []);
               return (
                 <Select
                   value={String(row[column.key] ?? "")}
@@ -2439,7 +2339,6 @@ export default function SheetClient() {
     handleInsertColumn,
     charts,
     getSuggestedChartPreset,
-    openValidationDialog,
   ]);
 
   const filteredRows = useMemo<SheetRow[]>(() => {
@@ -2467,10 +2366,10 @@ export default function SheetClient() {
     const col = columns.find((c) => c.key === selectedCell.col);
     return col
       ? cellTypes.getCellType(
-          selectedCell.row,
-          selectedCell.col,
-          col.type || "text",
-        )
+        selectedCell.row,
+        selectedCell.col,
+        col.type || "text",
+      )
       : null;
   }, [selectedCell, columns, cellTypes.getCellType]);
 
@@ -2484,8 +2383,8 @@ export default function SheetClient() {
     () =>
       selectedCell
         ? textWrap.textWrapColumns.has(
-            `${selectedCell.row}-${selectedCell.col}`,
-          )
+          `${selectedCell.row}-${selectedCell.col}`,
+        )
         : false,
     [selectedCell, textWrap.textWrapColumns],
   );
@@ -2567,58 +2466,25 @@ export default function SheetClient() {
                   ORG
                 </div>
               )}
-              {forkedFromSheetId && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-semibold shrink-0 cursor-pointer transition-colors"
-                      onClick={() => router.push(`/sheet/${forkedFromSheetId}`)}
-                    >
-                      <GitBranch className="h-2.5 w-2.5" />
-                      Fork
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    className="text-xs text-center sheet-tooltip"
-                  >
-                    Forked from snapshot:
-                    <br />
-                    <strong>{forkedFromSnapshotLabel || "Auto-save"}</strong>
-                    {forkedAt && (
-                      <>
-                        <br />
-                        <span className="text-[10px] text-gray-400">
-                          {new Date(forkedAt).toLocaleString([], {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              )}
               {forks.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 text-[10px] font-semibold shrink-0 cursor-pointer transition-colors">
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 text-[10px] font-semibold shrink-0 cursor-pointer transition-colors select-none">
                       <GitBranch className="h-2.5 w-2.5" />
                       {forks.length} Fork{forks.length !== 1 ? "s" : ""}
+                      <ChevronDown className="h-2.5 w-2.5 opacity-50" />
                     </div>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="start"
-                    className="w-48 sheet-tooltip"
+                    className="w-56"
                     style={ddStyle(isDark)}
                   >
                     <DropdownMenuLabel
                       className="text-[10px] uppercase tracking-wider"
                       style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
                     >
-                      Forks of this sheet
+                      Forked sheets
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator
                       style={{ background: isDark ? "#1e2330" : "#e8eaed" }}
@@ -2627,11 +2493,26 @@ export default function SheetClient() {
                       <DropdownMenuItem
                         key={f.id}
                         onClick={() => router.push(`/sheet/${f.id}`)}
-                        className="text-xs"
+                        className="text-xs flex flex-col items-start gap-0.5"
                         style={ddItemStyle(isDark)}
                       >
-                        <FileSpreadsheet className="h-3 w-3 opacity-50" />
-                        <span className="truncate">{f.title}</span>
+                        <div className="flex items-center gap-1.5 w-full">
+                          <FileSpreadsheet className="h-3 w-3 opacity-50 shrink-0" />
+                          <span className="truncate font-medium">{f.title}</span>
+                        </div>
+                        {f.forked_at && (
+                          <span
+                            className="text-[10px] pl-4"
+                            style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                          >
+                            {new Date(f.forked_at).toLocaleString([], {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        )}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -2641,245 +2522,6 @@ export default function SheetClient() {
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 ml-1 min-w-0 overflow-visible [&_[data-slot=dropdown-menu-trigger]]:shrink-0 hide-scrollbar">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`sheet-menu-trigger h-7 px-2 text-[13px] font-semibold rounded-md outline-none transition-colors ${
-                    isDark
-                      ? "hover:bg-white/10 data-[state=open]:bg-white/[0.08]"
-                      : "hover:bg-black/[0.06] data-[state=open]:bg-black/[0.08]"
-                  }`}
-                >
-                  File
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                sideOffset={6}
-                style={ddStyle(isDark)}
-                className="w-52 z-[130] rounded-lg shadow-lg sheet-scrollbar max-h-[min(70vh,420px)] overflow-y-auto p-1"
-              >
-                <DropdownMenuLabel
-                  className="text-[10px] uppercase tracking-wider"
-                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
-                >
-                  Download
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator
-                  style={{ background: isDark ? "#1e2330" : "#e8eaed" }}
-                />
-                <DropdownMenuItem
-                  className="text-xs"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => handleExport("xlsx")}
-                >
-                  <Layers className="h-3.5 w-3.5 opacity-70" />
-                  Excel (.xlsx)
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => handleExport("csv")}
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5 opacity-70" />
-                  CSV (.csv)
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => handleExport("pdf")}
-                >
-                  <Printer className="h-3.5 w-3.5 opacity-70" />
-                  PDF (.pdf)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`sheet-menu-trigger h-7 px-2 text-[13px] font-semibold rounded-md outline-none transition-colors ${
-                    isDark
-                      ? "hover:bg-white/10 data-[state=open]:bg-white/[0.08]"
-                      : "hover:bg-black/[0.06] data-[state=open]:bg-black/[0.08]"
-                  }`}
-                >
-                  Insert
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                sideOffset={6}
-                style={ddStyle(isDark)}
-                className="w-[17rem] z-[130] rounded-lg shadow-lg sheet-scrollbar max-h-[min(70vh,460px)] overflow-y-auto p-1"
-              >
-                <DropdownMenuLabel
-                  className="text-[10px] uppercase tracking-wider"
-                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
-                >
-                  Insert into sheet
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator
-                  style={{ background: isDark ? "#1e2330" : "#e8eaed" }}
-                />
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => handleInsertColumn("text")}
-                >
-                  <TableProperties className="h-3.5 w-3.5 shrink-0" />
-                  Column (text column)
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => {
-                    charts.insertChart(
-                      "column",
-                      rows,
-                      columns,
-                      getSuggestedChartPreset("column"),
-                    );
-                  }}
-                >
-                  <BarChart3 className="h-3.5 w-3.5 shrink-0" />
-                  Chart
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => toast.info("Pivot table added soon")}
-                >
-                  <Layers className="h-3.5 w-3.5 shrink-0" />
-                  Pivot table
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => handleInsertColumn("image")}
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
-                  Image column
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => setShowFormulaDialog(true)}
-                >
-                  <Sigma className="h-3.5 w-3.5 shrink-0" />
-                  Function…
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => handleInsertColumn("url")}
-                >
-                  <Link className="h-3.5 w-3.5 shrink-0" />
-                  Link column
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => handleInsertColumn("checkbox")}
-                >
-                  <CheckSquare className="h-3.5 w-3.5 shrink-0" />
-                  Checkbox column
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => openValidationDialog("cell")}
-                >
-                  <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-                  Dropdown (validation)
-                </DropdownMenuItem>
-                {isOrgSheet ? (
-                  <DropdownMenuItem
-                    className="text-xs gap-2"
-                    style={ddItemStyle(isDark)}
-                    onClick={() => setRightPanel("comments")}
-                  >
-                    <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                    Comments panel
-                  </DropdownMenuItem>
-                ) : null}
-                <DropdownMenuItem
-                  className="text-xs gap-2"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => toast.info("Notes support coming soon")}
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
-                  Note
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`sheet-menu-trigger h-7 px-2 text-[13px] font-semibold rounded-md outline-none transition-colors ${
-                    isDark
-                      ? "hover:bg-white/10 data-[state=open]:bg-white/[0.08]"
-                      : "hover:bg-black/[0.06] data-[state=open]:bg-black/[0.08]"
-                  }`}
-                >
-                  View
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                sideOffset={6}
-                style={ddStyle(isDark)}
-                className="w-52 z-[130] rounded-lg shadow-lg p-1"
-              >
-                <DropdownMenuItem
-                  className="text-xs"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => setShowFilters((v) => !v)}
-                >
-                  Toggle filter bar
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => setIsDark((v) => !v)}
-                >
-                  Toggle theme (light/dark sheet)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`sheet-menu-trigger h-7 px-2 text-[13px] font-semibold rounded-md outline-none transition-colors ${
-                    isDark
-                      ? "hover:bg-white/10 data-[state=open]:bg-white/[0.08]"
-                      : "hover:bg-black/[0.06] data-[state=open]:bg-black/[0.08]"
-                  }`}
-                >
-                  Extensions
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                sideOffset={6}
-                style={ddStyle(isDark)}
-                className="w-52 z-[130] rounded-lg shadow-lg p-1"
-              >
-                <DropdownMenuItem
-                  className="text-xs"
-                  style={ddItemStyle(isDark)}
-                  onClick={() => toast.info("Extensions coming soon")}
-                >
-                  Extensions coming soon
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
             {isOrgSheet && liveTracking && (
               <div className="sheet-live-pill hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -3420,13 +3062,6 @@ export default function SheetClient() {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-xs"
-                  onClick={handleFreezeColumn}
-                  style={ddItemStyle(isDark)}
-                >
-                  Freeze selected column
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs"
                   onClick={handleHideColumn}
                   style={ddItemStyle(isDark)}
                 >
@@ -3445,7 +3080,7 @@ export default function SheetClient() {
             <IconBtn
               icon={
                 selectedCell &&
-                protection.isCellProtected(selectedCell.row, selectedCell.col)
+                  protection.isCellProtected(selectedCell.row, selectedCell.col)
                   ? Lock
                   : Unlock
               }
@@ -3463,7 +3098,7 @@ export default function SheetClient() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setShowFormulaDialog(true)}
+                  onClick={() => openFormulaPanel()}
                   className="sheet-formula-btn flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium transition-all shrink-0"
                 >
                   <Sigma className="h-3.5 w-3.5" />
@@ -3552,8 +3187,8 @@ export default function SheetClient() {
             value={
               selectedCell
                 ? (formulas.formulas[
-                    protection.getCellKey(selectedCell.row, selectedCell.col)
-                  ] ??
+                  protection.getCellKey(selectedCell.row, selectedCell.col)
+                ] ??
                   formulas.columnFormulas[selectedCell.col] ??
                   String(rows[selectedCell.row]?.[selectedCell.col] ?? ""))
                 : ""
@@ -3597,7 +3232,7 @@ export default function SheetClient() {
               );
               const f = formulas.formulas[ck];
               if (f) await saveFormula(sheetId, ck, f);
-              else await deleteFormula(sheetId, ck).catch(() => {});
+              else await deleteFormula(sheetId, ck).catch(() => { });
             }}
           />
         </div>
@@ -3766,27 +3401,21 @@ export default function SheetClient() {
 
                 {[
                   selectedCell &&
-                  columns.find((c) => c.key === selectedCell.col)?.hidden
+                    columns.find((c) => c.key === selectedCell.col)?.hidden
                     ? {
-                        icon: EyeOff,
-                        label: "Show",
-                        action: handleHideColumn,
-                        tooltip: "Show hidden column (owner only)",
-                        ownerOnly: true,
-                      }
+                      icon: EyeOff,
+                      label: "Show",
+                      action: handleHideColumn,
+                      tooltip: "Show hidden column (owner only)",
+                      ownerOnly: true,
+                    }
                     : {
-                        icon: Eye,
-                        label: "Hide",
-                        action: handleHideColumn,
-                        tooltip: "Hide column from view (owner only)",
-                        ownerOnly: true,
-                      },
-                  {
-                    icon: Snowflake,
-                    label: "Freeze",
-                    action: handleFreezeColumn,
-                    tooltip: "Freeze column in place",
-                  },
+                      icon: Eye,
+                      label: "Hide",
+                      action: handleHideColumn,
+                      tooltip: "Hide column from view (owner only)",
+                      ownerOnly: true,
+                    },
                   {
                     icon: Paintbrush,
                     label: "Conditional",
@@ -3799,12 +3428,6 @@ export default function SheetClient() {
                     label: "Group",
                     action: () => toast.info("Group coming soon"),
                     tooltip: "Group columns together",
-                  },
-                  {
-                    icon: Check,
-                    label: "Validate",
-                    action: handleValidationSetup,
-                    tooltip: "Set validation rules for cell input",
                   },
                 ]
                   .filter(
@@ -4163,12 +3786,6 @@ export default function SheetClient() {
             isDark={isDark}
           />
         )}
-        <FormulaDialogComponent
-          open={showFormulaDialog}
-          onClose={() => setShowFormulaDialog(false)}
-          onInsert={handleFormulaInsert}
-          isDark={isDark}
-        />
         <SelectOptionsDialog
           open={selectSetupDialog.open}
           onClose={() => setSelectSetupDialog((p) => ({ ...p, open: false }))}
@@ -4177,70 +3794,10 @@ export default function SheetClient() {
           initialOptions={
             selectSetupDialog.colKey && selectSetupDialog.colKey !== "__new__"
               ? (columns.find((c) => c.key === selectSetupDialog.colKey)
-                  ?.selectOptions ?? [])
+                ?.selectOptions ?? [])
               : []
           }
         />
-        <Dialog
-          open={validationDialog.open}
-          onOpenChange={(open) =>
-            setValidationDialog((p) => ({ ...p, open }))
-          }
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Validation Dropdown</DialogTitle>
-              <DialogDescription>
-                Set options and choose whether this applies to the current cell
-                or whole column.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 text-xs">
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="radio"
-                    checked={validationDialog.scope === "column"}
-                    onChange={() =>
-                      setValidationDialog((p) => ({ ...p, scope: "column" }))
-                    }
-                  />
-                  Column
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="radio"
-                    checked={validationDialog.scope === "cell"}
-                    onChange={() =>
-                      setValidationDialog((p) => ({ ...p, scope: "cell" }))
-                    }
-                  />
-                  Single cell
-                </label>
-              </div>
-              <textarea
-                className="w-full min-h-24 rounded border px-2.5 py-2 text-xs"
-                value={validationDialog.optionsText}
-                onChange={(e) =>
-                  setValidationDialog((p) => ({
-                    ...p,
-                    optionsText: e.target.value,
-                  }))
-                }
-                placeholder="New, In Progress, Done"
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setValidationDialog((p) => ({ ...p, open: false }))}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleValidationSave}>Save</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
         <Dialog open={showDesktopTip} onOpenChange={setShowDesktopTip}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
@@ -4309,6 +3866,14 @@ export default function SheetClient() {
             }
           }
         `}</style>
+        {showFormulaDialog && (
+          <FormulaDialog
+            open={showFormulaDialog}
+            onClose={() => setShowFormulaDialog(false)}
+            onInsert={handleFormulaInsert}
+            isDark={isDark}
+          />
+        )}
       </div>
     </TooltipProvider>
   );

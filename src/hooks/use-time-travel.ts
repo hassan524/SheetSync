@@ -1,9 +1,3 @@
-/**
- * ============================================================
- *  hooks/use-time-travel.ts
- * ============================================================
- */
-
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
@@ -19,16 +13,13 @@ import {
 } from "@/lib/querys/sheet/snapshots";
 import { supabase } from "@/lib/supabase/client";
 
-// ─────────────────────────────────────────────
-//  TYPES
-// ─────────────────────────────────────────────
-
 export type TimelineEntry =
   | ({ kind: "event" } & HistoryEntry)
   | ({ kind: "snapshot" } & SheetSnapshot);
 
 export interface TimeTravelState {
   snapshots: SheetSnapshot[];
+  forkedSnapshotIds: Set<string>;
   timeline: TimelineEntry[];
   playIndex: number;
   isPlaying: boolean;
@@ -38,9 +29,7 @@ export interface TimeTravelState {
   isOpen: boolean;
   focusedSnapshotId: string | null;
   isLoadingSnapshots: boolean;
-  /** When set, show the fork-name dialog for this snapshot */
   pendingForkSnapshot: SheetSnapshot | null;
-  /** Current cell being highlighted during playback: { row: number, col: string } | null */
   activeCell: { row: number; col: string } | null;
 }
 
@@ -55,26 +44,15 @@ export interface TimeTravelActions {
   removeSnapshot: (id: string) => Promise<void>;
   renameSnapshot: (id: string, label: string) => Promise<void>;
   branchFromIndex: (index: number) => Promise<void>;
-  /** Opens the fork-name dialog — call this from the UI */
   branchFromSnapshot: (snapshot: SheetSnapshot) => void;
-  /** Called by the dialog once the user confirms a name */
   confirmBranch: (name: string) => Promise<void>;
-  /** Called by the dialog if the user cancels */
   cancelBranch: () => void;
   exitPreview: () => void;
   refreshSnapshots: () => Promise<void>;
   focusSnapshot: (id: string | null) => void;
 }
 
-// ─────────────────────────────────────────────
-//  CONSTANTS
-// ─────────────────────────────────────────────
-
 const BASE_INTERVAL_MS = 900;
-
-// ─────────────────────────────────────────────
-//  HOOK
-// ─────────────────────────────────────────────
 
 export function useTimeTravel({
   sheetId,
@@ -83,7 +61,6 @@ export function useTimeTravel({
   historyEntries,
   currentUserId,
   currentUserName,
-  /** The sheet's own organizationId — if set, the fork goes into the same org */
   organizationId,
   onBranch,
 }: {
@@ -97,29 +74,21 @@ export function useTimeTravel({
   onBranch?: (newSheetId: string, label: string) => void;
 }): [TimeTravelState, TimeTravelActions] {
   const [snapshots, setSnapshots] = useState<SheetSnapshot[]>([]);
+  const [forkedSnapshotIds, setForkedSnapshotIds] = useState<Set<string>>(new Set());
   const [playIndex, setPlayIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeedState] = useState<0.5 | 1 | 2>(1);
   const [previewRows, setPreviewRows] = useState<SheetRow[] | null>(null);
-  const [previewColumns, setPreviewColumns] = useState<ColumnDef[] | null>(
-    null,
-  );
+  const [previewColumns, setPreviewColumns] = useState<ColumnDef[] | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [focusedSnapshotId, setFocusedSnapshotId] = useState<string | null>(
-    null,
-  );
+  const [focusedSnapshotId, setFocusedSnapshotId] = useState<string | null>(null);
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
-  const [pendingForkSnapshot, setPendingForkSnapshot] =
-    useState<SheetSnapshot | null>(null);
-  const [activeCell, setActiveCell] = useState<{
-    row: number;
-    col: string;
-  } | null>(null);
+  const [pendingForkSnapshot, setPendingForkSnapshot] = useState<SheetSnapshot | null>(null);
+  const [activeCell, setActiveCell] = useState<{ row: number; col: string } | null>(null);
 
   const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isPlayingRef = useRef(false);
 
-  // ── Merge timeline ─────────────────────────────────────────────────────
   const timeline = useMemo<TimelineEntry[]>(() => {
     const events: TimelineEntry[] = historyEntries.map((e) => ({
       kind: "event" as const,
@@ -142,7 +111,6 @@ export function useTimeTravel({
     });
   }, [historyEntries, snapshots]);
 
-  // ── Snapshots ──────────────────────────────────────────────────────────
   const refreshSnapshots = useCallback(async () => {
     if (!sheetId) return;
     setIsLoadingSnapshots(true);
@@ -158,7 +126,6 @@ export function useTimeTravel({
     if (isOpen) refreshSnapshots();
   }, [isOpen, refreshSnapshots]);
 
-  // ── Build State ────────────────────────────────────────────────────────
   const buildStateForIndex = useCallback(
     (targetIndex: number) => {
       const rows = currentRows.map((r) => ({ ...r }));
@@ -178,7 +145,6 @@ export function useTimeTravel({
               }
               colIdx -= 1;
               const rowIdx = parseInt(rowStr) - 1;
-
               if (rows[rowIdx] && cols[colIdx]) {
                 const colKey = cols[colIdx].key;
                 rows[rowIdx][colKey] = entry.oldValue;
@@ -216,7 +182,6 @@ export function useTimeTravel({
     [currentRows, currentColumns, timeline],
   );
 
-  // ── Seek / preview ─────────────────────────────────────────────────────
   const seekTo = useCallback(
     (index: number) => {
       const clamped = Math.max(0, Math.min(index, timeline.length - 1));
@@ -224,9 +189,7 @@ export function useTimeTravel({
       const entry = timeline[clamped];
       if (!entry) return;
 
-      // Extract cell information for highlighting
       let cellToHighlight: { row: number; col: string } | null = null;
-
       if (entry.kind === "event" && entry.action === "cell_edit") {
         const match = entry.detail?.match(/^Edited ([A-Z]+)(\d+)/);
         if (match) {
@@ -252,7 +215,6 @@ export function useTimeTravel({
     [timeline, buildStateForIndex, currentColumns],
   );
 
-  // ── Playback ───────────────────────────────────────────────────────────
   const stopTimer = useCallback(() => {
     if (playTimerRef.current) {
       clearInterval(playTimerRef.current);
@@ -275,11 +237,8 @@ export function useTimeTravel({
           setActiveCell(null);
           return prev;
         }
-
-        // Extract cell information for highlighting
         const entry = timeline[next];
         let cellToHighlight: { row: number; col: string } | null = null;
-
         if (entry.kind === "event" && entry.action === "cell_edit") {
           const match = entry.detail?.match(/^Edited ([A-Z]+)(\d+)/);
           if (match) {
@@ -292,14 +251,10 @@ export function useTimeTravel({
             colIdx -= 1;
             const rowIdx = parseInt(rowStr) - 1;
             if (currentColumns[colIdx]) {
-              cellToHighlight = {
-                row: rowIdx,
-                col: currentColumns[colIdx].key,
-              };
+              cellToHighlight = { row: rowIdx, col: currentColumns[colIdx].key };
             }
           }
         }
-
         setActiveCell(cellToHighlight);
         const { rows, cols } = buildStateForIndex(next);
         setPreviewRows(rows);
@@ -325,7 +280,6 @@ export function useTimeTravel({
 
   useEffect(() => () => stopTimer(), [stopTimer]);
 
-  // ── Panel ──────────────────────────────────────────────────────────────
   const openPanel = useCallback(() => setIsOpen(true), []);
   const closePanel = useCallback(() => {
     pause();
@@ -345,7 +299,6 @@ export function useTimeTravel({
     setFocusedSnapshotId(id);
   }, []);
 
-  // ── Snapshot CRUD ──────────────────────────────────────────────────────
   const saveSnapshot = useCallback(
     async (label?: string) => {
       const snap = await createSnapshot({
@@ -376,18 +329,6 @@ export function useTimeTravel({
     setSnapshots((p) => p.map((s) => (s.id === id ? { ...s, label } : s)));
   }, []);
 
-  // ── Branching ──────────────────────────────────────────────────────────
-
-  /**
-   * The real DB work. Called after the user confirms a name in the dialog.
-   *
-   * Key fixes vs the original:
-   *  1. Respects organizationId — forked org sheets go into the same org
-   *  2. is_personal is false when organizationId is set
-   *  3. Stores forked_from_sheet_id + forked_from_snapshot_label so the
-   *     new sheet's header can show "Forked from X"
-   *  4. Correctly serialises select_options on columns
-   */
   const _doBranch = useCallback(
     async (
       rows: SheetRow[],
@@ -404,7 +345,6 @@ export function useTimeTravel({
 
       const isOrg = !!organizationId;
 
-      // 1. Create the sheet record — same org/personal bucket as the source
       const { data: newSheet, error: sheetErr } = await supabase
         .from("sheets")
         .insert({
@@ -412,7 +352,6 @@ export function useTimeTravel({
           owner_id: uid,
           is_personal: !isOrg,
           organization_id: isOrg ? organizationId : null,
-          // Metadata so the dashboard and sheet header can show provenance
           forked_from_sheet_id: sheetId,
           forked_from_snapshot_label: sourceSnapshot.label ?? null,
           forked_at: new Date().toISOString(),
@@ -432,7 +371,6 @@ export function useTimeTravel({
 
       const newId: string = newSheet.id;
 
-      // 2. Insert columns — preserve type, width, position, select_options
       const colInserts = cols.map((c, i) => ({
         sheet_id: newId,
         column_key: c.key,
@@ -440,11 +378,9 @@ export function useTimeTravel({
         type: c.type ?? "text",
         width: c.width ?? 150,
         position: i,
-        // select_options is stored as jsonb in your schema
         select_options: c.selectOptions ?? null,
       }));
 
-      // 3. Insert rows — strip the React `id` into row_key, rest goes into data
       const rowInserts = rows.map((r, i) => {
         const { id, ...data } = r;
         return {
@@ -475,18 +411,17 @@ export function useTimeTravel({
     [sheetId, organizationId, onBranch],
   );
 
-  /** Step 1 — show the name dialog */
   const branchFromSnapshot = useCallback((snapshot: SheetSnapshot) => {
     setPendingForkSnapshot(snapshot);
   }, []);
 
-  /** Step 2 — user confirmed a name */
   const confirmBranch = useCallback(
     async (name: string) => {
       if (!pendingForkSnapshot) return;
       const snap = pendingForkSnapshot;
       setPendingForkSnapshot(null);
       await _doBranch(snap.rows_data, snap.columns_data, name.trim(), snap);
+      setForkedSnapshotIds((p) => new Set([...p, snap.id]));
     },
     [pendingForkSnapshot, _doBranch],
   );
@@ -508,9 +443,9 @@ export function useTimeTravel({
     [timeline, branchFromSnapshot],
   );
 
-  // ─────────────────────────────────────────────
   const state: TimeTravelState = {
     snapshots,
+    forkedSnapshotIds,
     timeline,
     playIndex,
     isPlaying,
@@ -546,27 +481,17 @@ export function useTimeTravel({
   return [state, actions];
 }
 
-// ─────────────────────────────────────────────
-//  UTILS
-// ─────────────────────────────────────────────
-
 function parseCreatedAt(s: string): number {
   if (!s) return 0;
   try {
-    // Handle relative time strings like "Just now", "5m ago", "2h ago", "Yesterday"
     if (s === "Just now") return Date.now();
     if (s === "Yesterday") return Date.now() - 86400000;
-
     const minMatch = s.match(/^(\d+)m ago$/);
     if (minMatch) return Date.now() - parseInt(minMatch[1]) * 60000;
-
     const hourMatch = s.match(/^(\d+)h ago$/);
     if (hourMatch) return Date.now() - parseInt(hourMatch[1]) * 3600000;
-
-    // Try parsing as ISO date string
     const date = new Date(s);
     if (!isNaN(date.getTime())) return date.getTime();
-
     return 0;
   } catch {
     return 0;
