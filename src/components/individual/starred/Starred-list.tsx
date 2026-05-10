@@ -9,7 +9,7 @@ import {
   starredColumns,
   StarredAction,
   NoStarredSheetsIcon,
-} from "@/data/tables/personalSheets/starredTableColumns";
+} from "@/data/tables/columns/starredTableColumns";
 import { Search, Grid3X3, List } from "lucide-react";
 
 interface StarredListProps {

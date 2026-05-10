@@ -316,8 +316,7 @@ export function OrgActivityPanel({ org }: { org: { id: string } }) {
 
   return (
     <div
-      className="rounded-3xl border border-border bg-card overflow-hidden flex flex-col"
-      style={{ minHeight: "65vh", maxHeight: "65vh" }}
+      className="rounded-3xl border border-border bg-card overflow-hidden flex flex-col h-[400px] md:h-[65vh]"
     >
       {/* Header */}
       <div className="px-4 pt-4 pb-3 shrink-0">
@@ -345,7 +344,7 @@ export function OrgActivityPanel({ org }: { org: { id: string } }) {
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      <div className="flex-1 overflow-y-auto px-2 pb-2 hide-scrollbar">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-2">
             <div className="h-5 w-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />

@@ -157,9 +157,18 @@ const ImportDropzone = () => {
             ),
           );
 
-          const title = file.name.replace(/\.(xlsx|xls|csv)$/i, "").trim();
+          // Ensure title always meets the 5-char minimum for createSheet validation
+          let title = file.name.replace(/\.(xlsx|xls|csv)$/i, "").trim();
+          if (title.length < 5) {
+            title = `Imported ${title || "Sheet"}`;
+          }
+          // Final safety: pad if still too short
+          while (title.length < 5) {
+            title = title + " Sheet";
+          }
+
           const created = await createSheet({
-            name: title.length >= 5 ? title : `Imported ${title || "Sheet"}`,
+            name: title,
             templateId: BLANK_TEMPLATE_ID,
           });
           await saveAllColumns(created.id, parsed.columns);
@@ -175,6 +184,7 @@ const ImportDropzone = () => {
           toast.success(
             `Imported ${parsed.source === "excel" ? "Excel" : "CSV"} file successfully.`,
           );
+          setBusy(false);
           router.push(`/sheet/${created.id}?imported=${parsed.source}`);
           return;
         } catch (error: any) {

@@ -32,11 +32,32 @@ import {
   Plus,
   Copy,
   BadgeDollarSign,
+  TableProperties,
+  BarChart3,
+  Layers,
+  ChevronDown,
+  MessageSquare,
+  FileSpreadsheet,
 } from "lucide-react";
 import { ColumnDef } from "@/types";
 
+/** Same actions as Sheet → Insert menu; omit handlers to hide that row. */
+export type ColumnHeaderInsertExtras = Partial<{
+  onTextColumn: () => void;
+  onChart: () => void;
+  onPivot: () => void;
+  onImageColumn: () => void;
+  onFunction: () => void;
+  onLinkColumn: () => void;
+  onCheckboxColumn: () => void;
+  onDropdownValidation: () => void;
+  onComments: () => void;
+  onNote: () => void;
+}>;
+
 interface ColumnHeaderMenuProps {
   column: ColumnDef;
+  insertExtras?: ColumnHeaderInsertExtras;
   onChangeType: (type: ColumnDef["type"]) => void;
   onDelete: () => void;
   onRename?: (newName: string) => void;
@@ -71,19 +92,16 @@ const COLUMN_TYPES = [
 ];
 
 const CURRENCY_CODES = [
-  "USD",
-  "EUR",
-  "GBP",
-  "PKR",
-  "INR",
-  "AED",
-  "JPY",
-  "CAD",
-  "AUD",
-];
+  "USD", "EUR", "GBP", "PKR", "INR", "AED", "JPY", "CAD", "AUD",
+  "CHF", "CNY", "HKD", "NZD", "SEK", "KRW", "SGD", "NOK", "MXN",
+  "RUB", "ZAR", "BRL", "TRY", "TWD", "DKK", "PLN", "THB", "IDR",
+  "HUF", "CZK", "ILS", "CLP", "PHP", "MYR", "COP", "SAR", "RON",
+  "VND", "EGP", "NGN", "BDT", "KES", "GHS", "TZS", "UGX", "MAD"
+].sort();
 
 export default function ColumnHeaderMenu({
   column,
+  insertExtras,
   onChangeType,
   onDelete,
   onRename,
@@ -103,11 +121,19 @@ export default function ColumnHeaderMenu({
   onSortDesc,
   onSetCurrency,
 }: ColumnHeaderMenuProps) {
+  const insertHasAny =
+    insertExtras &&
+    Object.values(insertExtras).some((fn) => typeof fn === "function");
   const [renameValue, setRenameValue] = useState(column.name);
   const [open, setOpen] = useState(false);
   const [colFormulaValue, setColFormulaValue] = useState(columnFormula || "");
   const [newOptionValue, setNewOptionValue] = useState("");
   const [widthValue, setWidthValue] = useState(String(column.width ?? 160));
+  const [currencySearch, setCurrencySearch] = useState("");
+
+  const filteredCurrencies = CURRENCY_CODES.filter((c) =>
+    c.toLowerCase().includes(currencySearch.toLowerCase())
+  );
 
   const handleRenameSubmit = () => {
     if (renameValue.trim() && onRename) {
@@ -120,8 +146,11 @@ export default function ColumnHeaderMenu({
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
-        if (v) setColFormulaValue(columnFormula || "");
-        if (v) setWidthValue(String(column.width ?? 160));
+        if (v) {
+          setColFormulaValue(columnFormula || "");
+          setWidthValue(String(column.width ?? 160));
+          setCurrencySearch("");
+        }
       }}
     >
       <DropdownMenuTrigger asChild>
@@ -136,7 +165,8 @@ export default function ColumnHeaderMenu({
 
       <DropdownMenuContent
         align="start"
-        className="w-64 rounded-xl border border-border/70 shadow-xl p-1.5"
+        collisionPadding={10}
+        className="w-64 z-[130] rounded-xl border border-border/70 shadow-xl p-1.5 max-h-[min(70vh,450px)] overflow-y-auto hide-scrollbar"
       >
         {/* ── Rename section ── */}
         {onRename && (
@@ -172,7 +202,7 @@ export default function ColumnHeaderMenu({
           <DropdownMenuSubTrigger className="text-xs">
             Change Column Type
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
+          <DropdownMenuSubContent collisionPadding={10}>
             {COLUMN_TYPES.map(({ type, label, icon: Icon }) => (
               <DropdownMenuItem
                 key={type}
@@ -188,6 +218,135 @@ export default function ColumnHeaderMenu({
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+
+        {insertHasAny && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2 flex items-center gap-1">
+              <Plus className="h-3 w-3" /> Insert…
+            </DropdownMenuLabel>
+            {insertExtras!.onTextColumn && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onTextColumn!();
+                  setOpen(false);
+                }}
+              >
+                <TableProperties className="h-3.5 w-3.5" />
+                Column (text column)
+              </DropdownMenuItem>
+            )}
+            {insertExtras!.onChart && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onChart!();
+                  setOpen(false);
+                }}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                Chart
+              </DropdownMenuItem>
+            )}
+            {insertExtras!.onPivot && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onPivot!();
+                  setOpen(false);
+                }}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Pivot table
+              </DropdownMenuItem>
+            )}
+            {insertExtras!.onImageColumn && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onImageColumn!();
+                  setOpen(false);
+                }}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Image column
+              </DropdownMenuItem>
+            )}
+            {insertExtras!.onFunction && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onFunction!();
+                  setOpen(false);
+                }}
+              >
+                <Sigma className="h-3.5 w-3.5" />
+                Function…
+              </DropdownMenuItem>
+            )}
+            {insertExtras!.onLinkColumn && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onLinkColumn!();
+                  setOpen(false);
+                }}
+              >
+                <Link className="h-3.5 w-3.5" />
+                Link column
+              </DropdownMenuItem>
+            )}
+            {insertExtras!.onCheckboxColumn && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onCheckboxColumn!();
+                  setOpen(false);
+                }}
+              >
+                <CheckSquare className="h-3.5 w-3.5" />
+                Checkbox column
+              </DropdownMenuItem>
+            )}
+            {insertExtras!.onDropdownValidation && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onDropdownValidation!();
+                  setOpen(false);
+                }}
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+                Dropdown (validation)
+              </DropdownMenuItem>
+            )}
+            {insertExtras!.onComments && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onComments!();
+                  setOpen(false);
+                }}
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                Comments panel
+              </DropdownMenuItem>
+            )}
+            {insertExtras!.onNote && (
+              <DropdownMenuItem
+                className="text-xs gap-2"
+                onClick={() => {
+                  insertExtras!.onNote!();
+                  setOpen(false);
+                }}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Note
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
 
         {/* ── Column width (mobile-friendly) ── */}
         {onSetWidth && (
@@ -237,19 +396,37 @@ export default function ColumnHeaderMenu({
                 <BadgeDollarSign className="h-3 w-3" />
                 Currency ({column.currencyCode || "USD"})
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {CURRENCY_CODES.map((code) => (
-                  <DropdownMenuItem
-                    key={code}
-                    onClick={() => onSetCurrency(code)}
-                    className="text-xs gap-2"
-                  >
-                    {code}
-                    {(column.currencyCode || "USD") === code && (
-                      <span className="ml-auto text-primary">✓</span>
-                    )}
-                  </DropdownMenuItem>
-                ))}
+              <DropdownMenuSubContent collisionPadding={10} className="w-48">
+                <div className="p-1.5">
+                  <input
+                    className="w-full h-8 px-2.5 text-xs rounded-md border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="Search currency..."
+                    value={currencySearch}
+                    onChange={(e) => setCurrencySearch(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+                <div className="max-h-[min(50vh,300px)] overflow-y-auto hide-scrollbar">
+                  {filteredCurrencies.length === 0 ? (
+                    <div className="p-2 text-center text-xs text-muted-foreground">
+                      No currency found
+                    </div>
+                  ) : (
+                    filteredCurrencies.map((code) => (
+                      <DropdownMenuItem
+                        key={code}
+                        onClick={() => onSetCurrency(code)}
+                        className="text-xs gap-2"
+                      >
+                        {code}
+                        {(column.currencyCode || "USD") === code && (
+                          <span className="ml-auto text-primary">✓</span>
+                        )}
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </div>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           </>
@@ -291,30 +468,15 @@ export default function ColumnHeaderMenu({
                 Duplicate column
               </DropdownMenuItem>
             )}
-            {(onSortAsc || onSortDesc) && (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="text-xs">
-                  Sort
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  {onSortAsc && (
-                    <DropdownMenuItem
-                      onClick={onSortAsc}
-                      className="text-xs gap-2"
-                    >
-                      A → Z
-                    </DropdownMenuItem>
-                  )}
-                  {onSortDesc && (
-                    <DropdownMenuItem
-                      onClick={onSortDesc}
-                      className="text-xs gap-2"
-                    >
-                      Z → A
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+            {onSortAsc && (
+              <DropdownMenuItem onClick={onSortAsc} className="text-xs gap-2">
+                Sort A → Z
+              </DropdownMenuItem>
+            )}
+            {onSortDesc && (
+              <DropdownMenuItem onClick={onSortDesc} className="text-xs gap-2">
+                Sort Z → A
+              </DropdownMenuItem>
             )}
             {onClearColumn && (
               <DropdownMenuItem

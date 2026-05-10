@@ -77,7 +77,7 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
           {/* Source filter pills */}
           {(
             [
-              { key: "all", label: "All files", count: tableRows.length },
+              { key: "all", label: "All files", count: tableRows.length, icon: undefined },
               { key: "personal", label: "Personal", count: personalCount, icon: FolderOpen },
               { key: "organization", label: "Organizations", count: orgCount, icon: Building2 },
             ] as const
@@ -85,11 +85,10 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
             <button
               key={key}
               onClick={() => setSourceFilter(key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                sourceFilter === key
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${sourceFilter === key
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-              }`}
+                }`}
             >
               {Icon && <Icon className="h-3 w-3" />}
               {label}

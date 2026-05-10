@@ -60,9 +60,9 @@ const RecentSheets = () => {
   }, []);
 
   return (
-    <section className="h-full flex flex-col">
+    <section className="h-full min-h-0 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-base font-semibold">Recent Sheets</h2>
@@ -78,8 +78,8 @@ const RecentSheets = () => {
         </Button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1">
+      {/* Content — scroll inside card (parent caps height on dashboard) */}
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 -mr-0.5">
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (

@@ -16,9 +16,8 @@ import { DataTable } from "@/components/common/Data-table";
 import {
   peopleColumns,
   peopleAction,
-  NoPeopleIcon,
 } from "@/data/tables/columns/peopleTableColumns";
-import { Search, Filter, Grid3X3, List } from "lucide-react";
+import { Search, Filter, Grid3X3, List, UserX } from "lucide-react";
 import type { PersonData } from "@/lib/querys/people/people";
 
 interface PeopleListProps {
@@ -26,7 +25,10 @@ interface PeopleListProps {
   organizations: { id: string; name: string }[];
 }
 
-const PeopleList: React.FC<PeopleListProps> = ({ people, organizations }) => {
+const PeopleList: React.FC<PeopleListProps> = ({
+  people,
+  organizations,
+}) => {
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [orgFilter, setOrgFilter] = useState("all");
@@ -41,7 +43,7 @@ const PeopleList: React.FC<PeopleListProps> = ({ people, organizations }) => {
       const matchesOrg =
         orgFilter === "all" ||
         person.organizations.some((org) =>
-          org.toLowerCase().includes(orgFilter.toLowerCase()),
+          org.toLowerCase().includes(orgFilter.toLowerCase())
         );
 
       const matchesStatus =
@@ -51,7 +53,6 @@ const PeopleList: React.FC<PeopleListProps> = ({ people, organizations }) => {
     });
   }, [people, searchQuery, orgFilter, statusFilter]);
 
-  // Derive unique org names for the filter dropdown
   const uniqueOrgs = useMemo(() => {
     const seen = new Set<string>();
     return organizations.filter((org) => {
@@ -77,6 +78,7 @@ const PeopleList: React.FC<PeopleListProps> = ({ people, organizations }) => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Organization Filter */}
           <Select value={orgFilter} onValueChange={setOrgFilter}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All Organizations" />
@@ -91,6 +93,7 @@ const PeopleList: React.FC<PeopleListProps> = ({ people, organizations }) => {
             </SelectContent>
           </Select>
 
+          {/* Status Filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-32">
               <SelectValue placeholder="All Status" />
@@ -103,6 +106,7 @@ const PeopleList: React.FC<PeopleListProps> = ({ people, organizations }) => {
             </SelectContent>
           </Select>
 
+          {/* Reset Filters */}
           <Button
             variant="outline"
             size="icon"
@@ -116,6 +120,7 @@ const PeopleList: React.FC<PeopleListProps> = ({ people, organizations }) => {
             <Filter className="h-4 w-4" />
           </Button>
 
+          {/* View Toggle */}
           <Tabs
             value={viewMode}
             onValueChange={(v) => setViewMode(v as "cards" | "table")}
@@ -132,7 +137,7 @@ const PeopleList: React.FC<PeopleListProps> = ({ people, organizations }) => {
         </div>
       </div>
 
-      {/* People List / Table */}
+      {/* Table View */}
       {viewMode === "table" ? (
         <DataTable
           columns={peopleColumns}
@@ -141,9 +146,10 @@ const PeopleList: React.FC<PeopleListProps> = ({ people, organizations }) => {
           action={peopleAction}
           emptyText="No people found"
           emptyDescription="Invite team members to collaborate on your sheets."
-          emptyIcon={<NoPeopleIcon />}
+          emptyIcon={<UserX className="h-10 w-10 text-muted-foreground" />}
         />
       ) : (
+        /* Cards View */
         <>
           {filteredPeople.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

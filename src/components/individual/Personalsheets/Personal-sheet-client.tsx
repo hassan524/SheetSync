@@ -152,33 +152,50 @@ function SheetsPageClient({ initialFolders }: Props) {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {/* Grid / Table view toggle */}
+            <Tabs
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as "grid" | "table")}
+            >
+              <TabsList className="h-9 p-0.5">
+                <TabsTrigger value="grid" className="h-8 w-8 p-0">
+                  <Grid3X3 className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="table" className="h-8 w-8 p-0">
+                  <List className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             <Button
               onClick={() => setNewFolderOpen(true)}
               variant="outline"
               size="sm"
-              className="h-9 w-9 p-0"
+              className="h-9 gap-1.5"
             >
               <FolderPlus className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs">Folder</span>
             </Button>
             <Button
               onClick={() => setNewSheetOpen(true)}
               size="sm"
-              className="h-9 w-9 p-0"
+              className="h-9 gap-1.5"
             >
               <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs">New Sheet</span>
             </Button>
           </div>
         </div>
 
         {/* Info */}
-        <div className="flex items-start gap-3 rounded-xl border bg-muted/40 px-4 py-3">
+        <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
           <Info className="h-4 w-4 text-muted-foreground mt-0.5" />
           <p className="text-xs text-muted-foreground">
             Personal sheets are organized into folders...
           </p>
         </div>
 
-        {/* Stats */}
+        {/* Stats — same card treatment as Recent / Dashboard */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[
             {
@@ -187,28 +204,65 @@ function SheetsPageClient({ initialFolders }: Props) {
               icon: FileSpreadsheet,
               toggle: false,
               description: "In selected folder",
+              accent: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
             },
             {
               label: "Starred",
               value: starredCount,
               icon: Star,
               toggle: true,
-              description: "Click to filter",
+              description: "Tap to filter starred",
+              accent: "bg-amber-500/10 text-amber-600 border-amber-500/20",
             },
             {
               label: "Recent",
               value: recentCount,
               icon: Clock4,
               toggle: false,
-              description: "Last 72 hours",
+              description: "Edited last 72 hours",
+              accent: "bg-blue-500/10 text-blue-600 border-blue-500/20",
             },
-          ].map(({ label, value, icon: Icon, toggle, description }) => {
+          ].map(({ label, value, icon: Icon, toggle, description, accent }) => {
             const isActive = toggle && onlyStarred;
+            const inner = (
+              <>
+                <div className={cn("h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center shrink-0 border", accent)}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 text-left">
+                  <p className="text-lg font-bold leading-none">{value}</p>
+                  <p className="text-xs font-medium text-foreground mt-0.5 truncate">
+                    {label}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground hidden sm:block truncate">
+                    {description}
+                  </p>
+                </div>
+              </>
+            );
+            if (toggle) {
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setOnlyStarred((v) => !v)}
+                  className={`flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 text-left transition-all hover:border-primary/25 hover:shadow-sm ${
+                    isActive
+                      ? "ring-2 ring-amber-400/25 border-amber-400/30 bg-amber-50/30"
+                      : ""
+                  }`}
+                >
+                  {inner}
+                </button>
+              );
+            }
             return (
-              <button key={label}>
-                <Icon className="h-4 w-4" />
-                {value} {label}
-              </button>
+              <div
+                key={label}
+                className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3"
+              >
+                {inner}
+              </div>
             );
           })}
         </div>
@@ -228,6 +282,7 @@ function SheetsPageClient({ initialFolders }: Props) {
           searchQuery={searchQuery}
           folderName={currentFolderData?.name || ""}
           onNewSheet={() => setNewSheetOpen(true)}
+          onViewModeChange={(v) => setViewMode(v)}
         />
       </div>
 

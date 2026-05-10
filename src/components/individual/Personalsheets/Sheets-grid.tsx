@@ -3,7 +3,8 @@
 import { Sheet } from "@/types";
 import SheetCard from "@/components/sheets/Sheet-card";
 import { Button } from "@/components/ui/button";
-import { FileSpreadsheet, FolderOpen, Plus } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileSpreadsheet, FolderOpen, Plus, Grid3X3, List } from "lucide-react";
 import { formatDistanceToNowStrict, parseISO } from "date-fns";
 import { DataTable } from "@/components/common/Data-table";
 import {
@@ -20,6 +21,7 @@ interface Props {
   folderName: string;
   onNewSheet: () => void;
   onDeleted?: (id: string) => void;
+  onViewModeChange?: (mode: "grid" | "table") => void;
 }
 
 const SheetsGrid = ({
@@ -28,6 +30,7 @@ const SheetsGrid = ({
   searchQuery,
   folderName,
   onNewSheet,
+  onViewModeChange,
 }: Props) => {
   const tableRows: UniversalSheetRow[] = sheets.map((s) => ({
     id: s.id,
@@ -57,6 +60,23 @@ const SheetsGrid = ({
             {sheets.length}
           </span>
         </div>
+
+        {/* Inline view toggle */}
+        {onViewModeChange && (
+          <Tabs
+            value={viewMode}
+            onValueChange={(v) => onViewModeChange(v as "grid" | "table")}
+          >
+            <TabsList className="h-8 p-0.5">
+              <TabsTrigger value="grid" className="h-7 w-8 p-0">
+                <Grid3X3 className="h-3.5 w-3.5" />
+              </TabsTrigger>
+              <TabsTrigger value="table" className="h-7 w-8 p-0">
+                <List className="h-3.5 w-3.5" />
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
       </div>
 
       {/* Empty state */}

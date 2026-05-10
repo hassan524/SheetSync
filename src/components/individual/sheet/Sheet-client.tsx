@@ -82,6 +82,7 @@ import {
   Clock,
   ChevronRight,
   X,
+  Link,
   Send,
   MoreHorizontal,
   Sparkles,
@@ -336,16 +337,12 @@ export default function SheetClient() {
     Record<string, string[]>
   >({});
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
-  const [topMenuOpen, setTopMenuOpen] = useState<
-    null | "file" | "insert" | "view" | "extensions"
-  >(null);
   const [showDesktopTip, setShowDesktopTip] = useState(true);
   const [validationDialog, setValidationDialog] = useState<{
     open: boolean;
     scope: "cell" | "column";
     optionsText: string;
   }>({ open: false, scope: "column", optionsText: "" });
-  const topMenuRef = useRef<HTMLDivElement | null>(null);
   const chartsHydratedRef = useRef(false);
   const rowResizeRef = useRef<{
     rowId: string;
@@ -452,15 +449,6 @@ export default function SheetClient() {
       setRightPanel("charts");
     }
   }, [charts.activeChartId]);
-
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      if (!topMenuRef.current) return;
-      if (!topMenuRef.current.contains(e.target as Node)) setTopMenuOpen(null);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
 
   useEffect(() => {
     if (!sheetId) return;
@@ -1436,15 +1424,23 @@ export default function SheetClient() {
   );
 
   const openValidationDialog = useCallback(
-    (scope: "cell" | "column" = "column") => {
-      if (!selectedCell) {
+    (
+      scope: "cell" | "column" = "column",
+      anchor?: { row: number; colKey: string },
+    ) => {
+      const row = anchor?.row ?? selectedCell?.row;
+      const colKey = anchor?.colKey ?? selectedCell?.col;
+      if (row === undefined || !colKey) {
         toast.info("Select a cell first.");
         return;
       }
+      if (anchor) {
+        setSelectedCell({ row: anchor.row, col: anchor.colKey });
+      }
       const seed =
         scope === "cell"
-          ? cellSelectOptions[`${selectedCell.row}-${selectedCell.col}`]
-          : columns.find((c) => c.key === selectedCell.col)?.selectOptions;
+          ? cellSelectOptions[`${row}-${colKey}`]
+          : columns.find((c) => c.key === colKey)?.selectOptions;
       setValidationDialog({
         open: true,
         scope,
@@ -2002,6 +1998,31 @@ export default function SheetClient() {
               )}
               <ColumnHeaderMenu
                 column={col}
+                insertExtras={{
+                  onTextColumn: () => handleInsertColumn("text"),
+                  onChart: () =>
+                    charts.insertChart(
+                      "column",
+                      rows,
+                      columns,
+                      getSuggestedChartPreset("column"),
+                    ),
+                  onPivot: () => toast.info("Pivot table added soon"),
+                  onImageColumn: () => handleInsertColumn("image"),
+                  onFunction: () => setShowFormulaDialog(true),
+                  onLinkColumn: () => handleInsertColumn("url"),
+                  onCheckboxColumn: () => handleInsertColumn("checkbox"),
+                  onDropdownValidation: () =>
+                    openValidationDialog("cell", {
+                      row: 0,
+                      colKey: col.key,
+                    }),
+                  ...(isOrgSheet
+                    ? { onComments: () => setRightPanel("comments") }
+                    : {}),
+                  onNote: () =>
+                    toast.info("Notes support coming soon"),
+                }}
                 onChangeType={(t) => handleChangeColumnType(col.key, t)}
                 onDelete={() => handleDeleteColumn(col.key)}
                 onRename={(newName) => {
@@ -2415,6 +2436,10 @@ export default function SheetClient() {
     handleApplyFormulaToColumn,
     handleRemoveColumnFormula,
     isOrgSheet,
+    handleInsertColumn,
+    charts,
+    getSuggestedChartPreset,
+    openValidationDialog,
   ]);
 
   const filteredRows = useMemo<SheetRow[]>(() => {
@@ -2507,7 +2532,7 @@ export default function SheetClient() {
               <Input
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                className="sheet-title-input h-7 border-0 bg-transparent font-semibold text-[13px] focus-visible:ring-1 px-1 rounded-md w-24 sm:w-44 md:w-52 min-w-0"
+                className="sheet-title-input h-7 border-0 bg-transparent font-semibold not-italic text-[13px] tracking-tight focus-visible:ring-1 px-1.5 rounded-md w-24 sm:w-44 md:w-56 min-w-0"
               />
               <button
                 onClick={handleStarredToggle}
@@ -2615,135 +2640,246 @@ export default function SheetClient() {
             </div>
           </div>
 
-          <div
-            ref={topMenuRef}
-            className="relative flex items-center gap-1 sm:gap-2 shrink-0 ml-1 overflow-x-auto no-scrollbar"
-          >
-            {(["file", "insert", "view", "extensions"] as const).map((menu) => (
-              <button
-                key={menu}
-                className="h-7 px-2 text-[13px] font-medium rounded hover:bg-black/5"
-                onClick={() =>
-                  setTopMenuOpen((p) => (p === menu ? null : menu))
-                }
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 ml-1 min-w-0 overflow-visible [&_[data-slot=dropdown-menu-trigger]]:shrink-0 hide-scrollbar">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`sheet-menu-trigger h-7 px-2 text-[13px] font-semibold rounded-md outline-none transition-colors ${
+                    isDark
+                      ? "hover:bg-white/10 data-[state=open]:bg-white/[0.08]"
+                      : "hover:bg-black/[0.06] data-[state=open]:bg-black/[0.08]"
+                  }`}
+                >
+                  File
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                sideOffset={6}
+                style={ddStyle(isDark)}
+                className="w-52 z-[130] rounded-lg shadow-lg sheet-scrollbar max-h-[min(70vh,420px)] overflow-y-auto p-1"
               >
-                {menu.charAt(0).toUpperCase() + menu.slice(1)}
-              </button>
-            ))}
-            {topMenuOpen === "file" && (
-              <div className="absolute top-8 left-0 z-50 w-52 rounded-md border bg-white shadow-lg p-1">
+                <DropdownMenuLabel
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                >
+                  Download
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator
+                  style={{ background: isDark ? "#1e2330" : "#e8eaed" }}
+                />
+                <DropdownMenuItem
+                  className="text-xs"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => handleExport("xlsx")}
+                >
+                  <Layers className="h-3.5 w-3.5 opacity-70" />
+                  Excel (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => handleExport("csv")}
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 opacity-70" />
+                  CSV (.csv)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => handleExport("pdf")}
+                >
+                  <Printer className="h-3.5 w-3.5 opacity-70" />
+                  PDF (.pdf)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
-                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
+                  type="button"
+                  className={`sheet-menu-trigger h-7 px-2 text-[13px] font-semibold rounded-md outline-none transition-colors ${
+                    isDark
+                      ? "hover:bg-white/10 data-[state=open]:bg-white/[0.08]"
+                      : "hover:bg-black/[0.06] data-[state=open]:bg-black/[0.08]"
+                  }`}
+                >
+                  Insert
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                sideOffset={6}
+                style={ddStyle(isDark)}
+                className="w-[17rem] z-[130] rounded-lg shadow-lg sheet-scrollbar max-h-[min(70vh,460px)] overflow-y-auto p-1"
+              >
+                <DropdownMenuLabel
+                  className="text-[10px] uppercase tracking-wider"
+                  style={{ color: isDark ? "#4a5568" : "#9ca3af" }}
+                >
+                  Insert into sheet
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator
+                  style={{ background: isDark ? "#1e2330" : "#e8eaed" }}
+                />
+                <DropdownMenuItem
+                  className="text-xs gap-2"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => handleInsertColumn("text")}
+                >
+                  <TableProperties className="h-3.5 w-3.5 shrink-0" />
+                  Column (text column)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs gap-2"
+                  style={ddItemStyle(isDark)}
                   onClick={() => {
-                    handleExport("xlsx");
-                    setTopMenuOpen(null);
+                    charts.insertChart(
+                      "column",
+                      rows,
+                      columns,
+                      getSuggestedChartPreset("column"),
+                    );
                   }}
                 >
-                  Download Excel
-                </button>
-                <button
-                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
-                  onClick={() => {
-                    handleExport("csv");
-                    setTopMenuOpen(null);
-                  }}
+                  <BarChart3 className="h-3.5 w-3.5 shrink-0" />
+                  Chart
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs gap-2"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => toast.info("Pivot table added soon")}
                 >
-                  Download CSV
-                </button>
-                <button
-                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
-                  onClick={() => {
-                    handleExport("pdf");
-                    setTopMenuOpen(null);
-                  }}
+                  <Layers className="h-3.5 w-3.5 shrink-0" />
+                  Pivot table
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs gap-2"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => handleInsertColumn("image")}
                 >
-                  Download PDF
-                </button>
-              </div>
-            )}
-            {topMenuOpen === "insert" && (
-              <div className="absolute top-8 left-14 z-50 w-64 rounded-md border bg-white shadow-lg p-1 max-h-[70vh] overflow-y-auto sheet-scrollbar">
-                {[
-                  { label: "Pre-built tables", icon: TableProperties, action: () => handleInsertColumn("text") },
-                  {
-                    label: "Chart",
-                    icon: BarChart3,
-                    action: () => {
-                      charts.insertChart(
-                        "column",
-                        rows,
-                        columns,
-                        getSuggestedChartPreset("column"),
-                      );
-                      setTopMenuOpen(null);
-                    },
-                  },
-                  { label: "Pivot table", icon: Layers, action: () => toast.info("Pivot table added soon") },
-                  { label: "Image", icon: FileSpreadsheet, action: () => handleInsertColumn("image") },
-                  { label: "Function", icon: Sigma, action: () => setShowFormulaDialog(true) },
-                  { label: "Link", icon: Link, action: () => handleInsertColumn("url") },
-                  {
-                    label: "Checkbox",
-                    icon: CheckSquare,
-                    action: () => {
-                      handleInsertColumn("checkbox");
-                      setTopMenuOpen(null);
-                    },
-                  },
-                  {
-                    label: "Dropdown",
-                    icon: ChevronDown,
-                    action: () => {
-                      openValidationDialog("cell");
-                      setTopMenuOpen(null);
-                    },
-                  },
-                  { label: "Comment", icon: MessageSquare, action: () => setRightPanel("comments") },
-                  { label: "Note", icon: FileSpreadsheet, action: () => toast.info("Notes support coming soon") },
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded flex items-center gap-2"
-                    onClick={item.action}
+                  <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
+                  Image column
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs gap-2"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => setShowFormulaDialog(true)}
+                >
+                  <Sigma className="h-3.5 w-3.5 shrink-0" />
+                  Function…
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs gap-2"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => handleInsertColumn("url")}
+                >
+                  <Link className="h-3.5 w-3.5 shrink-0" />
+                  Link column
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs gap-2"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => handleInsertColumn("checkbox")}
+                >
+                  <CheckSquare className="h-3.5 w-3.5 shrink-0" />
+                  Checkbox column
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs gap-2"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => openValidationDialog("cell")}
+                >
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                  Dropdown (validation)
+                </DropdownMenuItem>
+                {isOrgSheet ? (
+                  <DropdownMenuItem
+                    className="text-xs gap-2"
+                    style={ddItemStyle(isDark)}
+                    onClick={() => setRightPanel("comments")}
                   >
-                    <item.icon className="h-3.5 w-3.5" />
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            {topMenuOpen === "view" && (
-              <div className="absolute top-8 left-28 z-50 w-52 rounded-md border bg-white shadow-lg p-1">
+                    <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                    Comments panel
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuItem
+                  className="text-xs gap-2"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => toast.info("Notes support coming soon")}
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
+                  Note
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
-                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
-                  onClick={() => {
-                    setShowFilters((v) => !v);
-                    setTopMenuOpen(null);
-                  }}
+                  type="button"
+                  className={`sheet-menu-trigger h-7 px-2 text-[13px] font-semibold rounded-md outline-none transition-colors ${
+                    isDark
+                      ? "hover:bg-white/10 data-[state=open]:bg-white/[0.08]"
+                      : "hover:bg-black/[0.06] data-[state=open]:bg-black/[0.08]"
+                  }`}
+                >
+                  View
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                sideOffset={6}
+                style={ddStyle(isDark)}
+                className="w-52 z-[130] rounded-lg shadow-lg p-1"
+              >
+                <DropdownMenuItem
+                  className="text-xs"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => setShowFilters((v) => !v)}
                 >
                   Toggle filter bar
-                </button>
-                <button
-                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
-                  onClick={() => {
-                    setIsDark((v) => !v);
-                    setTopMenuOpen(null);
-                  }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  style={ddItemStyle(isDark)}
+                  onClick={() => setIsDark((v) => !v)}
                 >
-                  Toggle theme
-                </button>
-              </div>
-            )}
-            {topMenuOpen === "extensions" && (
-              <div className="absolute top-8 left-44 z-50 w-52 rounded-md border bg-white shadow-lg p-1">
+                  Toggle theme (light/dark sheet)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
-                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-100 rounded"
+                  type="button"
+                  className={`sheet-menu-trigger h-7 px-2 text-[13px] font-semibold rounded-md outline-none transition-colors ${
+                    isDark
+                      ? "hover:bg-white/10 data-[state=open]:bg-white/[0.08]"
+                      : "hover:bg-black/[0.06] data-[state=open]:bg-black/[0.08]"
+                  }`}
+                >
+                  Extensions
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                sideOffset={6}
+                style={ddStyle(isDark)}
+                className="w-52 z-[130] rounded-lg shadow-lg p-1"
+              >
+                <DropdownMenuItem
+                  className="text-xs"
+                  style={ddItemStyle(isDark)}
                   onClick={() => toast.info("Extensions coming soon")}
                 >
                   Extensions coming soon
-                </button>
-              </div>
-            )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {isOrgSheet && liveTracking && (
               <div className="sheet-live-pill hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -2858,7 +2994,7 @@ export default function SheetClient() {
           className="sheet-toolbar sheet-formatting-bar border-b shrink-0"
           style={{ height: "40px" }}
         >
-          <div className="h-full flex items-center px-2 gap-0.5 overflow-x-auto no-scrollbar min-w-0">
+          <div className="h-full flex items-center px-2 gap-0.5 overflow-x-auto hide-scrollbar min-w-0">
             <IconBtn
               icon={Undo2}
               tooltip="Undo"
@@ -2879,7 +3015,7 @@ export default function SheetClient() {
               onValueChange={(v) => handleZoomChange(Number(v))}
             >
               <SelectTrigger
-                className="sheet-select h-7 w-[68px] text-[11px] rounded-md px-2 border shrink-0"
+                className="sheet-select h-7 w-[68px] text-[11px] not-italic rounded-md px-2 border shrink-0"
                 style={selStyle}
               >
                 <SelectValue />
@@ -2919,7 +3055,7 @@ export default function SheetClient() {
             <ToolSep />
             <Select value={fontFamily} onValueChange={handleFontFamilyChange}>
               <SelectTrigger
-                className="sheet-select h-7 w-[100px] text-[11px] rounded-md px-2 border shrink-0"
+                className="sheet-select h-7 w-[100px] text-[11px] not-italic rounded-md px-2 border shrink-0"
                 style={selStyle}
               >
                 <SelectValue />
@@ -2953,7 +3089,7 @@ export default function SheetClient() {
             </Select>
             <Select value={fontSize} onValueChange={handleFontSizeChange}>
               <SelectTrigger
-                className="sheet-select h-7 w-[54px] text-[11px] rounded-md px-2 border ml-1 shrink-0"
+                className="sheet-select h-7 w-[54px] text-[11px] not-italic tabular-nums rounded-md px-2 border ml-1 shrink-0"
                 style={selStyle}
               >
                 <SelectValue />
@@ -3007,7 +3143,8 @@ export default function SheetClient() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="w-56 max-h-72 overflow-y-auto sheet-scrollbar"
+                collisionPadding={10}
+                className="w-56 max-h-[min(60vh,300px)] overflow-y-auto hide-scrollbar"
                 style={ddStyle(isDark)}
               >
                 <DropdownMenuLabel
@@ -3470,7 +3607,7 @@ export default function SheetClient() {
           className="sheet-actionbar border-b shrink-0"
           style={{ height: "36px" }}
         >
-          <div className="h-full flex items-center px-2 gap-0.5 overflow-x-auto no-scrollbar">
+          <div className="h-full flex items-center px-2 gap-0.5 overflow-x-auto hide-scrollbar">
             {sheetState.userRole !== "viewer" && (
               <>
                 <Tooltip>
@@ -3511,7 +3648,8 @@ export default function SheetClient() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="start"
-                    className="w-44"
+                    collisionPadding={10}
+                    className="w-44 max-h-[min(60vh,300px)] overflow-y-auto hide-scrollbar"
                     style={ddStyle(isDark)}
                   >
                     <DropdownMenuLabel

@@ -65,18 +65,20 @@ export function OrgHeader({ org }: OrgHeaderProps) {
           <Button
             variant="outline"
             size="sm"
-            className="h-9 w-9 p-0"
+            className="h-9 gap-1.5"
             onClick={() => setInviteOpen(true)}
           >
             <UserPlus className="h-4 w-4" />
+            <span className="hidden sm:inline text-xs">Invite</span>
           </Button>
 
           <Button
             size="sm"
-            className="h-9 w-9 p-0"
+            className="h-9 gap-1.5"
             onClick={() => setNewSheetOpen(true)}
           >
             <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline text-xs">New Sheet</span>
           </Button>
 
           <Button

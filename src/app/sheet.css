@@ -99,6 +99,25 @@
   background: var(--sh-div);
 }
 
+/* ─── Mobile: fixed toolbar height & no scrollbar ────────────────────────── */
+@media (max-width: 768px) {
+  .sheet-toolbar,
+  .sheet-formatting-bar {
+    max-height: 44px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .sheet-toolbar::-webkit-scrollbar,
+  .sheet-formatting-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .sheet-root {
+    overflow-x: hidden;
+  }
+}
+
 /* ─── Header / Title ─────────────────────────────────────────────────────── */
 .sheet-app-icon {
   background: var(--primary);
@@ -116,6 +135,8 @@
 .sheet-title-input {
   color: var(--sh-text) !important;
   font-size: 13.5px;
+  font-style: normal;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 

@@ -19,6 +19,7 @@ import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { createSheet } from "@/lib/querys/sheets/sheets";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { toast } from "sonner";
+import { ICON_MAP } from "@/constants/Sheet-templates";
 
 export interface UseTemplateModalProps {
   open: boolean;
@@ -44,7 +45,7 @@ const UseTemplateModal = ({
   const router = useRouter();
 
   const template = SHEET_TEMPLATES.find((t) => t.id === templateId);
-  const Icon = template?.icon;
+  const Icon = template ? ICON_MAP[template.iconName] : null;
   const copy = template?.copy;
   const accent = template?.accent;
 

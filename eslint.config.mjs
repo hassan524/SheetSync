@@ -32,7 +32,7 @@ const eslintConfig = [
       "@typescript-eslint/no-unused-expressions": "off",
       "react-hooks/exhaustive-deps": "off",
       "react-hooks/set-state-in-effect": "off",
-      "@next/next/no-img-element": "off",
+      "@next/next/no-img-element": "warn",
 
       // only keep this one — unused vars is actually useful
       "@typescript-eslint/no-unused-vars": "warn",

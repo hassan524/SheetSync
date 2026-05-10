@@ -78,7 +78,7 @@ export function DataTable<T>({
           "border rounded-xl overflow-hidden flex flex-col items-center justify-center gap-5 p-10 text-center bg-card/30",
           className,
         )}
-        style={{ minHeight: "65vh" }}
+        style={{ minHeight: "min(400px, 65vh)" }}
       >
         <div className="text-muted-foreground/50 p-5 bg-muted/20 rounded-2xl">
           {emptyIcon ?? <DefaultEmptyIcon />}
@@ -98,11 +98,11 @@ export function DataTable<T>({
     <div
       className={cn(
         "border rounded-xl overflow-hidden flex flex-col shadow-sm",
+        "h-[400px] md:h-[65vh]",
         className,
       )}
-      style={{ minHeight: "65vh", maxHeight: "65vh" }}
     >
-      <div className="overflow-x-auto overflow-y-auto flex-1 scrollbar-thin">
+      <div className="overflow-x-auto overflow-y-auto flex-1 hide-scrollbar">
         <table className="w-full border-collapse" style={{ minWidth: "600px" }}>
           <colgroup>
             {columns.map((col) => (

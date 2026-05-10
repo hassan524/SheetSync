@@ -188,6 +188,7 @@ function buildOptions(
     },
     colors,
     theme: { mode: isDark ? "dark" : "light" },
+
     legend: {
       show: chart.showLegend && !isMobile,
       position: "bottom",
@@ -196,24 +197,31 @@ function buildOptions(
       markers: { size: 5 },
       itemMargin: { horizontal: 6 },
     },
-    tooltip: { theme: isDark ? "dark" : "light", style: { fontSize: "12px" } },
+
+    tooltip: {
+      theme: isDark ? "dark" : "light",
+      style: { fontSize: "12px" },
+    },
+
     stroke: {
       curve: "smooth",
       width: chart.kind === "line" || chart.kind === "area" ? 2.5 : 0,
     },
+
     fill: {
       opacity: chart.kind === "area" ? 0.18 : 1,
       type: chart.kind === "area" ? "gradient" : "solid",
       gradient:
         chart.kind === "area"
           ? {
-              shadeIntensity: 1,
-              opacityFrom: 0.25,
-              opacityTo: 0.02,
-              stops: [0, 100],
-            }
+            shadeIntensity: 1,
+            opacityFrom: 0.25,
+            opacityTo: 0.02,
+            stops: [0, 100],
+          }
           : undefined,
     },
+
     dataLabels: {
       enabled: chart.showLabels,
       style: { fontSize: "10px", fontWeight: 600 },
@@ -225,40 +233,44 @@ function buildOptions(
             : val.toFixed(1)
           : String(val),
     },
+
     grid: {
       show: chart.showGrid && !isPolar && !isRadar,
       borderColor: gridC,
       strokeDashArray: 3,
       padding: { left: 2, right: 2, top: 0, bottom: 0 },
     },
+
     ...(!isPolar &&
       !isRadar && {
-        xaxis: {
-          categories,
-          labels: {
-            style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
-            rotate,
-            trim: true,
-            maxHeight,
-            hideOverlappingLabels: true,
-          },
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-          tickAmount: Math.min(categories.length, chart.maxXLabels ?? 12),
+      xaxis: {
+        categories,
+        labels: {
+          style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
+          rotate,
+          trim: true,
+          maxHeight,
+          hideOverlappingLabels: true,
         },
-        yaxis: {
-          labels: {
-            style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
-            formatter: (val: number) =>
-              typeof val === "number"
-                ? val >= 1000
-                  ? `${(val / 1000).toFixed(1)}k`
-                  : String(Math.round(val))
-                : String(val),
-          },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        tickAmount: Math.min(categories.length, chart.maxXLabels ?? 12),
+      },
+      yaxis: {
+        labels: {
+          style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
+          formatter: (val: number) =>
+            typeof val === "number"
+              ? val >= 1000
+                ? `${(val / 1000).toFixed(1)}k`
+                : String(Math.round(val))
+              : String(val),
         },
-      }),
+      },
+    }),
+
     ...(isPolar && { labels: categories }),
+
     plotOptions: {
       bar: {
         horizontal: chart.kind === "bar",
@@ -267,19 +279,39 @@ function buildOptions(
           Math.min(70, Math.max(20, 80 - categories.length * 2)) + "%",
         barHeight: "60%",
       },
+
       pie: {
         donut: {
           size: "55%",
           labels: {
             show: chart.showLabels,
+
+            // ✅ CORRECT styling places
+            name: {
+              color: textC,
+              fontSize: "12px",
+            },
+            value: {
+              color: textC,
+              fontSize: "12px",
+            },
+
+            // ✅ FIXED: removed invalid `style`
             total: {
               show: chart.showLabels,
               label: "Total",
-              style: { color: textC, fontSize: "12px" },
+              formatter: (w: any) => {
+                const sum = w.globals.seriesTotals.reduce(
+                  (a: number, b: number) => a + b,
+                  0,
+                );
+                return String(sum);
+              },
             },
           },
         },
       },
+
       radar: {
         polygons: {
           strokeColors: gridC,
@@ -538,7 +570,7 @@ export default function ChartWidget({
     chart.dataMode === "sheet"
       ? !chart.labelColumnKey || (!isCat && chart.seriesKeys.length === 0)
       : chart.manualCategories.length === 0 ||
-        chart.manualSeries.every((s) => s.values.length === 0);
+      chart.manualSeries.every((s) => s.values.length === 0);
 
   // ── Theme ──
   const accent = "#1a7a4a";

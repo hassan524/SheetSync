@@ -94,7 +94,9 @@ const sheetColumns = [
 
         <div>
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium">{s.title}</span>
+            <span className="text-sm font-medium text-primary hover:underline cursor-pointer transition-colors">
+              {s.title}
+            </span>
             {s.is_starred && (
               <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
             )}
@@ -268,6 +270,7 @@ export function OrgTablesPanel({ org }: { org: Organization }) {
           rows={sheets}
           getKey={(s) => s.id}
           action={sheetAction}
+          onRowClick={(s) => router.push(`/sheet/${s.id}`)}
           emptyText="No sheets"
           emptyIcon={<NoSheetsIcon />}
         />

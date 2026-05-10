@@ -70,12 +70,14 @@ const Index = async () => {
         {/* Templates — above recent sheets, just like original */}
         <TemplatePicker />
 
-        {/* Recent Sheets + Activity Panel — equal-height side-by-side */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
-          <div className="lg:col-span-2 flex flex-col">
-            <RecentSheets />
+        {/* Recent Sheets + Activity — same max height, scroll inside (matches Recent page rhythm) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch min-h-0">
+          <div className="lg:col-span-2 flex flex-col min-h-0 max-h-[min(70vh,640px)]">
+            <div className="rounded-xl border border-border bg-card flex flex-col min-h-0 h-full overflow-hidden p-4 sm:p-5">
+              <RecentSheets />
+            </div>
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col min-h-0 max-h-[min(70vh,640px)]">
             <DashboardPanel />
           </div>
         </div>

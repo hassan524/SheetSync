@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 
-const BASE_URL = "https://yoursite.com";
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL || "https://sheetsync.app";
 
 type SEOProps = {
   title: string;
@@ -14,15 +15,15 @@ export function generateSEO({
   title,
   description,
   path = "/",
-  ogImage = "/og/default-og.png",
+  ogImage = "/og-image.png",
   noIndex = false,
 }: SEOProps): Metadata {
-  const url = `${BASE_URL}${path}`;
+  const url = `${APP_URL}${path}`;
 
   return {
     title,
     description,
-    metadataBase: new URL(BASE_URL),
+    metadataBase: new URL(APP_URL),
     alternates: { canonical: url },
     openGraph: {
       title,
