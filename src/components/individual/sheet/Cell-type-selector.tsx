@@ -17,6 +17,7 @@ import {
   AlertCircle,
   ChevronDown,
   BarChart2,
+  ListChecks,
 } from "lucide-react";
 import { ColumnDef } from "@/types";
 
@@ -35,6 +36,7 @@ const CELL_TYPES = [
   { type: "url" as const, label: "URL", icon: Link },
   { type: "priority" as const, label: "Priority", icon: AlertCircle },
   { type: "status" as const, label: "Status", icon: AlertCircle },
+  { type: "select" as const, label: "Dropdown", icon: ListChecks },
   { type: "progress" as const, label: "Progress", icon: BarChart2 },
 ];
 
@@ -60,7 +62,11 @@ export default function CellTypeSelector({
           <ChevronDown className="h-3 w-3 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-40">
+      <DropdownMenuContent
+        align="start"
+        collisionPadding={10}
+        className="sheet-scrollbar w-40 max-h-72 overflow-y-auto"
+      >
         {CELL_TYPES.map(({ type, label, icon: ItemIcon }) => (
           <DropdownMenuItem
             key={type}

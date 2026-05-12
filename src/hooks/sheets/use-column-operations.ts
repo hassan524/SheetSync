@@ -3,6 +3,17 @@ import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { SheetRow, ColumnDef } from "@/types";
 
+function columnIndexToName(index: number): string {
+  let n = index + 1;
+  let name = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    name = String.fromCharCode(65 + rem) + name;
+    n = Math.floor((n - 1) / 26);
+  }
+  return name;
+}
+
 export function useColumnOperations(
   rows: SheetRow[],
   columns: ColumnDef[],
@@ -17,7 +28,7 @@ export function useColumnOperations(
       const newKey = `col_${Date.now()}`;
       const newColumn: ColumnDef = {
         key: newKey,
-        name: `Column ${columns.length + 1}`,
+        name: columnIndexToName(columns.length),
         width: 150,
         editable: true,
         resizable: true,

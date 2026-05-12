@@ -20,6 +20,30 @@ interface SelectOptionsDialogProps {
   isDark?: boolean;
 }
 
+const OPTION_PALETTE = [
+  "#e0f2fe",
+  "#d1fae5",
+  "#ffedd5",
+  "#ede9fe",
+  "#ffe4e6",
+  "#cffafe",
+  "#fef3c7",
+  "#dcfce7",
+  "#f3e8ff",
+  "#e0e7ff",
+];
+
+function getOptionBgStyle(label: string) {
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
+  }
+  return {
+    color: "#1f2937",
+    backgroundColor: OPTION_PALETTE[hash % OPTION_PALETTE.length],
+  };
+}
+
 export default function SelectOptionsDialog({
   open,
   onClose,
@@ -34,7 +58,11 @@ export default function SelectOptionsDialog({
   }, [open, initialOptions]);
 
   const parsedOptions = useMemo(
-    () => input.split(",").map((o) => o.trim()).filter(Boolean),
+    () =>
+      input
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean),
     [input],
   );
 
@@ -64,9 +92,15 @@ export default function SelectOptionsDialog({
             <ListChecks className="h-4 w-4 text-primary" />
             Set Select Options
           </DialogTitle>
-          <DialogDescription style={{ color: d ? "#8892a4" : "#6b7280" }} className="text-xs">
+          <DialogDescription
+            style={{ color: d ? "#8892a4" : "#6b7280" }}
+            className="text-xs"
+          >
             Enter options separated by commas. e.g.{" "}
-            <code style={{ background: d ? "#1e2330" : "#f3f4f6" }} className="px-1 rounded">
+            <code
+              style={{ background: d ? "#1e2330" : "#f3f4f6" }}
+              className="px-1 rounded"
+            >
               Laptop, Phone, iPad
             </code>
           </DialogDescription>
@@ -85,38 +119,48 @@ export default function SelectOptionsDialog({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleConfirm();
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey))
+                handleConfirm();
             }}
           />
 
           {parsedOptions.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: d ? "#4a5568" : "#9ca3af" }}>
+              <p
+                className="text-[10px] font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: d ? "#4a5568" : "#9ca3af" }}
+              >
                 Preview
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {parsedOptions.map((opt, i) => (
-                  <span
-                    key={i}
-                    className="sheet-badge-pill text-[11px]"
-                    style={{
-                      color: d ? "#93c5fd" : "#1e40af",
-                      backgroundColor: d ? "rgba(37,99,235,0.15)" : "#dbeafe",
-                    }}
-                  >
-                    {opt}
-                  </span>
-                ))}
+                {parsedOptions.map((opt, i) => {
+                  const optionStyle = getOptionBgStyle(opt);
+                  return (
+                    <span
+                      key={i}
+                      className="sheet-badge-pill text-[11px]"
+                      style={optionStyle}
+                    >
+                      {opt}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
         </div>
 
-        <DialogFooter className="gap-2 pt-1 border-t" style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}>
+        <DialogFooter
+          className="gap-2 pt-1 border-t"
+          style={{ borderColor: d ? "#1e2330" : "#e5e7eb" }}
+        >
           <button
             onClick={onClose}
             className="text-xs px-3 py-1.5 rounded border transition-colors"
-            style={{ borderColor: d ? "#1e2330" : "#e5e7eb", color: d ? "#8892a4" : "#374151" }}
+            style={{
+              borderColor: d ? "#1e2330" : "#e5e7eb",
+              color: d ? "#8892a4" : "#374151",
+            }}
           >
             Cancel
           </button>

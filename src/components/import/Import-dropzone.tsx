@@ -27,6 +27,18 @@ interface ImportedFile {
 }
 
 const BLANK_TEMPLATE_ID = "f628aed8-bca7-4f51-b687-6db9f932be34";
+const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
+
+function columnIndexToName(index: number): string {
+  let n = index + 1;
+  let name = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    name = String.fromCharCode(65 + rem) + name;
+    n = Math.floor((n - 1) / 26);
+  }
+  return name;
+}
 
 function normalizeValue(v: unknown): string | number | boolean {
   if (v === null || v === undefined) return "";
@@ -42,17 +54,54 @@ function normalizeValue(v: unknown): string | number | boolean {
   return s;
 }
 
-function inferType(values: Array<string | number | boolean>): ColumnDef["type"] {
-  const nonEmpty = values.filter((v) => v !== "" && v !== null && v !== undefined);
+function inferType(
+  values: Array<string | number | boolean>,
+): ColumnDef["type"] {
+  const nonEmpty = values.filter(
+    (v) => v !== "" && v !== null && v !== undefined,
+  );
   if (nonEmpty.length === 0) return "text";
   const allBool = nonEmpty.every((v) => typeof v === "boolean");
   if (allBool) return "checkbox";
   const allNum = nonEmpty.every((v) => typeof v === "number");
   if (allNum) return "number";
+  const asText = nonEmpty.map((v) => String(v).trim());
+  const allDates = asText.every((v) => !Number.isNaN(Date.parse(v)));
+  if (allDates) return "date";
+  const statusValues = new Set([
+    "todo",
+    "to do",
+    "not started",
+    "in progress",
+    "in review",
+    "done",
+    "blocked",
+  ]);
+  if (asText.every((v) => statusValues.has(v.toLowerCase()))) return "status";
+  const priorityValues = new Set([
+    "low",
+    "medium",
+    "high",
+    "critical",
+    "urgent",
+  ]);
+  if (asText.every((v) => priorityValues.has(v.toLowerCase())))
+    return "priority";
+  const unique = new Set(asText.map((v) => v.toLowerCase()));
+  if (
+    unique.size > 1 &&
+    unique.size <= 12 &&
+    unique.size <= nonEmpty.length / 2
+  ) {
+    return "select";
+  }
   return "text";
 }
 
-function buildImportedSheetData(file: File, buffer: ArrayBuffer): {
+function buildImportedSheetData(
+  file: File,
+  buffer: ArrayBuffer,
+): {
   columns: ColumnDef[];
   rows: SheetRow[];
   source: "csv" | "excel";
@@ -79,11 +128,11 @@ function buildImportedSheetData(file: File, buffer: ArrayBuffer): {
   const headers = Array.from({ length: maxCols }, (_, i) => {
     const val = rawHeader?.[i];
     const title = val ? String(val).trim() : "";
-    return title || `Column ${i + 1}`;
+    return title || columnIndexToName(i);
   });
 
   const columns: ColumnDef[] = headers.map((h, idx) => ({
-    key: `col${idx}`,
+    key: `col_${idx}`,
     name: h,
     width: 160,
     editable: true,
@@ -98,13 +147,22 @@ function buildImportedSheetData(file: File, buffer: ArrayBuffer): {
     return mapped;
   });
 
-  columns.forEach((c, ci) => {
+  columns.forEach((c) => {
     c.type = inferType(rows.map((r) => r[c.key]));
+    if (c.type === "select") {
+      c.selectOptions = Array.from(
+        new Set(
+          rows
+            .map((r) => r[c.key])
+            .filter((v) => v !== null && v !== undefined && v !== "")
+            .map((v) => String(v)),
+        ),
+      ).slice(0, 24);
+    }
   });
 
   const lower = file.name.toLowerCase();
-  const source: "csv" | "excel" =
-    lower.endsWith(".csv") ? "csv" : "excel";
+  const source: "csv" | "excel" = lower.endsWith(".csv") ? "csv" : "excel";
   return { columns, rows, source };
 }
 
@@ -144,6 +202,14 @@ const ImportDropzone = () => {
 
       for (const file of selectedFiles) {
         try {
+          if (file.size > MAX_IMPORT_BYTES) {
+            throw new Error("File is larger than the 50 MB import limit.");
+          }
+          if (!/\.(csv|xlsx|xls)$/i.test(file.name)) {
+            throw new Error(
+              "Unsupported file type. Upload a CSV, XLSX, or XLS file.",
+            );
+          }
           setFiles((prev) =>
             prev.map((f) =>
               f.name === file.name ? { ...f, progress: 25 } : f,
@@ -208,13 +274,16 @@ const ImportDropzone = () => {
     [router],
   );
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    importFiles(droppedFiles);
-  }, [importFiles]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      importFiles(droppedFiles);
+    },
+    [importFiles],
+  );
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {

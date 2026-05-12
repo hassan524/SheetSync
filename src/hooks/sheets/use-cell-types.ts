@@ -36,6 +36,7 @@ export function useCellTypes(
       if (newType === "checkbox") row[colKey] = false;
       else if (newType === "priority") row[colKey] = "low";
       else if (newType === "status") row[colKey] = "todo";
+      else if (newType === "select") row[colKey] = "";
       else if (newType === "date")
         row[colKey] = new Date().toISOString().split("T")[0];
       else if (

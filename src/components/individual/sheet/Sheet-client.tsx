@@ -54,8 +54,6 @@ import {
   Download,
   Share2,
   Star,
-  CheckSquare,
-  Square,
   GripVertical,
   GitBranch,
   Calendar,
@@ -232,6 +230,97 @@ interface SheetState {
 
 const Avatar = SheetAvatar;
 const WORKING_MIN_ROWS = 1200;
+const ROW_CELL_TYPES_KEY = "__cellTypes";
+const ROW_CELL_SELECT_OPTIONS_KEY = "__cellSelectOptions";
+
+function columnIndexToName(index: number): string {
+  let n = index + 1;
+  let name = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    name = String.fromCharCode(65 + rem) + name;
+    n = Math.floor((n - 1) / 26);
+  }
+  return name;
+}
+
+function isGeneratedColumnName(name?: string): boolean {
+  if (!name) return true;
+  return /^Column\s+\d+$/i.test(name) || /^[A-Z]{1,3}$/.test(name);
+}
+
+function normalizeGeneratedColumnNames(cols: ColumnDef[]): ColumnDef[] {
+  return cols.map((col, index) =>
+    isGeneratedColumnName(col.name)
+      ? { ...col, name: columnIndexToName(index) }
+      : col,
+  );
+}
+
+const OPTION_PALETTE = [
+  "#e0f2fe",
+  "#d1fae5",
+  "#ffedd5",
+  "#ede9fe",
+  "#ffe4e6",
+  "#cffafe",
+  "#fef3c7",
+  "#dcfce7",
+  "#f3e8ff",
+  "#e0e7ff",
+];
+
+function getOptionBgStyle(label: string) {
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
+  }
+  return {
+    color: "#1f2937",
+    backgroundColor: OPTION_PALETTE[hash % OPTION_PALETTE.length],
+  };
+}
+
+function getDefaultValueForType(type: ColumnDef["type"]) {
+  if (type === "checkbox") return false;
+  if (type === "priority") return "Low";
+  if (type === "status") return "To Do";
+  if (type === "date") return new Date().toISOString().split("T")[0];
+  if (type === "number" || type === "currency" || type === "progress") return 0;
+  return "";
+}
+
+type FilterOperator =
+  | "contains"
+  | "equals"
+  | "not_equals"
+  | "empty"
+  | "not_empty"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte";
+
+type AdvancedFilterRule = {
+  id: string;
+  columnKey: string;
+  operator: FilterOperator;
+  value: string;
+};
+
+function getStatusOptionStyle(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return (
+    Object.entries(STATUS_COLORS).find(
+      ([key]) => key.toLowerCase() === normalized,
+    )?.[1] ??
+    [...PRIORITY_OPTIONS, ...STATUS_OPTIONS].find(
+      (option) =>
+        option.value.toLowerCase() === normalized ||
+        option.label.toLowerCase() === normalized,
+    )
+  );
+}
 
 function buildEmptyRow(index: number, columns: ColumnDef[]): SheetRow {
   const row: SheetRow = { id: String(index + 1) };
@@ -306,6 +395,9 @@ export default function SheetClient() {
   const [showFilters, setShowFilters] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [filterValue, setFilterValue] = useState("");
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterRule[]>(
+    [],
+  );
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showFormulaDialog, setShowFormulaDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -364,8 +456,9 @@ export default function SheetClient() {
   const [selectSetupDialog, setSelectSetupDialog] = useState<{
     open: boolean;
     colKey: string | null;
-    mode: "insert" | "change";
-  }>({ open: false, colKey: null, mode: "insert" });
+    row: number | null;
+    mode: "insert" | "change" | "cell";
+  }>({ open: false, colKey: null, row: null, mode: "insert" });
 
   const rowsHistory = useHistory<SheetRow[]>([]);
   const columnsHistory = useHistory<ColumnDef[]>([]);
@@ -383,25 +476,25 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: "edited cells",
           target: sheetTitle || title,
-        }).catch(() => { });
+        }).catch(() => {});
       }, 30000);
     },
     [sheetId, organizationId, title],
   );
 
-  const formatting = useSheetFormatting(() => { });
-  const textWrap = useTextWrap(rows, () => { });
-  const clipboard = useClipboard(rows, rowsHistory, () => { });
-  const protection = useProtectedCells(() => { });
-  const rowOps = useRowOperations(rows, columns, rowsHistory, () => { });
+  const formatting = useSheetFormatting(() => {});
+  const textWrap = useTextWrap(rows, () => {});
+  const clipboard = useClipboard(rows, rowsHistory, () => {});
+  const protection = useProtectedCells(() => {});
+  const rowOps = useRowOperations(rows, columns, rowsHistory, () => {});
   const colOps = useColumnOperations(
     rows,
     columns,
     columnsHistory,
     rowsHistory,
-    () => { },
+    () => {},
   );
-  const cellTypes = useCellTypes(rows, rowsHistory, () => { });
+  const cellTypes = useCellTypes(rows, rowsHistory, () => {});
   const formulas = useFormulas(rows, columns);
 
   const [timeTravelState, timeTravelActions] = useTimeTravel({
@@ -466,7 +559,8 @@ export default function SheetClient() {
             const selectByCell: Record<string, string[]> = {};
             Object.entries(data.cellFormats).forEach(([key, fmt]) => {
               const opts = (fmt as any)?.selectOptions;
-              if (Array.isArray(opts) && opts.length > 0) selectByCell[key] = opts;
+              if (Array.isArray(opts) && opts.length > 0)
+                selectByCell[key] = opts;
             });
             if (Object.keys(selectByCell).length > 0) {
               setCellSelectOptions(selectByCell);
@@ -483,6 +577,31 @@ export default function SheetClient() {
             protection.setProtectedCells(data.protectedCells);
           if (wrapSet.size > 0) textWrap.setTextWrapColumns(wrapSet);
           const bufferedRows = ensureWorkingRowBuffer(data.rows, data.columns);
+          const typeOverrides: Record<string, ColumnDef["type"]> = {};
+          const rowSelectOptions: Record<string, string[]> = {};
+          bufferedRows.forEach((row, rowIdx) => {
+            const rowTypes = row[ROW_CELL_TYPES_KEY];
+            if (rowTypes && typeof rowTypes === "object") {
+              Object.entries(rowTypes).forEach(([colKey, type]) => {
+                typeOverrides[`${rowIdx}-${colKey}`] =
+                  type as ColumnDef["type"];
+              });
+            }
+            const rowSelects = row[ROW_CELL_SELECT_OPTIONS_KEY];
+            if (rowSelects && typeof rowSelects === "object") {
+              Object.entries(rowSelects).forEach(([colKey, options]) => {
+                if (Array.isArray(options) && options.length > 0) {
+                  rowSelectOptions[`${rowIdx}-${colKey}`] = options.map(String);
+                }
+              });
+            }
+          });
+          if (Object.keys(typeOverrides).length > 0) {
+            cellTypes.setCellTypeOverrides(typeOverrides);
+          }
+          if (Object.keys(rowSelectOptions).length > 0) {
+            setCellSelectOptions((prev) => ({ ...prev, ...rowSelectOptions }));
+          }
           rowsHistory.pushState(bufferedRows);
           columnsHistory.pushState(data.columns);
           const userRole =
@@ -490,7 +609,7 @@ export default function SheetClient() {
               ? data.ownerId === currentUser.id
                 ? "owner"
                 : orgMembers.find((m) => m.id === currentUser.id)?.role ||
-                "viewer"
+                  "viewer"
               : "owner";
 
           setSheetState({
@@ -816,7 +935,7 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: "inserted a row",
           target: title,
-        }).catch(() => { });
+        }).catch(() => {});
       } catch {
         toast.error("Row added locally but failed to persist.");
         setSaveStatus("saved");
@@ -851,7 +970,7 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: `deleted ${count} row${count > 1 ? "s" : ""}`,
           target: title,
-        }).catch(() => { });
+        }).catch(() => {});
       }, 50);
     } catch {
       toast.error("Row deleted locally but failed to persist.");
@@ -872,20 +991,29 @@ export default function SheetClient() {
   const handleInsertColumn = useCallback(
     async (type: ColumnDef["type"]) => {
       if (type === "select") {
-        setSelectSetupDialog({ open: true, colKey: "__new__", mode: "insert" });
+        setSelectSetupDialog({
+          open: true,
+          colKey: "__new__",
+          row: null,
+          mode: "insert",
+        });
         return;
       }
       colOps.insertColumn(type);
       setTimeout(async () => {
         markSaving();
+        const normalizedCols = normalizeGeneratedColumnNames(
+          columnsHistory.currentState,
+        );
+        columnsHistory.pushState(normalizedCols);
+        setSheetState((p) => ({ ...p, columns: normalizedCols }));
         await Promise.all([
-          saveAllColumns(sheetId, columnsHistory.currentState),
+          saveAllColumns(sheetId, normalizedCols),
           saveAllRows(sheetId, rowsHistory.currentState),
         ]);
         markSaved();
         if (isOrgSheet) {
-          const nc =
-            columnsHistory.currentState[columnsHistory.currentState.length - 1];
+          const nc = normalizedCols[normalizedCols.length - 1];
           logColAdd(sheetId, nc?.name ?? "Column", type ?? "text");
         }
         logActivity({
@@ -893,7 +1021,7 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: `added a column (${type ?? "text"})`,
           target: title,
-        }).catch(() => { });
+        }).catch(() => {});
       }, 50);
     },
     [
@@ -927,7 +1055,7 @@ export default function SheetClient() {
           organizationId: organizationId ?? undefined,
           action: `deleted column "${colName}"`,
           target: title,
-        }).catch(() => { });
+        }).catch(() => {});
       }, 50);
     },
     [
@@ -947,7 +1075,7 @@ export default function SheetClient() {
   const handleChangeColumnType = useCallback(
     async (colKey: string, newType: ColumnDef["type"]) => {
       if (newType === "select") {
-        setSelectSetupDialog({ open: true, colKey, mode: "change" });
+        setSelectSetupDialog({ open: true, colKey, row: null, mode: "change" });
         return;
       }
       colOps.changeColumnType(colKey, newType);
@@ -972,7 +1100,7 @@ export default function SheetClient() {
 
   const handleSelectSetupConfirm = useCallback(
     async (options: string[]) => {
-      const { colKey, mode } = selectSetupDialog;
+      const { colKey, mode, row } = selectSetupDialog;
       if (mode === "insert") {
         colOps.insertColumn("select");
         setTimeout(async () => {
@@ -980,8 +1108,10 @@ export default function SheetClient() {
           const updatedCols = columnsHistory.currentState;
           const newCol = updatedCols[updatedCols.length - 1];
           if (newCol) {
-            const withOptions = updatedCols.map((c) =>
-              c.key === newCol.key ? { ...c, selectOptions: options } : c,
+            const withOptions = normalizeGeneratedColumnNames(
+              updatedCols.map((c) =>
+                c.key === newCol.key ? { ...c, selectOptions: options } : c,
+              ),
             );
             columnsHistory.pushState(withOptions);
             setSheetState((p) => ({ ...p, columns: withOptions }));
@@ -996,7 +1126,7 @@ export default function SheetClient() {
               organizationId: organizationId ?? undefined,
               action: "added a select column",
               target: title,
-            }).catch(() => { });
+            }).catch(() => {});
           }
           markSaved();
         }, 50);
@@ -1007,10 +1137,10 @@ export default function SheetClient() {
           const updatedCols = columnsHistory.currentState.map((c) =>
             c.key === colKey
               ? {
-                ...c,
-                type: "select" as ColumnDef["type"],
-                selectOptions: options,
-              }
+                  ...c,
+                  type: "select" as ColumnDef["type"],
+                  selectOptions: options,
+                }
               : c,
           );
           columnsHistory.pushState(updatedCols);
@@ -1021,6 +1151,34 @@ export default function SheetClient() {
           ]);
           markSaved();
         }, 50);
+      } else if (mode === "cell" && colKey && row !== null) {
+        const cellKey = `${row}-${colKey}`;
+        cellTypes.setCellTypeOverrides((prev) => ({
+          ...prev,
+          [cellKey]: "select",
+        }));
+        setCellSelectOptions((prev) => ({ ...prev, [cellKey]: options }));
+        const updatedRows = rows.map((r, idx) => {
+          if (idx !== row) return r;
+          return {
+            ...r,
+            [colKey]: "",
+            [ROW_CELL_TYPES_KEY]: {
+              ...(r[ROW_CELL_TYPES_KEY] ?? {}),
+              [colKey]: "select",
+            },
+            [ROW_CELL_SELECT_OPTIONS_KEY]: {
+              ...(r[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}),
+              [colKey]: options,
+            },
+          };
+        });
+        rowsHistory.pushState(updatedRows);
+        setSheetState((p) => ({ ...p, rows: updatedRows }));
+        markSaving();
+        await saveAllRows(sheetId, updatedRows);
+        markSaved();
+        toast.success("Cell dropdown saved");
       }
     },
     [
@@ -1034,6 +1192,9 @@ export default function SheetClient() {
       isOrgSheet,
       organizationId,
       title,
+      rows,
+      cellTypes,
+      setSheetState,
     ],
   );
 
@@ -1199,7 +1360,7 @@ export default function SheetClient() {
         name:
           mode === "duplicate" && base?.name
             ? `${base.name} copy`
-            : `Column ${columns.length + 1}`,
+            : columnIndexToName(Math.max(0, Math.min(columns.length, index))),
         width: base?.width ?? 150,
         editable: true,
         resizable: true,
@@ -1214,8 +1375,12 @@ export default function SheetClient() {
 
       const nextCols = [...columns];
       nextCols.splice(Math.max(0, Math.min(nextCols.length, index)), 0, newCol);
-      columnsHistory.pushState(nextCols);
-      setSheetState((p) => ({ ...p, columns: nextCols }));
+      const namedCols =
+        mode === "duplicate"
+          ? nextCols
+          : normalizeGeneratedColumnNames(nextCols);
+      columnsHistory.pushState(namedCols);
+      setSheetState((p) => ({ ...p, columns: namedCols }));
 
       const nextRows = rows.map((r) => {
         const nr: any = { ...r };
@@ -1412,6 +1577,52 @@ export default function SheetClient() {
     [columns, columnsHistory, sheetId, markSaving, markSaved],
   );
 
+  const handleSelectedCellTypeChange = useCallback(
+    (type: ColumnDef["type"]) => {
+      if (!selectedCell) return;
+      if (type === "select") {
+        const cellKey = `${selectedCell.row}-${selectedCell.col}`;
+        setSelectSetupDialog({
+          open: true,
+          colKey: selectedCell.col,
+          row: selectedCell.row,
+          mode: "cell",
+        });
+        if (cellSelectOptions[cellKey]?.length > 0) return;
+        return;
+      }
+
+      const cellKey = `${selectedCell.row}-${selectedCell.col}`;
+      cellTypes.setCellTypeOverrides((prev) => ({ ...prev, [cellKey]: type }));
+      const updatedRows = rows.map((row, idx) => {
+        if (idx !== selectedCell.row) return row;
+        return {
+          ...row,
+          [selectedCell.col]: getDefaultValueForType(type),
+          [ROW_CELL_TYPES_KEY]: {
+            ...(row[ROW_CELL_TYPES_KEY] ?? {}),
+            [selectedCell.col]: type,
+          },
+        };
+      });
+      rowsHistory.pushState(updatedRows);
+      setSheetState((p) => ({ ...p, rows: updatedRows }));
+      saveAllRows(sheetId, updatedRows).catch(() => {
+        toast.error("Failed to save cell type");
+      });
+      toast.success(`Cell changed to ${type}`);
+    },
+    [
+      selectedCell,
+      cellTypes,
+      rows,
+      rowsHistory,
+      sheetId,
+      cellSelectOptions,
+      setSheetState,
+    ],
+  );
+
   const groupedCommentsForPanel = useMemo(() => {
     const result: Record<string, any[]> = {};
     Object.entries(comments).forEach(([cellKey, cellComments]) => {
@@ -1429,9 +1640,9 @@ export default function SheetClient() {
             createdAt: r.createdAt,
             timestamp: r.createdAt
               ? new Date(r.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
               : "just now",
           })),
       }));
@@ -1521,11 +1732,9 @@ export default function SheetClient() {
       const cellComments = getCellComments(rowIdx, colKey);
       const commentKey = `${rowIdx}-${colKey}`;
       const isWrapped = textWrap.textWrapColumns.has(`${rowIdx}-${colKey}`);
-      const horizontalAlign = (cellStyle.textAlign as
-        | "left"
-        | "center"
-        | "right"
-        | undefined) ?? undefined;
+      const horizontalAlign =
+        (cellStyle.textAlign as "left" | "center" | "right" | undefined) ??
+        undefined;
       const activeCollabEntry = Object.values(activeCursors).find(
         (c) => c.row === rowIdx && c.col === colKey,
       );
@@ -1541,12 +1750,7 @@ export default function SheetClient() {
         switch (type) {
           case "status":
           case "priority": {
-            const val = String(displayValue ?? "")
-              .trim()
-              .toLowerCase();
-            const opt = Object.entries(STATUS_COLORS).find(
-              ([k]) => k.toLowerCase() === val,
-            )?.[1];
+            const opt = getStatusOptionStyle(String(displayValue ?? ""));
             if (!opt)
               return <span className="sheet-cell-text">{displayValue}</span>;
             return (
@@ -1561,12 +1765,10 @@ export default function SheetClient() {
           case "checkbox":
             return displayValue ? (
               <span className="h-6 w-6 rounded-md bg-emerald-500/15 border border-emerald-600/60 flex items-center justify-center">
-                <CheckSquare className="h-4.5 w-4.5 text-emerald-700" />
+                <Check className="h-4 w-4 text-emerald-700" />
               </span>
             ) : (
-              <span className="h-6 w-6 rounded-md bg-white border-2 border-gray-500/70 flex items-center justify-center">
-                <Square className="h-4.5 w-4.5 text-gray-400" />
-              </span>
+              <span className="h-5 w-5 rounded border border-gray-400/80 bg-white" />
             );
           case "date":
             return displayValue ? (
@@ -1648,6 +1850,7 @@ export default function SheetClient() {
           }
           case "select": {
             const val = String(displayValue ?? "");
+            const optionStyle = getOptionBgStyle(val);
             if (!val)
               return (
                 <span className="text-gray-300 text-[10px] italic">
@@ -1655,10 +1858,7 @@ export default function SheetClient() {
                 </span>
               );
             return (
-              <span
-                className="sheet-badge-pill"
-                style={{ color: "#1e40af", backgroundColor: "#dbeafe" }}
-              >
+              <span className="sheet-badge-pill" style={optionStyle}>
                 {val}
               </span>
             );
@@ -1696,9 +1896,9 @@ export default function SheetClient() {
             ...cellStyle,
             ...(activeCollab
               ? {
-                outline: `2px solid ${activeCollab.color}`,
-                outlineOffset: "-2px",
-              }
+                  outline: `2px solid ${activeCollab.color}`,
+                  outlineOffset: "-2px",
+                }
               : {}),
           }}
           onClick={() => {
@@ -1782,7 +1982,7 @@ export default function SheetClient() {
       if (hadChange) {
         logCellEditActivity(title);
         maybeAutoSnapshot(sheetId, updatedRows, columns, currentUser?.id).catch(
-          () => { },
+          () => {},
         );
       }
     },
@@ -1897,32 +2097,10 @@ export default function SheetClient() {
               {[...textWrap.textWrapColumns].some((k) =>
                 k.endsWith(`-${col.key}`),
               ) && (
-                  <WrapText className="h-3 w-3 text-primary flex-shrink-0 opacity-60" />
-                )}
+                <WrapText className="h-3 w-3 text-primary flex-shrink-0 opacity-60" />
+              )}
               <ColumnHeaderMenu
                 column={col}
-                insertExtras={{
-                  onTextColumn: () => handleInsertColumn("text"),
-                  onChart: () => {
-                    charts.insertChart(
-                      "column",
-                      rows,
-                      columns,
-                      getSuggestedChartPreset("column"),
-                    );
-                    setRightPanel("charts");
-                  },
-                  onPivot: () => toast.info("Pivot table added soon"),
-                  onImageColumn: () => handleInsertColumn("image"),
-                  onFunction: () => openFormulaPanel(),
-                  onLinkColumn: () => handleInsertColumn("url"),
-                  onCheckboxColumn: () => handleInsertColumn("checkbox"),
-                  ...(isOrgSheet
-                    ? { onComments: () => setRightPanel("comments") }
-                    : {}),
-                  onNote: () =>
-                    toast.info("Notes support coming soon"),
-                }}
                 onChangeType={(t) => handleChangeColumnType(col.key, t)}
                 onDelete={() => handleDeleteColumn(col.key)}
                 onRename={(newName) => {
@@ -2042,7 +2220,8 @@ export default function SheetClient() {
 
             const onTextChange = (v: string) => {
               const allowed =
-                (cellSelectOptions[cellKey] && cellSelectOptions[cellKey].length > 0
+                (cellSelectOptions[cellKey] &&
+                cellSelectOptions[cellKey].length > 0
                   ? cellSelectOptions[cellKey]
                   : col.validation_rules?.type === "dropdown"
                     ? (col.validation_rules?.options as string[] | undefined)
@@ -2081,7 +2260,7 @@ export default function SheetClient() {
             const onBlurSave = async () => {
               const f = formulas.formulas[cellKey];
               if (f) await saveFormula(sheetId, cellKey, f);
-              else await deleteFormula(sheetId, cellKey).catch(() => { });
+              else await deleteFormula(sheetId, cellKey).catch(() => {});
             };
 
             if (isProtected) {
@@ -2093,11 +2272,16 @@ export default function SheetClient() {
               );
             }
             if (cellType === "priority" || cellType === "status") {
-              // Store/display labels (e.g. "In Progress", "Medium") so they match STATUS_COLORS + templates.
               const opts =
                 cellType === "priority"
-                  ? PRIORITY_OPTIONS.map((o) => ({ ...o, value: o.label }))
-                  : STATUS_OPTIONS.map((o) => ({ ...o, value: o.label }));
+                  ? ["Low", "Medium", "High", "Critical"]
+                  : [
+                      "Not Started",
+                      "In Progress",
+                      "In Review",
+                      "Done",
+                      "Blocked",
+                    ];
               return (
                 <Select
                   value={String(row[column.key] ?? "")}
@@ -2109,20 +2293,26 @@ export default function SheetClient() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent style={selStyle}>
-                    {opts.map((o) => (
-                      <SelectItem
-                        key={o.value}
-                        value={o.value}
-                        style={ddItemStyle(isDark)}
-                      >
-                        <span
-                          className="sheet-badge-pill"
-                          style={{ color: o.color, backgroundColor: o.bgColor }}
+                    {opts.map((value) => {
+                      const style = getStatusOptionStyle(value);
+                      return (
+                        <SelectItem
+                          key={value}
+                          value={value}
+                          style={ddItemStyle(isDark)}
                         >
-                          {o.label}
-                        </span>
-                      </SelectItem>
-                    ))}
+                          <span
+                            className="sheet-badge-pill"
+                            style={{
+                              color: style?.color,
+                              backgroundColor: style?.bgColor,
+                            }}
+                          >
+                            {style?.label ?? value}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               );
@@ -2158,12 +2348,10 @@ export default function SheetClient() {
                 >
                   {row[column.key] ? (
                     <span className="h-6 w-6 rounded-md bg-emerald-500/15 border border-emerald-600/60 flex items-center justify-center">
-                      <CheckSquare className="h-5 w-5 text-emerald-700" />
+                      <Check className="h-4 w-4 text-emerald-700" />
                     </span>
                   ) : (
-                    <span className="h-6 w-6 rounded-md bg-white border-2 border-gray-500/70 flex items-center justify-center">
-                      <Square className="h-5 w-5 text-gray-400" />
-                    </span>
+                    <span className="h-5 w-5 rounded border border-gray-400/80 bg-white" />
                   )}
                 </div>
               );
@@ -2229,10 +2417,10 @@ export default function SheetClient() {
               const selectOpts =
                 cellSelectOptions[cellKey]?.length > 0
                   ? cellSelectOptions[cellKey]
-                  : col.selectOptions ??
-                  (col.validation_rules?.type === "dropdown"
-                    ? ((col.validation_rules?.options as string[]) ?? [])
-                    : []);
+                  : (col.selectOptions ??
+                    (col.validation_rules?.type === "dropdown"
+                      ? ((col.validation_rules?.options as string[]) ?? [])
+                      : []));
               return (
                 <Select
                   value={String(row[column.key] ?? "")}
@@ -2244,23 +2432,23 @@ export default function SheetClient() {
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent style={selStyle}>
-                    {selectOpts.map((opt) => (
-                      <SelectItem
-                        key={opt}
-                        value={opt}
-                        style={ddItemStyle(isDark)}
-                      >
-                        <span
-                          className="sheet-badge-pill"
-                          style={{
-                            color: "#1e40af",
-                            backgroundColor: "#dbeafe",
-                          }}
+                    {selectOpts.map((opt) => {
+                      const optionStyle = getOptionBgStyle(opt);
+                      return (
+                        <SelectItem
+                          key={opt}
+                          value={opt}
+                          style={ddItemStyle(isDark)}
                         >
-                          {opt}
-                        </span>
-                      </SelectItem>
-                    ))}
+                          <span
+                            className="sheet-badge-pill"
+                            style={optionStyle}
+                          >
+                            {opt}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                     {selectOpts.length === 0 && (
                       <div className="px-2.5 py-2 text-[11px] text-gray-400 italic">
                         No options — edit column to add some.
@@ -2344,14 +2532,45 @@ export default function SheetClient() {
   const filteredRows = useMemo<SheetRow[]>(() => {
     const activeRows = timeTravelState.previewRows || rows;
     const activeCols = timeTravelState.previewColumns || columns;
-    const q = searchQuery || filterValue;
-    if (!q) return activeRows;
-    return activeRows.filter((row) =>
-      activeCols.some((col) => {
-        const v = row[col.key];
-        return v && String(v).toLowerCase().includes(q.toLowerCase());
-      }),
-    );
+    const q = (searchQuery || filterValue).trim().toLowerCase();
+    const activeRules = advancedFilters.filter((rule) => rule.columnKey);
+    if (!q && activeRules.length === 0) return activeRows;
+    return activeRows.filter((row) => {
+      const matchesSearch =
+        !q ||
+        activeCols.some((col) => {
+          const v = row[col.key];
+          return v && String(v).toLowerCase().includes(q);
+        });
+      if (!matchesSearch) return false;
+
+      return activeRules.every((rule) => {
+        const col = activeCols.find((c) => c.key === rule.columnKey);
+        const raw = row[rule.columnKey];
+        const text = String(raw ?? "").trim();
+        const target = rule.value.trim();
+        const lowerText = text.toLowerCase();
+        const lowerTarget = target.toLowerCase();
+
+        if (rule.operator === "empty") return text === "";
+        if (rule.operator === "not_empty") return text !== "";
+        if (rule.operator === "contains")
+          return lowerText.includes(lowerTarget);
+        if (rule.operator === "equals") return lowerText === lowerTarget;
+        if (rule.operator === "not_equals") return lowerText !== lowerTarget;
+
+        const left =
+          col?.type === "date" ? Date.parse(text) : Number(String(raw ?? ""));
+        const right =
+          col?.type === "date" ? Date.parse(target) : Number(target);
+        if (Number.isNaN(left) || Number.isNaN(right)) return false;
+        if (rule.operator === "gt") return left > right;
+        if (rule.operator === "gte") return left >= right;
+        if (rule.operator === "lt") return left < right;
+        if (rule.operator === "lte") return left <= right;
+        return true;
+      });
+    });
   }, [
     rows,
     columns,
@@ -2359,17 +2578,87 @@ export default function SheetClient() {
     timeTravelState.previewColumns,
     searchQuery,
     filterValue,
+    advancedFilters,
   ]);
+
+  const filterColumns = useMemo(
+    () => columns.filter((col) => !col.hidden),
+    [columns],
+  );
+
+  const createFilterRule = useCallback((): AdvancedFilterRule => {
+    const firstCol = filterColumns[0];
+    return {
+      id: `filter_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      columnKey: firstCol?.key ?? "",
+      operator:
+        firstCol?.type === "number" ||
+        firstCol?.type === "currency" ||
+        firstCol?.type === "progress"
+          ? "gt"
+          : "contains",
+      value: "",
+    };
+  }, [filterColumns]);
+
+  const getFilterOperators = useCallback(
+    (columnKey: string): { value: FilterOperator; label: string }[] => {
+      const col = columns.find((c) => c.key === columnKey);
+      const numeric =
+        col?.type === "number" ||
+        col?.type === "currency" ||
+        col?.type === "progress" ||
+        col?.type === "date";
+      return numeric
+        ? [
+            { value: "gt", label: ">" },
+            { value: "gte", label: ">=" },
+            { value: "lt", label: "<" },
+            { value: "lte", label: "<=" },
+            { value: "equals", label: "is" },
+            { value: "not_equals", label: "is not" },
+            { value: "empty", label: "empty" },
+            { value: "not_empty", label: "not empty" },
+          ]
+        : [
+            { value: "contains", label: "contains" },
+            { value: "equals", label: "is" },
+            { value: "not_equals", label: "is not" },
+            { value: "empty", label: "empty" },
+            { value: "not_empty", label: "not empty" },
+          ];
+    },
+    [columns],
+  );
+
+  const filterSuggestions = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    const dataRows = timeTravelState.previewRows || rows;
+    filterColumns.forEach((col) => {
+      const values = Array.from(
+        new Set(
+          dataRows
+            .map((row) => row[col.key])
+            .filter(
+              (value) => value !== null && value !== undefined && value !== "",
+            )
+            .map((value) => String(value)),
+        ),
+      ).slice(0, 24);
+      map[col.key] = values;
+    });
+    return map;
+  }, [filterColumns, rows, timeTravelState.previewRows]);
 
   const selectedCellType = useMemo(() => {
     if (!selectedCell) return null;
     const col = columns.find((c) => c.key === selectedCell.col);
     return col
       ? cellTypes.getCellType(
-        selectedCell.row,
-        selectedCell.col,
-        col.type || "text",
-      )
+          selectedCell.row,
+          selectedCell.col,
+          col.type || "text",
+        )
       : null;
   }, [selectedCell, columns, cellTypes.getCellType]);
 
@@ -2383,8 +2672,8 @@ export default function SheetClient() {
     () =>
       selectedCell
         ? textWrap.textWrapColumns.has(
-          `${selectedCell.row}-${selectedCell.col}`,
-        )
+            `${selectedCell.row}-${selectedCell.col}`,
+          )
         : false,
     [selectedCell, textWrap.textWrapColumns],
   );
@@ -2498,7 +2787,9 @@ export default function SheetClient() {
                       >
                         <div className="flex items-center gap-1.5 w-full">
                           <FileSpreadsheet className="h-3 w-3 opacity-50 shrink-0" />
-                          <span className="truncate font-medium">{f.title}</span>
+                          <span className="truncate font-medium">
+                            {f.title}
+                          </span>
                         </div>
                         {f.forked_at && (
                           <span
@@ -2756,13 +3047,7 @@ export default function SheetClient() {
               <>
                 <CellTypeSelector
                   currentType={selectedCellType}
-                  onChangeType={(t) =>
-                    cellTypes.changeCellType(
-                      selectedCell.row,
-                      selectedCell.col,
-                      t,
-                    )
-                  }
+                  onChangeType={handleSelectedCellTypeChange}
                 />
                 <ToolSep />
               </>
@@ -3080,7 +3365,7 @@ export default function SheetClient() {
             <IconBtn
               icon={
                 selectedCell &&
-                  protection.isCellProtected(selectedCell.row, selectedCell.col)
+                protection.isCellProtected(selectedCell.row, selectedCell.col)
                   ? Lock
                   : Unlock
               }
@@ -3187,8 +3472,8 @@ export default function SheetClient() {
             value={
               selectedCell
                 ? (formulas.formulas[
-                  protection.getCellKey(selectedCell.row, selectedCell.col)
-                ] ??
+                    protection.getCellKey(selectedCell.row, selectedCell.col)
+                  ] ??
                   formulas.columnFormulas[selectedCell.col] ??
                   String(rows[selectedCell.row]?.[selectedCell.col] ?? ""))
                 : ""
@@ -3232,7 +3517,7 @@ export default function SheetClient() {
               );
               const f = formulas.formulas[ck];
               if (f) await saveFormula(sheetId, ck, f);
-              else await deleteFormula(sheetId, ck).catch(() => { });
+              else await deleteFormula(sheetId, ck).catch(() => {});
             }}
           />
         </div>
@@ -3385,7 +3670,7 @@ export default function SheetClient() {
                     >
                       <SlidersHorizontal className="h-3.5 w-3.5" />
                       Filter
-                      {filterValue && (
+                      {(filterValue || advancedFilters.length > 0) && (
                         <span className="h-1.5 w-1.5 rounded-full bg-primary ml-0.5" />
                       )}
                     </button>
@@ -3401,21 +3686,21 @@ export default function SheetClient() {
 
                 {[
                   selectedCell &&
-                    columns.find((c) => c.key === selectedCell.col)?.hidden
+                  columns.find((c) => c.key === selectedCell.col)?.hidden
                     ? {
-                      icon: EyeOff,
-                      label: "Show",
-                      action: handleHideColumn,
-                      tooltip: "Show hidden column (owner only)",
-                      ownerOnly: true,
-                    }
+                        icon: EyeOff,
+                        label: "Show",
+                        action: handleHideColumn,
+                        tooltip: "Show hidden column (owner only)",
+                        ownerOnly: true,
+                      }
                     : {
-                      icon: Eye,
-                      label: "Hide",
-                      action: handleHideColumn,
-                      tooltip: "Hide column from view (owner only)",
-                      ownerOnly: true,
-                    },
+                        icon: Eye,
+                        label: "Hide",
+                        action: handleHideColumn,
+                        tooltip: "Hide column from view (owner only)",
+                        ownerOnly: true,
+                      },
                   {
                     icon: Paintbrush,
                     label: "Conditional",
@@ -3558,7 +3843,7 @@ export default function SheetClient() {
 
         {/* ═══ FILTER BAR ══════════════════════════════════════════════════ */}
         {showFilters && (
-          <div className="sheet-filterbar h-9 border-b flex items-center px-3 gap-2 sm:gap-3 shrink-0 overflow-x-auto no-scrollbar">
+          <div className="sheet-filterbar min-h-11 border-b flex items-center px-3 py-1.5 gap-2 shrink-0 overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 shrink-0">
               <SlidersHorizontal className="h-3 w-3" />
               Filter
@@ -3568,11 +3853,127 @@ export default function SheetClient() {
               <input
                 value={filterValue}
                 onChange={(e) => setFilterValue(e.target.value)}
-                placeholder="Filter columns…"
+                placeholder="Search all cells"
                 className="sheet-filter-input h-6 w-40 sm:w-56 pl-6 pr-2 text-[11px] rounded-md border"
               />
             </div>
-            {filterValue && (
+            {advancedFilters.map((rule) => {
+              const operators = getFilterOperators(rule.columnKey);
+              const needsValue =
+                rule.operator !== "empty" && rule.operator !== "not_empty";
+              return (
+                <div
+                  key={rule.id}
+                  className="flex items-center gap-1 rounded-md border bg-background/80 px-1.5 py-1 shrink-0"
+                >
+                  <select
+                    className="h-6 max-w-32 rounded border bg-transparent px-1.5 text-[11px] outline-none"
+                    value={rule.columnKey}
+                    onChange={(e) => {
+                      const col = columns.find((c) => c.key === e.target.value);
+                      setAdvancedFilters((prev) =>
+                        prev.map((item) =>
+                          item.id === rule.id
+                            ? {
+                                ...item,
+                                columnKey: e.target.value,
+                                operator:
+                                  col?.type === "number" ||
+                                  col?.type === "currency" ||
+                                  col?.type === "progress"
+                                    ? "gt"
+                                    : "contains",
+                                value: "",
+                              }
+                            : item,
+                        ),
+                      );
+                    }}
+                  >
+                    {filterColumns.map((col) => (
+                      <option key={col.key} value={col.key}>
+                        {col.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="h-6 rounded border bg-transparent px-1.5 text-[11px] outline-none"
+                    value={rule.operator}
+                    onChange={(e) =>
+                      setAdvancedFilters((prev) =>
+                        prev.map((item) =>
+                          item.id === rule.id
+                            ? {
+                                ...item,
+                                operator: e.target.value as FilterOperator,
+                                value:
+                                  e.target.value === "empty" ||
+                                  e.target.value === "not_empty"
+                                    ? ""
+                                    : item.value,
+                              }
+                            : item,
+                        ),
+                      )
+                    }
+                  >
+                    {operators.map((operator) => (
+                      <option key={operator.value} value={operator.value}>
+                        {operator.label}
+                      </option>
+                    ))}
+                  </select>
+                  {needsValue && (
+                    <>
+                      <input
+                        list={`filter-values-${rule.id}`}
+                        className="h-6 w-28 rounded border bg-transparent px-1.5 text-[11px] outline-none"
+                        value={rule.value}
+                        placeholder="value"
+                        onChange={(e) =>
+                          setAdvancedFilters((prev) =>
+                            prev.map((item) =>
+                              item.id === rule.id
+                                ? { ...item, value: e.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                      <datalist id={`filter-values-${rule.id}`}>
+                        {(filterSuggestions[rule.columnKey] ?? []).map(
+                          (value) => (
+                            <option key={value} value={value} />
+                          ),
+                        )}
+                      </datalist>
+                    </>
+                  )}
+                  <button
+                    className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center"
+                    onClick={() =>
+                      setAdvancedFilters((prev) =>
+                        prev.filter((item) => item.id !== rule.id),
+                      )
+                    }
+                    aria-label="Remove filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              className="sheet-action-btn flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium shrink-0"
+              onClick={() =>
+                setAdvancedFilters((prev) => [...prev, createFilterRule()])
+              }
+              disabled={filterColumns.length === 0}
+            >
+              <Plus className="h-3 w-3" />
+              Rule
+            </button>
+            {(filterValue || advancedFilters.length > 0) && (
               <span className="text-[11px] text-amber-600 font-medium shrink-0">
                 {filteredRows.length}/{rows.length} rows
               </span>
@@ -3581,6 +3982,7 @@ export default function SheetClient() {
               className="sheet-clear-filter flex items-center gap-1 text-[11px] font-medium px-2 h-6 rounded shrink-0"
               onClick={() => {
                 setFilterValue("");
+                setAdvancedFilters([]);
                 setShowFilters(false);
               }}
             >
@@ -3590,7 +3992,7 @@ export default function SheetClient() {
           </div>
         )}
 
-        {/* ═══ MAIN BODY ════════════════════════════════════════════════════ */}
+        {/* MAIN BODY ════════════════════════════════════════════════════ */}
         <div className="flex-1 flex overflow-hidden relative">
           {/* Grid wrapper */}
           <div className="flex-1 overflow-hidden relative">
@@ -3792,10 +4194,17 @@ export default function SheetClient() {
           onConfirm={handleSelectSetupConfirm}
           isDark={isDark}
           initialOptions={
-            selectSetupDialog.colKey && selectSetupDialog.colKey !== "__new__"
-              ? (columns.find((c) => c.key === selectSetupDialog.colKey)
-                ?.selectOptions ?? [])
-              : []
+            selectSetupDialog.mode === "cell" &&
+            selectSetupDialog.row !== null &&
+            selectSetupDialog.colKey
+              ? (cellSelectOptions[
+                  `${selectSetupDialog.row}-${selectSetupDialog.colKey}`
+                ] ?? [])
+              : selectSetupDialog.colKey &&
+                  selectSetupDialog.colKey !== "__new__"
+                ? (columns.find((c) => c.key === selectSetupDialog.colKey)
+                    ?.selectOptions ?? [])
+                : []
           }
         />
         <Dialog open={showDesktopTip} onOpenChange={setShowDesktopTip}>
