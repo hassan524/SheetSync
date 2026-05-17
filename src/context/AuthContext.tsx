@@ -9,10 +9,11 @@ import {
 } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { AuthError, Session } from "@supabase/supabase-js";
+import { usePush } from "@/hooks/notfication/use-push";
 
 // -----------------------
 // User type
-// ----------------------
+// -----------------------
 interface UserProfile {
   id: string;
   name: string | null;
@@ -21,9 +22,6 @@ interface UserProfile {
   last_sign_in_at: string | null;
 }
 
-// -----------------------
-// Context type
-// -----------------------
 interface AuthContextType {
   user: UserProfile | null;
   accessToken: string | null;
@@ -32,9 +30,6 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
-// -----------------------
-// Create context
-// -----------------------
 const AuthContext = createContext<AuthContextType | null>(null);
 
 // -----------------------
@@ -47,7 +42,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setUserFromSession = (session: Session) => {
     const u = session.user;
-    const token = session.access_token;
 
     setUser({
       id: u.id,
@@ -57,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       last_sign_in_at: u.last_sign_in_at || null,
     });
 
-    setAccessToken(token);
+    setAccessToken(session.access_token);
   };
 
   const clearSession = () => {
@@ -71,18 +65,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (session?.user) setUserFromSession(session);
-      console.log("current session", session);
+      if (session?.user) {
+        setUserFromSession(session);
+      }
+
       setLoading(false);
     };
 
     initSession();
 
-    // Listen to auth changes (login / logout / token refresh)
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (session?.user) setUserFromSession(session);
-        else {
+        if (session?.user) {
+          setUserFromSession(session);
+        } else {
           clearSession();
         }
       },
@@ -90,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  usePush(user?.id);
 
   // -----------------------
   // Google login
@@ -114,9 +112,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSession();
   };
 
-  // -----------------------
-  // Provide context
-  // -----------------------
   return (
     <AuthContext.Provider
       value={{
@@ -133,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 // -----------------------
-// Hook for convenience
+// Hook
 // -----------------------
 export const useAuth = () => {
   const context = useContext(AuthContext);

@@ -10,7 +10,7 @@ import { LayoutTemplate, Sparkles, Info } from "lucide-react";
 import { SHEET_TEMPLATES } from "../../constants/Sheet-templates";
 
 export const metadata = generateSEO({
-  title: "Templates | SheetSync",
+  title: "Templates — Get Started Fast",
   description:
     "Browse professionally designed spreadsheet templates. Start quickly with pre-configured columns, formulas, and structure.",
   path: "/templates",

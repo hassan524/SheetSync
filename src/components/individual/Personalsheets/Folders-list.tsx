@@ -14,14 +14,54 @@ interface Props {
 }
 
 const FOLDER_COLORS = [
-  { bg: "#34a853", light: "rgba(52,168,83,0.12)", text: "#34a853", border: "rgba(52,168,83,0.3)" },
-  { bg: "#4285f4", light: "rgba(66,133,244,0.12)", text: "#4285f4", border: "rgba(66,133,244,0.3)" },
-  { bg: "#ea4335", light: "rgba(234,67,53,0.12)", text: "#ea4335", border: "rgba(234,67,53,0.3)" },
-  { bg: "#fbbc04", light: "rgba(251,188,4,0.15)", text: "#d69e02", border: "rgba(251,188,4,0.35)" },
-  { bg: "#8e24aa", light: "rgba(142,36,170,0.12)", text: "#8e24aa", border: "rgba(142,36,170,0.3)" },
-  { bg: "#00897b", light: "rgba(0,137,123,0.12)", text: "#00897b", border: "rgba(0,137,123,0.3)" },
-  { bg: "#e91e63", light: "rgba(233,30,99,0.12)", text: "#e91e63", border: "rgba(233,30,99,0.3)" },
-  { bg: "#ff6d00", light: "rgba(255,109,0,0.12)", text: "#ff6d00", border: "rgba(255,109,0,0.3)" },
+  {
+    bg: "#0d7c5f",
+    light: "rgba(13,124,95,0.10)",
+    text: "#0d7c5f",
+    border: "rgba(13,124,95,0.25)",
+  },
+  {
+    bg: "#4285f4",
+    light: "rgba(66,133,244,0.10)",
+    text: "#3b76db",
+    border: "rgba(66,133,244,0.25)",
+  },
+  {
+    bg: "#7c3aed",
+    light: "rgba(124,58,237,0.10)",
+    text: "#7c3aed",
+    border: "rgba(124,58,237,0.25)",
+  },
+  {
+    bg: "#d97706",
+    light: "rgba(217,119,6,0.10)",
+    text: "#b45309",
+    border: "rgba(217,119,6,0.25)",
+  },
+  {
+    bg: "#0891b2",
+    light: "rgba(8,145,178,0.10)",
+    text: "#0891b2",
+    border: "rgba(8,145,178,0.25)",
+  },
+  {
+    bg: "#059669",
+    light: "rgba(5,150,105,0.10)",
+    text: "#059669",
+    border: "rgba(5,150,105,0.25)",
+  },
+  {
+    bg: "#6366f1",
+    light: "rgba(99,102,241,0.10)",
+    text: "#6366f1",
+    border: "rgba(99,102,241,0.25)",
+  },
+  {
+    bg: "#64748b",
+    light: "rgba(100,116,139,0.10)",
+    text: "#475569",
+    border: "rgba(100,116,139,0.25)",
+  },
 ];
 
 function FolderSvg({ color, isOpen }: { color: string; isOpen: boolean }) {
@@ -73,10 +113,10 @@ const FoldersList = ({
   }
 
   return (
-    <div className="relative rounded-xl border border-border bg-card/50 p-2 overflow-hidden">
+    <div className="relative rounded-xl border border-border bg-card/50 p-2.5 overflow-hidden">
       <div
         ref={scrollRef}
-        className="flex gap-2.5 overflow-x-auto hide-scrollbar pb-1"
+        className="flex gap-3 overflow-x-auto hide-scrollbar pb-1"
         style={{ scrollSnapType: "x mandatory" }}
       >
         {folders.map((folder, index) => {
@@ -86,15 +126,17 @@ const FoldersList = ({
 
           const baseStyle: React.CSSProperties = {
             scrollSnapAlign: "start",
-            minWidth: "clamp(140px, 38vw, 164px)",
+            minWidth: "clamp(150px, 40vw, 175px)",
             flexShrink: 0,
           };
 
           const activeStyle: React.CSSProperties = isActive
             ? {
-              background: `linear-gradient(135deg, ${palette.light} 0%, transparent 70%)`,
-              border: `1px solid ${palette.border}`,
-            }
+                background: `linear-gradient(135deg, ${palette.light} 0%, transparent 60%)`,
+                borderColor: palette.border,
+                borderLeftWidth: "3px",
+                borderLeftColor: palette.bg,
+              }
             : {};
 
           return (
@@ -103,33 +145,53 @@ const FoldersList = ({
               onClick={() => onSelectFolder(folder.id)}
               style={{ ...baseStyle, ...activeStyle }}
               className={cn(
-                "group relative text-left rounded-xl transition-all duration-200 h-[88px] p-3",
-                isActive ? "shadow-md" : "hover:shadow-sm border border-border/60"
+                "group relative text-left rounded-xl transition-all duration-200 p-3.5 overflow-hidden",
+                isActive
+                  ? "shadow-md border"
+                  : "hover:shadow-sm border border-border/60 hover:border-border hover:bg-muted/30",
               )}
             >
-              <div className="flex items-center justify-between mb-2">
+              {/* Top row: icon + count badge */}
+              <div className="flex items-center justify-between mb-2.5">
                 <FolderSvg color={palette.bg} isOpen={isActive} />
                 <span
-                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums"
                   style={{
                     background: isActive ? palette.light : "hsl(var(--muted))",
-                    color: isActive ? palette.text : "hsl(var(--muted-foreground))",
+                    color: isActive
+                      ? palette.text
+                      : "hsl(var(--muted-foreground))",
+                    border: isActive
+                      ? `1px solid ${palette.border}`
+                      : "1px solid transparent",
                   }}
                 >
                   {count}
                 </span>
               </div>
 
+              {/* Folder name */}
               <p
-                className="text-[13px] font-medium truncate"
+                className="text-[13px] font-semibold truncate leading-tight"
                 style={isActive ? { color: palette.text } : undefined}
               >
                 {folder.name}
               </p>
 
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {count === 0 ? "Empty" : `${count} sheet${count !== 1 ? "s" : ""}`}
+              {/* Sheet count label */}
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {count === 0
+                  ? "Empty folder"
+                  : `${count} sheet${count !== 1 ? "s" : ""}`}
               </p>
+
+              {/* Active indicator dot */}
+              {isActive && (
+                <div
+                  className="absolute bottom-1.5 right-3 h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: palette.bg }}
+                />
+              )}
             </button>
           );
         })}
@@ -141,10 +203,12 @@ const FoldersList = ({
             minWidth: "110px",
             flexShrink: 0,
           }}
-          className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border hover:border-primary/40 h-[88px]"
+          className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border hover:border-primary/40 hover:bg-primary/[0.02] transition-all"
         >
           <Plus className="h-4 w-4 text-muted-foreground" />
-          <span className="text-[11px] text-muted-foreground">New folder</span>
+          <span className="text-[11px] text-muted-foreground font-medium">
+            New folder
+          </span>
         </button>
       </div>
     </div>

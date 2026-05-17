@@ -44,7 +44,6 @@ const SheetsGrid = ({
     createdAt: s.created_at ?? undefined,
     rows: s.rows ?? undefined,
     columns: s.columns ?? undefined,
-    size: s.size ?? undefined,
     visibility: s.visibility,
     activeEditors: s.activeEditors ?? undefined,
   }));
@@ -52,13 +51,19 @@ const SheetsGrid = ({
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between my-4">
-        <div className="flex items-center gap-2">
-          <FolderOpen className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-medium text-muted-foreground">{folderName}</h2>
-          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-            {sheets.length}
-          </span>
+      <div className="flex items-center justify-between my-4 px-3 py-2.5 rounded-xl border border-border/60 bg-card/50">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <FolderOpen className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-foreground">
+              {folderName}
+            </h2>
+            <span className="text-[11px] text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-full">
+              {sheets.length} {sheets.length === 1 ? "sheet" : "sheets"}
+            </span>
+          </div>
         </div>
 
         {/* Inline view toggle */}
@@ -124,7 +129,6 @@ const SheetsGrid = ({
                   folderName={folderName}
                   rows={sheet.rows ?? 0}
                   cols={sheet.columns ?? 0}
-                  fileSizeKb={Number(sheet.size_mb ?? 0)}
                   fillPercent={40}
                 />
               </div>

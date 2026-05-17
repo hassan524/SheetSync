@@ -21,7 +21,6 @@
  *      other                         → "none"
  */
 
-import { useState } from "react";
 import {
   BarChart3,
   Plus,
@@ -33,8 +32,6 @@ import {
   GripVertical,
   Info,
   Sparkles,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import type {
   SheetChart,
@@ -940,6 +937,7 @@ function YAxisSection({
   border: string;
   inputBg: string;
 }) {
+  void sub;
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
@@ -1100,6 +1098,7 @@ function ConfigSummary({
   text: string;
   sub: string;
 }) {
+  void isDark;
   const isCat = CATEGORICAL_KINDS.has(chart.kind);
   const xCol = columns.find((c) => c.key === chart.labelColumnKey);
   const yColNames = chart.seriesKeys
@@ -1164,6 +1163,7 @@ function ManualDataEditor({
   inputBg: string;
   inputBorder: string;
 }) {
+  void sub;
   const isCat = CATEGORICAL_KINDS.has(chart.kind);
 
   const inputStyle: React.CSSProperties = {
@@ -1348,6 +1348,7 @@ function DesignTab({
   sub: string;
   border: string;
 }) {
+  void sub;
   return (
     <div className="space-y-4">
       {/* Chart type switcher */}

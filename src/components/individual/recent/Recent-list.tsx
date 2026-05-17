@@ -28,7 +28,8 @@ const RecentList: React.FC<RecentListProps> = ({ recentSheets }) => {
         id: s.id,
         title: s.title,
         is_starred: s.isStarred ?? s.is_starred,
-        source: s.isOrganization || s.organization_id ? "organization" : "personal",
+        source:
+          s.isOrganization || s.organization_id ? "organization" : "personal",
         organizationName: s.organization?.name ?? s.organizationName ?? null,
         organizationId: s.organization?.id ?? s.organization_id ?? null,
         folderName: s.folder?.name ?? s.folderName ?? null,
@@ -38,7 +39,6 @@ const RecentList: React.FC<RecentListProps> = ({ recentSheets }) => {
         collaborators: s.collaborators ?? 0,
         rows: s.rowsCount ?? s.rows,
         columns: s.colsCount ?? s.columns,
-        size: s.size,
         visibility: s.visibility,
         activeEditors: s.activeEditors,
       })),
@@ -111,7 +111,10 @@ const RecentList: React.FC<RecentListProps> = ({ recentSheets }) => {
           {filteredSheets.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredSheets.map((sheet, index) => (
-                <div key={sheet.id} style={{ animationDelay: `${index * 30}ms` }}>
+                <div
+                  key={sheet.id}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                >
                   <SheetCard
                     id={sheet.id}
                     title={sheet.title}
@@ -120,7 +123,6 @@ const RecentList: React.FC<RecentListProps> = ({ recentSheets }) => {
                     rows={sheet.rows}
                     cols={sheet.columns}
                     templateId="default"
-                    fileSizeKb={100}
                     isOrganization={sheet.source === "organization"}
                     organizationName={sheet.organizationName}
                     folderName={sheet.folderName}

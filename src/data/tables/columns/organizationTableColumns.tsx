@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -19,6 +18,7 @@ import {
 } from "lucide-react";
 import { OrganizationTableData, Role } from "@/types";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const roleVariants: Record<Role, "default" | "secondary" | "outline"> = {
   owner: "default",
@@ -37,9 +37,13 @@ export const organizationColumns = [
           <Building2 className="h-3.5 w-3.5 text-primary/60" />
         </div>
         <div className="min-w-0">
-          <span className="text-sm font-medium truncate max-w-[200px] block">
+          <Link
+            href={`/organizations/${org.id}`}
+            className="text-sm font-medium truncate max-w-[200px] block text-foreground hover:text-primary hover:underline transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
             {org.name}
-          </span>
+          </Link>
           <span className="text-[11px] text-muted-foreground">
             Created {org.createdAt}
           </span>
@@ -95,21 +99,13 @@ export const organizationColumns = [
     ),
   },
   {
-    key: "storage",
-    header: "Storage",
-    width: "160px",
+    key: "created",
+    header: "Created",
+    width: "120px",
     render: (org: OrganizationTableData) => (
-      <div className="w-32">
-        <div className="flex items-center justify-between text-[11px] mb-1">
-          <span className="text-muted-foreground">
-            {org.storageUsed} / {org.storageLimit} GB
-          </span>
-        </div>
-        <Progress
-          value={(org.storageUsed / org.storageLimit) * 100}
-          className="h-1.5"
-        />
-      </div>
+      <span className="text-xs text-muted-foreground">
+        {org.createdAt ?? "—"}
+      </span>
     ),
   },
   {

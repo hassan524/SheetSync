@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
-import { Menu, X, Table, ChevronRight, LayoutDashboard } from "lucide-react";
+import { Menu, X, Table, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";

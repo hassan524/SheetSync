@@ -21,7 +21,9 @@ interface FilesListProps {
 const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "personal" | "organization">("all");
+  const [sourceFilter, setSourceFilter] = useState<
+    "all" | "personal" | "organization"
+  >("all");
 
   const tableRows: UniversalSheetRow[] = useMemo(
     () =>
@@ -38,8 +40,9 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
         createdAt: s.created_at,
         collaborators: s.collaborators ?? 0,
         rows: Array.isArray(s.rows) ? s.rows.length : (s.rows ?? undefined),
-        columns: Array.isArray(s.columns) ? s.columns.length : (s.columns ?? undefined),
-        size: s.size,
+        columns: Array.isArray(s.columns)
+          ? s.columns.length
+          : (s.columns ?? undefined),
         visibility: s.visibility,
         activeEditors: s.activeEditors,
       })),
@@ -49,7 +52,9 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
   const filtered = useMemo(
     () =>
       tableRows.filter((s) => {
-        const matchSearch = s.title.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchSearch = s.title
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
         const matchSource = sourceFilter === "all" || s.source === sourceFilter;
         return matchSearch && matchSource;
       }),
@@ -77,18 +82,34 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
           {/* Source filter pills */}
           {(
             [
-              { key: "all", label: "All files", count: tableRows.length, icon: undefined },
-              { key: "personal", label: "Personal", count: personalCount, icon: FolderOpen },
-              { key: "organization", label: "Organizations", count: orgCount, icon: Building2 },
+              {
+                key: "all",
+                label: "All files",
+                count: tableRows.length,
+                icon: undefined,
+              },
+              {
+                key: "personal",
+                label: "Personal",
+                count: personalCount,
+                icon: FolderOpen,
+              },
+              {
+                key: "organization",
+                label: "Organizations",
+                count: orgCount,
+                icon: Building2,
+              },
             ] as const
           ).map(({ key, label, count, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setSourceFilter(key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${sourceFilter === key
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                sourceFilter === key
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                }`}
+              }`}
             >
               {Icon && <Icon className="h-3 w-3" />}
               {label}
@@ -131,26 +152,29 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
           {filtered.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filtered.map((sheet, index) => (
-                <div key={sheet.id} style={{ animationDelay: `${index * 30}ms` }}>
+                <div
+                  key={sheet.id}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                >
                   <div className="relative">
-                    {sheet.source === "organization" && sheet.organizationName && (
-                      <div className="absolute -top-2 left-3 z-10">
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] gap-1 py-0 px-1.5 h-4 bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
-                        >
-                          <Building2 className="h-2.5 w-2.5" />
-                          {sheet.organizationName}
-                        </Badge>
-                      </div>
-                    )}
+                    {sheet.source === "organization" &&
+                      sheet.organizationName && (
+                        <div className="absolute -top-2 left-3 z-10">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] gap-1 py-0 px-1.5 h-4 bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
+                          >
+                            <Building2 className="h-2.5 w-2.5" />
+                            {sheet.organizationName}
+                          </Badge>
+                        </div>
+                      )}
                     <SheetCard
                       id={sheet.id}
                       title={sheet.title}
                       lastEdited={sheet.lastModified || ""}
                       isStarred={sheet.is_starred}
                       templateId="default"
-                      fileSizeKb={100}
                       isOrganization={sheet.source === "organization"}
                       organizationName={sheet.organizationName}
                       folderName={sheet.folderName}
@@ -161,7 +185,9 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
             </div>
           ) : (
             <div className="text-center py-14 animate-fade-in">
-              <p className="text-muted-foreground text-sm">No files found matching your search.</p>
+              <p className="text-muted-foreground text-sm">
+                No files found matching your search.
+              </p>
             </div>
           )}
         </>

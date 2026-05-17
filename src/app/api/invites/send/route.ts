@@ -25,23 +25,29 @@ export async function POST(req: NextRequest) {
     if (!orgId)
       return NextResponse.json(
         { error: "Organization ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
 
     if (!orgName)
       return NextResponse.json(
         { error: "Organization name is required" },
-        { status: 400 }
+        { status: 400 },
       );
 
     if (!emails || !Array.isArray(emails) || emails.length === 0)
       return NextResponse.json(
         { error: "At least one email is required" },
-        { status: 400 }
+        { status: 400 },
       );
 
     if (!role)
       return NextResponse.json({ error: "Role is required" }, { status: 400 });
+    if (!["admin", "editor", "viewer"].includes(role)) {
+      return NextResponse.json(
+        { error: "Invalid invite role" },
+        { status: 400 },
+      );
+    }
 
     const supabase = await createSupabaseServerClient();
 
@@ -58,8 +64,29 @@ export async function POST(req: NextRequest) {
     if (userError || !user)
       return NextResponse.json(
         { error: "Unauthorized. Please login again." },
-        { status: 401 }
+        { status: 401 },
       );
+
+    const { data: inviterMember, error: inviterMemberError } = await supabase
+      .from("organization_members")
+      .select("role")
+      .eq("organization_id", orgId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (inviterMemberError || !inviterMember) {
+      return NextResponse.json(
+        { error: "You are not a member of this organization" },
+        { status: 403 },
+      );
+    }
+
+    if (!["owner", "admin"].includes(inviterMember.role)) {
+      return NextResponse.json(
+        { error: "Only organization owners and admins can invite members" },
+        { status: 403 },
+      );
+    }
 
     const results: any[] = [];
 
@@ -170,7 +197,7 @@ export async function POST(req: NextRequest) {
           status: "pending",
           created_at: new Date().toISOString(),
           expires_at: new Date(
-            Date.now() + 7 * 24 * 60 * 60 * 1000
+            Date.now() + 7 * 24 * 60 * 60 * 1000,
           ).toISOString(),
         });
 
@@ -236,7 +263,7 @@ export async function POST(req: NextRequest) {
         error: "Unexpected server error",
         details: err.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

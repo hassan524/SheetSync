@@ -6,19 +6,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   BarChart3,
   Edit3,
-  FileSpreadsheet,
   Plus,
   Trash2,
   UserPlus,
   Clock,
   Eye,
   Share2,
-  Activity,
-  FileText,
   Download,
   MessageSquare,
-  Building2,
-  Mail,
 } from "lucide-react";
 import { getOrgActivity } from "@/lib/querys/activity/activity";
 
@@ -315,9 +310,7 @@ export function OrgActivityPanel({ org }: { org: { id: string } }) {
   }, [org.id]);
 
   return (
-    <div
-      className="rounded-3xl border border-border bg-card overflow-hidden flex flex-col h-[400px] md:h-[65vh]"
-    >
+    <div className="rounded-3xl border border-border bg-card overflow-hidden flex flex-col h-[400px] md:h-[65vh]">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 shrink-0">
         <div className="flex items-center justify-between">
@@ -371,7 +364,7 @@ export function OrgActivityPanel({ org }: { org: { id: string } }) {
               const displayTarget =
                 a.sheets?.title || a.target || "Unknown Sheet";
               const { icon: Icon, color, ring } = getActionMeta(a.action);
-              const { line1, line2, context } = formatAction(
+              const { line1, context } = formatAction(
                 a.action,
                 displayTarget,
                 "Organization Activity",

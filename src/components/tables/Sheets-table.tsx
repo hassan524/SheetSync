@@ -21,7 +21,6 @@ import {
   MoreHorizontal,
   FileSpreadsheet,
   Star,
-  Clock,
   Users,
   Lock,
   Globe,
@@ -52,7 +51,6 @@ const visibilityLabels = {
 
 const SheetsTable = ({
   sheets,
-  onSelect,
   onRenameSheet,
   onDeleteSheet,
 }: SheetsTableProps) => {

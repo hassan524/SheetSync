@@ -10,12 +10,6 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Filter, RotateCcw } from "lucide-react";
 
-interface FilterOption {
-  id: string;
-  label: string;
-  checked: boolean;
-}
-
 interface FilterPopoverProps {
   title?: string;
   filters?: {

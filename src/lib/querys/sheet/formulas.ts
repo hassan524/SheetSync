@@ -32,6 +32,28 @@ export async function deleteFormula(sheetId: string, cellKey: string) {
   if (error) throw new Error(`Failed to delete formula: ${error.message}`);
 }
 
+export async function saveAllFormulas(
+  sheetId: string,
+  formulas: Record<string, string>,
+) {
+  const rows = Object.entries(formulas)
+    .filter(([, formula]) => formula.trim().startsWith("="))
+    .map(([cellKey, formula]) => ({
+      sheet_id: sheetId,
+      cell_key: cellKey,
+      formula,
+    }));
+
+  if (rows.length === 0) return;
+
+  const { error } = await supabase
+    .from("formulas")
+    .upsert(rows, { onConflict: "sheet_id,cell_key" });
+
+  if (error)
+    throw new Error(`Failed to save imported formulas: ${error.message}`);
+}
+
 // ─────────────────────────────────────────────
 //  COLUMN FORMULAS  (cell_key = "col:colKey")
 //  Stored in the SAME `formulas` table with a
@@ -53,14 +75,10 @@ export async function saveColumnFormula(
     { onConflict: "sheet_id,cell_key" },
   );
 
-  if (error)
-    throw new Error(`Failed to save column formula: ${error.message}`);
+  if (error) throw new Error(`Failed to save column formula: ${error.message}`);
 }
 
-export async function deleteColumnFormula(
-  sheetId: string,
-  columnKey: string,
-) {
+export async function deleteColumnFormula(sheetId: string, columnKey: string) {
   const cellKey = `col:${columnKey}`;
   const { error } = await supabase
     .from("formulas")

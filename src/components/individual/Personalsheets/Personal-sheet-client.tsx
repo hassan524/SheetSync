@@ -200,11 +200,12 @@ function SheetsPageClient({ initialFolders }: Props) {
           {[
             {
               label: "Total Sheets",
-              value: allSheets.length,
+              value: totalSheets,
               icon: FileSpreadsheet,
               toggle: false,
               description: "In selected folder",
-              accent: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+              accent:
+                "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
             },
             {
               label: "Starred",
@@ -226,7 +227,12 @@ function SheetsPageClient({ initialFolders }: Props) {
             const isActive = toggle && onlyStarred;
             const inner = (
               <>
-                <div className={cn("h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center shrink-0 border", accent)}>
+                <div
+                  className={cn(
+                    "h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center shrink-0 border",
+                    accent,
+                  )}
+                >
                   <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 text-left">
@@ -274,6 +280,28 @@ function SheetsPageClient({ initialFolders }: Props) {
           onSelectFolder={handleFolderChange}
           onCreateFolder={() => setNewFolderOpen(true)}
         />
+
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search sheets in this folder"
+            className="h-8 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+          />
+          {searchQuery && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
 
         {/* Sheets */}
         <SheetsGrid

@@ -12,16 +12,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Plus,
-  Trash2,
-  Calculator,
-  Filter,
-  ArrowUpDown,
-  Undo2,
-  Redo2,
-  ChevronDown,
-} from "lucide-react";
+import { Plus, Trash2, Undo2, Redo2, ChevronDown } from "lucide-react";
 import { ColumnDef } from "@/types";
 
 interface DataToolbarProps {
@@ -173,36 +164,6 @@ export default function DataToolbar({
           </Button>
         </TooltipTrigger>
         <TooltipContent>Delete Selected Column</TooltipContent>
-      </Tooltip>
-
-      <div className="w-px h-6 bg-border" />
-
-      {/* Additional Features */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Calculator className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Formulas (Coming Soon)</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Filter className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Filter (Coming Soon)</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ArrowUpDown className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Sort (Coming Soon)</TooltipContent>
       </Tooltip>
     </div>
   );

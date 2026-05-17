@@ -78,10 +78,7 @@ export function useSheetTransition() {
       }, 120);
     };
 
-    const fallback = setTimeout(removeOverlay, 6000);
-
     const handler = () => {
-      clearTimeout(fallback);
       window.removeEventListener("__sheet-ready", handler);
       removeOverlay();
     };

@@ -1,11 +1,4 @@
-import {
-  Users,
-  Calculator,
-  PieChart,
-  Check,
-  FunctionSquare,
-  LayoutDashboard,
-} from "lucide-react";
+import { Users, Check, FunctionSquare, LayoutDashboard } from "lucide-react";
 
 export default function FeaturesSection() {
   return (

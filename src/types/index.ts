@@ -30,6 +30,8 @@ export interface Member {
   status?: "online" | "offline";
   lastActive?: string;
   avatar?: string;
+  joined_at?: string;
+  totalChanges?: number;
 }
 
 /* ============================================================
@@ -104,8 +106,6 @@ export interface Sheet {
   lastModifiedBy?: string;
   collaborators?: number;
   activeEditors?: number;
-  size?: string;
-
   rows?: number;
   columns?: number;
   size_mb?: number;
@@ -192,6 +192,31 @@ export interface CellFormat {
   borderStyle?: "none" | "solid" | "dashed" | "dotted";
   borderColor?: string;
   borderWidth?: number;
+}
+
+export type ConditionalFormatOperator =
+  | "not_empty"
+  | "empty"
+  | "contains"
+  | "equals"
+  | "not_equals"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "between";
+
+export interface ConditionalFormatRule {
+  id: string;
+  range: string;
+  startRow: number;
+  endRow: number;
+  startCol: number;
+  endCol: number;
+  operator: ConditionalFormatOperator;
+  value: string;
+  value2?: string;
+  format: Pick<CellFormat, "bold" | "italic" | "textColor" | "bgColor">;
 }
 
 /* ============================================================

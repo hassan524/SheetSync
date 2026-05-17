@@ -12,7 +12,7 @@ const PeopleList = dynamic(
 );
 
 export const metadata = generateSEO({
-  title: "People | SheetSync",
+  title: "People — Collaborators",
   description:
     "View and manage collaborators across your organizations. Track team activity, invite new members, and oversee access in real-time.",
   path: "/people",

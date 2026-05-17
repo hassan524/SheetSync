@@ -40,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+firebase-base64.txt
+sheetsync-d4c0a-firebase-adminsdk-fbsvc-dc12281fbd.json
+convert.js
+firebase-service-account.json
+
+.replit

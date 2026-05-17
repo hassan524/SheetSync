@@ -3,7 +3,6 @@
 import React, { useEffect } from "react";
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import TemplateCard from "@/components/sheets/Template-card";
 import UseTemplateModal from "@/components/sheets/Use-template-modal";
 import { getAllFolders } from "@/lib/querys/folder/folders";
@@ -19,8 +18,6 @@ const TemplatePicker = () => {
   >(null);
   const [folders, setFolders] = React.useState<any[]>([]);
   const [organizations, setOrganizations] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(false);
-
   const handleTemplateClick = (templateId: string) => {
     setSelectedTemplateId(templateId);
     setTemplateModalOpen(true);
@@ -29,7 +26,6 @@ const TemplatePicker = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
         const [folderData, orgData] = await Promise.all([
           getAllFolders(),
           getAllOrganizations(),
@@ -38,8 +34,6 @@ const TemplatePicker = () => {
         setOrganizations(orgData || []);
       } catch (error) {
         console.error("Failed to fetch data:", error);
-      } finally {
-        setLoading(false);
       }
     };
     fetchData();
@@ -78,7 +72,7 @@ const TemplatePicker = () => {
 
       {/* Templates — 1 col on mobile, 2 on sm, 4 on lg */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {(SHEET_TEMPLATES ?? []).slice(0, 8).map((template, index) => (
+        {(SHEET_TEMPLATES ?? []).slice(0, 8).map((template) => (
           <div
             key={template.id}
             className="cursor-pointer"

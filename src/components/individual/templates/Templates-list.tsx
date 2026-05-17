@@ -5,23 +5,7 @@ import TemplateCard from "@/components/sheets/Template-card";
 import UseTemplateModal from "@/components/sheets/Use-template-modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Search,
-  Sparkles,
-  BarChart3,
-  Calendar,
-  Clock,
-  Globe,
-  Layers,
-  MessageSquare,
-  PieChart,
-  ShoppingCart,
-  Target,
-  Truck,
-  Workflow,
-  Zap,
-} from "lucide-react";
+import { Search, Sparkles } from "lucide-react";
 import { ICON_MAP } from "@/constants/Sheet-templates";
 
 interface Template {
@@ -47,7 +31,9 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+    null,
+  );
 
   const filtered = templates.filter((t) => {
     const matchesSearch =
@@ -143,7 +129,9 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
           <div className="flex-1 h-px bg-border" />
           <div className="flex items-center gap-2 text-muted-foreground">
             <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">More templates coming soon</span>
+            <span className="text-sm font-medium">
+              More templates coming soon
+            </span>
           </div>
           <div className="flex-1 h-px bg-border" />
         </div>

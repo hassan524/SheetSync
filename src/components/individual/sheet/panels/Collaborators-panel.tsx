@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -221,9 +222,12 @@ export default function CollaboratorsPanel({
                     {/* Avatar */}
                     <div className="relative shrink-0">
                       {c.avatar_url ? (
-                        <img
+                        <Image
                           src={c.avatar_url}
                           alt={c.name}
+                          width={32}
+                          height={32}
+                          unoptimized
                           className="h-8 w-8 rounded-full object-cover"
                         />
                       ) : (

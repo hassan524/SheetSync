@@ -10,7 +10,7 @@ const FilesList = dynamic(
 import { Folder, Info, FileSpreadsheet, Star, Users } from "lucide-react";
 
 export const metadata = generateSEO({
-  title: "All Files | SheetSync",
+  title: "All Files — Browse Spreadsheets",
   description:
     "Browse every spreadsheet you own or collaborate on — personal and organizational — in one unified view.",
   path: "/files",

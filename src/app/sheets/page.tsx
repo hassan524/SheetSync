@@ -6,7 +6,7 @@ const SheetsPageClient = dynamic(
 );
 
 export const metadata = generateSEO({
-  title: "Personal Sheets | SheetSync",
+  title: "Personal Sheets — My Workspace",
   description:
     "Organize, manage, and collaborate on your personal spreadsheets. Browse folders, filter sheets, and create new ones with ease.",
   path: "/sheets",

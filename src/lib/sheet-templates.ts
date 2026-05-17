@@ -88,8 +88,6 @@ export const getColumnLetter = (index: number): string => {
 
 // ================= DATE HELPERS =================
 
-const today = () => new Date().toISOString().split("T")[0];
-
 const addDays = (n: number) => {
   const d = new Date();
   d.setDate(d.getDate() + n);
@@ -128,7 +126,7 @@ const makeRows = (
 
     columnKeys.forEach((key) => {
       const def = defaults[key];
-      base[key] = typeof def === "function" ? def() : (def ?? "");
+      base[key] = typeof def === "function" ? def(i) : (def ?? "");
     });
 
     if (seedData[i]) {
@@ -143,15 +141,15 @@ const makeRows = (
 // ================= DEFAULT VALUES PER TEMPLATE =================
 
 const PROJECT_DEFAULTS: Record<string, any> = {
-  start: () => today(),
-  due: () => addDays(7),
+  start: (i: number) => addDays(i),
+  due: (i: number) => addDays(i + 7),
   status: "Not Started",
   priority: "Medium",
   progress: 0,
 };
 
 const FINANCE_DEFAULTS: Record<string, any> = {
-  date: () => today(),
+  date: (i: number) => addDays(i),
   status: "Pending",
   income: 0,
   expense: 0,
@@ -159,7 +157,8 @@ const FINANCE_DEFAULTS: Record<string, any> = {
 };
 
 const QA_DEFAULTS: Record<string, any> = {
-  date: () => today(),
+  date: (i: number) => addDays(i),
+  deadline: (i: number) => addDays(i + 14),
   status: "Not Started",
   severity: "Medium",
 };
@@ -241,7 +240,12 @@ export const getTemplateData = (
       return {
         title: "Project Tracker",
         columns: [...templateCols, ...buildExtraColumns(templateCols.length)],
-        rows: makeRows(DEFAULT_WORKING_ROW_COUNT, allKeys, [], PROJECT_DEFAULTS),
+        rows: makeRows(
+          DEFAULT_WORKING_ROW_COUNT,
+          allKeys,
+          [],
+          PROJECT_DEFAULTS,
+        ),
       };
     }
 
@@ -298,7 +302,12 @@ export const getTemplateData = (
       return {
         title: "Finance Tracker",
         columns: [...templateCols, ...buildExtraColumns(templateCols.length)],
-        rows: makeRows(DEFAULT_WORKING_ROW_COUNT, allKeys, [], FINANCE_DEFAULTS),
+        rows: makeRows(
+          DEFAULT_WORKING_ROW_COUNT,
+          allKeys,
+          [],
+          FINANCE_DEFAULTS,
+        ),
       };
     }
 
@@ -360,6 +369,48 @@ export const getTemplateData = (
           key: "date",
           name: "Date Found",
           width: 130,
+          editable: true,
+          type: "date",
+        },
+        {
+          key: "deadline",
+          name: "Deadline",
+          width: 130,
+          editable: true,
+          type: "date",
+        },
+        {
+          key: "expected",
+          name: "Expected Result",
+          width: 260,
+          editable: true,
+          type: "text",
+        },
+        {
+          key: "actual",
+          name: "Actual Result",
+          width: 260,
+          editable: true,
+          type: "text",
+        },
+        {
+          key: "steps",
+          name: "Steps to Reproduce",
+          width: 300,
+          editable: true,
+          type: "text",
+        },
+        {
+          key: "video",
+          name: "Video URL",
+          width: 220,
+          editable: true,
+          type: "url",
+        },
+        {
+          key: "comment",
+          name: "Comment",
+          width: 260,
           editable: true,
           type: "text",
         },

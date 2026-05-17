@@ -15,7 +15,9 @@ const EmptyState = () => (
     </div>
     <div className="space-y-1">
       <p className="text-sm font-semibold">No recent sheets</p>
-      <p className="text-xs text-muted-foreground">Sheets you open will appear here.</p>
+      <p className="text-xs text-muted-foreground">
+        Sheets you open will appear here.
+      </p>
     </div>
   </div>
 );
@@ -45,13 +47,12 @@ const RecentSheets = () => {
             lastEdited: formatTimeAgo(sheet.lastEdited),
             rows: sheet.rowsCount,
             cols: sheet.colsCount,
-            fileSizeKb: 120,
             templateId: sheet.templateId,
             isOrganization: sheet.isOrganization,
             organizationName: sheet.organization?.name,
             membersCount: sheet.organization?.membersCount,
             folderName: sheet.folder?.name,
-          }))
+          })),
         );
       } finally {
         setLoading(false);
@@ -79,7 +80,7 @@ const RecentSheets = () => {
       </div>
 
       {/* Content — scroll inside card (parent caps height on dashboard) */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1 -mr-0.5">
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 -mr-0.5 styled-scrollbar">
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (

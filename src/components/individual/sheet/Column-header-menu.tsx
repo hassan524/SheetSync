@@ -32,8 +32,11 @@ import {
   Plus,
   Copy,
   BadgeDollarSign,
+  Bold,
+  Italic,
+  Minus,
 } from "lucide-react";
-import { ColumnDef } from "@/types";
+import { CellFormat, ColumnDef } from "@/types";
 
 interface ColumnHeaderMenuProps {
   column: ColumnDef;
@@ -55,6 +58,7 @@ interface ColumnHeaderMenuProps {
   onSortAsc?: () => void;
   onSortDesc?: () => void;
   onSetCurrency?: (currencyCode: string) => void;
+  onApplyColumnFormat?: (format: Partial<CellFormat>) => void;
 }
 
 const COLUMN_TYPES = [
@@ -139,6 +143,7 @@ export default function ColumnHeaderMenu({
   onSortAsc,
   onSortDesc,
   onSetCurrency,
+  onApplyColumnFormat,
 }: ColumnHeaderMenuProps) {
   const [renameValue, setRenameValue] = useState(column.name);
   const [open, setOpen] = useState(false);
@@ -154,6 +159,7 @@ export default function ColumnHeaderMenu({
   const canUseColumnFormula = !["checkbox", "image", "select"].includes(
     column.type || "text",
   );
+  const columnFormat = column.conditional_formatting?.columnFormat ?? {};
 
   const handleRenameSubmit = () => {
     if (renameValue.trim() && onRename) {
@@ -386,6 +392,110 @@ export default function ColumnHeaderMenu({
                 Clear column values
               </DropdownMenuItem>
             )}
+          </>
+        )}
+
+        {onApplyColumnFormat && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
+              Edit column
+            </DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => onApplyColumnFormat({ bold: !columnFormat.bold })}
+              className="text-xs gap-2"
+            >
+              <Bold className="h-3 w-3" />
+              Bold column
+              {columnFormat.bold && (
+                <span className="ml-auto text-primary">✓</span>
+              )}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                onApplyColumnFormat({ italic: !columnFormat.italic })
+              }
+              className="text-xs gap-2"
+            >
+              <Italic className="h-3 w-3" />
+              Italic column
+              {columnFormat.italic && (
+                <span className="ml-auto text-primary">On</span>
+              )}
+            </DropdownMenuItem>
+            <div className="px-2 py-2 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  className="h-8 w-8 rounded-md border border-border hover:bg-muted flex items-center justify-center"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApplyColumnFormat({
+                      fontSize: Math.max(8, (columnFormat.fontSize ?? 12) - 1),
+                    });
+                  }}
+                >
+                  <Minus className="h-3 w-3" />
+                </button>
+                <input
+                  className="h-8 flex-1 min-w-0 rounded-md border border-border bg-background px-2 text-xs text-center outline-none focus:ring-2 focus:ring-primary/30"
+                  value={columnFormat.fontSize ?? 12}
+                  inputMode="numeric"
+                  onChange={(e) => {
+                    const value = Number(e.target.value.replace(/[^\d]/g, ""));
+                    if (!Number.isNaN(value)) {
+                      onApplyColumnFormat({
+                        fontSize: Math.max(8, Math.min(72, value)),
+                      });
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
+                <button
+                  type="button"
+                  className="h-8 w-8 rounded-md border border-border hover:bg-muted flex items-center justify-center"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApplyColumnFormat({
+                      fontSize: Math.min(72, (columnFormat.fontSize ?? 12) + 1),
+                    });
+                  }}
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="space-y-1">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    Text
+                  </span>
+                  <input
+                    type="color"
+                    className="h-8 w-full rounded border border-border bg-background cursor-pointer"
+                    value={columnFormat.textColor ?? "#000000"}
+                    onChange={(e) =>
+                      onApplyColumnFormat({ textColor: e.target.value })
+                    }
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    Fill
+                  </span>
+                  <input
+                    type="color"
+                    className="h-8 w-full rounded border border-border bg-background cursor-pointer"
+                    value={columnFormat.bgColor ?? "#ffffff"}
+                    onChange={(e) =>
+                      onApplyColumnFormat({ bgColor: e.target.value })
+                    }
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </label>
+              </div>
+            </div>
           </>
         )}
 

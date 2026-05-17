@@ -67,17 +67,6 @@ function isA1Token(token: string): boolean {
   return /^[A-Z]+\d+$/i.test(token);
 }
 
-function columnIndexToLetter(index: number): string {
-  let letter = "";
-  let n = index + 1;
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    letter = String.fromCharCode(65 + rem) + letter;
-    n = Math.floor((n - 1) / 26);
-  }
-  return letter;
-}
-
 // ─────────────────────────────────────────────────────────────
 //  STRING UTILITIES
 // ─────────────────────────────────────────────────────────────
@@ -190,8 +179,9 @@ function resolveAggCol(arg: ResolvedArg, ctx: FormulaContext): number {
 
 function resolveAggStart(
   arg: ResolvedArg | undefined,
-  ctx: FormulaContext,
+  ctx?: FormulaContext,
 ): number {
+  void ctx;
   if (!arg) return 0;
   if (arg.isA1) return arg.a1Row;
   return Number(arg.value) || 0;
@@ -215,7 +205,7 @@ function numVals(
   if (!colArg) return [];
   const ci = resolveAggCol(colArg, ctx);
   if (ci === -1) return [];
-  const start = resolveAggStart(args[colArgIdx + 1], ctx);
+  const start = resolveAggStart(args[colArgIdx + 1]);
   const end = resolveAggEnd(args[colArgIdx + 2], ctx);
   return ctx.getColValues(ci, start, end);
 }
@@ -229,7 +219,7 @@ function rawVals(
   if (!colArg) return [];
   const ci = resolveAggCol(colArg, ctx);
   if (ci === -1) return [];
-  const start = resolveAggStart(args[colArgIdx + 1], ctx);
+  const start = resolveAggStart(args[colArgIdx + 1]);
   const end = resolveAggEnd(args[colArgIdx + 2], ctx);
   return ctx.getColRawValues(ci, start, end);
 }
@@ -264,11 +254,13 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   // ── MATH AGGREGATE ────────────────────────────────────────
   SUM: (args, ctx) => {
     const v = numVals(args, ctx, 0);
-    return v.reduce((a, b) => a + b, 0);
+    return Math.round(v.reduce((a, b) => a + b, 0) * 1e10) / 1e10;
   },
   AVG: (args, ctx) => {
     const v = numVals(args, ctx, 0);
-    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+    return v.length
+      ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 1e4) / 1e4
+      : 0;
   },
   AVERAGE: (args, ctx) => FORMULA_IMPL.AVG(args, ctx),
   COUNT: (args, ctx) => numVals(args, ctx, 0).length,
@@ -296,7 +288,8 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const v = [...numVals(args, ctx, 0)].sort((a, b) => a - b);
     if (!v.length) return 0;
     const m = Math.floor(v.length / 2);
-    return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+    const raw = v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+    return Math.round(raw * 1e4) / 1e4;
   },
   MODE: (args, ctx) => {
     const v = numVals(args, ctx, 0);
@@ -309,18 +302,26 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     const v = numVals(args, ctx, 0);
     if (!v.length) return 0;
     const mean = v.reduce((a, b) => a + b, 0) / v.length;
-    return Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length);
+    return (
+      Math.round(
+        Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length) * 1e4,
+      ) / 1e4
+    );
   },
   VARIANCE: (args, ctx) => {
     const v = numVals(args, ctx, 0);
     if (!v.length) return 0;
     const mean = v.reduce((a, b) => a + b, 0) / v.length;
-    return v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length;
+    return (
+      Math.round(
+        (v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length) * 1e4,
+      ) / 1e4
+    );
   },
   PERCENTILE: (args, ctx) => {
     const ci = resolveAggCol(args[0], ctx);
     const pct = Number(args[1]?.value ?? 50) / 100;
-    const start = resolveAggStart(args[2], ctx);
+    const start = resolveAggStart(args[2]);
     const end = resolveAggEnd(args[3], ctx);
     const v = [...ctx.getColValues(ci, start, end)].sort((a, b) => a - b);
     if (!v.length) return 0;
@@ -500,15 +501,22 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   CEIL: (args) => Math.ceil(Number(args[0]?.value ?? 0)),
   FLOOR: (args) => Math.floor(Number(args[0]?.value ?? 0)),
   ABS: (args) => Math.abs(Number(args[0]?.value ?? 0)),
-  SQRT: (args) => Math.sqrt(Number(args[0]?.value ?? 0)),
+  SQRT: (args) =>
+    Math.round(Math.sqrt(Number(args[0]?.value ?? 0)) * 1e6) / 1e6,
   POWER: (args) =>
-    Math.pow(Number(args[0]?.value ?? 0), Number(args[1]?.value ?? 2)),
+    Math.round(
+      Math.pow(Number(args[0]?.value ?? 0), Number(args[1]?.value ?? 2)) * 1e10,
+    ) / 1e10,
   MOD: (args) => Number(args[0]?.value ?? 0) % Number(args[1]?.value ?? 1),
   LOG: (args) =>
-    Math.log(Number(args[0]?.value ?? 1)) /
-    Math.log(Number(args[1]?.value ?? 10)),
-  LOG10: (args) => Math.log10(Number(args[0]?.value ?? 1)),
-  EXP: (args) => Math.exp(Number(args[0]?.value ?? 0)),
+    Math.round(
+      (Math.log(Number(args[0]?.value ?? 1)) /
+        Math.log(Number(args[1]?.value ?? 10))) *
+        1e6,
+    ) / 1e6,
+  LOG10: (args) =>
+    Math.round(Math.log10(Number(args[0]?.value ?? 1)) * 1e6) / 1e6,
+  EXP: (args) => Math.round(Math.exp(Number(args[0]?.value ?? 0)) * 1e6) / 1e6,
   SIGN: (args) => Math.sign(Number(args[0]?.value ?? 0)),
   CLAMP: (args) =>
     Math.min(
@@ -529,12 +537,23 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   //    =MULTIPLY(price, qty) — two current-row columns
   //    =DIVIDE(B1, C2)       — two specific cells from different rows
   //
-  ADD: (args) => Number(args[0]?.value ?? 0) + Number(args[1]?.value ?? 0),
-  SUBTRACT: (args) => Number(args[0]?.value ?? 0) - Number(args[1]?.value ?? 0),
-  MULTIPLY: (args) => Number(args[0]?.value ?? 0) * Number(args[1]?.value ?? 1),
+  ADD: (args) =>
+    Math.round(
+      (Number(args[0]?.value ?? 0) + Number(args[1]?.value ?? 0)) * 1e10,
+    ) / 1e10,
+  SUBTRACT: (args) =>
+    Math.round(
+      (Number(args[0]?.value ?? 0) - Number(args[1]?.value ?? 0)) * 1e10,
+    ) / 1e10,
+  MULTIPLY: (args) =>
+    Math.round(
+      Number(args[0]?.value ?? 0) * Number(args[1]?.value ?? 1) * 1e10,
+    ) / 1e10,
   DIVIDE: (args) => {
     const divisor = Number(args[1]?.value ?? 1);
-    return divisor !== 0 ? Number(args[0]?.value ?? 0) / divisor : "#DIV/0!";
+    return divisor !== 0
+      ? Math.round((Number(args[0]?.value ?? 0) / divisor) * 1e4) / 1e4
+      : "#DIV/0!";
   },
 
   COLVAL: (args, ctx) => {
@@ -1183,7 +1202,7 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     ) / 100,
 
   // ── UTILITY ───────────────────────────────────────────────
-  RANDOM: () => Math.random(),
+  RANDOM: () => Math.round(Math.random() * 1e4) / 1e4,
   RANDOMINT: (args) => {
     const mn = Number(args[0]?.value ?? 0),
       mx = Number(args[1]?.value ?? 100);
@@ -1618,8 +1637,9 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
       if (!formula || !String(formula).startsWith("=")) return formula;
       const expr = formula.slice(1).trim();
 
-      // Delegate A1-range syntax (SUM(A1:A10)) to hot-formula-parser
-      if (/[A-Z]+\d+\s*:/i.test(expr)) {
+      // Let hot-formula-parser handle standard Excel formulas first.
+      // If it cannot parse a SheetSync column-name formula, fall back below.
+      if (/[A-Z]+\d+/i.test(expr)) {
         const { error, result } = parser.parse(expr);
         if (!error) return result;
       }

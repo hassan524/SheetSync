@@ -24,11 +24,8 @@ import {
   Type,
   ChevronDown,
   WrapText,
-  Eye,
-  EyeOff,
   ArrowUpDown,
   Filter,
-  LayoutGrid,
   Columns,
   Rows,
 } from "lucide-react";

@@ -308,3 +308,9 @@ ADD COLUMN IF NOT EXISTS forked_from_snapshot_label text,
 ADD COLUMN IF NOT EXISTS forked_at timestamptz,
 ADD COLUMN IF NOT EXISTS forked_by_user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
 
+-- ============================================================
+-- Push Notification Preference
+-- ============================================================
+ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS push_enabled BOOLEAN DEFAULT true;
+

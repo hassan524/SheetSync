@@ -1,7 +1,17 @@
 import dynamic from "next/dynamic";
+import { generateSEO } from "@/lib/seo/metadata";
+import { getAllFolders } from "@/lib/querys/folder/folders";
+import { getAllOrganizations } from "@/lib/querys/organization/organization";
 const DashboardLayout = dynamic(
   () => import("@/components/layout/Dashboard-layout"),
 );
+
+export const metadata = generateSEO({
+  title: "Import — Upload Spreadsheets",
+  description:
+    "Upload your existing spreadsheets to start collaborating in SheetSync. Supports Excel, CSV, and Google Sheets exports.",
+  path: "/import",
+});
 const ImportDropzone = dynamic(
   () => import("@/components/import/Import-dropzone"),
 );
@@ -60,10 +70,25 @@ const benefits = [
   },
 ];
 
-const ImportPage = () => {
+const ImportPage = async () => {
+  let organizations: { id: string; name: string }[] = [];
+  let folders: { id: string; name: string }[] = [];
+  try {
+    const data = await getAllOrganizations();
+    organizations = data.map((org: any) => ({ id: org.id, name: org.name }));
+  } catch {
+    organizations = [];
+  }
+  try {
+    const data = await getAllFolders();
+    folders = data.map((folder: any) => ({ id: folder.id, name: folder.name }));
+  } catch {
+    folders = [];
+  }
+
   return (
     <DashboardLayout breadcrumbItems={["SheetSync", "Import"]}>
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Page Header */}
         <div className="flex items-center gap-3">
           <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -102,7 +127,7 @@ const ImportPage = () => {
 
         {/* Import Dropzone */}
         <div>
-          <ImportDropzone />
+          <ImportDropzone organizations={organizations} folders={folders} />
         </div>
 
         {/* Supported Formats */}

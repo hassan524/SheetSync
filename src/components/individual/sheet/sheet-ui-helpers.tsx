@@ -1,6 +1,11 @@
 "use client";
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import Image from "next/image";
 
 // ── Dropdown style helpers ──────────────────────────────────────────────────
 export const ddStyle = (dark: boolean) => ({
@@ -15,8 +20,16 @@ export const ddItemStyle = (dark: boolean) => ({
 
 // ── Member helpers ──────────────────────────────────────────────────────────
 export const MEMBER_COLORS = [
-  "#0d7c5f", "#f59e0b", "#10b981", "#ef4444", "#6366f1",
-  "#ec4899", "#14b8a6", "#f97316", "#8b5cf6", "#06b6d4",
+  "#0d7c5f",
+  "#f59e0b",
+  "#10b981",
+  "#ef4444",
+  "#6366f1",
+  "#ec4899",
+  "#14b8a6",
+  "#f97316",
+  "#8b5cf6",
+  "#06b6d4",
 ];
 
 export const getMemberColor = (id: string) =>
@@ -60,7 +73,10 @@ export function CommentDot({ count }: { count: number }) {
 export function CollabCursor({ name, color }: { name: string; color: string }) {
   return (
     <div className="absolute -top-5 left-0 z-50 pointer-events-none flex items-center gap-1">
-      <div className="w-0.5 h-5 rounded-full" style={{ backgroundColor: color }} />
+      <div
+        className="w-0.5 h-5 rounded-full"
+        style={{ backgroundColor: color }}
+      />
       <span
         className="text-[10px] font-semibold text-white px-1.5 py-0.5 rounded whitespace-nowrap"
         style={{ backgroundColor: color, boxShadow: `0 1px 4px ${color}55` }}
@@ -123,7 +139,9 @@ export function IconBtn({
 
 // ── ToolSep ──────────────────────────────────────────────────────────────────
 export function ToolSep() {
-  return <div className="sheet-tool-sep mx-1 h-5 w-px self-center flex-shrink-0" />;
+  return (
+    <div className="sheet-tool-sep mx-1 h-5 w-px self-center flex-shrink-0" />
+  );
 }
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
@@ -147,9 +165,12 @@ export function SheetAvatar({
       style={{ borderColor: "var(--sheet-titlebar-bg)" }}
     >
       {member.avatar_url ? (
-        <img
+        <Image
           src={member.avatar_url}
           alt={member.name}
+          width={24}
+          height={24}
+          unoptimized
           referrerPolicy="no-referrer"
           className="absolute inset-0 h-full w-full rounded-full object-cover"
         />

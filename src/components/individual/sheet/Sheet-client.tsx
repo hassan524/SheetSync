@@ -8,6 +8,7 @@ import {
   useEffect,
   startTransition,
 } from "react";
+import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import DataGrid, {
   Column,
@@ -70,50 +71,26 @@ import {
   FileSpreadsheet,
   Users,
   MessageSquare,
-  History,
   ChevronDown,
-  Filter,
   Search,
-  Settings2,
-  Zap,
   Eye,
   Bell,
   Clock,
   ChevronRight,
   X,
-  Link,
-  Send,
-  MoreHorizontal,
-  Sparkles,
   BarChart3,
   Code2,
-  Webhook,
-  KeyRound,
-  Maximize2,
   Sun,
   Moon,
   Globe,
-  RefreshCw,
   Keyboard,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
   ArrowDownAZ,
   ArrowUpAZ,
   Paintbrush,
   Printer,
-  Type,
-  Snowflake,
   SlidersHorizontal,
   Sigma,
-  Hash,
-  Percent,
-  Play,
-  TableProperties,
   Layers,
-  Activity,
-  ListChecks,
-  ChevronUp,
   EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -141,7 +118,9 @@ import ChartWidget from "./Charts-widget";
 import {
   SheetRow,
   ColumnDef,
+  CellFormat,
   SaveStatus,
+  ConditionalFormatRule,
   PRIORITY_OPTIONS,
   STATUS_OPTIONS,
 } from "@/types/index";
@@ -203,7 +182,6 @@ import {
   ddStyle,
   ddItemStyle,
   getMemberColor,
-  getMemberInitials,
 } from "./sheet-ui-helpers";
 import SelectOptionsDialog from "./dialogs/Select-options-dialog";
 
@@ -217,7 +195,6 @@ interface SheetState {
   updatedAt: string | null;
   ownerId: string | null;
   organizationId: string | null;
-  size: string | null;
   starred: boolean;
   rows: SheetRow[];
   columns: ColumnDef[];
@@ -308,6 +285,48 @@ type AdvancedFilterRule = {
   value: string;
 };
 
+function isCellInConditionalRange(
+  rule: ConditionalFormatRule,
+  rowIdx: number,
+  colIdx: number,
+) {
+  return (
+    rowIdx >= rule.startRow &&
+    rowIdx <= rule.endRow &&
+    colIdx >= rule.startCol &&
+    colIdx <= rule.endCol
+  );
+}
+
+function conditionalRuleMatches(rule: ConditionalFormatRule, raw: unknown) {
+  const text = String(raw ?? "").trim();
+  const target = rule.value.trim();
+  const lowerText = text.toLowerCase();
+  const lowerTarget = target.toLowerCase();
+
+  if (rule.operator === "empty") return text === "";
+  if (rule.operator === "not_empty") return text !== "";
+  if (rule.operator === "contains") return lowerText.includes(lowerTarget);
+  if (rule.operator === "equals") return lowerText === lowerTarget;
+  if (rule.operator === "not_equals") return lowerText !== lowerTarget;
+
+  const value = Number(raw);
+  const target1 = Number(rule.value);
+  const target2 = Number(rule.value2);
+  if (Number.isNaN(value) || Number.isNaN(target1)) return false;
+  if (rule.operator === "gt") return value > target1;
+  if (rule.operator === "gte") return value >= target1;
+  if (rule.operator === "lt") return value < target1;
+  if (rule.operator === "lte") return value <= target1;
+  if (rule.operator === "between") {
+    if (Number.isNaN(target2)) return false;
+    return (
+      value >= Math.min(target1, target2) && value <= Math.max(target1, target2)
+    );
+  }
+  return false;
+}
+
 function getStatusOptionStyle(value: string) {
   const normalized = value.trim().toLowerCase();
   return (
@@ -360,7 +379,6 @@ export default function SheetClient() {
     updatedAt: null,
     ownerId: null,
     organizationId: null,
-    size: null,
     starred: false,
     rows: [],
     columns: [],
@@ -377,13 +395,9 @@ export default function SheetClient() {
     rows,
     columns,
     organizationId,
-    forkedFromSheetId,
-    forkedFromSnapshotLabel,
-    forkedAt,
-    forkedByUserId,
   } = sheetState;
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [selectedCell, setSelectedCell] = useState<{
@@ -503,7 +517,6 @@ export default function SheetClient() {
     currentColumns: columns,
     historyEntries: history,
     currentUserId: currentUser?.id,
-    currentUserName: currentUser?.name,
     organizationId: isOrgSheet ? organizationId : null,
     onBranch: (newSheetId, label) => {
       toast.success(`Branched! Opening "${label}"…`, { duration: 3000 });
@@ -531,12 +544,57 @@ export default function SheetClient() {
     return rightPanel;
   }, [isOrgSheet, rightPanel]);
 
-  // ── When a chart becomes active, open the charts panel ───
-  useEffect(() => {
-    if (charts.activeChartId) {
-      setRightPanel("charts");
-    }
-  }, [charts.activeChartId]);
+  const conditionalRules = useMemo<ConditionalFormatRule[]>(() => {
+    const rules = columns.flatMap((col) => {
+      const stored = col.conditional_formatting?.rules;
+      return Array.isArray(stored) ? stored : [];
+    });
+    return Array.from(new Map(rules.map((rule) => [rule.id, rule])).values());
+  }, [columns]);
+
+  const getEffectiveCellStyle = useCallback(
+    (rowIdx: number, colKey: string, row: SheetRow): React.CSSProperties => {
+      const base = formatting.getCellStyle(
+        rowIdx,
+        colKey,
+        textWrap.textWrapColumns,
+      );
+      const colIdx = columns.findIndex((col) => col.key === colKey);
+      const columnFormat =
+        columns[colIdx]?.conditional_formatting?.columnFormat ?? {};
+      const conditionalFormat = conditionalRules
+        .filter((rule) => isCellInConditionalRange(rule, rowIdx, colIdx))
+        .filter((rule) => conditionalRuleMatches(rule, row[colKey]))
+        .reduce<React.CSSProperties>(
+          (style, rule) => ({
+            ...style,
+            backgroundColor: rule.format.bgColor ?? style.backgroundColor,
+            color: rule.format.textColor ?? style.color,
+            fontWeight: rule.format.bold ? 700 : style.fontWeight,
+            fontStyle: rule.format.italic ? "italic" : style.fontStyle,
+          }),
+          {},
+        );
+
+      return {
+        ...base,
+        fontWeight: columnFormat.bold ? 700 : base.fontWeight,
+        fontStyle: columnFormat.italic ? "italic" : base.fontStyle,
+        fontSize: columnFormat.fontSize
+          ? `${columnFormat.fontSize}px`
+          : base.fontSize,
+        color: columnFormat.textColor ?? base.color,
+        backgroundColor: columnFormat.bgColor ?? base.backgroundColor,
+        ...conditionalFormat,
+      };
+    },
+    [
+      columns,
+      conditionalRules,
+      formatting.getCellStyle,
+      textWrap.textWrapColumns,
+    ],
+  );
 
   useEffect(() => {
     if (!sheetId) return;
@@ -620,7 +678,6 @@ export default function SheetClient() {
             updatedAt: data.updated_at,
             ownerId: data.ownerId,
             organizationId: data.organizationId ?? null,
-            size: data.size,
             starred: data.isStarred,
             rows: bufferedRows,
             columns: data.columns,
@@ -669,7 +726,10 @@ export default function SheetClient() {
         console.error(err);
         toast.error("Failed to load sheet. Please refresh.");
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        setIsLoading(false);
+        window.dispatchEvent(new Event("__sheet-ready"));
+      });
   }, [sheetId, charts.replaceAll]);
 
   useEffect(() => {
@@ -760,6 +820,27 @@ export default function SheetClient() {
       })
       .catch(console.error);
   }, [sheetId, isOrgSheet]);
+
+  useEffect(() => {
+    if (!isOrgSheet || !currentUser) return;
+    setSheetState((prev) => {
+      if (prev.ownerId === currentUser.id) {
+        return prev.userRole === "owner"
+          ? prev
+          : { ...prev, userRole: "owner" };
+      }
+      const memberRole = orgMembers.find((m) => m.id === currentUser.id)?.role;
+      const nextRole =
+        memberRole === "owner"
+          ? "owner"
+          : memberRole === "admin" || memberRole === "editor"
+            ? "editor"
+            : "viewer";
+      return prev.userRole === nextRole
+        ? prev
+        : { ...prev, userRole: nextRole };
+    });
+  }, [currentUser, isOrgSheet, orgMembers]);
 
   useEffect(() => {
     if (!sheetId) return;
@@ -867,6 +948,82 @@ export default function SheetClient() {
       formatting.applyFormat,
       formatting.getCurrentCellFormat,
     ],
+  );
+
+  const persistColumns = useCallback(
+    async (nextColumns: ColumnDef[]) => {
+      setSheetState((p) => ({ ...p, columns: nextColumns }));
+      columnsHistory.pushState(nextColumns);
+      markSaving();
+      await saveAllColumns(sheetId, nextColumns);
+      markSaved();
+    },
+    [columnsHistory, markSaved, markSaving, sheetId],
+  );
+
+  const handleApplyColumnFormat = useCallback(
+    async (columnKey: string, formatUpdate: Partial<CellFormat>) => {
+      const nextColumns = columns.map((col) => {
+        if (col.key !== columnKey) return col;
+        return {
+          ...col,
+          conditional_formatting: {
+            ...(col.conditional_formatting ?? {}),
+            columnFormat: {
+              ...(col.conditional_formatting?.columnFormat ?? {}),
+              ...formatUpdate,
+            },
+          },
+        };
+      });
+      await persistColumns(nextColumns);
+    },
+    [columns, persistColumns],
+  );
+
+  const handleSaveConditionalRule = useCallback(
+    async (rule: ConditionalFormatRule) => {
+      const nextColumns = columns.map((col, colIdx) => {
+        if (colIdx < rule.startCol || colIdx > rule.endCol) return col;
+        const existing = Array.isArray(col.conditional_formatting?.rules)
+          ? col.conditional_formatting.rules
+          : [];
+        return {
+          ...col,
+          conditional_formatting: {
+            ...(col.conditional_formatting ?? {}),
+            rules: [
+              ...existing.filter((item: any) => item.id !== rule.id),
+              rule,
+            ],
+          },
+        };
+      });
+      await persistColumns(nextColumns);
+      toast.success("Conditional formatting rule added.");
+    },
+    [columns, persistColumns],
+  );
+
+  const handleDeleteConditionalRule = useCallback(
+    async (ruleId: string) => {
+      const nextColumns = columns.map((col) => {
+        const existing = Array.isArray(col.conditional_formatting?.rules)
+          ? col.conditional_formatting.rules
+          : [];
+        return {
+          ...col,
+          conditional_formatting: {
+            ...(col.conditional_formatting ?? {}),
+            rules: existing.filter(
+              (rule: ConditionalFormatRule) => rule.id !== ruleId,
+            ),
+          },
+        };
+      });
+      await persistColumns(nextColumns);
+    },
+    [columns, persistColumns],
   );
 
   const handlePaste = useCallback(async () => {
@@ -1721,12 +1878,7 @@ export default function SheetClient() {
       const activeRows = timeTravelState.previewRows || rows;
       const { row } = props;
       const rowIdx = activeRows.findIndex((r) => r.id === row.id);
-      const cellStyle = formatting.getCellStyle(
-        rowIdx,
-        colKey,
-        textWrap.textWrapColumns,
-      );
-      const cellKey = protection.getCellKey(rowIdx, colKey);
+      const cellStyle = getEffectiveCellStyle(rowIdx, colKey, row);
       const formula = formulas.getFormula(rowIdx, colKey);
       const isProtected = protection.isCellProtected(rowIdx, colKey);
       const cellComments = getCellComments(rowIdx, colKey);
@@ -1791,11 +1943,13 @@ export default function SheetClient() {
             );
           case "image":
             return displayValue ? (
-              <img
+              <Image
                 src={String(displayValue)}
                 alt="Cell"
+                width={32}
+                height={32}
+                unoptimized
                 className="h-8 w-8 rounded object-cover border border-gray-200"
-                loading="lazy"
               />
             ) : (
               <span className="text-gray-300 text-[10px] italic">
@@ -1938,7 +2092,7 @@ export default function SheetClient() {
       isOrgSheet,
       liveTracking,
       comments,
-      formatting.getCellStyle,
+      getEffectiveCellStyle,
       formatting.getCurrentCellFormat,
       textWrap.textWrapColumns,
       protection.getCellKey,
@@ -2186,6 +2340,9 @@ export default function SheetClient() {
                     markSaved();
                   }, 50);
                 }}
+                onApplyColumnFormat={(formatUpdate) =>
+                  handleApplyColumnFormat(col.key, formatUpdate)
+                }
               />
             </div>
           ),
@@ -2205,11 +2362,7 @@ export default function SheetClient() {
               col.key,
               col.type || "text",
             );
-            const cellStyle = formatting.getCellStyle(
-              rowIdx,
-              column.key,
-              textWrap.textWrapColumns,
-            );
+            const cellStyle = getEffectiveCellStyle(rowIdx, column.key, row);
             const cellKey = protection.getCellKey(rowIdx, col.key);
             const isTextWrap = textWrap.textWrapColumns.has(col.key);
             const isProtected = protection.isCellProtected(rowIdx, col.key);
@@ -2501,7 +2654,7 @@ export default function SheetClient() {
     selectedRows,
     textWrap.textWrapColumns,
     cellTypes.getCellType,
-    formatting.getCellStyle,
+    getEffectiveCellStyle,
     formulas.formulas,
     formulas.columnFormulas,
     formulas.setFormulas,
@@ -2523,6 +2676,7 @@ export default function SheetClient() {
     markSaved,
     handleApplyFormulaToColumn,
     handleRemoveColumnFormula,
+    handleApplyColumnFormat,
     isOrgSheet,
     handleInsertColumn,
     charts,
@@ -2661,12 +2815,6 @@ export default function SheetClient() {
         )
       : null;
   }, [selectedCell, columns, cellTypes.getCellType]);
-
-  // keep a selected row for row-height tools (e.g., resize handle)
-  const selectedRowId = useMemo(() => {
-    if (selectedRows.size === 0) return null;
-    return Array.from(selectedRows)[0] ?? null;
-  }, [selectedRows]);
 
   const isSelectedColumnWrapped = useMemo(
     () =>
@@ -3397,11 +3545,7 @@ export default function SheetClient() {
                 Browse and insert formulas
               </TooltipContent>
             </Tooltip>
-            <IconBtn
-              icon={Paintbrush}
-              tooltip="Format painter (coming soon)"
-              onClick={() => toast.info("Format painter coming soon")}
-            />
+
             <ToolSep />
             {showSearch ? (
               <div className="flex items-center gap-1 shrink-0">
@@ -3701,19 +3845,6 @@ export default function SheetClient() {
                         tooltip: "Hide column from view (owner only)",
                         ownerOnly: true,
                       },
-                  {
-                    icon: Paintbrush,
-                    label: "Conditional",
-                    action: () =>
-                      toast.info("Conditional formatting coming soon"),
-                    tooltip: "Apply conditional formatting rules",
-                  },
-                  {
-                    icon: Layers,
-                    label: "Group",
-                    action: () => toast.info("Group coming soon"),
-                    tooltip: "Group columns together",
-                  },
                 ]
                   .filter(
                     ({ ownerOnly }: any) =>
@@ -3825,6 +3956,17 @@ export default function SheetClient() {
               active={effectiveRightPanel === "charts"}
               badge={
                 charts.charts.length > 0 ? charts.charts.length : undefined
+              }
+            />
+            <IconBtn
+              icon={Paintbrush}
+              tooltip="Conditional formatting"
+              onClick={() => toggleRightPanel("conditional")}
+              active={effectiveRightPanel === "conditional"}
+              badge={
+                conditionalRules.length > 0
+                  ? conditionalRules.length
+                  : undefined
               }
             />
             <IconBtn
@@ -4058,6 +4200,9 @@ export default function SheetClient() {
                 columns={columns}
                 onSelect={(id) => {
                   charts.setActiveChart(id);
+                }}
+                onOpenEditor={(id) => {
+                  charts.setActiveChart(id);
                   setRightPanel("charts");
                 }}
                 onRemove={charts.removeChart}
@@ -4075,6 +4220,7 @@ export default function SheetClient() {
             (rightPanel === "developer" ||
               rightPanel === "timetravel" ||
               rightPanel === "charts" ||
+              rightPanel === "conditional" ||
               rightPanel === "shortcuts" ||
               isOrgSheet) && (
               <>
@@ -4106,6 +4252,7 @@ export default function SheetClient() {
                     rows={rows}
                     columns={columns}
                     totalComments={totalComments}
+                    historyCount={history.length}
                     members={orgMembers}
                     timeTravelState={timeTravelState}
                     timeTravelActions={timeTravelActions}
@@ -4123,6 +4270,10 @@ export default function SheetClient() {
                         setRightPanel(null);
                       }
                     }}
+                    selectedCell={selectedCell}
+                    conditionalRules={conditionalRules}
+                    onSaveConditionalRule={handleSaveConditionalRule}
+                    onDeleteConditionalRule={handleDeleteConditionalRule}
                   />
                 </div>
               </>

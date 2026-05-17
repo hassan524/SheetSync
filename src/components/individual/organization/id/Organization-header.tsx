@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,7 @@ const NewSheetModal = dynamic(
 const ShareDialog = dynamic(
   () => import("@/components/individual/sheet/dialogs/Share-dialog"),
 );
-import { Plus, UserPlus, Settings, Shield, Zap } from "lucide-react";
+import { Plus, UserPlus, Shield, Zap } from "lucide-react";
 import type { Organization } from "@/types";
 
 interface OrgHeaderProps {
@@ -19,8 +18,6 @@ interface OrgHeaderProps {
 }
 
 export function OrgHeader({ org }: OrgHeaderProps) {
-  const router = useRouter();
-
   const [newSheetOpen, setNewSheetOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -79,14 +76,6 @@ export function OrgHeader({ org }: OrgHeaderProps) {
           >
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline text-xs">New Sheet</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 shrink-0 flex items-center justify-center"
-          >
-            <Settings className="h-4 w-4 text-muted-foreground" />
           </Button>
         </div>
       </div>

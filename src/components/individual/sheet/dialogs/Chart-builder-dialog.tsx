@@ -10,7 +10,7 @@
  * • Calls onInsert(chart) — no DB save, caller adds to in-memory state
  */
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
@@ -21,7 +21,6 @@ import {
   Check,
   ArrowRight,
   TrendingUp,
-  BarChart2,
   AlertCircle,
   ChevronRight,
 } from "lucide-react";

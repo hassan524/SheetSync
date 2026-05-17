@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Star, Users, FolderOpen, Trash2 } from "lucide-react";
+import { Star, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { useSheetTransition } from "@/hooks/sheets/use-sheet-transition";
@@ -19,7 +23,6 @@ interface SheetCardProps {
   rows?: number;
   cols?: number;
   templateId: string;
-  fileSizeKb: number;
   fillPercent?: number;
   isStarred?: boolean;
   isOrganization?: boolean;
@@ -44,12 +47,13 @@ function drawTexture(canvas: HTMLCanvasElement) {
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, W, H);
 
-  const cW = 40, cH = 26;
+  const cW = 40,
+    cH = 26;
   const filledRows = Math.ceil((H * 0.7) / cH);
 
   for (let row = 0; row < filledRows; row++) {
     const progress = row / filledRows;
-    const alpha = 0.10 * (1 - progress) + 0.01 * progress;
+    const alpha = 0.1 * (1 - progress) + 0.01 * progress;
     ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`;
     ctx.fillRect(0, row * cH, W, cH);
   }
@@ -75,19 +79,13 @@ function drawTexture(canvas: HTMLCanvasElement) {
   ctx.fillRect(0, 0, W, cH);
 }
 
-function formatSize(kb: number) {
-  return kb >= 1000 ? (kb / 1000).toFixed(1) + " MB" : `${kb} KB`;
-}
-
 const SheetCard = ({
-  id, title, lastEdited,
-  rows = 0,
-  cols = 0,
-  templateId, fileSizeKb,
-  fillPercent = 40, isStarred,
-  isOrganization,
-  organizationName, membersCount,
-  folderName, onDeleted,
+  id,
+  title,
+  lastEdited,
+  templateId,
+  isStarred,
+  onDeleted,
 }: SheetCardProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -145,26 +143,29 @@ const SheetCard = ({
             </span>
           </div>
 
-          <div className="absolute bottom-2 left-2">
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/90 border text-muted-foreground">
-              {rows.toLocaleString()} rows · {cols} cols
-            </span>
-          </div>
-
-          <div className="absolute bottom-2 right-2">
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/90 border text-muted-foreground">
-              {formatSize(fileSizeKb)}
-            </span>
-          </div>
-
           <div
-            className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100"
+            className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
           >
-            <Button size="icon" variant="ghost" className="h-6 w-6 bg-white/95 border">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 bg-white/95 border"
+            >
+              <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+            </Button>
+
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 bg-white/95 border"
+            >
               <Star
-                className={`h-3 w-3 ${isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground"
-                  }`}
+                className={`h-3 w-3 ${
+                  isStarred
+                    ? "fill-amber-400 text-amber-400"
+                    : "text-muted-foreground"
+                }`}
               />
             </Button>
 
@@ -183,13 +184,11 @@ const SheetCard = ({
         </div>
 
         <div className="mt-2.5 space-y-1.5 px-0.5">
-          <p className="text-[13px] font-medium truncate">{title}</p>
+          <p className="text-[13px] font-medium truncate group-hover:underline underline-offset-2">
+            {title}
+          </p>
 
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span>{rows.toLocaleString()} rows</span>
-            <span>·</span>
-            <span>{cols} cols</span>
-            <span>·</span>
             <span>{lastEdited}</span>
           </div>
         </div>
@@ -200,12 +199,17 @@ const SheetCard = ({
           <DialogHeader>
             <DialogTitle className="text-sm">Delete sheet?</DialogTitle>
             <DialogDescription className="text-xs">
-              <span className="font-medium">"{title}"</span> will be permanently deleted.
+              <span className="font-medium">"{title}"</span> will be permanently
+              deleted.
             </DialogDescription>
           </DialogHeader>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowDelete(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDelete(false)}
+            >
               Cancel
             </Button>
 

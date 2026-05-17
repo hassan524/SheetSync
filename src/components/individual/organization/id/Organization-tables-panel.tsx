@@ -6,9 +6,6 @@ import { DataTable } from "@/components/common/Data-table";
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   FileSpreadsheet,
@@ -16,15 +13,12 @@ import {
   FileText,
   Star,
   StarOff,
-  Download,
   Trash2,
   Share2,
   Mail,
-  UserMinus,
-  UserCog,
-  Edit3,
-  Shield,
-  ChevronRight,
+  Calendar,
+  Clock,
+  Activity,
 } from "lucide-react";
 import type { Organization, Sheet, Member } from "@/types";
 import { useRouter } from "next/navigation";
@@ -33,12 +27,6 @@ import { updateSheetStarred } from "@/lib/querys/sheet/sheet";
 import { timeAgo } from "@/lib/utils";
 
 // ── Visibility styles ─────────────────────────────
-const VIS = {
-  team: { label: "Team", dot: "bg-blue-400" },
-  private: { label: "Private", dot: "bg-orange-400" },
-  public: { label: "Public", dot: "bg-green-400" },
-} as const;
-
 const ROLE_STYLE: Record<string, string> = {
   owner: "text-amber-700 bg-amber-50 border border-amber-200",
   admin: "text-purple-700 bg-purple-50 border border-purple-200",
@@ -81,11 +69,14 @@ function NoMembersIcon() {
   );
 }
 
-// ── SHEET COLUMNS ────────────────────────────────
+// ── SHEET COLUMNS — same 5 standard columns ──────
+import Link from "next/link";
+
 const sheetColumns = [
   {
     key: "title",
     header: "Name",
+    width: "240px",
     render: (s: Sheet) => (
       <div className="flex items-center gap-3">
         <div className="h-7 w-7 rounded-lg border bg-card flex items-center justify-center">
@@ -94,9 +85,13 @@ const sheetColumns = [
 
         <div>
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-primary hover:underline cursor-pointer transition-colors">
+            <Link
+              href={`/sheet/${s.id}`}
+              className="text-sm font-medium text-foreground hover:text-primary hover:underline transition-colors truncate max-w-[160px] block"
+              onClick={(e) => e.stopPropagation()}
+            >
               {s.title}
-            </span>
+            </Link>
             {s.is_starred && (
               <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
             )}
@@ -114,46 +109,45 @@ const sheetColumns = [
   {
     key: "owner",
     header: "Owner",
+    width: "140px",
     render: (s: Sheet) => (
       <div className="flex items-center gap-2">
         <Avatar className="h-6 w-6">
-          {s.owner.avatar && <AvatarImage src={s.owner.avatar} />}
-          <AvatarFallback>{s.owner.initials}</AvatarFallback>
+          {s.owner?.avatar && <AvatarImage src={s.owner.avatar} />}
+          <AvatarFallback className="text-[9px] font-semibold bg-primary/10 text-primary">
+            {s.owner?.initials ?? "ME"}
+          </AvatarFallback>
         </Avatar>
-        <span className="text-xs">{s.owner.name.split(" ")[0]}</span>
+        <span className="text-xs font-medium">
+          {s.owner?.name?.split(" ")[0] ?? "You"}
+        </span>
       </div>
     ),
   },
   {
-    key: "visibility",
-    header: "Access",
-    render: (s: Sheet) => {
-      const v = VIS[s.visibility ?? "team"];
-      return (
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${v.dot}`} />
-          <span className="text-xs">{v.label}</span>
-        </div>
-      );
-    },
+    key: "personal",
+    header: "Personal",
+    width: "90px",
+    render: () => <span className="text-xs font-bold text-primary">No</span>,
   },
   {
-    key: "rows",
-    header: "Rows",
-    render: (s: Sheet) => <span>{s.rows ?? 0}</span>,
-  },
-  {
-    key: "columns",
-    header: "Cols",
-    render: (s: Sheet) => <span>{s.columns ?? 0}</span>,
+    key: "created_at",
+    header: "Created",
+    width: "120px",
+    render: (s: Sheet) => (
+      <span className="text-xs text-muted-foreground">
+        {s.created_at ? timeAgo(s.created_at) : "—"}
+      </span>
+    ),
   },
   {
     key: "last_modified",
-    header: "Updated",
+    header: "Last Modified",
+    width: "130px",
     render: (s: Sheet) => (
-      <div>
-        <p className="text-xs">{s.updated_at ? timeAgo(s.updated_at) : "—"}</p>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        {s.updated_at ? timeAgo(s.updated_at) : "—"}
+      </p>
     ),
   },
 ];
@@ -163,6 +157,7 @@ const memberColumns = [
   {
     key: "profiles",
     header: "Member",
+    width: "220px",
     render: (m: Member) => (
       <div className="flex items-center gap-2">
         <Avatar className="h-7 w-7">
@@ -171,7 +166,7 @@ const memberColumns = [
         </Avatar>
 
         <div>
-          <p className="text-sm">{m.profiles.name}</p>
+          <p className="text-sm font-medium">{m.profiles.name}</p>
           <p className="text-xs text-muted-foreground">{m.profiles.email}</p>
         </div>
       </div>
@@ -180,6 +175,7 @@ const memberColumns = [
   {
     key: "role",
     header: "Role",
+    width: "100px",
     render: (m: Member) => (
       <span
         className={`text-xs px-2 py-0.5 rounded ${ROLE_STYLE[m.role ?? "viewer"]}`}
@@ -191,7 +187,66 @@ const memberColumns = [
   {
     key: "status",
     header: "Status",
-    render: (m: Member) => <span className="text-xs">{m.status}</span>,
+    width: "90px",
+    render: (m: Member) => {
+      const isOnline = m.status === "online";
+      return (
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`h-2 w-2 rounded-full shrink-0 ${
+              isOnline ? "bg-emerald-500" : "bg-slate-300"
+            }`}
+          />
+          <span
+            className={`text-xs font-medium capitalize ${isOnline ? "text-emerald-600" : "text-muted-foreground"}`}
+          >
+            {m.status}
+          </span>
+        </div>
+      );
+    },
+  },
+  {
+    key: "joined_at",
+    header: "Joined",
+    width: "120px",
+    render: (m: Member) => (
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Calendar className="h-3 w-3 shrink-0" />
+        <span>{m.joined_at ? timeAgo(m.joined_at) : "—"}</span>
+      </div>
+    ),
+  },
+  {
+    key: "totalChanges",
+    header: "Changes",
+    width: "100px",
+    render: (m: Member) => {
+      const count = m.totalChanges ?? 0;
+      return (
+        <div className="flex items-center gap-1.5">
+          <Activity className="h-3 w-3 text-primary/50 shrink-0" />
+          <span
+            className={`text-xs font-semibold ${count > 0 ? "text-foreground" : "text-muted-foreground"}`}
+          >
+            {count > 0 ? count.toLocaleString() : "—"}
+          </span>
+        </div>
+      );
+    },
+  },
+  {
+    key: "lastActive",
+    header: "Last Active",
+    width: "120px",
+    render: (m: Member) => (
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Clock className="h-3 w-3 shrink-0" />
+        <span>
+          {m.lastActive && m.lastActive !== "Never" ? m.lastActive : "—"}
+        </span>
+      </div>
+    ),
   },
 ];
 
@@ -199,26 +254,37 @@ const memberColumns = [
 const createSheetAction = (router: ReturnType<typeof useRouter>) => ({
   render: (s: Sheet) => (
     <>
-      <DropdownMenuItem onClick={() => router.push(`/sheet/${s.id}`)}>
-        <Edit3 className="h-3.5 w-3.5" /> Open
-      </DropdownMenuItem>
-
-      <DropdownMenuItem onClick={() => toast.info("Share")}>
-        <Share2 className="h-3.5 w-3.5" /> Share
+      <DropdownMenuItem
+        className="text-xs gap-2"
+        onClick={() => {
+          const url = `${window.location.origin}/sheet/${s.id}`;
+          navigator.clipboard
+            .writeText(url)
+            .then(() => toast.success("Link copied"));
+        }}
+      >
+        <Share2 className="h-3.5 w-3.5" /> Copy Link
       </DropdownMenuItem>
 
       <DropdownMenuItem
+        className="text-xs gap-2"
         onClick={async () => {
           await updateSheetStarred(s.id, !s.is_starred);
-          toast.success("Updated");
+          toast.success(s.is_starred ? "Unstarred" : "Starred");
+          router.refresh();
         }}
       >
-        {s.is_starred ? <StarOff /> : <Star />} Star
+        {s.is_starred ? (
+          <StarOff className="h-3.5 w-3.5" />
+        ) : (
+          <Star className="h-3.5 w-3.5" />
+        )}{" "}
+        {s.is_starred ? "Unstar" : "Star"}
       </DropdownMenuItem>
 
       <DropdownMenuSeparator />
 
-      <DropdownMenuItem className="text-red-500">
+      <DropdownMenuItem className="text-xs gap-2 text-red-500 focus:text-red-500">
         <Trash2 className="h-3.5 w-3.5" /> Delete
       </DropdownMenuItem>
     </>

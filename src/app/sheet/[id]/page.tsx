@@ -24,8 +24,6 @@ const SheetClient = dynamic(
   { loading: () => <GlobalLoader /> },
 );
 
-export default async function SheetPage({ params }: PageProps) {
-  const { id } = await params;
-
-  return <SheetClient  />;
+export default function SheetPage() {
+  return <SheetClient />;
 }

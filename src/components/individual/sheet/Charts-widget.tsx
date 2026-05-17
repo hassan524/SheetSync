@@ -214,11 +214,11 @@ function buildOptions(
       gradient:
         chart.kind === "area"
           ? {
-            shadeIntensity: 1,
-            opacityFrom: 0.25,
-            opacityTo: 0.02,
-            stops: [0, 100],
-          }
+              shadeIntensity: 1,
+              opacityFrom: 0.25,
+              opacityTo: 0.02,
+              stops: [0, 100],
+            }
           : undefined,
     },
 
@@ -243,31 +243,31 @@ function buildOptions(
 
     ...(!isPolar &&
       !isRadar && {
-      xaxis: {
-        categories,
-        labels: {
-          style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
-          rotate,
-          trim: true,
-          maxHeight,
-          hideOverlappingLabels: true,
+        xaxis: {
+          categories,
+          labels: {
+            style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
+            rotate,
+            trim: true,
+            maxHeight,
+            hideOverlappingLabels: true,
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          tickAmount: Math.min(categories.length, chart.maxXLabels ?? 12),
         },
-        axisBorder: { show: false },
-        axisTicks: { show: false },
-        tickAmount: Math.min(categories.length, chart.maxXLabels ?? 12),
-      },
-      yaxis: {
-        labels: {
-          style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
-          formatter: (val: number) =>
-            typeof val === "number"
-              ? val >= 1000
-                ? `${(val / 1000).toFixed(1)}k`
-                : String(Math.round(val))
-              : String(val),
+        yaxis: {
+          labels: {
+            style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
+            formatter: (val: number) =>
+              typeof val === "number"
+                ? val >= 1000
+                  ? `${(val / 1000).toFixed(1)}k`
+                  : String(Math.round(val))
+                : String(val),
+          },
         },
-      },
-    }),
+      }),
 
     ...(isPolar && { labels: categories }),
 
@@ -333,6 +333,7 @@ interface ChartWidgetProps {
   rows: SheetRow[];
   columns: ColumnDef[];
   onSelect: (id: string) => void;
+  onOpenEditor: (id: string) => void;
   onRemove: (id: string) => void;
   onPositionChange: (id: string, x: number, y: number) => void;
   onSizeChange: (id: string, w: number, h: number) => void;
@@ -346,6 +347,7 @@ export default function ChartWidget({
   rows,
   columns,
   onSelect,
+  onOpenEditor,
   onRemove,
   onPositionChange,
   onSizeChange,
@@ -570,7 +572,7 @@ export default function ChartWidget({
     chart.dataMode === "sheet"
       ? !chart.labelColumnKey || (!isCat && chart.seriesKeys.length === 0)
       : chart.manualCategories.length === 0 ||
-      chart.manualSeries.every((s) => s.values.length === 0);
+        chart.manualSeries.every((s) => s.values.length === 0);
 
   // ── Theme ──
   const accent = "#1a7a4a";
@@ -655,7 +657,7 @@ export default function ChartWidget({
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            onSelect(chart.id);
+            onOpenEditor(chart.id);
           }}
           className="h-5 w-5 flex items-center justify-center rounded-md shrink-0"
           style={{ color: mutedC }}
@@ -729,7 +731,7 @@ export default function ChartWidget({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onSelect(chart.id);
+                  onOpenEditor(chart.id);
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-semibold"

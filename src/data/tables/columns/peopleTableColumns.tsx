@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -16,7 +15,6 @@ import {
   FileSpreadsheet,
   Building2,
   ShieldCheck,
-  UserMinus,
   ChevronRight,
   Shield,
 } from "lucide-react";
@@ -63,8 +61,8 @@ export const peopleColumns = [
               person.status === "online"
                 ? "bg-emerald-500"
                 : person.status === "away"
-                ? "bg-amber-500"
-                : "bg-gray-300"
+                  ? "bg-amber-500"
+                  : "bg-gray-300"
             }`}
           />
         </div>
@@ -90,7 +88,11 @@ export const peopleColumns = [
       const orgs = person.organizations ?? [];
 
       if (orgs.length === 0) {
-        return <span className="text-xs text-muted-foreground">No organizations</span>;
+        return (
+          <span className="text-xs text-muted-foreground">
+            No organizations
+          </span>
+        );
       }
 
       return (
@@ -164,9 +166,7 @@ export const peopleColumns = [
 /* ---------------- ACTION MENU ---------------- */
 
 function PeopleActionMenu({ person }: { person: PersonData }) {
-  const [currentRole, setCurrentRole] = useState<Role>(
-    person.role as Role
-  );
+  const [currentRole, setCurrentRole] = useState<Role>(person.role as Role);
 
   const handleRoleChange = (newRole: Role) => {
     setCurrentRole(newRole);
@@ -221,17 +221,6 @@ function PeopleActionMenu({ person }: { person: PersonData }) {
           ))}
         </DropdownMenuSubContent>
       </DropdownMenuSub>
-
-      <DropdownMenuSeparator />
-
-      <DropdownMenuItem
-        className="text-xs gap-2 text-red-600 focus:text-red-600"
-        onClick={() =>
-          toast.info(`Remove ${person.name}'s access — coming soon`)
-        }
-      >
-        <UserMinus className="h-3.5 w-3.5" /> Remove Access
-      </DropdownMenuItem>
     </>
   );
 }

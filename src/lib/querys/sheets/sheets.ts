@@ -69,11 +69,13 @@ export async function createSheet({
   folder_id,
   templateId,
   organizationId,
+  markRecent,
 }: {
   name: string;
   folder_id?: string;
   templateId: string;
   organizationId?: string;
+  markRecent?: boolean;
 }) {
   const supabase = await createSupabaseServerClient();
 
@@ -95,6 +97,7 @@ export async function createSheet({
         organization_id: organizationId ?? null,
         template_id: templateId,
         is_personal: !organizationId,
+        last_opened_at: markRecent ? new Date().toISOString() : null,
       },
     ])
     .select()
@@ -201,6 +204,7 @@ export async function getRecentSheets(limit?: number) {
       title: sheet.title,
       templateId: sheet.template_id,
       lastEdited: sheet.last_opened_at ?? sheet.updated_at,
+      createdAt: sheet.created_at,
       isOrganization: !!sheet.organization_id,
       organization: org
         ? {

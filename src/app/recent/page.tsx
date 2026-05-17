@@ -10,7 +10,7 @@ const RecentList = dynamic(
 import { Clock, FileSpreadsheet, Info } from "lucide-react";
 
 export const metadata = generateSEO({
-  title: "Recent Sheets | SheetSync",
+  title: "Recent — Activity",
   description:
     "View your most recently opened and edited spreadsheets across all your organizations and personal folders.",
   path: "/recent",

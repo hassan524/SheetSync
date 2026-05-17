@@ -15,7 +15,6 @@ import {
   MessageSquare,
   Building2,
   Mail,
-  AlertCircle,
 } from "lucide-react";
 
 import { getMyActivity } from "@/lib/querys/activity/activity";
@@ -24,46 +23,54 @@ import { getMyInvitesActivity } from "@/lib/querys/organization/organization";
 function getActionMeta(action: string = "") {
   const a = action.toLowerCase();
 
-  if (a.includes("create")) return {
-    icon: Plus,
-    color: "bg-primary/15 text-primary",
-    ring: "ring-1 ring-primary/30",
-  };
-  if (a.includes("edit") || a.includes("update") || a.includes("add")) return {
-    icon: Edit3,
-    color: "bg-primary/10 text-primary",
-    ring: "ring-1 ring-primary/20",
-  };
-  if (a.includes("view") || a.includes("open")) return {
-    icon: Eye,
-    color: "bg-primary/10 text-primary",
-    ring: "ring-1 ring-primary/20",
-  };
-  if (a.includes("share")) return {
-    icon: Share2,
-    color: "bg-primary/10 text-primary",
-    ring: "ring-1 ring-primary/20",
-  };
-  if (a.includes("invite") || a.includes("join")) return {
-    icon: UserPlus,
-    color: "bg-primary/15 text-primary",
-    ring: "ring-1 ring-primary/30",
-  };
-  if (a.includes("download")) return {
-    icon: Download,
-    color: "bg-primary/10 text-primary",
-    ring: "ring-1 ring-primary/20",
-  };
-  if (a.includes("delete") || a.includes("remove")) return {
-    icon: Trash2,
-    color: "bg-destructive/10 text-destructive",
-    ring: "ring-1 ring-destructive/20",
-  };
-  if (a.includes("comment")) return {
-    icon: MessageSquare,
-    color: "bg-primary/10 text-primary",
-    ring: "ring-1 ring-primary/20",
-  };
+  if (a.includes("create"))
+    return {
+      icon: Plus,
+      color: "bg-primary/15 text-primary",
+      ring: "ring-1 ring-primary/30",
+    };
+  if (a.includes("edit") || a.includes("update") || a.includes("add"))
+    return {
+      icon: Edit3,
+      color: "bg-primary/10 text-primary",
+      ring: "ring-1 ring-primary/20",
+    };
+  if (a.includes("view") || a.includes("open"))
+    return {
+      icon: Eye,
+      color: "bg-primary/10 text-primary",
+      ring: "ring-1 ring-primary/20",
+    };
+  if (a.includes("share"))
+    return {
+      icon: Share2,
+      color: "bg-primary/10 text-primary",
+      ring: "ring-1 ring-primary/20",
+    };
+  if (a.includes("invite") || a.includes("join"))
+    return {
+      icon: UserPlus,
+      color: "bg-primary/15 text-primary",
+      ring: "ring-1 ring-primary/30",
+    };
+  if (a.includes("download"))
+    return {
+      icon: Download,
+      color: "bg-primary/10 text-primary",
+      ring: "ring-1 ring-primary/20",
+    };
+  if (a.includes("delete") || a.includes("remove"))
+    return {
+      icon: Trash2,
+      color: "bg-destructive/10 text-destructive",
+      ring: "ring-1 ring-destructive/20",
+    };
+  if (a.includes("comment"))
+    return {
+      icon: MessageSquare,
+      color: "bg-primary/10 text-primary",
+      ring: "ring-1 ring-primary/20",
+    };
 
   return {
     icon: Clock,
@@ -113,7 +120,8 @@ function formatAction(action: string = "", target: string, subtitle: string) {
   if (a.includes("invited to organization")) {
     return {
       line1: `You were invited to join "${target}"`,
-      line2: "Check your email to accept. Don't forget to check your spam folder too!",
+      line2:
+        "Check your email to accept. Don't forget to check your spam folder too!",
       context: "Organization invite",
     };
   }
@@ -205,7 +213,7 @@ export default function ActivityPanel() {
 
         const merged = [...formattedInvites, ...formattedActivity].sort(
           (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
 
         setActivities(merged);
@@ -221,7 +229,6 @@ export default function ActivityPanel() {
 
   return (
     <div className="rounded-xl border border-border bg-card h-full min-h-0 flex flex-col overflow-hidden max-h-full">
-
       {/* HEADER */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center justify-between">
@@ -249,8 +256,7 @@ export default function ActivityPanel() {
       </div>
 
       {/* BODY */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
-
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 styled-scrollbar">
         {/* LOADING */}
         {loading && (
           <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -280,7 +286,7 @@ export default function ActivityPanel() {
               const { line1, line2, context } = formatAction(
                 a.action,
                 a.target,
-                a.subtitle
+                a.subtitle,
               );
               const isFirst = index === 0;
 
@@ -302,7 +308,6 @@ export default function ActivityPanel() {
 
                   {/* TEXT */}
                   <div className="flex-1 min-w-0">
-
                     {/* Main message */}
                     <p className="text-[11px] font-medium leading-snug text-foreground">
                       {line1}
@@ -370,7 +375,6 @@ export default function ActivityPanel() {
           </p>
         </div>
       )}
-
     </div>
   );
 }

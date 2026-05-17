@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Edit3, Share2, Download, Trash2, Star, StarOff } from "lucide-react";
+import { Edit3, Trash2, Star, StarOff } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
@@ -34,7 +34,7 @@ export const recentColumns = [
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium truncate max-w-[200px] block">
+            <span className="text-sm font-medium truncate max-w-[180px] block">
               {s.title}
             </span>
             {s.isStarred && (
@@ -89,34 +89,12 @@ export const recentColumns = [
   {
     key: "last_opened",
     header: "Last Opened",
-    width: "160px",
+    width: "140px",
     render: (s: RecentSheetRow) => (
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Clock className="h-3 w-3" />
         <span>{s.lastEdited ? timeAgo(s.lastEdited) : "—"}</span>
       </div>
-    ),
-  },
-
-  {
-    key: "rows",
-    header: "Rows",
-    width: "80px",
-    render: (s: RecentSheetRow) => (
-      <span className="text-xs text-muted-foreground">
-        {s.rowsCount ?? "—"}
-      </span>
-    ),
-  },
-
-  {
-    key: "columns",
-    header: "Columns",
-    width: "80px",
-    render: (s: RecentSheetRow) => (
-      <span className="text-xs text-muted-foreground">
-        {s.colsCount ?? "—"}
-      </span>
     ),
   },
 ];
@@ -131,12 +109,6 @@ function RecentActionMenu({ sheet }: { sheet: RecentSheetRow }) {
         onClick={() => router.push(`/sheet/${sheet.id}`)}
       >
         <Edit3 className="h-3.5 w-3.5" /> Open & Edit
-      </DropdownMenuItem>
-      <DropdownMenuItem className="text-xs gap-2">
-        <Share2 className="h-3.5 w-3.5" /> Share
-      </DropdownMenuItem>
-      <DropdownMenuItem className="text-xs gap-2">
-        <Download className="h-3.5 w-3.5" /> Download
       </DropdownMenuItem>
       <DropdownMenuItem className="text-xs gap-2">
         {sheet.isStarred ? (

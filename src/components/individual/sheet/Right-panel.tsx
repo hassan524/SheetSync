@@ -9,8 +9,7 @@ import {
   Clock,
   BarChart3,
   Keyboard,
-  Sigma,
-  ChevronDown,
+  Paintbrush,
 } from "lucide-react";
 import CommentsPanel from "./panels/Comments-panel";
 import CollaboratorsPanel from "./panels/Collaborators-panel";
@@ -18,13 +17,14 @@ import DeveloperPanel from "./panels/Developers-panel";
 import TimeTravelPanel from "./panels/TimeTravel-panel";
 import ChartsPanel from "./panels/Charts-panel"; // ← new
 import KeyboardShortcutsPanel from "./panels/Keyboard-shortcuts-panel";
+import ConditionalFormattingPanel from "./panels/Conditional-formatting-panel";
 import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import type {
   TimeTravelState,
   TimeTravelActions,
 } from "@/hooks/use-time-travel";
 import type { SheetChart, ChartPanelTab } from "@/hooks/sheets/use-charts";
-import type { SheetRow, ColumnDef } from "@/types/index";
+import type { ConditionalFormatRule, SheetRow, ColumnDef } from "@/types/index";
 
 // ─────────────────────────────────────────────────────────────
 //  TYPES
@@ -37,6 +37,7 @@ export type RightPanelType =
   | "timetravel"
   | "charts"
   | "shortcuts"
+  | "conditional"
   | null;
 
 interface RightPanelProps {
@@ -66,6 +67,7 @@ interface RightPanelProps {
   rows: SheetRow[];
   columns: ColumnDef[];
   totalComments: number;
+  historyCount?: number;
 
   // Members
   members: OrgMember[];
@@ -80,6 +82,11 @@ interface RightPanelProps {
   setChartPanelTab?: (t: ChartPanelTab) => void;
   onUpdateChart?: (patch: Partial<SheetChart>) => void;
   onRemoveChart?: () => void;
+
+  selectedCell?: { row: number; col: string } | null;
+  conditionalRules?: ConditionalFormatRule[];
+  onSaveConditionalRule?: (rule: ConditionalFormatRule) => void;
+  onDeleteConditionalRule?: (ruleId: string) => void;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -104,6 +111,11 @@ const PANEL_META: Record<
   timetravel: { label: "Time Travel", icon: Clock, color: "text-violet-500" },
   charts: { label: "Charts", icon: BarChart3, color: "text-sky-400" },
   shortcuts: { label: "Shortcuts", icon: Keyboard, color: "text-indigo-500" },
+  conditional: {
+    label: "Conditional Formatting",
+    icon: Paintbrush,
+    color: "text-emerald-500",
+  },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -131,6 +143,7 @@ export default function RightPanel({
   rows,
   columns,
   totalComments,
+  historyCount = 0,
   members,
   timeTravelState,
   timeTravelActions,
@@ -139,6 +152,10 @@ export default function RightPanel({
   setChartPanelTab,
   onUpdateChart,
   onRemoveChart,
+  selectedCell,
+  conditionalRules = [],
+  onSaveConditionalRule,
+  onDeleteConditionalRule,
 }: RightPanelProps) {
   const meta = PANEL_META[rightPanel] ?? PANEL_META.developer;
   const Icon = meta.icon;
@@ -146,13 +163,15 @@ export default function RightPanel({
 
   return (
     <div
-      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${d ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"
-        }`}
+      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${
+        d ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"
+      }`}
     >
       {/* ── Panel header ── */}
       <div
-        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${d ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"
-          }`}
+        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${
+          d ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"
+        }`}
       >
         <div className="flex items-center gap-2">
           <Icon className={`h-3.5 w-3.5 ${meta.color}`} />
@@ -209,6 +228,7 @@ export default function RightPanel({
             rows={rows}
             columns={columns}
             totalComments={totalComments}
+            historyCount={historyCount}
           />
         )}
 
@@ -219,7 +239,7 @@ export default function RightPanel({
               state={timeTravelState}
               actions={timeTravelActions}
               isDark={isDark}
-              orgMembers={members}   // ← add this
+              orgMembers={members} // ← add this
             />
           )}
 
@@ -229,14 +249,24 @@ export default function RightPanel({
             isDark={d}
             activeChart={activeChart ?? null}
             panelTab={chartPanelTab}
-            setPanelTab={setChartPanelTab ?? (() => { })}
+            setPanelTab={setChartPanelTab ?? (() => {})}
             rows={rows}
             columns={columns}
-            onUpdateChart={onUpdateChart ?? (() => { })}
-            onRemoveChart={onRemoveChart ?? (() => { })}
+            onUpdateChart={onUpdateChart ?? (() => {})}
+            onRemoveChart={onRemoveChart ?? (() => {})}
           />
         )}
         {rightPanel === "shortcuts" && <KeyboardShortcutsPanel isDark={d} />}
+        {rightPanel === "conditional" && (
+          <ConditionalFormattingPanel
+            isDark={d}
+            columns={columns}
+            selectedCell={selectedCell ?? null}
+            rules={conditionalRules}
+            onSaveRule={onSaveConditionalRule ?? (() => {})}
+            onDeleteRule={onDeleteConditionalRule ?? (() => {})}
+          />
+        )}
       </div>
     </div>
   );

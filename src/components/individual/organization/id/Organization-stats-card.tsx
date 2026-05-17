@@ -1,30 +1,11 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
-import { Users, Activity, FileSpreadsheet, HardDrive } from "lucide-react";
+import { Users, Activity, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { Organization } from "@/types";
 
 export function OrgStatCards({ org }: { org: Organization }) {
   const members = org.members ?? [];
   const sheets = org.sheets ?? [];
   const online = members.filter((m) => m.status === "online");
-  const pct =
-    org.storageUsed && org.storageLimit
-      ? Math.round((org.storageUsed / org.storageLimit) * 100)
-      : 0;
-
-  const storageColor =
-    pct >= 90
-      ? "text-red-600"
-      : pct >= 70
-        ? "text-orange-500"
-        : "text-green-600";
-
-  const storageBarColor =
-    pct >= 90
-      ? "[&>div]:bg-red-500"
-      : pct >= 70
-        ? "[&>div]:bg-orange-400"
-        : "[&>div]:bg-green-500";
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -148,48 +129,50 @@ export function OrgStatCards({ org }: { org: Organization }) {
         </div>
       </div>
 
-      {/* ── Storage ───────────────────────────────────────────── */}
+      {/* ── Your Role ───────────────────────────────────────────── */}
       <div className="relative border rounded-xl p-3 bg-card overflow-hidden group hover:shadow-md transition-shadow duration-200">
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent pointer-events-none" />
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
-              <HardDrive className="h-4 w-4 text-orange-500" />
+            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+              <ShieldCheck className="h-4 w-4 text-amber-500" />
             </div>
             <div className="min-w-0">
-              <p className="text-lg font-bold leading-none tracking-tight">
-                {(org.storageUsed ?? 0).toFixed(1)}
-                <span className="text-xs font-normal text-muted-foreground">
-                  {" "}
-                  GB
-                </span>
+              <p className="text-lg font-bold leading-none tracking-tight capitalize">
+                {org.role ?? "member"}
               </p>
               <p className="text-xs font-medium text-foreground mt-0.5 truncate">
-                of {org.storageLimit ?? 0} GB limit
+                Your role
               </p>
             </div>
           </div>
           <span
             className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border shrink-0 ${
-              pct >= 90
-                ? "text-red-600 bg-red-50 border-red-200 dark:bg-red-950/40 dark:border-red-800"
-                : pct >= 70
-                  ? "text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800"
-                  : "text-green-600 bg-green-50 border-green-200 dark:bg-green-950/40 dark:border-green-800"
+              org.role === "owner" || org.role === "admin"
+                ? "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800"
+                : "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800"
             }`}
           >
-            {pct}% used
+            {org.role === "owner" || org.role === "admin"
+              ? "Full access"
+              : "Limited"}
           </span>
         </div>
-        <div className="mt-2 space-y-1">
-          <Progress value={pct} className={`h-1.5 ${storageBarColor}`} />
-          <p className={`text-[10px] font-medium ${storageColor}`}>
-            {pct >= 90
-              ? "Critical — upgrade soon"
-              : pct >= 70
-                ? "Getting full"
-                : `${((org.storageLimit ?? 0) - (org.storageUsed ?? 0)).toFixed(1)} GB free`}
-          </p>
+        <div className="mt-2 flex items-center gap-2">
+          <div className="flex gap-1">
+            {["owner", "admin", "editor", "viewer"].map((r) => (
+              <div
+                key={r}
+                className={`h-1.5 flex-1 rounded-full ${
+                  r === org.role ? "bg-amber-500" : "bg-muted"
+                }`}
+                style={{ width: 20 }}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] text-muted-foreground capitalize">
+            {org.role}
+          </span>
         </div>
       </div>
     </div>

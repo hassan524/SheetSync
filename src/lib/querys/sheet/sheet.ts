@@ -29,8 +29,7 @@ export async function loadSheet(sheetId: string) {
     throw new Error(`Failed to load sheet: ${sheet.error.message}`);
   if (columns.error)
     throw new Error(`Failed to load columns: ${columns.error.message}`);
-  if (rows.error)
-    throw new Error(`Failed to load rows: ${rows.error.message}`);
+  if (rows.error) throw new Error(`Failed to load rows: ${rows.error.message}`);
 
   return {
     id: sheet.data.id,
@@ -67,6 +66,7 @@ export async function loadSheet(sheetId: string) {
             : col.select_options
           : undefined,
         currencyCode: col.currency_code ?? "USD",
+        conditional_formatting: col.conditional_formatting ?? null,
       })) ?? [],
 
     rows:
@@ -108,9 +108,7 @@ export async function loadSheet(sheetId: string) {
         .map((f) => [f.cell_key.replace("col:", ""), f.formula]),
     ),
 
-    protectedCells: new Set(
-      (protectedCells.data ?? []).map((p) => p.cell_key),
-    ),
+    protectedCells: new Set((protectedCells.data ?? []).map((p) => p.cell_key)),
 
     textWrapColumns: new Set<string>(),
   };
@@ -132,8 +130,7 @@ export async function updateSheetRowHeights(
     .from("sheets")
     .update({ row_heights: rowHeights, updated_at: new Date().toISOString() })
     .eq("id", sheetId);
-  if (error)
-    throw new Error(`Failed to update row heights: ${error.message}`);
+  if (error) throw new Error(`Failed to update row heights: ${error.message}`);
 }
 
 export async function updateSheetTitle(sheetId: string, title: string) {

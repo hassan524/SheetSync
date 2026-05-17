@@ -13,32 +13,25 @@ const OrganizationList = dynamic(
 import { timeAgo } from "@/lib/utils";
 
 export const metadata = generateSEO({
-  title: "Organizations | SheetSync",
+  title: "Organizations — Manage Teams",
   description:
     "Manage your organizations, collaborate with teams, and control shared spreadsheets in real-time.",
   path: "/organizations",
   ogImage: "/og/organizations-og.png",
 });
 
-// Generate stable storage value outside render using org id as seed
-function seededStorage(index: number): number {
-  return parseFloat(
-    ((((index * 9301 + 49297) % 233280) / 233280) * 4 + 1).toFixed(1),
-  );
-}
-
 export default async function OrganizationsPage() {
   const organizations = await getAllOrganizations();
 
-  const tableData = organizations.map((org: any, index: number) => ({
-    id: `org-${index}`,
+  const tableData = organizations.map((org: any) => ({
+    id: org.id,
     name: org.name,
     role: org.role,
     members: org.membersCount ?? 0,
     sheets: org.sheetsCount ?? 0,
+    storageUsed: org.storageUsed ?? 0,
+    storageLimit: org.storageLimit ?? 10,
     activeNow: org.activeNow ?? 0,
-    storageUsed: seededStorage(index),
-    storageLimit: 10,
     lastModified: org.updated_at ? timeAgo(org.updated_at) : "Recently",
     createdAt: org.created_at
       ? new Date(org.created_at).toLocaleDateString()

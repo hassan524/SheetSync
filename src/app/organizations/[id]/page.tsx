@@ -32,7 +32,7 @@ const TrackActive = dynamic(() =>
   ),
 );
 
-import { Users, Activity, FileSpreadsheet, HardDrive } from "lucide-react";
+import { Users, Activity, FileSpreadsheet, Star } from "lucide-react";
 import type { Organization } from "@/types";
 
 type PageProps = {
@@ -51,7 +51,7 @@ export async function generateMetadata({ params }: PageProps) {
 
   if (!org) {
     return generateSEO({
-      title: "Organization | SheetSync",
+      title: "Organization — Dashboard",
       description:
         "View and collaborate on spreadsheets inside your organization.",
       path: `/organizations/${id}`,
@@ -59,7 +59,7 @@ export async function generateMetadata({ params }: PageProps) {
   }
 
   return generateSEO({
-    title: `${org.name} | SheetSync`,
+    title: `${org.name} — Organization`,
     description: `Collaborate with your team in ${org.name}. Manage shared spreadsheets, members, and activity in real-time.`,
     path: `/organizations/${id}`,
     ogImage: "/og/organization-detail-og.png",
@@ -84,11 +84,7 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
   const members = org.members ?? [];
   const sheets = org.sheets ?? [];
   const online = members.filter((m) => m.status === "online");
-  const storageUsed = org.storageUsed ?? 0;
-  const storageLimit = org.storageLimit ?? 0;
-  const storagePct = storageLimit
-    ? Math.round((storageUsed / storageLimit) * 100)
-    : 0;
+  const starredCount = sheets.filter((s) => s.is_starred).length;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -145,11 +141,11 @@ export default async function OrganizationDetailPage({ params }: PageProps) {
               icon={<FileSpreadsheet className="h-5 w-5 text-primary" />}
             />
             <StatsCard
-              title="Storage Used"
-              value={`${storageUsed.toFixed(1)} GB`}
-              change={storagePct >= 90 ? -storagePct : storagePct}
-              changeLabel={`of ${storageLimit} GB limit`}
-              icon={<HardDrive className="h-5 w-5 text-primary" />}
+              title="Starred Sheets"
+              value={starredCount}
+              change={starredCount}
+              changeLabel="sheets starred"
+              icon={<Star className="h-5 w-5 text-primary" />}
             />
           </div>
 

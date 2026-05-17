@@ -60,7 +60,6 @@ export function useTimeTravel({
   currentColumns,
   historyEntries,
   currentUserId,
-  currentUserName,
   organizationId,
   onBranch,
 }: {
@@ -69,22 +68,31 @@ export function useTimeTravel({
   currentColumns: ColumnDef[];
   historyEntries: HistoryEntry[];
   currentUserId?: string;
-  currentUserName?: string;
   organizationId?: string | null;
   onBranch?: (newSheetId: string, label: string) => void;
 }): [TimeTravelState, TimeTravelActions] {
   const [snapshots, setSnapshots] = useState<SheetSnapshot[]>([]);
-  const [forkedSnapshotIds, setForkedSnapshotIds] = useState<Set<string>>(new Set());
+  const [forkedSnapshotIds, setForkedSnapshotIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [playIndex, setPlayIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeedState] = useState<0.5 | 1 | 2>(1);
   const [previewRows, setPreviewRows] = useState<SheetRow[] | null>(null);
-  const [previewColumns, setPreviewColumns] = useState<ColumnDef[] | null>(null);
+  const [previewColumns, setPreviewColumns] = useState<ColumnDef[] | null>(
+    null,
+  );
   const [isOpen, setIsOpen] = useState(false);
-  const [focusedSnapshotId, setFocusedSnapshotId] = useState<string | null>(null);
+  const [focusedSnapshotId, setFocusedSnapshotId] = useState<string | null>(
+    null,
+  );
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
-  const [pendingForkSnapshot, setPendingForkSnapshot] = useState<SheetSnapshot | null>(null);
-  const [activeCell, setActiveCell] = useState<{ row: number; col: string } | null>(null);
+  const [pendingForkSnapshot, setPendingForkSnapshot] =
+    useState<SheetSnapshot | null>(null);
+  const [activeCell, setActiveCell] = useState<{
+    row: number;
+    col: string;
+  } | null>(null);
 
   const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isPlayingRef = useRef(false);
@@ -251,7 +259,10 @@ export function useTimeTravel({
             colIdx -= 1;
             const rowIdx = parseInt(rowStr) - 1;
             if (currentColumns[colIdx]) {
-              cellToHighlight = { row: rowIdx, col: currentColumns[colIdx].key };
+              cellToHighlight = {
+                row: rowIdx,
+                col: currentColumns[colIdx].key,
+              };
             }
           }
         }
@@ -495,18 +506,5 @@ function parseCreatedAt(s: string): number {
     return 0;
   } catch {
     return 0;
-  }
-}
-
-function formatRelative(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
   }
 }

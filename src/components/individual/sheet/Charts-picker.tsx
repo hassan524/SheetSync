@@ -16,7 +16,6 @@
 import { useEffect, useRef, useMemo } from "react";
 import { X, Sparkles } from "lucide-react";
 import type { ChartKind, SheetChart } from "@/hooks/sheets/use-charts";
-import { CATEGORICAL_KINDS } from "@/hooks/sheets/use-charts";
 import type { SheetRow, ColumnDef } from "@/types/index";
 
 // ─────────────────────────────────────────────────────────────

@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Building2, FileSpreadsheet, ArrowRight, Zap } from "lucide-react";
-import NewSheetModal from "@/components/sheets/New-sheet-modal";
+import {
+  Users,
+  Building2,
+  FileSpreadsheet,
+  ArrowRight,
+  Zap,
+} from "lucide-react";
 import ShareDialog from "@/components/individual/sheet/dialogs/Share-dialog";
 import CreateOrganizationDialog from "../organization/Create-organization-dialog";
-import { getAllFolders } from "@/lib/querys/folder/folders";
 import { getAllOrganizations } from "@/lib/querys/organization/organization";
 
 const actions = [
@@ -47,22 +51,8 @@ export default function QuickActions() {
 
   const [inviteTeamOpen, setInviteTeamOpen] = useState(false);
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
-  const [folders, setFolders] = useState<any[]>([]);
   const [organizations, setOrganizations] = useState<any[]>([]);
-  const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoadingFolders(true);
-        const data = await getAllFolders();
-        setFolders(data || []);
-      } finally {
-        setLoadingFolders(false);
-      }
-    })();
-  }, []);
 
   useEffect(() => {
     (async () => {
@@ -114,18 +104,28 @@ export default function QuickActions() {
                 disabled={disabled}
                 className="group relative overflow-hidden flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5 text-left transition-all duration-200 hover:border-primary/30 hover:bg-primary/[0.02] hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:bg-card"
               >
-                <div className={`pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br ${action.accent}`} />
+                <div
+                  className={`pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br ${action.accent}`}
+                />
 
-                <div className={`relative h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ring-1 ${action.iconBg} transition-transform duration-200 group-hover:scale-105`}>
+                <div
+                  className={`relative h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ring-1 ${action.iconBg} transition-transform duration-200 group-hover:scale-105`}
+                >
                   <Icon className={`h-4 w-4 ${action.iconColor}`} />
                 </div>
 
                 <div className="relative flex-1 min-w-0">
-                  <p className="text-[12px] font-semibold text-foreground leading-tight">{action.label}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{action.description}</p>
+                  <p className="text-[12px] font-semibold text-foreground leading-tight">
+                    {action.label}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                    {action.description}
+                  </p>
                 </div>
 
-                <ArrowRight className={`relative h-3.5 w-3.5 flex-shrink-0 transition-all duration-200 translate-x-0 group-hover:translate-x-0.5 ${action.arrowColor}`} />
+                <ArrowRight
+                  className={`relative h-3.5 w-3.5 flex-shrink-0 transition-all duration-200 translate-x-0 group-hover:translate-x-0.5 ${action.arrowColor}`}
+                />
               </button>
             );
           })}

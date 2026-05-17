@@ -660,3 +660,46 @@ body[data-sheet-dark="true"] [role="dialog"] .bg-blue-50 {
 body[data-sheet-dark="true"] [role="dialog"] .bg-gray-900 {
   background: #0a0d13 !important;
 }
+
+/* ─── Real-time collaboration cell highlights ─────────────────────────────── */
+.cell-collab-highlight {
+  position: relative;
+  z-index: 2;
+}
+
+.cell-collab-highlight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--collab-color, #6366f1);
+  border-radius: 1px;
+  pointer-events: none;
+  animation: collab-pulse 2s ease-in-out infinite;
+}
+
+.cell-collab-label {
+  position: absolute;
+  top: -18px;
+  left: -1px;
+  z-index: 50;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: "DM Sans", system-ui, sans-serif;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 14px;
+  letter-spacing: 0.02em;
+}
+
+@keyframes collab-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}

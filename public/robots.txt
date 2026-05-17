@@ -12,6 +12,4 @@ Disallow: /people/
 Disallow: /files/
 Disallow: /starred/
 Disallow: /recent/
-Disallow: /templates/
-Disallow: /import/
 Disallow: /invite/

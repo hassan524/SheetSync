@@ -4,7 +4,6 @@ import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./App-sidebar";
 import Breadcrumb from "./Bread-crumb";
-import HelpPopover from "@/components/header/Help-popover";
 import SettingsDialog from "@/components/header/Settings-dialog";
 import ProtectedRoute from "../Protected-route";
 
@@ -32,7 +31,6 @@ const DashboardLayout = ({
                 <Breadcrumb items={breadcrumbItems} />
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <HelpPopover />
                 <SettingsDialog />
               </div>
             </header>

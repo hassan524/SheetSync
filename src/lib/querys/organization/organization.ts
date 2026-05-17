@@ -1,17 +1,9 @@
 "use server";
 
-import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createOrganizationMember } from "./members";
 import { getInitials, timeAgo } from "@/lib/utils";
 import type { Organization, Sheet, Member } from "@/types";
-
-/**
- * Schema used to validate organization creation input.
- */
-const createOrganizationSchema = z.object({
-  name: z.string().min(1).max(100),
-});
 
 /**
  * Get all organizations the current user belongs to.
@@ -45,7 +37,8 @@ export async function getAllOrganizations() {
           id,
           title,
           updated_at,
-          is_starred
+          is_starred,
+          forked_from_sheet_id
         ),
         organization_members!inner (
           id,
@@ -69,8 +62,11 @@ export async function getAllOrganizations() {
     const org = item.organizations;
 
     let latestUpdate = org?.updated_at ? new Date(org.updated_at).getTime() : 0;
-    if (org?.sheets) {
-      org.sheets.forEach((sheet: any) => {
+    const visibleSheets = (org?.sheets ?? []).filter(
+      (sheet: any) => !sheet.forked_from_sheet_id,
+    );
+    if (visibleSheets) {
+      visibleSheets.forEach((sheet: any) => {
         const sheetDate = sheet.updated_at
           ? new Date(sheet.updated_at).getTime()
           : 0;
@@ -89,8 +85,8 @@ export async function getAllOrganizations() {
         ? new Date(latestUpdate).toISOString()
         : org?.updated_at,
 
-      sheets: org?.sheets ?? [],
-      sheetsCount: org?.sheets?.length ?? 0,
+      sheets: visibleSheets,
+      sheetsCount: visibleSheets.length,
 
       members: org?.organization_members ?? [],
       membersCount: org?.organization_members?.length ?? 0,
@@ -146,6 +142,7 @@ export async function getOrganizationById(
           created_at,
           updated_at,
           size_mb,
+          forked_from_sheet_id,
           owner:profiles!sheets_owner_id_fkey (
             id,
             name,
@@ -235,11 +232,34 @@ export async function getOrganizationById(
         ? timeAgo(member.last_active_at)
         : "Never",
       avatar: member.profiles.avatar_url || getInitials(member.profiles.name),
+      joined_at: member.joined_at ?? null,
+      totalChanges: 0,
     })) ?? [];
+
+  /* ---------------- MEMBER CHANGE COUNTS ---------------- */
+  // Count total changes per member from sheet_history within this organization
+  const memberIds = members.map((m) => m.id);
+  if (memberIds.length > 0) {
+    const { data: historyCounts, error: historyError } = await supabase
+      .from("sheet_history")
+      .select("user_id")
+      .eq("organization_id", id)
+      .in("user_id", memberIds);
+
+    if (!historyError && historyCounts) {
+      const countMap: Record<string, number> = {};
+      historyCounts.forEach((row: any) => {
+        countMap[row.user_id] = (countMap[row.user_id] || 0) + 1;
+      });
+      members.forEach((m) => {
+        m.totalChanges = countMap[m.id] || 0;
+      });
+    }
+  }
 
   /* ---------------- STORAGE ---------------- */
   const storageUsed = sheets.reduce(
-    (sum, s) => sum + parseFloat(s.size || "0"),
+    (sum, s) => sum + Number(s.size_mb ?? 0),
     0,
   );
   const storageLimit = 10;

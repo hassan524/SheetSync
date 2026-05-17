@@ -10,7 +10,7 @@ const StarredList = dynamic(
 import { Star, FileSpreadsheet, Building2, Info } from "lucide-react";
 
 export const metadata = generateSEO({
-  title: "Starred Sheets | SheetSync",
+  title: "Starred — Quick Access",
   description:
     "Access your most important spreadsheets instantly. View and manage all sheets you've starred across personal folders and organizations.",
   path: "/starred",
