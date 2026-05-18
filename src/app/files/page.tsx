@@ -39,16 +39,16 @@ export default async function AllFilesPage() {
       <DashboardLayout breadcrumbItems={["SheetSync", "All Files"]}>
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Page Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
               <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Folder className="h-5 w-5 text-primary" />
               </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight">
+              <div className="space-y-0.5 min-w-0">
+                <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
                   All Files
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
                   Every spreadsheet you own or have access to — in one place
                 </p>
               </div>

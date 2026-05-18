@@ -65,8 +65,8 @@ const PeopleList: React.FC<PeopleListProps> = ({
   return (
     <>
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6 animate-slide-up">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6 animate-slide-up overflow-hidden">
+        <div className="relative flex-1 w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
@@ -77,10 +77,10 @@ const PeopleList: React.FC<PeopleListProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Organization Filter */}
           <Select value={orgFilter} onValueChange={setOrgFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-36 sm:w-40">
               <SelectValue placeholder="All Organizations" />
             </SelectTrigger>
             <SelectContent>
@@ -95,7 +95,7 @@ const PeopleList: React.FC<PeopleListProps> = ({
 
           {/* Status Filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-28 sm:w-32">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
@@ -116,6 +116,7 @@ const PeopleList: React.FC<PeopleListProps> = ({
               setSearchQuery("");
             }}
             title="Reset filters"
+            className="shrink-0"
           >
             <Filter className="h-4 w-4" />
           </Button>

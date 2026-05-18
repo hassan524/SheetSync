@@ -9,6 +9,13 @@ import { getAllFolders } from "@/lib/querys/folder/folders";
 import { getAllOrganizations } from "@/lib/querys/organization/organization";
 import { ArrowRight, LayoutTemplate } from "lucide-react";
 
+const DASHBOARD_TEMPLATE_TITLES = [
+  "Blank Sheet",
+  "Finance Tracker",
+  "QA Tracker",
+  "Project Tracker",
+];
+
 const TemplatePicker = () => {
   const router = useRouter();
 
@@ -72,15 +79,19 @@ const TemplatePicker = () => {
 
       {/* Templates — 1 col on mobile, 2 on sm, 4 on lg */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {(SHEET_TEMPLATES ?? []).slice(0, 8).map((template) => (
-          <div
-            key={template.id}
-            className="cursor-pointer"
-            onClick={() => handleTemplateClick(template.id)}
-          >
-            <TemplateCard {...template} />
-          </div>
-        ))}
+        {DASHBOARD_TEMPLATE_TITLES.map((title) =>
+          (SHEET_TEMPLATES ?? []).find((template) => template.title === title),
+        )
+          .filter((template) => Boolean(template))
+          .map((template) => (
+            <div
+              key={template!.id}
+              className="cursor-pointer"
+              onClick={() => handleTemplateClick(template!.id)}
+            >
+              <TemplateCard {...template!} />
+            </div>
+          ))}
       </div>
 
       {selectedTemplateId && (

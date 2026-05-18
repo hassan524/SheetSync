@@ -87,14 +87,25 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="SheetSync" />
       </head>
       <body>
-        <Toaster richColors position="top-right" />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: '#ffffff',
+              border: 'none',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+              color: '#1a1a1a',
+              fontSize: '13px',
+              fontFamily: 'Manrope, sans-serif',
+            },
+          }}
+        />
         <Providers>{children}</Providers>
         <PwaInstallBanner />
         <Script id="register-sw" strategy="afterInteractive">

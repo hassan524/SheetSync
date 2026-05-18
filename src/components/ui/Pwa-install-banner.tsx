@@ -36,9 +36,11 @@ export function PwaInstallBanner() {
       if (daysSince < DISMISS_DAYS) return;
     }
 
-    // Detect iOS (no beforeinstallprompt support)
+    // Detect iOS / iPadOS (no beforeinstallprompt support)
+    const ua = navigator.userAgent;
     const isIosDevice =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      (/iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     setIsIos(isIosDevice);
 
     if (isIosDevice) {
@@ -48,15 +50,33 @@ export function PwaInstallBanner() {
     }
 
     // Chrome/Edge/Samsung — listen for the native install prompt
+    let promptReceived = false;
     const handler = (e: Event) => {
       e.preventDefault();
+      promptReceived = true;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      // Show banner after a short delay
       setTimeout(() => setShowBanner(true), 2000);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+
+    // Fallback: if on mobile and no prompt received within 5s, show generic banner
+    const isMobile = /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+      (window.innerWidth <= 768 && "ontouchstart" in window);
+
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+    if (isMobile) {
+      fallbackTimer = setTimeout(() => {
+        if (!promptReceived) {
+          setShowBanner(true);
+        }
+      }, 5000);
+    }
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+    };
   }, []);
 
   const handleInstall = useCallback(async () => {
@@ -111,14 +131,19 @@ export function PwaInstallBanner() {
                   &quot;Add to Home Screen&quot;
                 </span>
               </p>
-            ) : (
+            ) : deferredPrompt ? (
               <p className="pwa-install-desc">
                 Add to your home screen for quick access — works offline too.
+              </p>
+            ) : (
+              <p className="pwa-install-desc">
+                Open browser menu and tap{" "}
+                <span style={{ fontWeight: 600 }}>&quot;Add to Home Screen&quot;</span> for quick access.
               </p>
             )}
           </div>
 
-          {/* Install button (non-iOS only) */}
+          {/* Install button (only when native prompt available) */}
           {!isIos && deferredPrompt && (
             <button onClick={handleInstall} className="pwa-install-btn">
               <Download size={16} />

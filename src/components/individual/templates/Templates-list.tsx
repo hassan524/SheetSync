@@ -5,8 +5,14 @@ import TemplateCard from "@/components/sheets/Template-card";
 import UseTemplateModal from "@/components/sheets/Use-template-modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Sparkles } from "lucide-react";
-import { ICON_MAP } from "@/constants/Sheet-templates";
+import { Search } from "lucide-react";
+
+const ACTIVE_TEMPLATE_TITLES = new Set([
+  "Blank Sheet",
+  "Finance Tracker",
+  "QA Tracker",
+  "Project Tracker",
+]);
 
 interface Template {
   id: string;
@@ -47,6 +53,9 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
   });
 
   const handleTemplateClick = (id: string) => {
+    const template = templates.find((t) => t.id === id);
+    if (!template || !ACTIVE_TEMPLATE_TITLES.has(template.title)) return;
+
     setSelectedTemplateId(id);
     setTemplateModalOpen(true);
   };
@@ -87,7 +96,11 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
             <div
               key={template.id}
               onClick={() => handleTemplateClick(template.id)}
-              className="cursor-pointer"
+              className={
+                ACTIVE_TEMPLATE_TITLES.has(template.title)
+                  ? "cursor-pointer"
+                  : "cursor-not-allowed"
+              }
             >
               {/* 🔥 FIX: convert iconName → icon */}
               <TemplateCard
@@ -97,6 +110,7 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
                 iconName={template.iconName}
                 color={template.color}
                 features={template.features}
+                disabled={!ACTIVE_TEMPLATE_TITLES.has(template.title)}
               />
             </div>
           ))}
@@ -122,42 +136,6 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
           </Button>
         </div>
       )}
-
-      {/* Coming Soon Templates (unchanged logic but FIX icon handling) */}
-      <div className="mt-12 space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-border" />
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">
-              More templates coming soon
-            </span>
-          </div>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {templates.slice(0, 6).map((template) => {
-            const Icon = ICON_MAP[template.iconName];
-
-            return (
-              <div
-                key={template.id}
-                className="relative rounded-xl border border-border bg-muted/20 p-4 opacity-60 cursor-not-allowed"
-              >
-                <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center mb-3">
-                  {Icon && <Icon className="h-5 w-5 text-muted-foreground" />}
-                </div>
-
-                <p className="text-sm font-semibold">{template.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {template.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {selectedTemplateId && (
         <UseTemplateModal

@@ -42,7 +42,7 @@ export default async function StarredPage() {
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Page Header */}
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-5 min-w-0">
+            <div className="flex items-start gap-3 min-w-0">
               <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center flex-shrink-0">
                 <Star className="h-5 w-5 text-amber-500 fill-amber-400" />
               </div>

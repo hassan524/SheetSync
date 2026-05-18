@@ -23,7 +23,7 @@ const PeopleStatsRow: React.FC<PeopleStatsRowProps> = ({
   return (
     <>
       <div className="flex items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-5 min-w-0">
+        <div className="flex items-start gap-3 min-w-0">
           <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
             <Users className="h-5 w-5 text-primary" />
           </div>
@@ -38,7 +38,7 @@ const PeopleStatsRow: React.FC<PeopleStatsRowProps> = ({
         </div>
         <Button
           size="sm"
-          className="shrink-0 h-9 w-9 p-0 sm:w-auto sm:px-3 gap-1.5"
+          className="shrink-0 hidden md:inline-flex h-9 gap-1.5"
           onClick={() => setInviteOpen(true)}
         >
           <UserPlus className="h-4 w-4" />

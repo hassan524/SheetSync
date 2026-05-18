@@ -110,6 +110,7 @@
 
   html {
     box-sizing: border-box;
+    overflow-x: hidden;
   }
 
   *,
@@ -161,6 +162,7 @@
     -ms-overflow-style: none !important;
     scrollbar-width: none !important;
   }
+
   .hide-scrollbar::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
@@ -172,16 +174,20 @@
     scrollbar-width: thin;
     scrollbar-color: oklch(0.75 0.05 160 / 0.35) transparent;
   }
+
   .styled-scrollbar::-webkit-scrollbar {
     width: 4px;
   }
+
   .styled-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
+
   .styled-scrollbar::-webkit-scrollbar-thumb {
     background: oklch(0.75 0.05 160 / 0.35);
     border-radius: 9999px;
   }
+
   .styled-scrollbar::-webkit-scrollbar-thumb:hover {
     background: oklch(0.65 0.07 160 / 0.5);
   }
@@ -191,11 +197,13 @@
       opacity: 0;
       transform: scale(0.95);
     }
+
     to {
       opacity: 1;
       transform: scale(1);
     }
   }
+
   .animate-scale-in {
     animation: scale-in 0.3s ease-out forwards;
   }
@@ -205,11 +213,13 @@
       opacity: 0;
       transform: translateY(8px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
+
   .animate-slide-up {
     animation: slide-up 0.3s ease-out forwards;
   }
@@ -307,6 +317,7 @@
       opacity: 0;
       transform: translateY(32px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -318,6 +329,7 @@
       opacity: 0;
       transform: scale(0.96) translateY(16px);
     }
+
     to {
       opacity: 1;
       transform: scale(1) translateY(0);
@@ -337,27 +349,35 @@
   .delay-100 {
     animation-delay: 100ms;
   }
+
   .delay-150 {
     animation-delay: 150ms;
   }
+
   .delay-200 {
     animation-delay: 200ms;
   }
+
   .delay-300 {
     animation-delay: 300ms;
   }
+
   .delay-400 {
     animation-delay: 400ms;
   }
+
   .delay-500 {
     animation-delay: 500ms;
   }
+
   .delay-600 {
     animation-delay: 600ms;
   }
+
   .delay-700 {
     animation-delay: 700ms;
   }
+
   .delay-800 {
     animation-delay: 800ms;
   }
@@ -432,24 +452,31 @@
   .reveal-delay-1 {
     transition-delay: 60ms;
   }
+
   .reveal-delay-2 {
     transition-delay: 120ms;
   }
+
   .reveal-delay-3 {
     transition-delay: 180ms;
   }
+
   .reveal-delay-4 {
     transition-delay: 240ms;
   }
+
   .reveal-delay-5 {
     transition-delay: 300ms;
   }
+
   .reveal-delay-6 {
     transition-delay: 360ms;
   }
+
   .reveal-delay-7 {
     transition-delay: 420ms;
   }
+
   .reveal-delay-8 {
     transition-delay: 480ms;
   }
@@ -496,6 +523,7 @@
   cursor: pointer;
   transition: all 0.15s ease;
 }
+
 .pwa-install-close:hover {
   background: #f3f4f6;
   color: #374151;
@@ -554,10 +582,12 @@
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(13, 124, 95, 0.25);
 }
+
 .pwa-install-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(13, 124, 95, 0.35);
 }
+
 .pwa-install-btn:active {
   transform: translateY(0);
 }
@@ -570,11 +600,13 @@
     gap: 10px;
     border-radius: 14px;
   }
+
   .pwa-install-icon {
     width: 38px;
     height: 38px;
     border-radius: 10px;
   }
+
   .pwa-install-btn {
     padding: 7px 12px;
     font-size: 12px;

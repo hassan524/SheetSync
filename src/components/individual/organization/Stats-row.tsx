@@ -68,14 +68,16 @@ const StatsRow: React.FC<StatsRowProps> = ({ organizations }) => {
   return (
     <>
       {/* Page Header */}
-      <div className="flex items-start justify-between pt-1 mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between pt-1 mb-6 gap-4">
+        <div className="flex items-start gap-3 min-w-0">
           <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
             <Building2 className="h-5 w-5 text-primary" />
           </div>
-          <div className="space-y-0.5">
-            <h1 className="text-2xl font-semibold tracking-tight">Organizations</h1>
-            <p className="text-sm text-muted-foreground">
+          <div className="space-y-0.5 min-w-0">
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
+              Organizations
+            </h1>
+            <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
               Manage and collaborate with your teams
             </p>
           </div>
@@ -97,7 +99,9 @@ const StatsRow: React.FC<StatsRowProps> = ({ organizations }) => {
       <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 mb-6">
         <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
         <p className="text-xs text-muted-foreground">
-          Organizations let you collaborate with teams on shared spreadsheets. Create a new organization, invite members, and control access with role-based permissions — all in one place.
+          Organizations let you collaborate with teams on shared spreadsheets.
+          Create a new organization, invite members, and control access with
+          role-based permissions — all in one place.
         </p>
       </div>
 
@@ -112,11 +116,15 @@ const StatsRow: React.FC<StatsRowProps> = ({ organizations }) => {
               <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
                 <Icon className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-xs font-medium text-muted-foreground">{label}</p>
+              <p className="text-xs font-medium text-muted-foreground">
+                {label}
+              </p>
             </div>
             <div>
               <p className="text-2xl font-bold leading-none">{value}</p>
-              <p className="text-[11px] text-muted-foreground mt-1">{description}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {description}
+              </p>
             </div>
           </div>
         ))}

@@ -13,13 +13,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Building2, User, X } from "lucide-react";
+import { Building2, User, X, FolderPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { createSheet } from "@/lib/querys/sheets/sheets";
+import { createFolder } from "@/lib/querys/folder/folders";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { toast } from "sonner";
 import { ICON_MAP } from "@/constants/Sheet-templates";
+import CreateFolderDialog from "@/components/individual/Personalsheets/Create-folder-dialog";
 
 export interface UseTemplateModalProps {
   open: boolean;
@@ -33,7 +35,7 @@ const UseTemplateModal = ({
   open,
   onOpenChange,
   templateId,
-  folders,
+  folders: externalFolders,
   organizations,
 }: UseTemplateModalProps) => {
   const [sheetName, setSheetName] = useState("");
@@ -41,6 +43,8 @@ const UseTemplateModal = ({
   const [selectedOrg, setSelectedOrg] = useState<string>("");
   const [selectedFolder, setSelectedFolder] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [localFolders, setLocalFolders] = useState<any[]>([]);
 
   const router = useRouter();
 
@@ -48,6 +52,11 @@ const UseTemplateModal = ({
   const Icon = template ? ICON_MAP[template.iconName] : null;
   const copy = template?.copy;
   const accent = template?.accent;
+
+  const folders = [...(externalFolders || []), ...localFolders.filter(
+    (lf) => !(externalFolders || []).find((f: any) => f.id === lf.id)
+  )];
+  const hasFolders = folders.length > 0;
 
   useEffect(() => {
     if (template) setSheetName(template.title);
@@ -59,8 +68,26 @@ const UseTemplateModal = ({
     setSelectedFolder("");
   };
 
+  const handleCreateFolder = async (name: string) => {
+    try {
+      const data = await createFolder(name);
+      await logActivity({
+        organizationId: null,
+        action: "created folder",
+        target: name,
+      });
+      const newFolder = { ...data, sheets: [] };
+      setLocalFolders((prev) => [...prev, newFolder]);
+      setSelectedFolder(newFolder.id);
+      toast.success(`Folder "${name}" created — now create your sheet`);
+    } catch (err: any) {
+      toast.error(err.message || "Error creating folder");
+    }
+  };
+
   const handleCreateSheet = async () => {
     if (!template || !sheetName.trim()) return;
+    if (!saveToOrg && !hasFolders) return;
 
     try {
       setLoading(true);
@@ -91,121 +118,161 @@ const UseTemplateModal = ({
     }
   };
 
-  const canCreate = !!sheetName.trim() && (saveToOrg ? !!selectedOrg : true);
+  const canCreate = !!sheetName.trim() && (saveToOrg ? !!selectedOrg : hasFolders);
 
   if (!template) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden rounded-2xl border border-zinc-200/80 shadow-xl [&>button]:hidden">
-        {/* HEADER */}
-        <div
-          className={`relative h-[152px] overflow-hidden bg-gradient-to-br ${accent?.from}`}
-        >
-          <button
-            onClick={() => onOpenChange(false)}
-            className="absolute top-3.5 right-3.5 h-7 w-7 rounded-full bg-black/5 hover:bg-black/10 border flex items-center justify-center"
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden rounded-2xl border border-zinc-200/80 shadow-xl [&>button]:hidden">
+          {/* HEADER */}
+          <div
+            className={`relative h-[152px] overflow-hidden bg-gradient-to-br ${accent?.from}`}
           >
-            <X className="h-3.5 w-3.5 text-zinc-500" />
-          </button>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="absolute top-3.5 right-3.5 h-7 w-7 rounded-full bg-black/5 hover:bg-black/10 border flex items-center justify-center"
+            >
+              <X className="h-3.5 w-3.5 text-zinc-500" />
+            </button>
 
-          <div className="absolute inset-0 flex flex-col justify-end px-6 pb-5">
-            <div className="flex items-center gap-2.5 mb-2">
-              {Icon && (
-                <div className="h-7 w-7 rounded-lg border flex items-center justify-center">
-                  <Icon className="h-3.5 w-3.5 text-zinc-600" />
-                </div>
-              )}
-              <span className="text-[10.5px] font-semibold uppercase text-zinc-400">
-                {template.title}
-              </span>
-            </div>
-            <p className="text-[19px] font-bold">{copy?.tagline}</p>
-          </div>
-        </div>
-
-        {/* BODY */}
-        <div className="px-6 py-5 space-y-5 bg-white">
-          <p className="text-[13.5px] text-zinc-500">{copy?.body}</p>
-
-          {/* NAME */}
-          <div className="space-y-1.5">
-            <Label className="text-xs text-zinc-400">Sheet name</Label>
-            <Input
-              value={sheetName}
-              onChange={(e) => setSheetName(e.target.value)}
-            />
-          </div>
-
-          {/* SAVE TO */}
-          <div className="space-y-3">
-            <Label className="text-xs text-zinc-400">Save to</Label>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {saveToOrg ? (
-                  <Building2 className="h-4 w-4 text-zinc-400" />
-                ) : (
-                  <User className="h-4 w-4 text-zinc-400" />
+            <div className="absolute inset-0 flex flex-col justify-end px-6 pb-5">
+              <div className="flex items-center gap-2.5 mb-2">
+                {Icon && (
+                  <div className="h-7 w-7 rounded-lg border flex items-center justify-center">
+                    <Icon className="h-3.5 w-3.5 text-zinc-600" />
+                  </div>
                 )}
-                <span className="text-sm">
-                  {saveToOrg ? "Organization" : "Personal"}
+                <span className="text-[10.5px] font-semibold uppercase text-zinc-400">
+                  {template.title}
                 </span>
               </div>
+              <p className="text-[19px] font-bold">{copy?.tagline}</p>
+            </div>
+          </div>
 
-              <Switch checked={saveToOrg} onCheckedChange={handleToggleOrg} />
+          {/* BODY */}
+          <div className="px-6 py-5 space-y-5 bg-white">
+            <p className="text-[13.5px] text-zinc-500">{copy?.body}</p>
+
+            {/* NAME */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-zinc-400">Sheet name</Label>
+              <Input
+                value={sheetName}
+                onChange={(e) => setSheetName(e.target.value)}
+              />
             </div>
 
-            {/* ORGANIZATION */}
-            {saveToOrg && (
-              <Select value={selectedOrg} onValueChange={setSelectedOrg}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select organization..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {organizations?.map((org) => (
-                    <SelectItem key={org.id} value={org.id}>
-                      {org.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            {/* SAVE TO */}
+            <div className="space-y-3">
+              <Label className="text-xs text-zinc-400">Save to</Label>
 
-            {/* PERSONAL FOLDER */}
-            {!saveToOrg && (
-              <Select value={selectedFolder} onValueChange={setSelectedFolder}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select folder..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {folders?.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {saveToOrg ? (
+                    <Building2 className="h-4 w-4 text-zinc-400" />
+                  ) : (
+                    <User className="h-4 w-4 text-zinc-400" />
+                  )}
+                  <span className="text-sm">
+                    {saveToOrg ? "Organization" : "Personal"}
+                  </span>
+                </div>
+
+                <Switch checked={saveToOrg} onCheckedChange={handleToggleOrg} />
+              </div>
+
+              {/* ORGANIZATION */}
+              {saveToOrg && (
+                <Select value={selectedOrg} onValueChange={setSelectedOrg}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select organization..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations?.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* PERSONAL FOLDER */}
+              {!saveToOrg && (
+                <>
+                  {hasFolders ? (
+                    <>
+                      <Select value={selectedFolder} onValueChange={setSelectedFolder}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select folder..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {folders.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <button
+                        className="text-xs text-zinc-500 flex items-center gap-1 hover:text-zinc-700 transition-colors"
+                        onClick={() => setCreateFolderOpen(true)}
+                      >
+                        <FolderPlus className="h-3 w-3" />
+                        New folder
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 py-4 px-3 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50">
+                      <FolderPlus className="h-5 w-5 text-zinc-400" />
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-zinc-700">Create a folder first</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          You need at least one folder to save your sheet
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => setCreateFolderOpen(true)}
+                      >
+                        <FolderPlus className="h-3.5 w-3.5" />
+                        Create Folder
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* FOOTER */}
-        <div className="flex justify-end gap-2 p-4 border-t">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
+          {/* FOOTER */}
+          <div className="flex justify-end gap-2 p-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
 
-          <Button onClick={handleCreateSheet} disabled={!canCreate || loading}>
-            {loading ? "Creating..." : "Create"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+            <Button onClick={handleCreateSheet} disabled={!canCreate || loading}>
+              {loading ? "Creating..." : "Create"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <CreateFolderDialog
+        open={createFolderOpen}
+        onOpenChange={setCreateFolderOpen}
+        onConfirm={handleCreateFolder}
+      />
+    </>
   );
 };
 

@@ -42,7 +42,7 @@ export default function TemplatesPage() {
         <div className="max-w-7xl mx-auto space-y-10 md:space-y-12">
           {/* Page Header */}
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-5 min-w-0">
+            <div className="flex items-start gap-3 min-w-0">
               <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <LayoutTemplate className="h-5 w-5 text-primary" />
               </div>

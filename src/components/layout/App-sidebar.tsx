@@ -120,7 +120,7 @@ export function AppSidebar() {
               {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link href={item.url} className={getLinkClasses(item.url)}>
+                    <Link href={item.url} prefetch className={getLinkClasses(item.url)}>
                       <item.icon className="h-4 w-4 flex-shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
                     </Link>
@@ -143,7 +143,7 @@ export function AppSidebar() {
               {quickAccessItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link href={item.url} className={getLinkClasses(item.url)}>
+                    <Link href={item.url} prefetch className={getLinkClasses(item.url)}>
                       <item.icon className="h-4 w-4 flex-shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
                     </Link>
@@ -205,7 +205,7 @@ export function AppSidebar() {
               {toolsItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link href={item.url} className={getLinkClasses(item.url)}>
+                    <Link href={item.url} prefetch className={getLinkClasses(item.url)}>
                       <item.icon className="h-4 w-4 flex-shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
                     </Link>

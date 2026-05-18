@@ -17,19 +17,16 @@ const CreateFolderDialog = dynamic(() => import("./Create-folder-dialog"));
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
   Plus,
   Search,
-  Grid3X3,
-  List,
   FolderPlus,
   Star,
   X,
   Clock4,
   Info,
-  FileSpreadsheet, // ✅ FIXED
+  FileSpreadsheet,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -139,34 +136,45 @@ function SheetsPageClient({ initialFolders }: Props) {
         "Personal Sheets",
         currentFolderData?.name || "",
       ]}
+      mobileActions={
+        <>
+          <Button
+            onClick={() => setNewFolderOpen(true)}
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+          >
+            <FolderPlus className="h-3.5 w-3.5" />
+            Folder
+          </Button>
+          <Button
+            onClick={() => setNewSheetOpen(true)}
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New Sheet
+          </Button>
+        </>
+      }
     >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="space-y-0.5 truncate min-w-0">
-            <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
-              Personal Sheets
-            </h1>
-            <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
-              Manage and organize all your personal spreadsheets
-            </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+            </div>
+            <div className="space-y-0.5 truncate min-w-0">
+              <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
+                Personal Sheets
+              </h1>
+              <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
+                Manage and organize all your personal spreadsheets
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Grid / Table view toggle */}
-            <Tabs
-              value={viewMode}
-              onValueChange={(v) => setViewMode(v as "grid" | "table")}
-            >
-              <TabsList className="h-9 p-0.5">
-                <TabsTrigger value="grid" className="h-8 w-8 p-0">
-                  <Grid3X3 className="h-4 w-4" />
-                </TabsTrigger>
-                <TabsTrigger value="table" className="h-8 w-8 p-0">
-                  <List className="h-4 w-4" />
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             <Button
               onClick={() => setNewFolderOpen(true)}
               variant="outline"

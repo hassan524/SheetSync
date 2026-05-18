@@ -36,7 +36,7 @@ const NewSheetModal = ({
   open,
   onOpenChange,
   ShowSaveTo,
-  folders,
+  folders: externalFolders,
   currentFolder,
   onSheetCreated,
 }: Props) => {
@@ -45,15 +45,26 @@ const NewSheetModal = ({
     SHEET_TEMPLATES[0].id,
   );
   const [selectedFolder, setSelectedFolder] = useState(
-    currentFolder || "personal",
+    currentFolder || "",
   );
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [localFolders, setLocalFolders] = useState<FolderWithSheets[]>([]);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const pathname = usePathname();
   const router = useRouter();
+
+  const folders = useMemo(() => {
+    const combined = [...(externalFolders || [])];
+    for (const lf of localFolders) {
+      if (!combined.find((f) => f.id === lf.id)) combined.push(lf);
+    }
+    return combined;
+  }, [externalFolders, localFolders]);
+
+  const hasFolders = folders.length > 0;
 
   const organizationId = useMemo(() => {
     const match = pathname.match(/^\/organizations\/([^/]+)/);
@@ -95,6 +106,7 @@ const NewSheetModal = ({
 
   const handleCreate = async () => {
     if (!sheetName.trim()) return;
+    if (!hasFolders) return;
 
     try {
       setLoading(true);
@@ -102,7 +114,7 @@ const NewSheetModal = ({
       const createdSheet = await createSheet({
         name: sheetName,
         templateId: selectedTemplateId,
-        folder_id: selectedFolder !== "personal" ? selectedFolder : undefined,
+        folder_id: selectedFolder || undefined,
         organizationId: organizationId || undefined,
       });
 
@@ -117,7 +129,7 @@ const NewSheetModal = ({
 
       onSheetCreated?.(
         createdSheet,
-        selectedFolder === "personal" ? "" : selectedFolder,
+        selectedFolder || "",
       );
 
       toast.success(`Sheet "${sheetName}" created`);
@@ -133,7 +145,7 @@ const NewSheetModal = ({
 
   const handleCreateFolder = async (name: string) => {
     try {
-      organizationId
+      const data = organizationId
         ? await createFolder(name, organizationId)
         : await createFolder(name);
 
@@ -145,13 +157,16 @@ const NewSheetModal = ({
         target: name,
       });
 
-      toast.success(`Folder "${name}" created`);
+      const newFolder: FolderWithSheets = { ...data, sheets: [] };
+      setLocalFolders((prev) => [...prev, newFolder]);
+      setSelectedFolder(newFolder.id);
+      toast.success(`Folder "${name}" created — now create your sheet`);
     } catch (err: any) {
       toast.error(err.message || "Error creating folder");
     }
   };
 
-  const canCreate = !!sheetName.trim();
+  const canCreate = !!sheetName.trim() && hasFolders;
 
   return (
     <>
@@ -213,50 +228,73 @@ const NewSheetModal = ({
               {activeTemplate.copy.body}
             </p>
 
-            <div className="space-y-1.5">
-              <Label>Sheet name</Label>
-              <Input
-                value={sheetName}
-                onChange={(e) => setSheetName(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && canCreate && handleCreate()
-                }
-                placeholder={`e.g. My ${activeTemplate.title}`}
-              />
-            </div>
-
-            {ShowSaveTo && (
-              <div className="space-y-2">
-                <Label>Save to</Label>
-
-                <Select
-                  value={selectedFolder}
-                  onValueChange={setSelectedFolder}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="personal">
-                      <Folder className="h-3 w-3 mr-2" />
-                      Personal
-                    </SelectItem>
-                    {folders?.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <button
-                  className="text-xs text-zinc-500 flex items-center gap-1 hover:text-zinc-700 transition-colors"
+            {/* No folders — block with create prompt */}
+            {!hasFolders ? (
+              <div className="flex flex-col items-center gap-3 py-4 px-3 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50">
+                <FolderPlus className="h-5 w-5 text-zinc-400" />
+                <div className="text-center">
+                  <p className="text-sm font-medium text-zinc-700">Create a folder first</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    You need at least one folder to save your sheet
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
                   onClick={() => setCreateFolderOpen(true)}
                 >
-                  <FolderPlus className="h-3 w-3" />
-                  New folder
-                </button>
+                  <FolderPlus className="h-3.5 w-3.5" />
+                  Create Folder
+                </Button>
               </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Sheet name</Label>
+                  <Input
+                    value={sheetName}
+                    onChange={(e) => setSheetName(e.target.value)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && canCreate && handleCreate()
+                    }
+                    placeholder={`e.g. My ${activeTemplate.title}`}
+                  />
+                </div>
+
+                {ShowSaveTo && (
+                  <div className="space-y-2">
+                    <Label>Save to</Label>
+
+                    <Select
+                      value={selectedFolder}
+                      onValueChange={setSelectedFolder}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select folder..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {folders.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>
+                            <div className="flex items-center gap-2">
+                              <Folder className="h-3 w-3" />
+                              {f.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <button
+                      className="text-xs text-zinc-500 flex items-center gap-1 hover:text-zinc-700 transition-colors"
+                      onClick={() => setCreateFolderOpen(true)}
+                    >
+                      <FolderPlus className="h-3 w-3" />
+                      New folder
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
