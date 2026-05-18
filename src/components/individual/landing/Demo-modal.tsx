@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { X, Play } from "lucide-react";
+import { X } from "lucide-react";
 
 interface DemoModalProps {
   open: boolean;
