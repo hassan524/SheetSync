@@ -139,30 +139,33 @@ const UseTemplateModal = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden rounded-2xl border border-zinc-200/80 shadow-xl [&>button]:hidden">
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-[460px] p-0 overflow-hidden rounded-2xl border border-zinc-200/80 shadow-xl"
+        >
           {/* HEADER */}
           <div
-            className={`relative h-[152px] overflow-hidden bg-gradient-to-br ${accent?.from}`}
+            className={`relative h-[115px] sm:h-[152px] overflow-hidden bg-gradient-to-br ${accent?.from}`}
           >
-            <button
+            <button type="button"
               onClick={() => onOpenChange(false)}
-              className="absolute top-3.5 right-3.5 h-7 w-7 rounded-full bg-black/5 hover:bg-black/10 border flex items-center justify-center"
+              className="absolute top-3.5 right-3.5 z-30 h-7 w-7 cursor-pointer rounded-full bg-black/5 hover:bg-black/10 border flex items-center justify-center transition-colors"
             >
               <X className="h-3.5 w-3.5 text-zinc-500" />
             </button>
 
-            <div className="absolute inset-0 flex flex-col justify-end px-6 pb-5">
-              <div className="flex items-center gap-2.5 mb-2">
+            <div className="absolute inset-0 flex flex-col justify-end px-4 pb-3 sm:px-6 sm:pb-5">
+              <div className="flex items-center gap-2 mb-1 sm:mb-2">
                 {Icon && (
-                  <div className="h-7 w-7 rounded-lg border flex items-center justify-center">
+                  <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg border flex items-center justify-center">
                     <Icon className="h-3.5 w-3.5 text-zinc-600" />
                   </div>
                 )}
-                <span className="text-[10.5px] font-semibold uppercase text-zinc-400">
+                <span className="text-[10px] sm:text-[10.5px] font-semibold uppercase text-zinc-400">
                   {template.title}
                 </span>
               </div>
-              <p className="text-[19px] font-bold">{copy?.tagline}</p>
+              <p className="text-[15px] sm:text-[19px] font-bold leading-tight">{copy?.tagline}</p>
             </div>
           </div>
 

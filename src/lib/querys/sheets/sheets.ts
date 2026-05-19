@@ -9,7 +9,9 @@ import { z } from "zod";
 
 // Validation schemas
 const createSheetSchema = z.object({
-  name: z.string().min(5).max(100),
+  name: z.string()
+    .min(1, "Sheet name cannot be empty")
+    .max(100, "Sheet name must be less than 100 characters"),
 });
 
 const renameSheetSchema = z.object({
@@ -254,7 +256,10 @@ export async function createSheet({
   const supabase = await createSupabaseServerClient();
 
   const parsed = createSheetSchema.safeParse({ name });
-  if (!parsed.success) throw new Error("Invalid sheet name");
+  if (!parsed.success) {
+    const errorMsg = parsed.error.issues[0]?.message || "Invalid sheet name";
+    throw new Error(errorMsg);
+  }
 
   const {
     data: { user },
@@ -282,8 +287,8 @@ export async function createSheet({
   // ✅ Seed template data immediately so dashboard shows correct counts
   const templateData = getTemplateData(templateId);
   await Promise.all([
-    saveAllRows(data.id, templateData.rows),
-    saveAllColumns(data.id, templateData.columns),
+    saveAllRows(data.id, templateData.rows, supabase),
+    saveAllColumns(data.id, templateData.columns, supabase),
   ]);
 
   return data;

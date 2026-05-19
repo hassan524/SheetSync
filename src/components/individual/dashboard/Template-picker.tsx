@@ -78,7 +78,7 @@ const TemplatePicker = () => {
       </div>
 
       {/* Templates — 1 col on mobile, 2 on sm, 4 on lg */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {DASHBOARD_TEMPLATE_TITLES.map((title) =>
           (SHEET_TEMPLATES ?? []).find((template) => template.title === title),
         )

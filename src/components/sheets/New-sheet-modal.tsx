@@ -23,6 +23,8 @@ import { logActivity } from "@/lib/querys/activity/activity";
 import { SHEET_TEMPLATES, ICON_MAP } from "@/constants/Sheet-templates";
 import { FolderWithSheets, Sheet } from "@/types";
 
+const AVAILABLE_TEMPLATES = SHEET_TEMPLATES.slice(0, 4);
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,7 +44,7 @@ const NewSheetModal = ({
 }: Props) => {
   const [sheetName, setSheetName] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
-    SHEET_TEMPLATES[0].id,
+    AVAILABLE_TEMPLATES[0].id,
   );
   const [selectedFolder, setSelectedFolder] = useState(
     currentFolder || "",
@@ -79,20 +81,20 @@ const NewSheetModal = ({
   useEffect(() => {
     if (open) {
       setActiveIndex(0);
-      setSelectedTemplateId(SHEET_TEMPLATES[0].id);
+      setSelectedTemplateId(AVAILABLE_TEMPLATES[0].id);
       setSheetName("");
     }
   }, [open]);
 
-  const activeTemplate = SHEET_TEMPLATES[activeIndex];
+  const activeTemplate = AVAILABLE_TEMPLATES[activeIndex];
   const Icon = ICON_MAP[activeTemplate.iconName];
 
   const scrollTo = (index: number) => {
     const next =
-      ((index % SHEET_TEMPLATES.length) + SHEET_TEMPLATES.length) %
-      SHEET_TEMPLATES.length;
+      ((index % AVAILABLE_TEMPLATES.length) + AVAILABLE_TEMPLATES.length) %
+      AVAILABLE_TEMPLATES.length;
     setActiveIndex(next);
-    setSelectedTemplateId(SHEET_TEMPLATES[next].id);
+    setSelectedTemplateId(AVAILABLE_TEMPLATES[next].id);
 
     const container = carouselRef.current;
     if (container) {
@@ -172,14 +174,18 @@ const NewSheetModal = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden rounded-2xl border border-zinc-200/80 shadow-xl [&>button]:hidden">
+        <DialogContent 
+          showCloseButton={false}
+          className="sm:max-w-[460px] p-0 overflow-hidden rounded-2xl border border-zinc-200/80 shadow-xl"
+        >
           {/* HEADER */}
           <div
-            className={`relative h-[160px] overflow-hidden bg-gradient-to-br ${activeTemplate.accent.from}`}
+            className={`relative h-[120px] sm:h-[160px] overflow-hidden bg-gradient-to-br ${activeTemplate.accent.from}`}
           >
             <button
+              type="button"
               onClick={() => onOpenChange(false)}
-              className="absolute top-3.5 right-3.5 z-10 h-7 w-7 rounded-full bg-black/5 hover:bg-black/10 border flex items-center justify-center"
+              className="absolute top-3.5 right-3.5 z-30 h-7 w-7 cursor-pointer rounded-full bg-black/5 hover:bg-black/10 border flex items-center justify-center transition-colors"
             >
               <X className="h-3.5 w-3.5 text-zinc-500" />
             </button>
@@ -191,32 +197,31 @@ const NewSheetModal = ({
               <ChevronRight className="h-3.5 w-3.5 text-zinc-600" />
             </button>
 
-            <div className="absolute inset-0 flex flex-col justify-end px-6 pb-4">
-              <div className="flex items-center gap-2.5 mb-2">
+            <div className="absolute inset-0 flex flex-col justify-end px-4 pb-3 sm:px-6 sm:pb-4">
+              <div className="flex items-center gap-2 mb-1 sm:mb-2">
                 <div
-                  className={`h-7 w-7 rounded-lg border flex items-center justify-center ${activeTemplate.accent.iconRing}`}
+                  className={`h-6 w-6 sm:h-7 sm:w-7 rounded-lg border flex items-center justify-center ${activeTemplate.accent.iconRing}`}
                 >
                   {Icon && <Icon className="h-3.5 w-3.5 text-zinc-600" />}
                 </div>
-                <span className="text-[10.5px] font-semibold uppercase text-zinc-400 tracking-wide">
+                <span className="text-[10px] sm:text-[10.5px] font-semibold uppercase text-zinc-400 tracking-wide">
                   {activeTemplate.title}
                 </span>
               </div>
 
-              <p className="text-[19px] font-bold leading-snug">
+              <p className="text-[15px] sm:text-[19px] font-bold leading-snug">
                 {activeTemplate.copy.tagline}
               </p>
 
               {/* Dot indicators */}
               <div className="flex items-center gap-1 mt-3">
-                {SHEET_TEMPLATES.map((_, i) => (
+                {AVAILABLE_TEMPLATES.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => scrollTo(i)}
-                    className={`h-1.5 rounded-full transition-all duration-200 ${i === activeIndex
-                        ? "w-4 bg-zinc-500"
-                        : "w-1.5 bg-zinc-300"
-                      }`}
+                    className={`h-1.5 rounded-full transition-all duration-200 ${
+                      i === activeIndex ? "w-4 bg-zinc-500" : "w-1.5 bg-zinc-300"
+                    }`}
                   />
                 ))}
               </div>

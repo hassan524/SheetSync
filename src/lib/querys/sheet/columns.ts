@@ -1,13 +1,13 @@
 // lib/supabase/sheets/columns.ts
-import { supabase } from "../../supabase/client";
+import { supabase as defaultSupabase } from "../../supabase/client";
 import type { ColumnDef } from "@/types";
 
-export async function saveAllColumns(sheetId: string, columns: ColumnDef[]) {
+export async function saveAllColumns(sheetId: string, columns: ColumnDef[], client = defaultSupabase) {
   // FIX: The unique(sheet_id, position) constraint causes upsert to fail when
   // columns are reordered because two columns temporarily share a position.
   // Solution: delete all existing columns for this sheet then reinsert.
   // This is safe because column data lives in rows.data (JSONB), not here.
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await client
     .from("columns")
     .delete()
     .eq("sheet_id", sheetId);
@@ -33,7 +33,7 @@ export async function saveAllColumns(sheetId: string, columns: ColumnDef[]) {
     // text_wrap_enabled: textWrapColumns.has(col.key),
   }));
 
-  const { error: insertError } = await supabase
+  const { error: insertError } = await client
     .from("columns")
     .insert(columnsToInsert);
 

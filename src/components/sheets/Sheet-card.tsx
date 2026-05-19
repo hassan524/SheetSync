@@ -154,7 +154,7 @@ const SheetCard = ({
           </div>
 
           <div
-            className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-2 right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
           >
             <Button

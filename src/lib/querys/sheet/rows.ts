@@ -1,5 +1,5 @@
 // lib/supabase/sheets/rows.ts
-import { supabase } from "../../supabase/client";
+import { supabase as defaultSupabase } from "../../supabase/client";
 import type { SheetRow } from "@/types";
 
 function getLastUsedRowIndex(rows: SheetRow[]): number {
@@ -39,10 +39,10 @@ export async function saveRow(
   if (error) throw new Error(`Failed to save row: ${error.message}`);
 }
 
-export async function saveAllRows(sheetId: string, rows: SheetRow[]) {
+export async function saveAllRows(sheetId: string, rows: SheetRow[], client = defaultSupabase) {
   // FIX: Same position-conflict issue as columns. Delete + reinsert is the
   // safest approach when row order can change (sort, delete, paste reorder).
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await client
     .from("rows")
     .delete()
     .eq("sheet_id", sheetId);
@@ -67,7 +67,7 @@ export async function saveAllRows(sheetId: string, rows: SheetRow[]) {
     };
   });
 
-  const { error: insertError } = await supabase
+  const { error: insertError } = await client
     .from("rows")
     .insert(rowsToInsert);
 
