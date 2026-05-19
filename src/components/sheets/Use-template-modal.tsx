@@ -22,6 +22,7 @@ import { logActivity } from "@/lib/querys/activity/activity";
 import { toast } from "sonner";
 import { ICON_MAP } from "@/constants/Sheet-templates";
 import CreateFolderDialog from "@/components/individual/Personalsheets/Create-folder-dialog";
+import CreateOrganizationDialog from "@/components/individual/organization/Create-organization-dialog";
 
 export interface UseTemplateModalProps {
   open: boolean;
@@ -44,7 +45,9 @@ const UseTemplateModal = ({
   const [selectedFolder, setSelectedFolder] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [createOrgOpen, setCreateOrgOpen] = useState(false);
   const [localFolders, setLocalFolders] = useState<any[]>([]);
+  const [localOrganizations, setLocalOrganizations] = useState<any[]>([]);
 
   const router = useRouter();
 
@@ -53,10 +56,20 @@ const UseTemplateModal = ({
   const copy = template?.copy;
   const accent = template?.accent;
 
-  const folders = [...(externalFolders || []), ...localFolders.filter(
-    (lf) => !(externalFolders || []).find((f: any) => f.id === lf.id)
-  )];
+  const folders = [
+    ...(externalFolders || []),
+    ...localFolders.filter(
+      (lf) => !(externalFolders || []).find((f: any) => f.id === lf.id),
+    ),
+  ];
+  const organizationOptions = [
+    ...(organizations || []),
+    ...localOrganizations.filter(
+      (lo) => !(organizations || []).find((org: any) => org.id === lo.id),
+    ),
+  ];
   const hasFolders = folders.length > 0;
+  const hasOrganizations = organizationOptions.length > 0;
 
   useEffect(() => {
     if (template) setSheetName(template.title);
@@ -118,7 +131,8 @@ const UseTemplateModal = ({
     }
   };
 
-  const canCreate = !!sheetName.trim() && (saveToOrg ? !!selectedOrg : hasFolders);
+  const canCreate =
+    !!sheetName.trim() && (saveToOrg ? !!selectedOrg : hasFolders);
 
   if (!template) return null;
 
@@ -186,18 +200,52 @@ const UseTemplateModal = ({
 
               {/* ORGANIZATION */}
               {saveToOrg && (
-                <Select value={selectedOrg} onValueChange={setSelectedOrg}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select organization..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {organizations?.map((org) => (
-                      <SelectItem key={org.id} value={org.id}>
-                        {org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <>
+                  {hasOrganizations ? (
+                    <>
+                      <Select value={selectedOrg} onValueChange={setSelectedOrg}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select organization..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {organizationOptions.map((org) => (
+                            <SelectItem key={org.id} value={org.id}>
+                              {org.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <button
+                        className="text-xs text-zinc-500 flex items-center gap-1 hover:text-zinc-700 transition-colors"
+                        onClick={() => setCreateOrgOpen(true)}
+                      >
+                        <Building2 className="h-3 w-3" />
+                        New organization
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 py-4 px-3 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50">
+                      <Building2 className="h-5 w-5 text-zinc-400" />
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-zinc-700">
+                          Create an organization first
+                        </p>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          You need an organization to save this as a team sheet
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => setCreateOrgOpen(true)}
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                        Create Organization
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* PERSONAL FOLDER */}
@@ -271,6 +319,15 @@ const UseTemplateModal = ({
         open={createFolderOpen}
         onOpenChange={setCreateFolderOpen}
         onConfirm={handleCreateFolder}
+      />
+
+      <CreateOrganizationDialog
+        open={createOrgOpen}
+        onOpenChange={setCreateOrgOpen}
+        onCreated={(org) => {
+          setLocalOrganizations((prev) => [...prev, org]);
+          setSelectedOrg(org.id);
+        }}
       />
     </>
   );

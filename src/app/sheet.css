@@ -109,10 +109,12 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
   .sheet-toolbar::-webkit-scrollbar,
   .sheet-formatting-bar::-webkit-scrollbar {
     display: none;
   }
+
   .sheet-root {
     overflow-x: hidden;
   }
@@ -223,8 +225,9 @@
 }
 
 .sheet-action-btn:hover:not(:disabled) {
-  background: var(--sh-hover);
-  color: var(--sh-text);
+  /* background: var(--sh-hover);
+  color: var(--sh-text); */
+  background-color: transparent;
 }
 
 .sheet-action-btn--active {
@@ -699,6 +702,7 @@ body[data-sheet-dark="true"] [role="dialog"] .bg-gray-900 {
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.6;
   }

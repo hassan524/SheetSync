@@ -39,11 +39,11 @@ export default function Navigation() {
   };
 
   const handleGetStarted = async () => {
-    setIsNavigating(true);
     if (user) {
       router.push("/dashboard");
       return;
     }
+    setIsNavigating(true);
     const error = await loginWithGoogle();
     if (error) {
       alert("Login failed: " + error.message);

@@ -48,11 +48,8 @@ const CreateFolderDialog = ({ open, onOpenChange, onConfirm }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden">
-        {/* Accent top bar */}
-        <div className="h-1 w-full bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
-
-        <div className="p-6">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[400px] p-0 overflow-hidden rounded-xl">
+        <div className="p-5 sm:p-6">
           <DialogHeader className="mb-5">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">

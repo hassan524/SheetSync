@@ -5,9 +5,13 @@ import { Rocket, ArrowRight, Play } from "lucide-react";
 
 interface CtaBannerSectionProps {
   onDemoOpen: () => void;
+  onGetStarted: () => void;
 }
 
-const CtaBannerSection = ({ onDemoOpen }: CtaBannerSectionProps) => {
+const CtaBannerSection = ({
+  onDemoOpen,
+  onGetStarted,
+}: CtaBannerSectionProps) => {
   return (
     <section className="py-24 sm:py-32 bg-white">
       <div className="max-w-4xl mx-auto px-5 sm:px-6 lg:px-8">
@@ -25,7 +29,10 @@ const CtaBannerSection = ({ onDemoOpen }: CtaBannerSectionProps) => {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button className="bg-white text-primary px-8 py-3.5 text-base font-semibold hover:bg-gray-100 h-auto">
+            <Button
+              onClick={onGetStarted}
+              className="bg-white text-primary px-8 py-3.5 text-base font-semibold hover:bg-gray-100 h-auto"
+            >
               Get Started Free
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>

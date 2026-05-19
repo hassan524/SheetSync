@@ -21,12 +21,16 @@ const TemplatePicker = dynamic(
 const RecentSheets = dynamic(
   () => import("@/components/individual/dashboard/Recent-sheets"),
 );
+const FirstLoginGuide = dynamic(
+  () => import("@/components/individual/dashboard/First-login-guide"),
+);
 
 const Index = async () => {
   const stats = await getDashboardStats();
 
   return (
     <DashboardLayout breadcrumbItems={["SheetSync", "Dashboard"]}>
+      <FirstLoginGuide />
       <div className="max-w-7xl mx-auto space-y-8 md:space-y-10">
         {/* Welcome */}
         <DashboardWelcome />

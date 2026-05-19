@@ -44,6 +44,180 @@ export async function getAllSheets(folderId?: string) {
 }
 
 // ── Get single sheet by ID
+export async function getPersonalSheetOptions() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Unauthorized");
+
+  const { data, error } = await supabase
+    .from("sheets")
+    .select("id, title, updated_at")
+    .is("forked_from_sheet_id", null)
+    .eq("owner_id", user.id)
+    .eq("is_personal", true)
+    .order("updated_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function importPersonalSheetToOrganization({
+  sourceSheetId,
+  organizationId,
+}: {
+  sourceSheetId: string;
+  organizationId: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Unauthorized");
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("organization_members")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (membershipError || !membership) {
+    throw new Error("You do not have access to this organization.");
+  }
+
+  const { data: source, error: sourceError } = await supabase
+    .from("sheets")
+    .select("*")
+    .eq("id", sourceSheetId)
+    .eq("owner_id", user.id)
+    .eq("is_personal", true)
+    .single();
+
+  if (sourceError || !source) throw new Error("Personal sheet not found.");
+
+  const [
+    { data: columns, error: columnsError },
+    { data: rows, error: rowsError },
+    { data: formulas, error: formulasError },
+    { data: formats, error: formatsError },
+    { data: protectedCells, error: protectedError },
+  ] = await Promise.all([
+    supabase
+      .from("columns")
+      .select("*")
+      .eq("sheet_id", sourceSheetId)
+      .order("position"),
+    supabase
+      .from("rows")
+      .select("*")
+      .eq("sheet_id", sourceSheetId)
+      .order("position"),
+    supabase.from("formulas").select("*").eq("sheet_id", sourceSheetId),
+    supabase.from("cell_formats").select("*").eq("sheet_id", sourceSheetId),
+    supabase.from("protected_cells").select("*").eq("sheet_id", sourceSheetId),
+  ]);
+
+  const readError =
+    columnsError || rowsError || formulasError || formatsError || protectedError;
+  if (readError) throw new Error(readError.message);
+
+  const { data: created, error: createError } = await supabase
+    .from("sheets")
+    .insert({
+      title: source.title,
+      folder_id: null,
+      owner_id: user.id,
+      organization_id: organizationId,
+      template_id: source.template_id,
+      is_personal: false,
+      last_opened_at: new Date().toISOString(),
+      charts: source.charts ?? null,
+      row_heights: source.row_heights ?? null,
+    })
+    .select()
+    .single();
+
+  if (createError) throw new Error(createError.message);
+
+  const writes = await Promise.all([
+    columns?.length
+      ? supabase.from("columns").insert(
+          columns.map((col: any) => ({
+            sheet_id: created.id,
+            column_key: col.column_key,
+            name: col.name,
+            type: col.type,
+            width: col.width,
+            position: col.position,
+            select_options: col.select_options,
+            currency_code: col.currency_code,
+            conditional_formatting: col.conditional_formatting,
+          })),
+        )
+      : Promise.resolve({ error: null }),
+    rows?.length
+      ? supabase.from("rows").insert(
+          rows.map((row: any) => ({
+            sheet_id: created.id,
+            row_key: row.row_key,
+            position: row.position,
+            data: row.data,
+            updated_at: new Date().toISOString(),
+          })),
+        )
+      : Promise.resolve({ error: null }),
+    formulas?.length
+      ? supabase.from("formulas").insert(
+          formulas.map((formula: any) => ({
+            sheet_id: created.id,
+            cell_key: formula.cell_key,
+            formula: formula.formula,
+          })),
+        )
+      : Promise.resolve({ error: null }),
+    formats?.length
+      ? supabase.from("cell_formats").insert(
+          formats.map((format: any) => ({
+            sheet_id: created.id,
+            cell_key: format.cell_key,
+            bold: format.bold,
+            italic: format.italic,
+            underline: format.underline,
+            strikethrough: format.strikethrough,
+            font_size: format.font_size,
+            font_family: format.font_family,
+            text_color: format.text_color,
+            bg_color: format.bg_color,
+            text_align: format.text_align,
+            text_wrap: format.text_wrap,
+            border_style: format.border_style,
+            border_color: format.border_color,
+            border_width: format.border_width,
+          })),
+        )
+      : Promise.resolve({ error: null }),
+    protectedCells?.length
+      ? supabase.from("protected_cells").insert(
+          protectedCells.map((cell: any) => ({
+            sheet_id: created.id,
+            cell_key: cell.cell_key,
+            user_id: cell.user_id,
+            created_at: cell.created_at,
+          })),
+        )
+      : Promise.resolve({ error: null }),
+  ]);
+
+  const writeError = writes.find((result: any) => result?.error)?.error;
+  if (writeError) throw new Error(writeError.message);
+
+  return created;
+}
+
 export async function getSheetById(sheetId: string) {
   const supabase = await createSupabaseServerClient();
   const {

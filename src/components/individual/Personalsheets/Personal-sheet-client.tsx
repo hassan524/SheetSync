@@ -136,27 +136,6 @@ function SheetsPageClient({ initialFolders }: Props) {
         "Personal Sheets",
         currentFolderData?.name || "",
       ]}
-      mobileActions={
-        <>
-          <Button
-            onClick={() => setNewFolderOpen(true)}
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-          >
-            <FolderPlus className="h-3.5 w-3.5" />
-            Folder
-          </Button>
-          <Button
-            onClick={() => setNewSheetOpen(true)}
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Sheet
-          </Button>
-        </>
-      }
     >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
@@ -174,7 +153,7 @@ function SheetsPageClient({ initialFolders }: Props) {
               </p>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               onClick={() => setNewFolderOpen(true)}
               variant="outline"

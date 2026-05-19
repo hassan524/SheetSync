@@ -65,6 +65,7 @@ const NewSheetModal = ({
   }, [externalFolders, localFolders]);
 
   const hasFolders = folders.length > 0;
+  const hasRequiredDestination = !ShowSaveTo || hasFolders;
 
   const organizationId = useMemo(() => {
     const match = pathname.match(/^\/organizations\/([^/]+)/);
@@ -106,7 +107,7 @@ const NewSheetModal = ({
 
   const handleCreate = async () => {
     if (!sheetName.trim()) return;
-    if (!hasFolders) return;
+    if (!hasRequiredDestination) return;
 
     try {
       setLoading(true);
@@ -166,7 +167,7 @@ const NewSheetModal = ({
     }
   };
 
-  const canCreate = !!sheetName.trim() && hasFolders;
+  const canCreate = !!sheetName.trim() && hasRequiredDestination;
 
   return (
     <>
@@ -229,7 +230,7 @@ const NewSheetModal = ({
             </p>
 
             {/* No folders — block with create prompt */}
-            {!hasFolders ? (
+            {ShowSaveTo && !hasFolders ? (
               <div className="flex flex-col items-center gap-3 py-4 px-3 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50">
                 <FolderPlus className="h-5 w-5 text-zinc-400" />
                 <div className="text-center">

@@ -92,6 +92,8 @@ import {
   Sigma,
   Layers,
   EyeOff,
+  Upload,
+  Columns3,
 } from "lucide-react";
 import { toast } from "sonner";
 import FormattingToolbar from "@/components/individual/sheet/Formatting-toolbar";
@@ -128,8 +130,9 @@ import { getTemplateData, STATUS_COLORS } from "@/lib/sheet-templates";
 import { updateSheetTitle, updateSheetStarred } from "@/lib/querys/sheet/sheet";
 import { saveRow, saveAllRows, deleteRows } from "@/lib/querys/sheet/rows";
 import { saveAllColumns, deleteColumn } from "@/lib/querys/sheet/columns";
-import { saveCellFormat } from "@/lib/querys/sheet/format";
+import { saveAllCellFormats, saveCellFormat } from "@/lib/querys/sheet/format";
 import {
+  saveAllFormulas,
   saveFormula,
   deleteFormula,
   saveColumnFormula,
@@ -147,6 +150,11 @@ import {
   updateSheetRowHeights,
 } from "@/lib/querys/sheet/sheet";
 import { exportSheet, ExportFormat } from "@/lib/querys/export";
+import {
+  buildImportedSheetData,
+  getImportedSheetTitle,
+  MAX_IMPORT_BYTES,
+} from "@/lib/import-sheet";
 import {
   getSheetOrgMembers,
   type OrgMember,
@@ -429,6 +437,7 @@ export default function SheetClient() {
     Record<string, { name: string; color: string; row: number; col: string }>
   >({});
   const presenceChannelRef = useRef<any>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const [comments, setComments] = useState<Record<string, SheetComment[]>>({});
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [activeCommentCell, setActiveCommentCell] = useState<string | null>(
@@ -444,6 +453,10 @@ export default function SheetClient() {
   >({});
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
   const [showDesktopTip, setShowDesktopTip] = useState(true);
+  const [isImportingSheet, setIsImportingSheet] = useState(false);
+  const [importSource, setImportSource] = useState<"csv" | "excel" | null>(
+    importedFrom === "csv" || importedFrom === "excel" ? importedFrom : null,
+  );
   const chartsHydratedRef = useRef(false);
   const rowResizeRef = useRef<{
     rowId: string;
@@ -478,6 +491,9 @@ export default function SheetClient() {
   const columnsHistory = useHistory<ColumnDef[]>([]);
   const titleSaveTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const rowSaveTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
+  const pendingRowSavesRef = useRef<
+    Map<string, { row: SheetRow; position: number }>
+  >(new Map());
   const columnResizeTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const activityLogTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
 
@@ -735,6 +751,9 @@ export default function SheetClient() {
   useEffect(() => {
     if (!importedFrom) return;
     const label = importedFrom === "excel" ? "Excel" : "CSV";
+    if (importedFrom === "excel" || importedFrom === "csv") {
+      setImportSource(importedFrom);
+    }
     toast.success(`This sheet was imported from ${label}.`);
   }, [importedFrom]);
 
@@ -911,20 +930,37 @@ export default function SheetClient() {
     });
   }, [sheetId]);
 
-  const handleSaveChangedRow = useCallback(
-    (updated: SheetRow[], prev: SheetRow[]) => {
-      const changed = updated.find(
-        (r, i) => !prev[i] || JSON.stringify(r) !== JSON.stringify(prev[i]),
+  const persistPendingRowsNow = useCallback(async () => {
+    clearTimeout(rowSaveTimeout.current);
+    const pendingRows = Array.from(pendingRowSavesRef.current.values());
+    pendingRowSavesRef.current.clear();
+    if (pendingRows.length === 0) return;
+
+    try {
+      await Promise.all(
+        pendingRows.map(({ row, position }) => saveRow(sheetId, row, position)),
       );
-      if (!changed) return;
-      markSaving();
+    } catch (error: any) {
+      toast.error(error?.message ?? "Some cell changes failed to save.");
+    }
+  }, [sheetId]);
+
+  const queueChangedRowsSave = useCallback(
+    (updated: SheetRow[], prev: SheetRow[]) => {
+      updated.forEach((row, index) => {
+        const prevRow = prev[index];
+        if (!prevRow || JSON.stringify(row) !== JSON.stringify(prevRow)) {
+          pendingRowSavesRef.current.set(row.id, { row, position: index });
+        }
+      });
+
+      if (pendingRowSavesRef.current.size === 0) return;
       clearTimeout(rowSaveTimeout.current);
-      rowSaveTimeout.current = setTimeout(async () => {
-        await saveRow(sheetId, changed, updated.indexOf(changed));
-        markSaved();
-      }, 800);
+      rowSaveTimeout.current = setTimeout(() => {
+        persistPendingRowsNow();
+      }, 180);
     },
-    [sheetId, markSaving, markSaved],
+    [persistPendingRowsNow],
   );
 
   const handleFormatChange = useCallback(
@@ -1465,13 +1501,143 @@ export default function SheetClient() {
     async (format: ExportFormat) => {
       const id = toast.loading(`Preparing ${format.toUpperCase()} export…`);
       try {
+        await persistPendingRowsNow();
         await exportSheet({ format, sheetId });
         toast.success(`Downloaded as ${format.toUpperCase()}`, { id });
-      } catch {
-        toast.error("Export failed. Please try again.", { id });
+      } catch (error: any) {
+        toast.error(error?.message ?? "Export failed. Please try again.", {
+          id,
+        });
       }
     },
-    [sheetId],
+    [persistPendingRowsNow, sheetId],
+  );
+
+  const handleSheetImport = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+
+      try {
+        if (file.size > MAX_IMPORT_BYTES) {
+          throw new Error("File is larger than the 50 MB import limit.");
+        }
+        if (!/\.(csv|xlsx|xls)$/i.test(file.name)) {
+          throw new Error(
+            "Unsupported file type. Upload a CSV, XLSX, or XLS file.",
+          );
+        }
+
+        setIsImportingSheet(true);
+        markSaving();
+        const buffer = await file.arrayBuffer();
+        const parsed = buildImportedSheetData(file, buffer);
+        const importedRows = ensureWorkingRowBuffer(
+          parsed.rows,
+          parsed.columns,
+        );
+        const nextTitle = getImportedSheetTitle(file.name);
+
+        const [formulasDelete, formatsDelete] = await Promise.all([
+          supabase.from("formulas").delete().eq("sheet_id", sheetId),
+          supabase.from("cell_formats").delete().eq("sheet_id", sheetId),
+        ]);
+        if (formulasDelete.error || formatsDelete.error) {
+          throw new Error(
+            formulasDelete.error?.message ??
+              formatsDelete.error?.message ??
+              "Failed to clear existing imported data.",
+          );
+        }
+
+        await Promise.all([
+          updateSheetTitle(sheetId, nextTitle),
+          saveAllColumns(sheetId, parsed.columns),
+          saveAllRows(sheetId, importedRows),
+          saveAllFormulas(sheetId, parsed.formulas),
+          saveAllCellFormats(sheetId, parsed.cellFormats),
+        ]);
+
+        columnsHistory.pushState(parsed.columns);
+        rowsHistory.pushState(importedRows);
+        setSheetState((prev) => ({
+          ...prev,
+          title: nextTitle,
+          columns: parsed.columns,
+          rows: importedRows,
+        }));
+        setSelectedRows(new Set());
+        setSelectedCell(null);
+        setImportSource(parsed.source);
+        markSaved();
+        toast.success(
+          `Imported ${parsed.source === "excel" ? "Excel" : "CSV"} file successfully.`,
+        );
+      } catch (error: any) {
+        setSaveStatus("saved");
+        toast.error(error?.message ?? "Import failed. Please try again.");
+      } finally {
+        setIsImportingSheet(false);
+      }
+    },
+    [columnsHistory, markSaved, markSaving, rowsHistory, sheetId],
+  );
+
+  const handleApplyColumns = useCallback(
+    async (nextColumns: ColumnDef[]) => {
+      if (nextColumns.length === 0) {
+        toast.error("Keep at least one column.");
+        return;
+      }
+
+      const normalizedColumns = nextColumns.map((column, index) => ({
+        ...column,
+        key: column.key || `col_custom_${Date.now()}_${index}`,
+        name: column.name.trim() || columnIndexToName(index),
+        type: column.type ?? "text",
+        width: column.width ?? 160,
+        editable: true,
+        position: index,
+      }));
+
+      const nextRows = rows.map((row) => {
+        const mapped: SheetRow = { id: row.id };
+        normalizedColumns.forEach((column) => {
+          mapped[column.key] = row[column.key] ?? "";
+        });
+        return mapped;
+      });
+
+      try {
+        markSaving();
+        await Promise.all([
+          saveAllColumns(sheetId, normalizedColumns),
+          saveAllRows(sheetId, nextRows),
+        ]);
+        columnsHistory.pushState(normalizedColumns);
+        rowsHistory.pushState(nextRows);
+        setSheetState((prev) => ({
+          ...prev,
+          columns: normalizedColumns,
+          rows: nextRows,
+        }));
+        markSaved();
+        toast.success("Columns updated");
+      } catch (error: any) {
+        setSaveStatus("saved");
+        toast.error(error?.message ?? "Failed to update columns.");
+      }
+    },
+    [
+      columnsHistory,
+      markSaved,
+      markSaving,
+      rows,
+      rowsHistory,
+      sheetId,
+      setSaveStatus,
+    ],
   );
 
   const handleSort = useCallback(
@@ -2110,7 +2276,7 @@ export default function SheetClient() {
     (updatedRows: SheetRow[]) => {
       const prev = rows;
       rowsHistory.pushState(updatedRows);
-      handleSaveChangedRow(updatedRows, prev);
+      queueChangedRowsSave(updatedRows, prev);
       let hadChange = false;
       updatedRows.forEach((row, rowIdx) => {
         const prevRow = prev[rowIdx];
@@ -2144,7 +2310,7 @@ export default function SheetClient() {
       rows,
       columns,
       rowsHistory.pushState,
-      handleSaveChangedRow,
+      queueChangedRowsSave,
       sheetId,
       isOrgSheet,
       logCellEditActivity,
@@ -2878,7 +3044,7 @@ export default function SheetClient() {
                   className={`h-3.5 w-3.5 transition-colors ${starred ? "fill-amber-400 text-amber-400" : "text-gray-300 hover:text-amber-400"}`}
                 />
               </button>
-              <div className="sheet-save-status hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium shrink-0">
+              <div className="sheet-save-status hidden">
                 {saveStatus === "saving" ? (
                   <>
                     <Loader2 className="h-2.5 w-2.5 animate-spin text-amber-500" />
@@ -2892,7 +3058,7 @@ export default function SheetClient() {
                 )}
               </div>
               <span
-                className="sm:hidden h-1.5 w-1.5 rounded-full shrink-0"
+                className="hidden"
                 style={{
                   background: saveStatus === "saving" ? "#f59e0b" : "#10b981",
                 }}
@@ -2901,6 +3067,12 @@ export default function SheetClient() {
                 <div className="sheet-org-badge hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0">
                   <Globe className="h-2.5 w-2.5" />
                   ORG
+                </div>
+              )}
+              {importSource && (
+                <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 text-[10px] font-semibold shrink-0">
+                  <Upload className="h-2.5 w-2.5" />
+                  IMPORTED
                 </div>
               )}
               {forks.length > 0 && (
@@ -3014,6 +3186,29 @@ export default function SheetClient() {
                 </TooltipContent>
               </Tooltip>
             ) : null}
+
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={handleSheetImport}
+              disabled={isImportingSheet}
+            />
+            <button
+              className="sheet-btn-secondary flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-2.5 rounded-md text-[11.5px] font-medium transition-all shrink-0 disabled:opacity-60"
+              onClick={() => importInputRef.current?.click()}
+              disabled={isImportingSheet}
+            >
+              {isImportingSheet ? (
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span className="hidden sm:inline">
+                {isImportingSheet ? "Importing" : "Import"}
+              </span>
+            </button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -3943,6 +4138,13 @@ export default function SheetClient() {
               active={effectiveRightPanel === "timetravel"}
             />
             <IconBtn
+              icon={Columns3}
+              tooltip="Columns"
+              onClick={() => toggleRightPanel("columns")}
+              active={effectiveRightPanel === "columns"}
+              badge={columns.length}
+            />
+            <IconBtn
               icon={Code2}
               tooltip="Developer tools"
               onClick={() => toggleRightPanel("developer")}
@@ -4221,6 +4423,7 @@ export default function SheetClient() {
               rightPanel === "timetravel" ||
               rightPanel === "charts" ||
               rightPanel === "conditional" ||
+              rightPanel === "columns" ||
               rightPanel === "shortcuts" ||
               isOrgSheet) && (
               <>
@@ -4274,6 +4477,7 @@ export default function SheetClient() {
                     conditionalRules={conditionalRules}
                     onSaveConditionalRule={handleSaveConditionalRule}
                     onDeleteConditionalRule={handleDeleteConditionalRule}
+                    onApplyColumns={handleApplyColumns}
                   />
                 </div>
               </>

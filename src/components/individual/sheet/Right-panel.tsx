@@ -10,6 +10,7 @@ import {
   BarChart3,
   Keyboard,
   Paintbrush,
+  Columns3,
 } from "lucide-react";
 import CommentsPanel from "./panels/Comments-panel";
 import CollaboratorsPanel from "./panels/Collaborators-panel";
@@ -18,6 +19,7 @@ import TimeTravelPanel from "./panels/TimeTravel-panel";
 import ChartsPanel from "./panels/Charts-panel"; // ← new
 import KeyboardShortcutsPanel from "./panels/Keyboard-shortcuts-panel";
 import ConditionalFormattingPanel from "./panels/Conditional-formatting-panel";
+import ColumnsPanel from "./panels/Columns-panel";
 import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import type {
   TimeTravelState,
@@ -38,6 +40,7 @@ export type RightPanelType =
   | "charts"
   | "shortcuts"
   | "conditional"
+  | "columns"
   | null;
 
 interface RightPanelProps {
@@ -87,6 +90,7 @@ interface RightPanelProps {
   conditionalRules?: ConditionalFormatRule[];
   onSaveConditionalRule?: (rule: ConditionalFormatRule) => void;
   onDeleteConditionalRule?: (ruleId: string) => void;
+  onApplyColumns?: (columns: ColumnDef[]) => void;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -115,6 +119,11 @@ const PANEL_META: Record<
     label: "Conditional Formatting",
     icon: Paintbrush,
     color: "text-emerald-500",
+  },
+  columns: {
+    label: "Columns",
+    icon: Columns3,
+    color: "text-blue-500",
   },
 };
 
@@ -156,6 +165,7 @@ export default function RightPanel({
   conditionalRules = [],
   onSaveConditionalRule,
   onDeleteConditionalRule,
+  onApplyColumns,
 }: RightPanelProps) {
   const meta = PANEL_META[rightPanel] ?? PANEL_META.developer;
   const Icon = meta.icon;
@@ -265,6 +275,13 @@ export default function RightPanel({
             rules={conditionalRules}
             onSaveRule={onSaveConditionalRule ?? (() => {})}
             onDeleteRule={onDeleteConditionalRule ?? (() => {})}
+          />
+        )}
+        {rightPanel === "columns" && (
+          <ColumnsPanel
+            isDark={d}
+            columns={columns}
+            onApply={onApplyColumns ?? (() => {})}
           />
         )}
       </div>

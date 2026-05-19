@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Rocket } from "lucide-react";
 import { steps } from "@/data/landing";
 
-const HowItWorksSection = () => {
+interface HowItWorksSectionProps {
+  onGetStarted: () => void;
+}
+
+const HowItWorksSection = ({ onGetStarted }: HowItWorksSectionProps) => {
   return (
     <section
       id="how-it-works"
@@ -56,7 +60,10 @@ const HowItWorksSection = () => {
         </div>
 
         <div className="text-center mt-14">
-          <Button className="btn-primary text-white px-8 py-3.5 text-base font-semibold h-auto">
+          <Button
+            onClick={onGetStarted}
+            className="btn-primary text-white px-8 py-3.5 text-base font-semibold h-auto"
+          >
             <Rocket className="mr-2 h-5 w-5" />
             Get Started Free
           </Button>

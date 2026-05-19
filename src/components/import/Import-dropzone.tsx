@@ -340,7 +340,7 @@ const ImportDropzone = ({
   const [busy, setBusy] = useState(false);
   const [destinationType, setDestinationType] = useState<
     "skip" | "personal" | "organization" | null
-  >(null);
+  >("skip");
   const [selectedFolderId, setSelectedFolderId] = useState("");
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
 
@@ -399,10 +399,6 @@ const ImportDropzone = ({
   const importFiles = useCallback(
     async (selectedFiles: File[]) => {
       if (selectedFiles.length === 0) return;
-      if (!destinationType) {
-        toast.error("Choose where to save this imported sheet first.");
-        return;
-      }
       if (destinationType === "organization" && !selectedOrganizationId) {
         toast.error("Choose an organization for this imported sheet.");
         return;
@@ -531,8 +527,8 @@ const ImportDropzone = ({
         <div>
           <p className="text-sm font-medium">Import destination</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Choose whether to save this import in your personal workspace, an
-            organization, or no folder.
+            By default the imported sheet opens now and appears in Recent. You
+            can also save it to a personal folder or organization.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

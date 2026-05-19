@@ -30,6 +30,26 @@ interface SheetExportData {
   formulas: Record<string, string>;
 }
 
+function parseJsonArray(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function safeExportFilename(title: string, extension: ExportFormat) {
+  const name = title
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${name || "SheetSync Export"}.${extension}`;
+}
+
 // ─────────────────────────────────────────────────────────────
 //  COLORS — Priority / Status (match your UI exactly)
 // ─────────────────────────────────────────────────────────────
@@ -87,6 +107,9 @@ async function fetchSheetForExport(sheetId: string): Promise<SheetExportData> {
       type: col.type,
       width: col.width,
       position: col.position,
+      selectOptions: parseJsonArray(col.select_options),
+      currencyCode: col.currency_code ?? "USD",
+      conditional_formatting: col.conditional_formatting ?? null,
     })),
 
     // Filter out empty/buffer rows — only keep rows with at least one non-empty cell
@@ -276,7 +299,7 @@ function exportCSV(data: SheetExportData) {
     new Blob(["\uFEFF" + lines.join("\r\n")], {
       type: "text/csv;charset=utf-8;",
     }),
-    `${title}.csv`,
+    safeExportFilename(title, "csv"),
   );
 }
 
@@ -476,7 +499,10 @@ function exportXLSX(data: SheetExportData) {
     CreatedDate: new Date(),
   };
 
-  XLSX.writeFile(wb, `${title}.xlsx`, { cellStyles: true, compression: true });
+  XLSX.writeFile(wb, safeExportFilename(title, "xlsx"), {
+    cellStyles: true,
+    compression: true,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -696,7 +722,7 @@ function exportPDF(data: SheetExportData) {
     },
   });
 
-  doc.save(`${title}.pdf`);
+  doc.save(safeExportFilename(title, "pdf"));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -741,7 +767,7 @@ function exportJSON(data: SheetExportData) {
 
   triggerDownload(
     new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
-    `${title}.json`,
+    safeExportFilename(title, "json"),
   );
 }
 

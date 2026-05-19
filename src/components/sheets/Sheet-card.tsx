@@ -85,6 +85,8 @@ const SheetCard = ({
   lastEdited,
   templateId,
   isStarred,
+  isOrganization,
+  organizationName,
   onDeleted,
 }: SheetCardProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -137,10 +139,18 @@ const SheetCard = ({
         <div className="relative rounded-xl overflow-hidden border border-border bg-white h-[140px] sm:h-[150px] transition-all group-hover:shadow-md">
           <canvas ref={canvasRef} className="w-full h-full" />
 
-          <div className="absolute top-2 left-2">
+          <div className="absolute top-2 left-2 flex items-center gap-1">
             <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/90 border text-muted-foreground font-mono">
               {templateTitle}
             </span>
+            {isOrganization && (
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-50/95 border border-emerald-200 text-emerald-700 font-semibold"
+                title={organizationName || "Organization sheet"}
+              >
+                ORG
+              </span>
+            )}
           </div>
 
           <div

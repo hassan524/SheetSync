@@ -5,9 +5,10 @@ import { Zap, Rocket, Play, CheckCircle2 } from "lucide-react";
 
 interface HeroSectionProps {
   onDemoOpen: () => void;
+  onGetStarted: () => void;
 }
 
-const HeroSection = ({ onDemoOpen }: HeroSectionProps) => {
+const HeroSection = ({ onDemoOpen, onGetStarted }: HeroSectionProps) => {
   return (
     <section className="hero-gradient pt-28 pb-20 sm:pt-36 sm:pb-28 px-5 sm:px-6 lg:px-8">
       <div className="max-w-5xl w-full flex flex-col gap-7 mx-auto text-center">
@@ -43,7 +44,10 @@ const HeroSection = ({ onDemoOpen }: HeroSectionProps) => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center items-center animate-fade-in-up delay-400">
-          <Button className="btn-primary text-white px-8 py-4 text-base font-semibold h-auto w-full sm:w-auto">
+          <Button
+            onClick={onGetStarted}
+            className="btn-primary text-white px-8 py-4 text-base font-semibold h-auto w-full sm:w-auto"
+          >
             <Rocket className="mr-2 h-5 w-5" />
             Start Free — It&apos;s Free
           </Button>

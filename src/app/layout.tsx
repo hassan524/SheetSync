@@ -4,7 +4,6 @@ import "./index.css";
 import { Providers } from "@/layout/providers";
 import { Toaster } from "sonner";
 import Script from "next/script";
-import { PwaInstallBanner } from "@/components/ui/Pwa-install-banner";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sheetsync.app";
 
@@ -107,7 +106,6 @@ export default function RootLayout({
           }}
         />
         <Providers>{children}</Providers>
-        <PwaInstallBanner />
         <Script id="register-sw" strategy="afterInteractive">
           {`
             if ('serviceWorker' in navigator) {
