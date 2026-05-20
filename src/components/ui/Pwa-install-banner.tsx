@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, X } from "lucide-react";
+import { Check, Download, RefreshCw, X } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -18,6 +18,62 @@ export function PwaInstallBanner() {
   const [showBanner, setShowBanner] = useState(false);
   const [isIos, setIsIos] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+
+    let cancelled = false;
+
+    const registerServiceWorker = async () => {
+      try {
+        const registration = await navigator.serviceWorker.register("/sw.js");
+        if (cancelled) return;
+
+        if (registration.waiting) {
+          setUpdateReady(registration);
+          setShowBanner(true);
+        }
+
+        registration.addEventListener("updatefound", () => {
+          const worker = registration.installing;
+          if (!worker) return;
+
+          worker.addEventListener("statechange", () => {
+            if (
+              worker.state === "installed" &&
+              navigator.serviceWorker.controller
+            ) {
+              setUpdateReady(registration);
+              setShowBanner(true);
+            }
+          });
+        });
+      } catch {
+        // Browsers only allow service workers on HTTPS or localhost.
+      }
+    };
+
+    registerServiceWorker();
+
+    const reloadOnControllerChange = () => window.location.reload();
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      reloadOnControllerChange,
+      { once: true },
+    );
+
+    return () => {
+      cancelled = true;
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        reloadOnControllerChange,
+      );
+    };
+  }, []);
 
   useEffect(() => {
     const standalone =
@@ -59,13 +115,34 @@ export function PwaInstallBanner() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleInstalled = () => {
+      setIsStandalone(true);
+      setShowBanner(false);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener("appinstalled", handleInstalled);
+    return () => window.removeEventListener("appinstalled", handleInstalled);
+  }, []);
+
   const handleInstall = useCallback(async () => {
     if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") setShowBanner(false);
-    setDeferredPrompt(null);
+    setIsInstalling(true);
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") setShowBanner(false);
+      setDeferredPrompt(null);
+    } finally {
+      setIsInstalling(false);
+    }
   }, [deferredPrompt]);
+
+  const handleUpdate = useCallback(() => {
+    updateReady?.waiting?.postMessage({ type: "SKIP_WAITING" });
+    setShowBanner(false);
+  }, [updateReady]);
 
   const handleDismiss = useCallback(() => {
     setShowBanner(false);
@@ -97,8 +174,14 @@ export function PwaInstallBanner() {
           </div>
 
           <div className="pwa-install-content">
-            <h3 className="pwa-install-title">Install SheetSync</h3>
-            {isIos ? (
+            <h3 className="pwa-install-title">
+              {updateReady ? "SheetSync is ready to update" : "Install SheetSync"}
+            </h3>
+            {updateReady ? (
+              <p className="pwa-install-desc">
+                Reload once to use the newest app version.
+              </p>
+            ) : isIos ? (
               <p className="pwa-install-desc">
                 Tap <span style={{ fontWeight: 600 }}>Share</span> then{" "}
                 <span style={{ fontWeight: 600 }}>
@@ -118,13 +201,19 @@ export function PwaInstallBanner() {
             )}
           </div>
 
-          {!isIos && (
+          {updateReady ? (
+            <button onClick={handleUpdate} className="pwa-install-btn">
+              <RefreshCw size={16} />
+              Update
+            </button>
+          ) : !isIos && (
             <button
               onClick={deferredPrompt ? handleInstall : handleDismiss}
               className="pwa-install-btn"
+              disabled={isInstalling}
             >
-              <Download size={16} />
-              {deferredPrompt ? "Install" : "Got it"}
+              {isInstalling ? <RefreshCw size={16} /> : deferredPrompt ? <Download size={16} /> : <Check size={16} />}
+              {isInstalling ? "Opening" : deferredPrompt ? "Install" : "Got it"}
             </button>
           )}
         </motion.div>

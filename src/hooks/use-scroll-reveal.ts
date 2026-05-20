@@ -11,22 +11,48 @@ export function useScrollReveal() {
       ".scroll-reveal-right",
     ].join(",");
 
-    const elements = document.querySelectorAll(selectors);
+    const elements = Array.from(document.querySelectorAll(selectors));
     if (!elements.length) return;
+
+    const reveal = (element: Element) => {
+      element.classList.add("revealed");
+    };
+
+    if (!("IntersectionObserver" in window)) {
+      elements.forEach(reveal);
+      return;
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            entry.target.classList.add("revealed");
+            reveal(entry.target);
             observer.unobserve(entry.target);
           }
         });
       },
-      { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
+      { threshold: 0.01, rootMargin: "0px 0px 120px 0px" },
     );
 
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    elements.forEach((element) => {
+      const rect = element.getBoundingClientRect();
+      if (rect.top < window.innerHeight + 120) {
+        reveal(element);
+        return;
+      }
+
+      observer.observe(element);
+    });
+
+    const safetyTimer = window.setTimeout(() => {
+      elements.forEach(reveal);
+      observer.disconnect();
+    }, 1800);
+
+    return () => {
+      window.clearTimeout(safetyTimer);
+      observer.disconnect();
+    };
   }, []);
 }

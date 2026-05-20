@@ -3,7 +3,6 @@ import "./app.css";
 import "./index.css";
 import { Providers } from "@/layout/providers";
 import { Toaster } from "sonner";
-import Script from "next/script";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sheetsync.app";
 
@@ -106,15 +105,6 @@ export default function RootLayout({
           }}
         />
         <Providers>{children}</Providers>
-        <Script id="register-sw" strategy="afterInteractive">
-          {`
-            if ('serviceWorker' in navigator) {
-              window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(() => {});
-              });
-            }
-          `}
-        </Script>
       </body>
     </html>
   );
