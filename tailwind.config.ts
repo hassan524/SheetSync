@@ -1,11 +1,9 @@
 import type { Config } from "tailwindcss";
 
 export default {
-    
- content: [
+  content: [
     "./src/**/*.{js,ts,jsx,tsx,css}",
   ],
-
   prefix: "",
   theme: {
     container: {
@@ -103,5 +101,4 @@ export default {
       },
     },
   },
-//   plugins: [require("tailwindcss-animate")], 
 } satisfies Config;

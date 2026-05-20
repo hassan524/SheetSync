@@ -1,9 +1,5 @@
-import dynamic from "next/dynamic";
 import { generateSEO } from "@/lib/seo/metadata";
-
-const LandingClient = dynamic(
-  () => import("@/components/individual/landing/Landing-client"),
-);
+import LandingWrapper from "@/components/individual/landing/Landing-wrapper";
 
 export const metadata = generateSEO({
   title: "SheetSync — Real-Time Collaborative Spreadsheets",
@@ -31,7 +27,7 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <LandingClient />
+      <LandingWrapper />
     </>
   );
 }

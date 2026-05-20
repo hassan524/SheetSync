@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 
-export function useScrollReveal() {
+export function useScrollReveal(enabled = true) {
   useEffect(() => {
+    if (!enabled) return;
+
     const selectors = [
       ".scroll-reveal",
       ".scroll-reveal-scale",
@@ -54,5 +56,5 @@ export function useScrollReveal() {
       window.clearTimeout(safetyTimer);
       observer.disconnect();
     };
-  }, []);
+  }, [enabled]);
 }

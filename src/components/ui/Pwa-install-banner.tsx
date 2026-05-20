@@ -95,23 +95,16 @@ export function PwaInstallBanner() {
       return () => clearTimeout(timer);
     }
 
-    let promptReceived = false;
     const handler = (event: Event) => {
       event.preventDefault();
-      promptReceived = true;
       setDeferredPrompt(event as BeforeInstallPromptEvent);
       setTimeout(() => setShowBanner(true), 600);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
 
-    const fallbackTimer = setTimeout(() => {
-      if (!promptReceived) setShowBanner(true);
-    }, 1200);
-
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
-      clearTimeout(fallbackTimer);
     };
   }, []);
 
