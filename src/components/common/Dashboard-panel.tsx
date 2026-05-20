@@ -82,6 +82,48 @@ function getActionMeta(action: string = "") {
 function formatAction(action: string = "", target: string, subtitle: string) {
   const a = action.toLowerCase();
 
+  if (a.includes("updated cell")) {
+    return {
+      line1: `You updated ${target}`,
+      line2: null,
+      context: subtitle,
+    };
+  }
+  if (a.includes("updated cells") || a.includes("edited cells")) {
+    return {
+      line1: `You updated cells in "${target !== "Unknown Sheet" ? target : "a sheet"}"`,
+      line2: null,
+      context: subtitle,
+    };
+  }
+  if (a.includes("created organization")) {
+    return {
+      line1: `You created organization "${target}"`,
+      line2: null,
+      context: "Organization",
+    };
+  }
+  if (a.includes("imported personal sheet")) {
+    return {
+      line1: `You imported "${target}" into an organization`,
+      line2: null,
+      context: subtitle,
+    };
+  }
+  if (a.includes("invited user")) {
+    return {
+      line1: `You invited someone to join "${target}"`,
+      line2: "They should check their email to accept the invitation.",
+      context: "Organization invite",
+    };
+  }
+  if (a.includes("joined organization")) {
+    return {
+      line1: `You joined "${target}"`,
+      line2: null,
+      context: "Organization",
+    };
+  }
   if (a.includes("created sheet") || a.includes("create sheet")) {
     return {
       line1: `You created "${target !== "Unknown Sheet" ? target : "Untitled Sheet"}"`,
@@ -194,7 +236,9 @@ export default function ActivityPanel() {
         const formattedActivity = (activityData || []).map((a: any) => ({
           id: a.id,
           action: a.action,
-          target: a.sheets?.title || a.target || "Unknown Sheet",
+          target: String(a.action || "").toLowerCase().includes("updated cell")
+            ? a.target || a.sheets?.title || "Unknown Sheet"
+            : a.sheets?.title || a.target || "Unknown Sheet",
           subtitle: a.organizations?.name
             ? `${a.organizations.name} · Org`
             : "Personal",

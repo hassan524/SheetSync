@@ -40,10 +40,12 @@ const SheetsGrid = ({
     folderName: folderName || undefined,
     owner: s.owner ?? { name: "You", initials: "ME" },
     collaborators: s.collaborators ?? 0,
+    members: (s as any).members ?? (s as any).sheet_members ?? [],
     lastModified: s.updated_at ?? undefined,
     createdAt: s.created_at ?? undefined,
     rows: s.rows ?? undefined,
     columns: s.columns ?? undefined,
+    templateId: (s as any).templateId ?? (s as any).template_id ?? undefined,
     visibility: s.visibility,
     activeEditors: s.activeEditors ?? undefined,
   }));
@@ -51,7 +53,7 @@ const SheetsGrid = ({
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between my-4 px-3 py-2.5 rounded-xl border border-border/60 bg-card/50">
+      <div className="flex items-center justify-between my-4 px-1 py-2.5">
         <div className="flex items-center gap-2.5">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <FolderOpen className="h-4 w-4 text-primary" />

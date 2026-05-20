@@ -25,6 +25,7 @@ import {
   getPersonalSheetOptions,
   importPersonalSheetToOrganization,
 } from "@/lib/querys/sheets/sheets";
+import { logActivity } from "@/lib/querys/activity/activity";
 import { toast } from "sonner";
 
 interface OrgHeaderProps {
@@ -64,6 +65,16 @@ export function OrgHeader({ org }: OrgHeaderProps) {
         sourceSheetId: selectedSheetId,
         organizationId: org.id,
       });
+      const sourceTitle =
+        personalSheets.find((sheet) => sheet.id === selectedSheetId)?.title ??
+        created.title ??
+        "Personal sheet";
+      await logActivity({
+        sheetId: created.id,
+        organizationId: org.id,
+        action: "imported personal sheet",
+        target: sourceTitle,
+      });
       toast.success("Personal sheet imported into organization");
       setImportOpen(false);
       router.push(`/sheet/${created.id}?org=true`);
@@ -77,11 +88,11 @@ export function OrgHeader({ org }: OrgHeaderProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6">
         {/* ─── Left: Org Info ─── */}
-        <div className="space-y-0.5 truncate min-w-0">
+        <div className="space-y-0.5 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">
+            <h1 className="expandable-truncate text-lg sm:text-xl font-semibold tracking-tight max-w-full" title={org.name} tabIndex={0}>
               {org.name}
             </h1>
 
@@ -105,14 +116,14 @@ export function OrgHeader({ org }: OrgHeaderProps) {
           </div>
 
           {org.description && (
-            <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
+            <p className="expandable-truncate text-[11px] sm:text-xs text-muted-foreground" title={org.description} tabIndex={0}>
               {org.description}
             </p>
           )}
         </div>
 
         {/* ─── Right: Actions ─── */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 overflow-x-auto styled-scrollbar pb-1 sm:pb-0">
           <Button
             variant="outline"
             size="sm"

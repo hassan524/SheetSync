@@ -67,7 +67,6 @@ const NewSheetModal = ({
   }, [externalFolders, localFolders]);
 
   const hasFolders = folders.length > 0;
-  const hasRequiredDestination = !ShowSaveTo || hasFolders;
 
   const organizationId = useMemo(() => {
     const match = pathname.match(/^\/organizations\/([^/]+)/);
@@ -108,8 +107,14 @@ const NewSheetModal = ({
   };
 
   const handleCreate = async () => {
-    if (!sheetName.trim()) return;
-    if (!hasRequiredDestination) return;
+    if (!sheetName.trim()) {
+      toast.error("Enter a sheet name before creating.");
+      return;
+    }
+    if (!organizationId && !selectedFolder) {
+      toast.error("Create a folder first, then save your sheet inside it.");
+      return;
+    }
 
     try {
       setLoading(true);
@@ -169,14 +174,14 @@ const NewSheetModal = ({
     }
   };
 
-  const canCreate = !!sheetName.trim() && hasRequiredDestination;
+  const canCreate = !!sheetName.trim() && (!!organizationId || !!selectedFolder);
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent 
           showCloseButton={false}
-          className="sm:max-w-[460px] p-0 overflow-hidden rounded-2xl border border-zinc-200/80 shadow-xl"
+          className="sm:max-w-[460px] p-0 overflow-hidden rounded-xl sm:rounded-2xl border border-zinc-200/80 shadow-xl"
         >
           {/* HEADER */}
           <div
@@ -229,13 +234,13 @@ const NewSheetModal = ({
           </div>
 
           {/* BODY */}
-          <div className="px-6 py-5 space-y-4 bg-white">
-            <p className="text-[13px] text-zinc-500 leading-relaxed">
+          <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 bg-white">
+            <p className="text-xs sm:text-[13px] text-zinc-500 leading-relaxed">
               {activeTemplate.copy.body}
             </p>
 
             {/* No folders — block with create prompt */}
-            {ShowSaveTo && !hasFolders ? (
+            {!organizationId && !hasFolders ? (
               <div className="flex flex-col items-center gap-3 py-4 px-3 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50">
                 <FolderPlus className="h-5 w-5 text-zinc-400" />
                 <div className="text-center">
@@ -305,7 +310,7 @@ const NewSheetModal = ({
           </div>
 
           {/* FOOTER */}
-          <div className="flex justify-end gap-2 p-4 border-t">
+          <div className="mobile-dialog-actions flex justify-end gap-2 p-3 sm:p-4 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

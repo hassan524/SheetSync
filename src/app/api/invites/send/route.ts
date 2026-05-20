@@ -231,6 +231,15 @@ export async function POST(req: NextRequest) {
           email: cleanEmail,
           status: "sent",
         });
+
+        await supabase.from("sheet_history").insert({
+          actor_id: user.id,
+          user_id: user.id,
+          sheet_id: null,
+          organization_id: orgId,
+          action: "invited user",
+          target: orgName,
+        });
       } catch (emailError: any) {
         console.error("Email send error:", emailError);
 

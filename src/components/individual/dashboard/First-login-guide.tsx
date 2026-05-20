@@ -16,7 +16,8 @@ import {
   Users,
 } from "lucide-react";
 
-const GUIDE_KEY = "sheetsync-dashboard-guide-seen";
+const GUIDE_COUNT_KEY = "sheetsync-dashboard-guide-count";
+const GUIDE_MAX_SHOWS = 2;
 
 const steps = [
   {
@@ -52,7 +53,8 @@ export default function FirstLoginGuide() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (localStorage.getItem(GUIDE_KEY)) return;
+    const count = Number(localStorage.getItem(GUIDE_COUNT_KEY) || "0");
+    if (count >= GUIDE_MAX_SHOWS) return;
     const timer = setTimeout(() => setOpen(true), 500);
     return () => clearTimeout(timer);
   }, []);
@@ -65,7 +67,11 @@ export default function FirstLoginGuide() {
   );
 
   const close = () => {
-    localStorage.setItem(GUIDE_KEY, "true");
+    const count = Number(localStorage.getItem(GUIDE_COUNT_KEY) || "0");
+    localStorage.setItem(
+      GUIDE_COUNT_KEY,
+      String(Math.min(count + 1, GUIDE_MAX_SHOWS)),
+    );
     setOpen(false);
   };
 

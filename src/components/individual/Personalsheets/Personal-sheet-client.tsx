@@ -31,7 +31,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { createFolder } from "@/lib/querys/folder/folders";
+import { createFolder, deleteFolder } from "@/lib/querys/folder/folders";
 
 interface Props {
   initialFolders: any[];
@@ -127,6 +127,24 @@ function SheetsPageClient({ initialFolders }: Props) {
         f.id === folderId ? { ...f, sheets: [...f.sheets, sheet] } : f,
       ),
     );
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    try {
+      await deleteFolder(folderId);
+      setFolders((prev) => {
+        const updated = prev.filter((f) => f.id !== folderId);
+        // If we deleted the current folder, switch to next available
+        if (currentFolder === folderId) {
+          setCurrentFolder(updated.length > 0 ? updated[0].id : null);
+        }
+        return updated;
+      });
+      toast.success("Folder deleted");
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete folder");
+    }
   };
 
   return (
@@ -266,6 +284,7 @@ function SheetsPageClient({ initialFolders }: Props) {
           currentFolder={currentFolder}
           onSelectFolder={handleFolderChange}
           onCreateFolder={() => setNewFolderOpen(true)}
+          onDeleteFolder={handleDeleteFolder}
         />
 
         <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">

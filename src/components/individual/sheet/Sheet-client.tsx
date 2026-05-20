@@ -498,14 +498,16 @@ export default function SheetClient() {
   const activityLogTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const logCellEditActivity = useCallback(
-    (sheetTitle: string) => {
+    (sheetTitle: string, cellLabel?: string) => {
       clearTimeout(activityLogTimeout.current);
       activityLogTimeout.current = setTimeout(() => {
         logActivity({
           sheetId,
           organizationId: organizationId ?? undefined,
-          action: "edited cells",
-          target: sheetTitle || title,
+          action: cellLabel ? "updated cell" : "updated cells",
+          target: cellLabel
+            ? `${cellLabel} in ${sheetTitle || title}`
+            : sheetTitle || title,
         }).catch(() => {});
       }, 30000);
     },
@@ -2278,6 +2280,7 @@ export default function SheetClient() {
       rowsHistory.pushState(updatedRows);
       queueChangedRowsSave(updatedRows, prev);
       let hadChange = false;
+      let firstChangedCell: string | undefined;
       updatedRows.forEach((row, rowIdx) => {
         const prevRow = prev[rowIdx];
         if (!prevRow) return;
@@ -2289,6 +2292,7 @@ export default function SheetClient() {
             const cl = String.fromCharCode(
               65 + columns.findIndex((c) => c.key === col.key),
             );
+            firstChangedCell ??= `${cl}${rowIdx + 1}`;
             logCellEdit(
               sheetId,
               `${cl}${rowIdx + 1}`,
@@ -2300,7 +2304,7 @@ export default function SheetClient() {
         });
       });
       if (hadChange) {
-        logCellEditActivity(title);
+        logCellEditActivity(title, firstChangedCell);
         maybeAutoSnapshot(sheetId, updatedRows, columns, currentUser?.id).catch(
           () => {},
         );

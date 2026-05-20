@@ -80,7 +80,7 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {/* ── Weekly Activity ── */}
-      <div className="border rounded-xl bg-card px-5 py-4 flex flex-col gap-4">
+      <div className="border rounded-lg bg-card px-3 sm:px-5 py-4 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
@@ -91,11 +91,11 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-3 divide-x">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-0 sm:divide-x">
           {weekStats.map((s, i) => (
             <div
               key={i}
-              className={`flex flex-col gap-2 ${i > 0 ? "pl-4" : ""} ${i < 2 ? "pr-4" : ""}`}
+              className={`flex flex-row sm:flex-col items-center sm:items-start gap-3 sm:gap-2 ${i > 0 ? "sm:pl-4" : ""} ${i < 2 ? "sm:pr-4" : ""}`}
             >
               <div
                 className={`h-7 w-7 rounded-lg border ${s.iconBg} flex items-center justify-center`}
@@ -103,7 +103,7 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
                 <s.icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
               </div>
               <div>
-                <p className={`text-2xl font-bold tracking-tight ${s.color}`}>
+                <p className={`text-lg sm:text-2xl font-bold tracking-tight ${s.color}`}>
                   {s.value.toLocaleString()}
                 </p>
                 <p className="text-xs font-medium text-foreground leading-tight mt-0.5">
@@ -119,7 +119,7 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
       </div>
 
       {/* ── Organization Info ── */}
-      <div className="border rounded-xl bg-card px-5 py-4 flex flex-col gap-4">
+      <div className="border rounded-lg bg-card px-3 sm:px-5 py-4 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users className="h-3.5 w-3.5 text-muted-foreground" />
@@ -130,7 +130,7 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="flex flex-col gap-1.5">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Owner
@@ -139,7 +139,7 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
               <div className="h-6 w-6 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
                 <Crown className="h-3 w-3 text-amber-500" />
               </div>
-              <span className="text-xs font-medium truncate">
+              <span className="expandable-truncate text-xs font-medium" title={owner?.profiles?.name ?? ""} tabIndex={0}>
                 {owner?.profiles?.name?.split(" ")[0] ?? "—"}
               </span>
             </div>
@@ -154,7 +154,7 @@ export function OrgBottomStrip({ org }: { org: Organization }) {
                 <Calendar className="h-3 w-3 text-muted-foreground" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium leading-tight truncate">
+                <p className="text-xs font-medium leading-tight">
                   {createdAt}
                 </p>
                 <p className="text-[10px] text-muted-foreground">{ageLabel}</p>

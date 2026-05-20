@@ -22,13 +22,13 @@ export function OrgStatCards({ org }: { org: Organization }) {
               <p className="text-lg font-bold leading-none tracking-tight">
                 {members.length}
               </p>
-              <p className="text-xs font-medium text-foreground mt-0.5 truncate">
+              <p className="text-[11px] sm:text-xs font-medium text-foreground mt-0.5">
                 Total members
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-medium text-green-600 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 px-1.5 py-0.5 rounded-full shrink-0">
-            ↑ 12%
+          <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full shrink-0">
+            {members.length} total
           </span>
         </div>
         {/* stacked avatars */}
@@ -65,7 +65,7 @@ export function OrgStatCards({ org }: { org: Organization }) {
               <p className="text-lg font-bold leading-none tracking-tight text-green-600">
                 {online.length}
               </p>
-              <p className="text-xs font-medium text-foreground mt-0.5 truncate">
+              <p className="text-[11px] sm:text-xs font-medium text-foreground mt-0.5">
                 Active right now
               </p>
             </div>
@@ -106,13 +106,13 @@ export function OrgStatCards({ org }: { org: Organization }) {
               <p className="text-lg font-bold leading-none tracking-tight">
                 {sheets.length}
               </p>
-              <p className="text-xs font-medium text-foreground mt-0.5 truncate">
+              <p className="text-[11px] sm:text-xs font-medium text-foreground mt-0.5">
                 Total sheets
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-medium text-violet-600 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 px-1.5 py-0.5 rounded-full shrink-0">
-            ↑ 8 this week
+          <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full shrink-0">
+            {sheets.length} total
           </span>
         </div>
         <div className="mt-2 grid grid-cols-3 gap-1">
@@ -141,7 +141,7 @@ export function OrgStatCards({ org }: { org: Organization }) {
               <p className="text-lg font-bold leading-none tracking-tight capitalize">
                 {org.role ?? "member"}
               </p>
-              <p className="text-xs font-medium text-foreground mt-0.5 truncate">
+              <p className="text-[11px] sm:text-xs font-medium text-foreground mt-0.5">
                 Your role
               </p>
             </div>

@@ -13,6 +13,7 @@ import {
 } from "@/data/tables/universalSheetColumns";
 import { Search, Grid3X3, List, Building2, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { getInitials } from "@/lib/utils";
 
 interface FilesListProps {
   sheets: any[];
@@ -36,6 +37,16 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
         organizationId: s.organization_id,
         folderName: s.folder?.name ?? s.folderName ?? null,
         owner: s.owner ?? { name: "You", initials: "ME" },
+        members: (s.organization?.members ?? s.organizationMembers ?? []).map(
+          (member: any) => ({
+            id: member.id,
+            name: member.name,
+            email: member.email,
+            avatar: member.avatar,
+            initials: getInitials(member.name ?? member.email ?? "Member"),
+            status: member.status,
+          }),
+        ),
         lastModified: s.updated_at,
         createdAt: s.created_at,
         collaborators: s.collaborators ?? 0,

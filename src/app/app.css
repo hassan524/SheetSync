@@ -127,6 +127,32 @@
     font-optical-sizing: auto;
     overflow-x: hidden;
   }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.63 0.06 160 / 0.45) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: oklch(0.63 0.06 160 / 0.32);
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.55 0.07 160 / 0.55);
+    background-clip: content-box;
+  }
 }
 
 .card {
@@ -172,11 +198,12 @@
   /* ── Styled thin scrollbar for panels & sidebar ── */
   .styled-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: oklch(0.75 0.05 160 / 0.35) transparent;
+    scrollbar-color: oklch(0.63 0.06 160 / 0.45) transparent;
   }
 
   .styled-scrollbar::-webkit-scrollbar {
-    width: 4px;
+    width: 8px;
+    height: 8px;
   }
 
   .styled-scrollbar::-webkit-scrollbar-track {
@@ -184,12 +211,34 @@
   }
 
   .styled-scrollbar::-webkit-scrollbar-thumb {
-    background: oklch(0.75 0.05 160 / 0.35);
+    background: oklch(0.63 0.06 160 / 0.32);
+    border: 2px solid transparent;
     border-radius: 9999px;
+    background-clip: content-box;
   }
 
   .styled-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.65 0.07 160 / 0.5);
+    background: oklch(0.55 0.07 160 / 0.55);
+    background-clip: content-box;
+  }
+
+  .expandable-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .expandable-truncate:focus,
+  .expandable-truncate:focus-within,
+  .expandable-truncate:active {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .mobile-dialog-actions {
+    @apply [&_button]:min-h-8 [&_button]:text-xs sm:[&_button]:text-sm;
   }
 
   @keyframes scale-in {

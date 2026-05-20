@@ -43,7 +43,7 @@ const LandingClient = () => {
   if (loading || user) return null;
 
   return (
-    <div className="bg-white">
+    <div className="bg-white overflow-x-hidden">
       <Navigation />
       <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
       <HeroSection

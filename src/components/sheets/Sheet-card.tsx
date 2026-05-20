@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Star, Trash2, MoreHorizontal } from "lucide-react";
+import { Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { useSheetTransition } from "@/hooks/sheets/use-sheet-transition";
 import { deleteSheet } from "@/lib/querys/sheets/sheets";
@@ -160,15 +162,8 @@ const SheetCard = ({
             <Button
               size="icon"
               variant="ghost"
-              className="h-6 w-6 bg-white/95 border"
-            >
-              <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
-            </Button>
-
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6 bg-white/95 border"
+              className="h-6 w-6 bg-transparent hover:bg-muted/60"
+              aria-label={isStarred ? "Starred sheet" : "Star sheet"}
             >
               <Star
                 className={`h-3 w-3 ${
@@ -182,11 +177,12 @@ const SheetCard = ({
             <Button
               size="icon"
               variant="ghost"
-              className="h-6 w-6 bg-white/95 border hover:border-destructive/40"
+              className="h-6 w-6 bg-transparent hover:bg-destructive/10"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowDelete(true);
               }}
+              aria-label="Delete sheet"
             >
               <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
             </Button>
@@ -194,7 +190,7 @@ const SheetCard = ({
         </div>
 
         <div className="mt-2.5 space-y-1.5 px-0.5">
-          <p className="text-[13px] font-medium truncate group-hover:underline underline-offset-2">
+          <p className="expandable-truncate text-[13px] font-medium group-hover:underline underline-offset-2" title={title} tabIndex={0}>
             {title}
           </p>
 
@@ -204,36 +200,34 @@ const SheetCard = ({
         </div>
       </div>
 
-      <Dialog open={showDelete} onOpenChange={setShowDelete}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-sm">Delete sheet?</DialogTitle>
-            <DialogDescription className="text-xs">
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent className="max-w-sm" onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm">Delete sheet?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">
               <span className="font-medium">"{title}"</span> will be permanently
               deleted.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowDelete(false)}
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel
+              disabled={isDeleting}
+              className="h-8 text-xs"
             >
               Cancel
-            </Button>
+            </AlertDialogCancel>
 
-            <Button
-              variant="destructive"
-              size="sm"
+            <AlertDialogAction
               onClick={handleDelete}
               disabled={isDeleting}
+              className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
             >
               {isDeleting ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

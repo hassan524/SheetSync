@@ -66,25 +66,25 @@ const CreateOrganizationDialog: React.FC<CreateOrganizationDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-primary-foreground" />
+          <div className="flex items-start gap-3 mb-1">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
             </div>
-            <div>
+            <div className="min-w-0 text-left">
               <DialogTitle>Create Organization</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="mt-1">
                 Create a new organization to collaborate with your team
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-3 sm:py-4">
           <div className="space-y-2">
             <Label htmlFor="org-name">Organization Name</Label>
             <Input
               id="org-name"
-              placeholder="e.g., Engineering Team"
+              placeholder="Engineering Team"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
               disabled={loading}
@@ -95,7 +95,7 @@ const CreateOrganizationDialog: React.FC<CreateOrganizationDialogProps> = ({
             <Label htmlFor="org-description">Description (optional)</Label>
             <Textarea
               id="org-description"
-              placeholder="What is this organization for?"
+              placeholder="Purpose, team, or department"
               value={orgDescription}
               onChange={(e) => setOrgDescription(e.target.value)}
               rows={3}
@@ -103,13 +103,12 @@ const CreateOrganizationDialog: React.FC<CreateOrganizationDialogProps> = ({
             />
           </div>
 
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+          <div className="bg-muted/50 rounded-lg p-3 sm:p-4 space-y-2">
             <h4 className="text-sm font-medium">What happens next?</h4>
             <ul className="text-xs text-muted-foreground space-y-1">
-              <li>• You'll be the admin of this organization</li>
-              <li>• Invite team members via email</li>
-              <li>• Create shared sheets for collaboration</li>
-              <li>• Manage roles and permissions</li>
+              <li>You will be the admin of this organization.</li>
+              <li>Invite members and create shared sheets.</li>
+              <li>Manage roles and permissions anytime.</li>
             </ul>
           </div>
         </div>

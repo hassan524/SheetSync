@@ -13,6 +13,7 @@ import {
   type UniversalSheetRow,
 } from "@/data/tables/universalSheetColumns";
 import { Search, RotateCcw, Grid3X3, List } from "lucide-react";
+import { getInitials } from "@/lib/utils";
 
 interface RecentListProps {
   recentSheets: any[];
@@ -34,6 +35,16 @@ const RecentList: React.FC<RecentListProps> = ({ recentSheets }) => {
         organizationId: s.organization?.id ?? s.organization_id ?? null,
         folderName: s.folder?.name ?? s.folderName ?? null,
         owner: s.owner ?? { name: "You", initials: "ME" },
+        members: (s.organization?.members ?? s.organizationMembers ?? []).map(
+          (member: any) => ({
+            id: member.id,
+            name: member.name,
+            email: member.email,
+            avatar: member.avatar,
+            initials: getInitials(member.name ?? member.email ?? "Member"),
+            status: member.status,
+          }),
+        ),
         lastModified: s.lastEdited ?? s.updated_at,
         createdAt: s.createdAt ?? s.created_at,
         collaborators: s.collaborators ?? 0,

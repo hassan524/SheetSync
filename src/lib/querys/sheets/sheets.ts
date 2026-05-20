@@ -4,12 +4,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getTemplateData } from "@/lib/sheet-templates";
 import { saveAllRows } from "../sheet/rows";
 import { saveAllColumns } from "../sheet/columns";
+import { getInitials } from "@/lib/utils";
 
 import { z } from "zod";
 
 // Validation schemas
 const createSheetSchema = z.object({
-  name: z.string()
+  name: z
+    .string()
     .min(1, "Sheet name cannot be empty")
     .max(100, "Sheet name must be less than 100 characters"),
 });
@@ -30,7 +32,34 @@ export async function getAllSheets(folderId?: string) {
 
   let query = supabase
     .from("sheets")
-    .select("*")
+    .select(
+      `
+      *,
+      owner:profiles!sheets_owner_id_fkey (
+        id,
+        name,
+        email,
+        avatar_url
+      ),
+      folders ( id, name ),
+      organizations (
+        id,
+        name,
+        organization_members (
+          id,
+          status,
+          profiles (
+            id,
+            name,
+            email,
+            avatar_url
+          )
+        )
+      ),
+      rows ( id ),
+      columns ( id )
+    `,
+    )
     .is("forked_from_sheet_id", null)
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false });
@@ -42,7 +71,44 @@ export async function getAllSheets(folderId?: string) {
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
-  return data;
+
+  return (data ?? []).map((sheet: any) => {
+    const org = Array.isArray(sheet.organizations)
+      ? sheet.organizations[0]
+      : sheet.organizations;
+    const folder = Array.isArray(sheet.folders)
+      ? sheet.folders[0]
+      : sheet.folders;
+    const ownerName = sheet.owner?.name ?? "Unknown";
+
+    return {
+      ...sheet,
+      folder: folder ? { id: folder.id, name: folder.name } : null,
+      organization: org
+        ? {
+            id: org.id,
+            name: org.name,
+            members: (org.organization_members ?? []).map((member: any) => ({
+              id: member.profiles?.id ?? member.id,
+              name: member.profiles?.name ?? "Member",
+              email: member.profiles?.email ?? "",
+              avatar: member.profiles?.avatar_url ?? null,
+              status: member.status ?? "offline",
+            })),
+          }
+        : null,
+      owner: {
+        name: ownerName,
+        email: sheet.owner?.email ?? "",
+        avatar: sheet.owner?.avatar_url ?? undefined,
+        initials: getInitials(ownerName),
+      },
+      rows: Array.isArray(sheet.rows) ? sheet.rows.length : sheet.rows,
+      columns: Array.isArray(sheet.columns)
+        ? sheet.columns.length
+        : sheet.columns,
+    };
+  });
 }
 
 // ── Get single sheet by ID
@@ -124,7 +190,11 @@ export async function importPersonalSheetToOrganization({
   ]);
 
   const readError =
-    columnsError || rowsError || formulasError || formatsError || protectedError;
+    columnsError ||
+    rowsError ||
+    formulasError ||
+    formatsError ||
+    protectedError;
   if (readError) throw new Error(readError.message);
 
   const { data: created, error: createError } = await supabase
@@ -357,7 +427,20 @@ export async function getRecentSheets(limit?: number) {
       created_at, updated_at, last_opened_at,
       organization_id, folder_id, size_mb,
       folders ( id, name ),
-      organizations ( id, name, organization_members ( id ) ),
+      organizations (
+        id,
+        name,
+        organization_members (
+          id,
+          status,
+          profiles (
+            id,
+            name,
+            email,
+            avatar_url
+          )
+        )
+      ),
       columns ( id )
     `,
     )
@@ -390,6 +473,13 @@ export async function getRecentSheets(limit?: number) {
             id: org.id,
             name: org.name,
             membersCount: org.organization_members?.length ?? 0,
+            members: (org.organization_members ?? []).map((member: any) => ({
+              id: member.profiles?.id ?? member.id,
+              name: member.profiles?.name ?? "Member",
+              email: member.profiles?.email ?? "",
+              avatar: member.profiles?.avatar_url ?? null,
+              status: member.status ?? "offline",
+            })),
           }
         : null,
       folder: folder ? { id: folder.id, name: folder.name } : null,
@@ -415,7 +505,20 @@ export async function getStarredSheets() {
       created_at, updated_at, last_opened_at,
       organization_id, folder_id, size_mb,
       folders ( id, name ),
-      organizations ( id, name, organization_members ( id ) ),
+      organizations (
+        id,
+        name,
+        organization_members (
+          id,
+          status,
+          profiles (
+            id,
+            name,
+            email,
+            avatar_url
+          )
+        )
+      ),
       rows ( id ),
       columns ( id )
     `,
@@ -443,6 +546,13 @@ export async function getStarredSheets() {
             id: org.id,
             name: org.name,
             membersCount: org.organization_members?.length ?? 0,
+            members: (org.organization_members ?? []).map((member: any) => ({
+              id: member.profiles?.id ?? member.id,
+              name: member.profiles?.name ?? "Member",
+              email: member.profiles?.email ?? "",
+              avatar: member.profiles?.avatar_url ?? null,
+              status: member.status ?? "offline",
+            })),
           }
         : null,
       folder: folder ? { id: folder.id, name: folder.name } : null,

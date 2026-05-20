@@ -69,3 +69,31 @@ export async function createFolder(name: string, OrganizationId?: string) {
   if (error) throw new Error(error.message);
   return data;
 }
+
+export async function deleteFolder(folderId: string) {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Unauthorized");
+
+  // Verify ownership
+  const { data: folder, error: fetchError } = await supabase
+    .from("folders")
+    .select("id, owner_id")
+    .eq("id", folderId)
+    .single();
+
+  if (fetchError || !folder) throw new Error("Folder not found");
+  if (folder.owner_id !== user.id) throw new Error("Unauthorized");
+
+  const { error } = await supabase
+    .from("folders")
+    .delete()
+    .eq("id", folderId);
+
+  if (error) throw new Error(error.message);
+  return { success: true };
+}

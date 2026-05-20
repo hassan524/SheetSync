@@ -40,15 +40,15 @@ const CreateOrgModal = ({ open, onOpenChange }: CreateOrgModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[500px] p-4 sm:p-6">
         <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-primary-foreground" />
+          <div className="flex items-start gap-3 mb-1">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-primary flex items-center justify-center">
+              <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
             </div>
-            <div>
-              <DialogTitle>Create Organization</DialogTitle>
-              <DialogDescription>
+            <div className="min-w-0 text-left">
+              <DialogTitle className="text-sm sm:text-lg">Create Organization</DialogTitle>
+              <DialogDescription className="text-[11px] sm:text-sm leading-relaxed">
                 Create a new organization to collaborate with your team
               </DialogDescription>
             </div>
@@ -57,20 +57,20 @@ const CreateOrgModal = ({ open, onOpenChange }: CreateOrgModalProps) => {
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="org-name">Organization Name</Label>
+            <Label htmlFor="org-name" className="text-xs sm:text-sm">Organization Name</Label>
             <Input
               id="org-name"
-              placeholder="e.g., Engineering Team"
+              placeholder="Engineering Team"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="org-description">Description (optional)</Label>
+            <Label htmlFor="org-description" className="text-xs sm:text-sm">Description (optional)</Label>
             <Textarea
               id="org-description"
-              placeholder="What is this organization for?"
+              placeholder="Purpose, team, or department"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -78,7 +78,7 @@ const CreateOrgModal = ({ open, onOpenChange }: CreateOrgModalProps) => {
           </div>
 
           <div className="space-y-2">
-            <Label>Visibility</Label>
+            <Label className="text-xs sm:text-sm">Visibility</Label>
             <Select value={visibility} onValueChange={setVisibility}>
               <SelectTrigger>
                 <SelectValue />
@@ -87,27 +87,27 @@ const CreateOrgModal = ({ open, onOpenChange }: CreateOrgModalProps) => {
                 <SelectItem value="private">
                   <div className="flex items-center gap-2">
                     <Lock className="h-4 w-4" />
-                    <span>Private - Invite only</span>
+                    <span>Private</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="internal">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
-                    <span>Internal - Discoverable</span>
+                    <span>Internal</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="public">
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4" />
-                    <span>Public - Anyone can join</span>
+                    <span>Public</span>
                   </div>
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-            <h4 className="text-sm font-medium">What happens next?</h4>
+          <div className="bg-muted/50 rounded-lg p-3 sm:p-4 space-y-2">
+            <h4 className="text-xs sm:text-sm font-medium">What happens next?</h4>
             <ul className="text-xs text-muted-foreground space-y-1">
               <li>• You'll be the admin of this organization</li>
               <li>• Invite team members via email</li>

@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createOrganizationMember } from "./members";
 import { getInitials, timeAgo } from "@/lib/utils";
 import type { Organization, Sheet, Member } from "@/types";
+import { logActivity } from "@/lib/querys/activity/activity";
 
 /**
  * Get all organizations the current user belongs to.
@@ -330,6 +331,11 @@ export async function createOrganization(name: string) {
   if (error) throw new Error(error.message);
 
   await createOrganizationMember(org.id, user.id, "owner");
+  await logActivity({
+    organizationId: org.id,
+    action: "created organization",
+    target: org.name,
+  });
 
   return org;
 }

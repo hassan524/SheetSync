@@ -57,15 +57,15 @@ const JoinOrgModal = ({ open, onOpenChange }: JoinOrgModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[500px] p-4 sm:p-6">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-primary-foreground" />
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-primary flex items-center justify-center">
+              <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
             </div>
             <div>
-              <DialogTitle>Join Organization</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-sm sm:text-lg">Join Organization</DialogTitle>
+              <DialogDescription className="text-[11px] sm:text-sm">
                 Join an existing organization or use an invite code
               </DialogDescription>
             </div>
@@ -75,7 +75,7 @@ const JoinOrgModal = ({ open, onOpenChange }: JoinOrgModalProps) => {
         <div className="space-y-4 py-4">
           {/* Invite Code Section */}
           <div className="space-y-2">
-            <Label htmlFor="invite-code">Have an invite code?</Label>
+            <Label htmlFor="invite-code" className="text-xs sm:text-sm">Have an invite code?</Label>
             <div className="flex gap-2">
               <Input
                 id="invite-code"

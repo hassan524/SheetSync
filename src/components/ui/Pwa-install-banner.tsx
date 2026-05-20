@@ -9,8 +9,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-const DISMISS_KEY = "sheetsync-pwa-dismiss";
-const DISMISS_DAYS = 7;
+const DISMISS_KEY = "sheetsync-pwa-dismiss-session";
 
 export function PwaInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] =
@@ -27,14 +26,7 @@ export function PwaInstallBanner() {
     setIsStandalone(standalone);
     if (standalone) return;
 
-    // Check dismiss timestamp
-    const dismissedAt = localStorage.getItem(DISMISS_KEY);
-    if (dismissedAt) {
-      const dismissDate = new Date(dismissedAt);
-      const daysSince =
-        (Date.now() - dismissDate.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSince < DISMISS_DAYS) return;
-    }
+    if (sessionStorage.getItem(DISMISS_KEY)) return;
 
     // Detect iOS / iPadOS (no beforeinstallprompt support)
     const ua = navigator.userAgent;
@@ -45,7 +37,7 @@ export function PwaInstallBanner() {
 
     if (isIosDevice) {
       // Show banner after a short delay on iOS
-      const timer = setTimeout(() => setShowBanner(true), 3000);
+      const timer = setTimeout(() => setShowBanner(true), 1200);
       return () => clearTimeout(timer);
     }
 
@@ -55,7 +47,7 @@ export function PwaInstallBanner() {
       e.preventDefault();
       promptReceived = true;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setTimeout(() => setShowBanner(true), 2000);
+      setTimeout(() => setShowBanner(true), 800);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
@@ -70,7 +62,7 @@ export function PwaInstallBanner() {
         if (!promptReceived) {
           setShowBanner(true);
         }
-      }, 5000);
+      }, 1500);
     }
 
     return () => {
@@ -91,7 +83,7 @@ export function PwaInstallBanner() {
 
   const handleDismiss = useCallback(() => {
     setShowBanner(false);
-    localStorage.setItem(DISMISS_KEY, new Date().toISOString());
+    sessionStorage.setItem(DISMISS_KEY, "true");
   }, []);
 
   // Don't render anything if already installed
@@ -144,10 +136,13 @@ export function PwaInstallBanner() {
           </div>
 
           {/* Install button (only when native prompt available) */}
-          {!isIos && deferredPrompt && (
-            <button onClick={handleInstall} className="pwa-install-btn">
+          {!isIos && (
+            <button
+              onClick={deferredPrompt ? handleInstall : handleDismiss}
+              className="pwa-install-btn"
+            >
               <Download size={16} />
-              Install
+              {deferredPrompt ? "Install" : "Got it"}
             </button>
           )}
         </motion.div>

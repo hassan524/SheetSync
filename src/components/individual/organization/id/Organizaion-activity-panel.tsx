@@ -93,6 +93,48 @@ function formatAction(
 ) {
   const a = action.toLowerCase();
 
+  if (a.includes("updated cell")) {
+    return {
+      line1: `${userName} updated ${target}`,
+      line2: null,
+      context: subtitle,
+    };
+  }
+  if (a.includes("updated cells") || a.includes("edited cells")) {
+    return {
+      line1: `${userName} updated cells in "${target !== "Unknown Sheet" ? target : "a sheet"}"`,
+      line2: null,
+      context: subtitle,
+    };
+  }
+  if (a.includes("created organization")) {
+    return {
+      line1: `${userName} created organization "${target}"`,
+      line2: null,
+      context: "Organization",
+    };
+  }
+  if (a.includes("imported personal sheet")) {
+    return {
+      line1: `${userName} imported "${target}" into this organization`,
+      line2: null,
+      context: subtitle,
+    };
+  }
+  if (a.includes("invited user")) {
+    return {
+      line1: `${userName} invited someone to join this organization`,
+      line2: "The invitee should check their email to accept.",
+      context: target,
+    };
+  }
+  if (a.includes("joined organization")) {
+    return {
+      line1: `${userName} joined this organization`,
+      line2: null,
+      context: target,
+    };
+  }
   if (a.includes("created sheet") || a.includes("create sheet")) {
     return {
       line1: `${userName} created "${target !== "Unknown Sheet" ? target : "Untitled Sheet"}"`,
@@ -158,7 +200,7 @@ function formatAction(
   }
 
   return {
-    line1: `${userName} ${action} — ${target}`,
+    line1: `${userName} ${action} - ${target}`,
     line2: null,
     context: subtitle,
   };
@@ -310,7 +352,7 @@ export function OrgActivityPanel({ org }: { org: { id: string } }) {
   }, [org.id]);
 
   return (
-    <div className="rounded-3xl border border-border bg-card overflow-hidden flex flex-col h-[400px] md:h-[65vh]">
+    <div className="rounded-lg border border-border bg-card overflow-hidden flex flex-col h-[400px] md:h-[65vh]">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 shrink-0">
         <div className="flex items-center justify-between">
@@ -337,7 +379,7 @@ export function OrgActivityPanel({ org }: { org: { id: string } }) {
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2 hide-scrollbar">
+      <div className="flex-1 overflow-y-auto px-2 pb-2 styled-scrollbar">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-2">
             <div className="h-5 w-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
@@ -362,9 +404,11 @@ export function OrgActivityPanel({ org }: { org: { id: string } }) {
             {activity.map((a, index) => {
               const userName = a.profiles?.name?.split(" ")[0] || "Unknown";
               const displayTarget =
-                a.sheets?.title || a.target || "Unknown Sheet";
+                a.action.toLowerCase().includes("updated cell")
+                  ? a.target || a.sheets?.title || "Unknown Sheet"
+                  : a.sheets?.title || a.target || "Unknown Sheet";
               const { icon: Icon, color, ring } = getActionMeta(a.action);
-              const { line1, context } = formatAction(
+              const { line1, line2, context } = formatAction(
                 a.action,
                 displayTarget,
                 "Organization Activity",
@@ -395,6 +439,12 @@ export function OrgActivityPanel({ org }: { org: { id: string } }) {
                       {line1}
                     </p>
 
+                    {line2 && (
+                      <p className="mt-1 text-[10px] text-muted-foreground leading-relaxed">
+                        {line2}
+                      </p>
+                    )}
+
                     {/* Context row */}
                     <div className="flex items-center gap-1 mt-1">
                       <Avatar className="h-3.5 w-3.5 shrink-0">
@@ -405,13 +455,13 @@ export function OrgActivityPanel({ org }: { org: { id: string } }) {
                           {getInitials(userName)}
                         </AvatarFallback>
                       </Avatar>
-                      <p className="text-[10px] text-muted-foreground truncate">
+                      <p className="expandable-truncate text-[10px] text-muted-foreground" title={userName} tabIndex={0}>
                         {userName}
                       </p>
                       <span className="text-[10px] text-muted-foreground/40 mx-0.5">
                         •
                       </span>
-                      <p className="text-[10px] text-muted-foreground truncate">
+                      <p className="expandable-truncate text-[10px] text-muted-foreground" title={context} tabIndex={0}>
                         {context}
                       </p>
                     </div>

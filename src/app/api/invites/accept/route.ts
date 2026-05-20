@@ -89,6 +89,21 @@ export async function POST(req: NextRequest) {
 
     if (updateError) throw updateError;
 
+    const { data: acceptedOrg } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", inviteData.organization_id)
+      .maybeSingle();
+
+    await supabase.from("sheet_history").insert({
+      actor_id: user.id,
+      user_id: user.id,
+      sheet_id: null,
+      organization_id: inviteData.organization_id,
+      action: "joined organization",
+      target: acceptedOrg?.name ?? "Organization",
+    });
+
     // ─── Send push notification to the organization owner ───
     try {
       // Use service role client to look up the org owner (since the current user might not have access)

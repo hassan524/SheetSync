@@ -25,8 +25,8 @@ import { toast } from "sonner";
 import { useState } from "react";
 import {
   colName,
-  colOwner,
   colPersonal,
+  colMembers,
   colCreated,
   colLastModified,
   type UniversalSheetRow,
@@ -38,8 +38,8 @@ export type StarredSheetRow = UniversalSheetRow;
 // ── Use the same 5 standard columns ──────────────────────────────
 export const starredColumns = [
   colName,
-  colOwner,
   colPersonal,
+  colMembers,
   colCreated,
   colLastModified,
 ];

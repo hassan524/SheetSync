@@ -42,7 +42,7 @@ export async function saveAllColumns(sheetId: string, columns: ColumnDef[], clie
 }
 
 export async function deleteColumn(sheetId: string, columnKey: string) {
-  const { error } = await supabase
+  const { error } = await defaultSupabase
     .from("columns")
     .delete()
     .eq("sheet_id", sheetId)

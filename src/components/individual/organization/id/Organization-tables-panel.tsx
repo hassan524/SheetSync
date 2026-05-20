@@ -24,7 +24,12 @@ import type { Organization, Sheet, Member } from "@/types";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { updateSheetStarred } from "@/lib/querys/sheet/sheet";
-import { timeAgo } from "@/lib/utils";
+import { getInitials, timeAgo } from "@/lib/utils";
+import {
+  sheetsWithSourceColumns,
+  universalSheetAction,
+  type UniversalSheetRow,
+} from "@/data/tables/universalSheetColumns";
 
 // ── Visibility styles ─────────────────────────────
 const ROLE_STYLE: Record<string, string> = {
@@ -312,8 +317,34 @@ export function OrgTablesPanel({ org }: { org: Organization }) {
 
   const sheets = org.sheets ?? [];
   const members = org.members ?? [];
+  const sheetRows: UniversalSheetRow[] = sheets.map((sheet) => ({
+    id: sheet.id,
+    title: sheet.title,
+    is_starred: sheet.is_starred,
+    source: "organization",
+    organizationName: org.name,
+    organizationId: org.id,
+    owner: sheet.owner,
+    collaborators: members.length,
+    members: members.map((member) => ({
+      id: member.id,
+      name: member.profiles.name,
+      email: member.profiles.email,
+      avatar: member.profiles.avatar_url,
+      initials: getInitials(
+        member.profiles.name ?? member.profiles.email ?? "Member",
+      ),
+      status: member.status,
+    })),
+    lastModified: sheet.updated_at,
+    createdAt: sheet.created_at,
+    rows: sheet.rows,
+    columns: sheet.columns,
+    templateId: sheet.template_id,
+    visibility: "team",
+    activeEditors: sheet.activeEditors,
+  }));
 
-  const sheetAction = createSheetAction(router);
   const memberAction = createMemberAction();
 
   return (
@@ -332,10 +363,10 @@ export function OrgTablesPanel({ org }: { org: Organization }) {
 
       <TabsContent value="sheets">
         <DataTable
-          columns={sheetColumns}
-          rows={sheets}
+          columns={sheetsWithSourceColumns}
+          rows={sheetRows}
           getKey={(s) => s.id}
-          action={sheetAction}
+          action={universalSheetAction}
           onRowClick={(s) => router.push(`/sheet/${s.id}`)}
           emptyText="No sheets"
           emptyIcon={<NoSheetsIcon />}

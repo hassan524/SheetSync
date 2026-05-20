@@ -25,7 +25,7 @@ export async function saveRow(
 ) {
   const { id, ...data } = row;
 
-  const { error } = await supabase.from("rows").upsert(
+  const { error } = await defaultSupabase.from("rows").upsert(
     {
       sheet_id: sheetId,
       row_key: id,
@@ -78,7 +78,7 @@ export async function saveAllRows(sheetId: string, rows: SheetRow[], client = de
 export async function deleteRows(sheetId: string, rowKeys: string[]) {
   if (rowKeys.length === 0) return;
 
-  const { error } = await supabase
+  const { error } = await defaultSupabase
     .from("rows")
     .delete()
     .eq("sheet_id", sheetId)

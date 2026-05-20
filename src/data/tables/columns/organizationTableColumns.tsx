@@ -31,6 +31,7 @@ export const organizationColumns = [
   {
     key: "name",
     header: "Organization",
+    width: "220px",
     render: (org: OrganizationTableData) => (
       <div className="flex items-center gap-3">
         <div className="h-7 w-7 rounded-lg border bg-card flex items-center justify-center shadow-sm shrink-0">
@@ -39,8 +40,9 @@ export const organizationColumns = [
         <div className="min-w-0">
           <Link
             href={`/organizations/${org.id}`}
-            className="text-sm font-medium truncate max-w-[200px] block text-foreground hover:text-primary hover:underline transition-colors"
+            className="expandable-truncate text-sm font-medium max-w-[150px] sm:max-w-[180px] block text-foreground hover:text-primary hover:underline transition-colors"
             onClick={(e) => e.stopPropagation()}
+            title={org.name}
           >
             {org.name}
           </Link>
@@ -54,7 +56,7 @@ export const organizationColumns = [
   {
     key: "role",
     header: "Your Role",
-    width: "120px",
+    width: "105px",
     render: (org: OrganizationTableData) => (
       <Badge variant={roleVariants[org.role]} className="text-[11px]">
         {org.role}
@@ -64,7 +66,7 @@ export const organizationColumns = [
   {
     key: "members",
     header: "Members",
-    width: "110px",
+    width: "105px",
     render: (org: OrganizationTableData) => (
       <div className="flex items-center gap-1.5">
         <Users className="h-3 w-3 text-muted-foreground" />
@@ -77,7 +79,7 @@ export const organizationColumns = [
   {
     key: "activeNow",
     header: "Active Now",
-    width: "110px",
+    width: "105px",
     render: (org: OrganizationTableData) => (
       <div className="flex items-center gap-1.5">
         <Circle className="h-2 w-2 fill-emerald-500 text-emerald-500" />
@@ -110,8 +112,8 @@ export const organizationColumns = [
   },
   {
     key: "lastModified",
-    header: "Last Modified",
-    width: "130px",
+    header: "Updated",
+    width: "115px",
     render: (org: OrganizationTableData) => (
       <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <Clock className="h-3 w-3" />
