@@ -3,6 +3,7 @@ import { generateSEO } from "@/lib/seo/metadata";
 
 const LandingClient = dynamic(
   () => import("@/components/individual/landing/Landing-client"),
+  { ssr: false }
 );
 
 export const metadata = generateSEO({
