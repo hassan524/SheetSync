@@ -22,6 +22,7 @@ export async function saveRow(
   sheetId: string,
   row: SheetRow,
   position: number,
+  client = defaultSupabase
 ) {
   const { id, ...data } = row;
 
@@ -33,15 +34,17 @@ export async function saveRow(
       data,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "sheet_id,row_key" },
+    { onConflict: "sheet_id,row_key" }
   );
 
   if (error) throw new Error(`Failed to save row: ${error.message}`);
 }
 
-export async function saveAllRows(sheetId: string, rows: SheetRow[], client = defaultSupabase) {
-  // FIX: Same position-conflict issue as columns. Delete + reinsert is the
-  // safest approach when row order can change (sort, delete, paste reorder).
+export async function saveAllRows(
+  sheetId: string,
+  rows: SheetRow[],
+  client = defaultSupabase
+) {
   const { error: deleteError } = await client
     .from("rows")
     .delete()
@@ -75,7 +78,11 @@ export async function saveAllRows(sheetId: string, rows: SheetRow[], client = de
     throw new Error(`Failed to save rows: ${insertError.message}`);
 }
 
-export async function deleteRows(sheetId: string, rowKeys: string[]) {
+export async function deleteRows(
+  sheetId: string,
+  rowKeys: string[],
+  client = defaultSupabase
+) {
   if (rowKeys.length === 0) return;
 
   const { error } = await defaultSupabase
