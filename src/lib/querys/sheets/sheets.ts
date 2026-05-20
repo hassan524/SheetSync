@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ensureUserProfile } from "@/lib/querys/profiles/ensure-profile";
 import { getTemplateData } from "@/lib/sheet-templates";
 import { saveAllRows } from "../sheet/rows";
 import { saveAllColumns } from "../sheet/columns";
@@ -335,6 +336,7 @@ export async function createSheet({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
+  await ensureUserProfile(supabase, user);
 
   const { data, error } = await supabase
     .from("sheets")

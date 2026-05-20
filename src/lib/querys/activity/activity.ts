@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ensureUserProfile } from "@/lib/querys/profiles/ensure-profile";
 
 /**
  * LOG ACTIVITY (GLOBAL FUNCTION — USE EVERYWHERE)
@@ -27,6 +28,7 @@ export async function logActivity({
             data: { user },
         } = await supabase.auth.getUser();
         if (!user) return; // silently bail — don't crash the caller
+        await ensureUserProfile(supabase, user);
 
         const { error } = await supabase.from("sheet_history").insert({
             actor_id: user.id,

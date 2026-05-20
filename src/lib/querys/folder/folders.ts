@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ensureUserProfile } from "@/lib/querys/profiles/ensure-profile";
 
 const createFolderSchema = z.object({
   name: z.string().min(1).max(50),
@@ -16,6 +17,7 @@ export async function getAllFolders() {
   } = await supabase.auth.getUser();
 
   if (!user) throw new Error("Unauthorized");
+  await ensureUserProfile(supabase, user);
 
   const { data, error } = await supabase
     .from("folders")
@@ -52,6 +54,7 @@ export async function createFolder(name: string, OrganizationId?: string) {
   } = await supabase.auth.getUser();
 
   if (!user) throw new Error("Unauthorized");
+  await ensureUserProfile(supabase, user);
 
   const { data, error } = await supabase
     .from("folders")

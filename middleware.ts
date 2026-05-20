@@ -4,6 +4,20 @@ import type { NextRequest } from "next/server";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  if (
+    pathname === "/manifest.json" ||
+    pathname === "/sw.js" ||
+    pathname === "/firebase-messaging-sw.js" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    pathname.startsWith("/icon-") ||
+    pathname.startsWith("/og-image") ||
+    pathname.startsWith("/Loading.") ||
+    /\.(png|jpg|jpeg|gif|svg|webp|ico)$/i.test(pathname)
+  ) {
+    return NextResponse.next();
+  }
+
   // Read your custom session cookie
   const token = req.cookies.get("my-supabase-session")?.value;
 

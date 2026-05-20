@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, X, Smartphone } from "lucide-react";
+import { Download, X } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -19,7 +20,6 @@ export function PwaInstallBanner() {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    // Already installed as PWA
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
@@ -28,7 +28,6 @@ export function PwaInstallBanner() {
 
     if (sessionStorage.getItem(DISMISS_KEY)) return;
 
-    // Detect iOS / iPadOS (no beforeinstallprompt support)
     const ua = navigator.userAgent;
     const isIosDevice =
       (/iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream) ||
@@ -36,38 +35,27 @@ export function PwaInstallBanner() {
     setIsIos(isIosDevice);
 
     if (isIosDevice) {
-      // Show banner after a short delay on iOS
       const timer = setTimeout(() => setShowBanner(true), 1200);
       return () => clearTimeout(timer);
     }
 
-    // Chrome/Edge/Samsung — listen for the native install prompt
     let promptReceived = false;
-    const handler = (e: Event) => {
-      e.preventDefault();
+    const handler = (event: Event) => {
+      event.preventDefault();
       promptReceived = true;
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setTimeout(() => setShowBanner(true), 800);
+      setDeferredPrompt(event as BeforeInstallPromptEvent);
+      setTimeout(() => setShowBanner(true), 600);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
 
-    // Fallback: if on mobile and no prompt received within 5s, show generic banner
-    const isMobile = /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
-      (window.innerWidth <= 768 && "ontouchstart" in window);
-
-    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
-    if (isMobile) {
-      fallbackTimer = setTimeout(() => {
-        if (!promptReceived) {
-          setShowBanner(true);
-        }
-      }, 1500);
-    }
+    const fallbackTimer = setTimeout(() => {
+      if (!promptReceived) setShowBanner(true);
+    }, 1200);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
-      if (fallbackTimer) clearTimeout(fallbackTimer);
+      clearTimeout(fallbackTimer);
     };
   }, []);
 
@@ -75,9 +63,7 @@ export function PwaInstallBanner() {
     if (!deferredPrompt) return;
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setShowBanner(false);
-    }
+    if (outcome === "accepted") setShowBanner(false);
     setDeferredPrompt(null);
   }, [deferredPrompt]);
 
@@ -86,20 +72,18 @@ export function PwaInstallBanner() {
     sessionStorage.setItem(DISMISS_KEY, "true");
   }, []);
 
-  // Don't render anything if already installed
   if (isStandalone) return null;
 
   return (
     <AnimatePresence>
       {showBanner && (
         <motion.div
-          initial={{ y: 120, opacity: 0 }}
+          initial={{ y: -40, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 120, opacity: 0 }}
+          exit={{ y: -40, opacity: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
           className="pwa-install-banner"
         >
-          {/* Close button */}
           <button
             onClick={handleDismiss}
             className="pwa-install-close"
@@ -108,12 +92,10 @@ export function PwaInstallBanner() {
             <X size={16} />
           </button>
 
-          {/* Icon */}
           <div className="pwa-install-icon">
-            <Smartphone size={24} />
+            <Image src="/icon-192.png" alt="" width={28} height={28} priority />
           </div>
 
-          {/* Content */}
           <div className="pwa-install-content">
             <h3 className="pwa-install-title">Install SheetSync</h3>
             {isIos ? (
@@ -124,18 +106,18 @@ export function PwaInstallBanner() {
                 </span>
               </p>
             ) : deferredPrompt ? (
-              <p className="pwa-install-desc">
-                Add to your home screen for quick access — works offline too.
-              </p>
+              <p className="pwa-install-desc">Add the app to your device.</p>
             ) : (
               <p className="pwa-install-desc">
                 Open browser menu and tap{" "}
-                <span style={{ fontWeight: 600 }}>&quot;Add to Home Screen&quot;</span> for quick access.
+                <span style={{ fontWeight: 600 }}>
+                  &quot;Add to Home Screen&quot;
+                </span>
+                .
               </p>
             )}
           </div>
 
-          {/* Install button (only when native prompt available) */}
           {!isIos && (
             <button
               onClick={deferredPrompt ? handleInstall : handleDismiss}
