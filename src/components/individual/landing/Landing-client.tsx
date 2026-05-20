@@ -21,7 +21,7 @@ const LandingClient = () => {
   const router = useRouter();
   const { user, loading, loginWithGoogle } = useAuth();
   const [demoOpen, setDemoOpen] = useState(false);
-  useScrollReveal();
+  // useScrollReveal();
 
   useEffect(() => {
     if (!loading && user) {
