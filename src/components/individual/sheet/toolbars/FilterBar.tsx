@@ -3,7 +3,7 @@
 import React from "react";
 import { SlidersHorizontal, Search, Plus, X } from "lucide-react";
 import { ColumnDef } from "@/types/index";
-import { AdvancedFilterRule, FilterOperator } from "@/types/sheet-types";
+import { AdvancedFilterRule, FilterOperator } from "@/types/index";
 
 interface FilterBarProps {
   filterValue: string;

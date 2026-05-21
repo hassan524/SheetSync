@@ -45,3 +45,4 @@ export async function deleteColumn(sheetId: string, columnKey: string) {
 
   if (error) throw new Error(`Failed to delete column: ${error.message}`);
 }
+

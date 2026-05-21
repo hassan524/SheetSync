@@ -26,3 +26,4 @@ const ValuePropsBar = () => {
 };
 
 export default ValuePropsBar;
+

@@ -66,3 +66,4 @@ const HeroSection = ({ onDemoOpen, onGetStarted }: HeroSectionProps) => {
 };
 
 export default HeroSection;
+

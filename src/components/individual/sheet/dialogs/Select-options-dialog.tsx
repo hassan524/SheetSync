@@ -11,6 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { getOptionBgStyle } from "@/utils/SheetUtils";
 
 interface SelectOptionsDialogProps {
   open: boolean;
@@ -18,30 +19,6 @@ interface SelectOptionsDialogProps {
   onConfirm: (options: string[]) => void;
   initialOptions?: string[];
   isDark?: boolean;
-}
-
-const OPTION_PALETTE = [
-  "#e0f2fe",
-  "#d1fae5",
-  "#ffedd5",
-  "#ede9fe",
-  "#ffe4e6",
-  "#cffafe",
-  "#fef3c7",
-  "#dcfce7",
-  "#f3e8ff",
-  "#e0e7ff",
-];
-
-function getOptionBgStyle(label: string) {
-  let hash = 0;
-  for (let i = 0; i < label.length; i++) {
-    hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
-  }
-  return {
-    color: "#1f2937",
-    backgroundColor: OPTION_PALETTE[hash % OPTION_PALETTE.length],
-  };
 }
 
 export default function SelectOptionsDialog({
@@ -175,3 +152,4 @@ export default function SelectOptionsDialog({
     </Dialog>
   );
 }
+

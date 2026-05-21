@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { SheetRow, ColumnDef, SaveStatus, ConditionalFormatRule } from "@/types/index";
-import { SheetState, AdvancedFilterRule, SelectSetupDialogState, FilterOperator } from "@/types/sheet-types";
+import { SheetState, AdvancedFilterRule, SelectSetupDialogState, FilterOperator } from "@/types/index";
 import type { RightPanelType } from "@/components/individual/sheet/Right-panel";
 import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import type { SheetComment, HistoryEntry } from "@/lib/querys/sheet/firebase-realtime";

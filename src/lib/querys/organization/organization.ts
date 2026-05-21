@@ -394,3 +394,4 @@ export async function getMyInvitesActivity() {
   if (error) throw error;
   return data || [];
 }
+

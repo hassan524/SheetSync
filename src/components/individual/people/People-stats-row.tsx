@@ -141,3 +141,4 @@ const PeopleStatsRow: React.FC<PeopleStatsRowProps> = ({
 };
 
 export default PeopleStatsRow;
+

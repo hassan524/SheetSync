@@ -521,3 +521,4 @@ export function useCharts(opts?: UseChartsOptions): UseChartsReturn {
     replaceAll,
   };
 }
+

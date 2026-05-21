@@ -63,3 +63,4 @@ export async function saveAllCellFormats(
   if (error)
     throw new Error(`Failed to save imported formats: ${error.message}`);
 }
+

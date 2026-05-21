@@ -116,3 +116,4 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
 };
 
 export default OrganizationCard;
+

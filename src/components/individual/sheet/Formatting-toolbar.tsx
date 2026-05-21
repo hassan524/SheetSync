@@ -459,3 +459,4 @@ export default function FormattingToolbar({
     </div>
   );
 }
+

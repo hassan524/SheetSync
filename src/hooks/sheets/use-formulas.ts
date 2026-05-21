@@ -1673,3 +1673,4 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
     getFormula,
   };
 }
+

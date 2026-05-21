@@ -22,3 +22,4 @@ export async function unprotectCell(sheetId: string, cellKey: string) {
 
   if (error) throw new Error(`Failed to unprotect cell: ${error.message}`);
 }
+

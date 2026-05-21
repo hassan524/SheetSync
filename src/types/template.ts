@@ -4,3 +4,4 @@ export interface TemplateInterface {
   icon: React.ElementType;
   bgColor: string;
 }
+

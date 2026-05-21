@@ -152,3 +152,4 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
 };
 
 export default TemplatesList;
+

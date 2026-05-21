@@ -8,3 +8,4 @@ export type ColumnWithExtras<T = any> = ColumnDef<T> & {
   icon?: string;
   icon2?: string;
 };
+

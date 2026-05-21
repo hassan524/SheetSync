@@ -93,3 +93,4 @@ export async function deleteRows(
 
   if (error) throw new Error(`Failed to delete rows: ${error.message}`);
 }
+

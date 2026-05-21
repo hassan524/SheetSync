@@ -148,3 +148,4 @@ export async function updateSheetStarred(sheetId: string, isStarred: boolean) {
     .eq("id", sheetId);
   if (error) throw new Error(`Failed to update starred: ${error.message}`);
 }
+

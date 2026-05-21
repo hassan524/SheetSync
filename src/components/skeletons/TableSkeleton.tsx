@@ -28,3 +28,4 @@ export function TableSkeleton({ rows = 8, columns = 5 }: { rows?: number; column
     </div>
   );
 }
+

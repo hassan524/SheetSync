@@ -166,3 +166,4 @@ const JoinOrgModal = ({ open, onOpenChange }: JoinOrgModalProps) => {
 };
 
 export default JoinOrgModal;
+

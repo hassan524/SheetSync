@@ -44,3 +44,4 @@ export function generateSEO({
       : { index: true, follow: true },
   };
 }
+

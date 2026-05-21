@@ -31,3 +31,4 @@ export function formatOpenedAgo(
   const year = Math.floor(day / 365);
   return `${year} year${year === 1 ? "" : "s"} ago`;
 }
+

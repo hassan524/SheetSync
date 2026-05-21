@@ -32,3 +32,4 @@ export function TrackActive({ organizationId }: TrackActiveProps) {
 
   return null;
 }
+

@@ -6,7 +6,7 @@ import { saveAllColumns, deleteColumn } from "@/lib/querys/sheet/columns";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { logColAdd, logColDelete, logColumnRename } from "@/lib/querys/sheet/firebase-realtime";
 import { normalizeGeneratedColumnNames, columnIndexToName } from "@/utils/SheetUtils";
-import { SelectSetupDialogState } from "@/types/sheet-types";
+import { SelectSetupDialogState } from "@/types/index";
 
 interface UseColOpsProps {
   sheetId: string;

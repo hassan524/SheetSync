@@ -80,3 +80,4 @@ const getCellStyle = (key: string, disableBorder = false) => {
 };
 
 export { getCellStyle, getBlockStyle };
+

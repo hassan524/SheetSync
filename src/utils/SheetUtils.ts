@@ -1,5 +1,8 @@
 import { SheetRow, ColumnDef } from "@/types/index";
 
+// Central shared sheet helper utilities.
+// This file contains helper functions used across the sheet editor,
+// including column naming, formatting helpers, row buffering, and select option styling.
 export function columnIndexToName(index: number): string {
   let n = index + 1;
   let name = "";

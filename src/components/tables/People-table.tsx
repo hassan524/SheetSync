@@ -157,3 +157,4 @@ const PeopleTable = ({ people }: PeopleTableProps) => {
 };
 
 export default PeopleTable;
+

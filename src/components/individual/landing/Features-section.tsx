@@ -102,3 +102,4 @@ const FeaturesSection = ({ onDemoOpen }: FeaturesSectionProps) => {
 };
 
 export default FeaturesSection;
+

@@ -100,3 +100,4 @@ export async function deleteFolder(folderId: string) {
   if (error) throw new Error(error.message);
   return { success: true };
 }
+

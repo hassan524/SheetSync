@@ -31,3 +31,4 @@ export async function getFirebaseMessaging(): Promise<Messaging | null> {
 }
 
 export default app;
+

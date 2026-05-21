@@ -85,3 +85,4 @@ export const mapFolders = (folders: any[]): FolderWithSheets[] => {
     }),
   }));
 };
+

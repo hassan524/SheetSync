@@ -30,22 +30,22 @@ import { StatusBar } from "./toolbars/StatusBar";
 import { CellRenderer } from "./CellRenderer";
 
 // ── Hooks ──────────────────────────────────────────────────────────────────
-import { useSheetStateVars } from "@/hooks/sheets/use-sheet-state-vars";
-import { useSheetPersistence } from "@/hooks/sheets/use-sheet-persistence";
-import { useSheetRowOps } from "@/hooks/sheets/use-sheet-row-ops";
-import { useSheetColOps } from "@/hooks/sheets/use-sheet-col-ops";
-import { useHistory } from "@/hooks/use-history";
-import { useSheetFormatting } from "@/hooks/sheets/use-sheet-formatting";
-import { useTextWrap } from "@/hooks/sheets/use-text-wrap";
-import { useClipboard } from "@/hooks/sheets/use-clipboard";
-import { useProtectedCells } from "@/hooks/sheets/use-protected-cells";
-import { useRowOperations } from "@/hooks/sheets/use-row-operations";
-import { useColumnOperations } from "@/hooks/sheets/use-column-operations";
-import { useCellTypes } from "@/hooks/sheets/use-cell-types";
-import { useFormulas } from "@/hooks/sheets/use-formulas";
-import { useKeyboardShortcuts } from "@/hooks/sheets/use-keyboard-shortcuts";
-import { useCharts } from "@/hooks/sheets/use-charts";
-import { useTimeTravel } from "@/hooks/use-time-travel";
+import { useSheetStateVars } from "@/hooks/sheets/use-sheet-state-vars"; // sheet state values and setters
+import { useSheetPersistence } from "@/hooks/sheets/use-sheet-persistence"; // save sheet changes and exports
+import { useSheetRowOps } from "@/hooks/sheets/use-sheet-row-ops"; // add/delete rows and row actions
+import { useSheetColOps } from "@/hooks/sheets/use-sheet-col-ops"; // add/delete columns and column actions
+import { useHistory } from "@/hooks/use-history"; // undo / redo history stack
+import { useSheetFormatting } from "@/hooks/sheets/use-sheet-formatting"; // cell format and style handling
+import { useTextWrap } from "@/hooks/sheets/use-text-wrap"; // cell text wrap state
+import { useClipboard } from "@/hooks/sheets/use-clipboard"; // copy / paste / cut operations
+import { useProtectedCells } from "@/hooks/sheets/use-protected-cells"; // cell protection helper
+import { useRowOperations } from "@/hooks/sheets/use-row-operations"; // row-specific operations
+import { useColumnOperations } from "@/hooks/sheets/use-column-operations"; // column-specific operations
+import { useCellTypes } from "@/hooks/sheets/use-cell-types"; // cell type detection and overrides
+import { useFormulas } from "@/hooks/sheets/use-formulas"; // formula storage and evaluation
+import { useKeyboardShortcuts } from "@/hooks/sheets/use-keyboard-shortcuts"; // keyboard commands
+import { useCharts } from "@/hooks/sheets/use-charts"; // chart widgets and picker state
+import { useTimeTravel } from "@/hooks/use-time-travel"; // sheet versions and history travel
 
 // ── Existing sub-components ────────────────────────────────────────────────
 import ColumnHeaderMenu from "@/components/individual/sheet/Column-header-menu";
@@ -83,9 +83,15 @@ import { getStatusOptionStyle, isCellInConditionalRange, conditionalRuleMatches 
 import "@/app/sheet.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
-import { SheetState, AdvancedFilterRule } from "@/types/sheet-types";
+import { SheetState, AdvancedFilterRule } from "@/types/index";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Main client-side sheet editor component
+// - Loads and persists the sheet content.
+// - Keeps all editor state in sync with hooks and helpers.
+// - Delegates sheet actions to modular hooks for rows, columns, formulas,
+//   formatting, clipboard, protection, charts, and time travel.
+
 export default function SheetClient() {
   const params = useParams<{ id?: string }>();
   const searchParams = useSearchParams();
@@ -95,7 +101,8 @@ export default function SheetClient() {
   const importedFrom = searchParams?.get("imported");
   const sheetId = params?.id ?? "";
 
-  // All useState in one hook
+  // This hook gives us the main sheet editor state.
+  // It stores the rows, columns, selected cell, panel state, and many UI flags.
   const sv = useSheetStateVars(isOrganizationSheet, importedFrom);
   const {
     sheetState, setSheetState,
@@ -135,6 +142,7 @@ export default function SheetClient() {
 
   const [, setIsLoading] = useState(true);
 
+  // Local undo/redo history stacks for rows and columns.
   const rowsHistory = useHistory<SheetRow[]>([]);
   const columnsHistory = useHistory<ColumnDef[]>([]);
   const titleSaveTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -145,26 +153,48 @@ export default function SheetClient() {
   const rowResizeRef = useRef<{ rowId: string; startY: number; startH: number; pointerId: number } | null>(null);
 
   // Sub-hooks
+  // Formatting hook for bold / italic / colors and cell style logic.
   const formatting = useSheetFormatting(() => { });
+
+  // Text wrap hook tracks which cells should wrap text.
   const textWrap = useTextWrap(rows, () => { });
+
+  // Clipboard hook handles copy, cut, and paste actions.
   const clipboard = useClipboard(rows, rowsHistory, () => { });
+
+  // Protection hook keeps track of locked cells.
   const protection = useProtectedCells(() => { });
+
+  // Row operations hook handles row insert/delete and row actions.
   const rowOps = useRowOperations(rows, columns, rowsHistory, () => { });
+
+  // Column operations hook handles column insert/delete and edits.
   const colOps = useColumnOperations(rows, columns, columnsHistory, rowsHistory, () => { });
+
+  // Cell type hook tracks types like date, checkbox, select.
   const cellTypes = useCellTypes(rows, rowsHistory, () => { });
+
+  // Formula hook stores formulas and calculates values.
   const formulas = useFormulas(rows, columns);
+
+  // Chart hook manages charts shown on the sheet.
   const charts = useCharts({ storageKey: sheetId ? `sheetsync:${sheetId}:charts` : null });
 
+  // These helpers mark the sheet as saving or saved.
   const markSaving = useCallback(() => setSaveStatus("saving"), [setSaveStatus]);
   const markSaved = useCallback(() => setSaveStatus("saved"), [setSaveStatus]);
 
+  // Time travel hook tracks sheet snapshots and preview rows for older versions.
   const [timeTravelState, timeTravelActions] = useTimeTravel({
     sheetId, currentRows: rows, currentColumns: columns, historyEntries: history,
     currentUserId: currentUser?.id, organizationId: isOrgSheet ? organizationId : null,
-    onBranch: (newSheetId, label) => { toast.success(`Branched! Opening "${label}"…`, { duration: 3000 }); router.push(`/sheet/${newSheetId}`); },
+    onBranch: (newSheetId: string, label: string) => { toast.success(`Branched! Opening "${label}"…`, { duration: 3000 }); router.push(`/sheet/${newSheetId}`); },
   });
 
   // Sync history states
+  // Keep the central sheet state in sync with undo/redo history.
+  // The history hooks may update outside the normal sheet state object,
+  // so we mirror the current history snapshot back to the sheet state here.
   useEffect(() => { startTransition(() => setSheetState((p) => ({ ...p, rows: rowsHistory.currentState }))); }, [rowsHistory.currentState]);
   useEffect(() => { startTransition(() => setSheetState((p) => ({ ...p, columns: columnsHistory.currentState }))); }, [columnsHistory.currentState]);
 
@@ -175,12 +205,14 @@ export default function SheetClient() {
   }, [isDark]);
 
   // ── Persistence hook ───────────────────────────────────────────────────
+  // This hook saves sheet changes and keeps the backend in sync.
   const persistence = useSheetPersistence({
     sheetId, organizationId, isOrgSheet, title, rows, columns,
     currentUserId: currentUser?.id, setSaveStatus, rowsHistoryCurrentState: rowsHistory.currentState,
   });
 
   // ── Row ops hook ───────────────────────────────────────────────────────
+  // Row-specific operations: insert, delete, and update row state.
   const sheetRowOps = useSheetRowOps({
     sheetId, organizationId, isOrgSheet, title, rows, columns,
     selectedRows, setSelectedRows, setSaveStatus,
@@ -188,6 +220,7 @@ export default function SheetClient() {
   });
 
   // ── Col ops hook ───────────────────────────────────────────────────────
+  // Column-specific operations: update columns and column metadata.
   const sheetColOps = useSheetColOps({
     sheetId, organizationId, isOrgSheet, title, rows, columns,
     setSheetState, setSelectSetupDialog, setSaveStatus,
@@ -196,6 +229,7 @@ export default function SheetClient() {
   });
 
   // ── Load sheet ─────────────────────────────────────────────────────────
+  // Load the sheet from the backend and initialize state, formats, formulas, and charts.
   useEffect(() => {
     if (!sheetId) return;
     chartsHydratedRef.current = false;
@@ -271,6 +305,7 @@ export default function SheetClient() {
   }, [sheetId, charts.replaceAll]);
 
   // Persist charts / row heights
+  // Save chart settings and row heights after changes settle.
   useEffect(() => {
     if (!sheetId || !chartsHydratedRef.current) return;
     const t = setTimeout(() => { updateSheetCharts(sheetId, charts.charts).catch(console.error); }, 600);
@@ -283,6 +318,7 @@ export default function SheetClient() {
   }, [rowHeights, sheetId]);
 
   // Auth + realtime
+  // Load the current signed-in user once when the page opens.
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) setCurrentUser({
@@ -292,18 +328,24 @@ export default function SheetClient() {
       });
     });
   }, []);
+
+  // If this is an organization sheet, load the member list.
   useEffect(() => {
     if (!sheetId || !isOrgSheet) { setOrgMembers([]); return; }
     getSheetOrgMembers(sheetId).then((data) => { if (data) setOrgMembers(data.members); }).catch(console.error);
   }, [sheetId, isOrgSheet]);
+  // Subscribe to shared sheet history updates.
   useEffect(() => {
     if (!sheetId) return;
     return subscribeToHistory(sheetId, setHistory);
   }, [sheetId]);
+
+  // Subscribe to realtime comments for this sheet.
   useEffect(() => {
     if (!sheetId) return;
     return subscribeToComments(sheetId, (grouped) => setComments(grouped));
   }, [sheetId]);
+  // Subscribe to collaborator cursor presence for organization sheets.
   useEffect(() => {
     if (!sheetId || !isOrgSheet || !currentUser) return;
     const ch = supabase.channel(`sheet-cursors:${sheetId}`, { config: { presence: { key: currentUser.id } } });
@@ -315,6 +357,8 @@ export default function SheetClient() {
     }).subscribe((status) => { if (status === "SUBSCRIBED") presenceChannelRef.current = ch; });
     return () => { supabase.removeChannel(ch); presenceChannelRef.current = null; };
   }, [sheetId, isOrgSheet, currentUser]);
+
+  // Track my current selected cell in the live cursor presence channel.
   useEffect(() => {
     if (!presenceChannelRef.current || !currentUser || !selectedCell) return;
     presenceChannelRef.current.track({ name: currentUser.name, color: getMemberColor(currentUser.id), row: selectedCell.row, col: selectedCell.col });
@@ -412,6 +456,8 @@ export default function SheetClient() {
     return Object.values(comments).reduce((a, b) => a + b.filter((c) => !c.resolved).length, 0);
   }, [comments, isOrgSheet]);
 
+  // Derived values used by the sheet UI.
+  // These values are memoized to keep grid and toolbar performance fast.
   const selectedCellType = useMemo(() => {
     if (!selectedCell) return null;
     const col = columns.find((c) => c.key === selectedCell.col);
@@ -435,6 +481,9 @@ export default function SheetClient() {
   }, [columns]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
+  // These functions are called by UI controls when the user edits the sheet.
+  // Each handler updates local state, then triggers save behavior if needed.
+  // Update the sheet title and save after the user stops typing.
   const handleTitleChange = useCallback((t: string) => {
     setSheetState((p) => ({ ...p, title: t }));
     markSaving();
@@ -442,10 +491,12 @@ export default function SheetClient() {
     titleSaveTimeout.current = setTimeout(async () => { await updateSheetTitle(sheetId, t); markSaved(); }, 1000);
   }, [sheetId, markSaving, markSaved]);
 
+  // Toggle starred/unstarred state for this sheet.
   const handleStarredToggle = useCallback(async () => {
     setSheetState((p) => { const n = !p.starred; updateSheetStarred(sheetId, n); return { ...p, starred: n }; });
   }, [sheetId]);
 
+  // Apply a formatting change to the selected cell and persist it.
   const handleFormatChange = useCallback(async (format: any) => {
     if (!selectedCell) return;
     formatting.applyFormat(selectedCell, format);
@@ -456,6 +507,7 @@ export default function SheetClient() {
     markSaved();
   }, [selectedCell, sheetId, markSaving, markSaved, formatting.applyFormat, formatting.getCurrentCellFormat]);
 
+  // Paste the copied or cut cell range, then save the new row state.
   const handlePaste = useCallback(async () => {
     clipboard.pasteCellOrRange(selectedCell);
     setTimeout(async () => {
@@ -464,6 +516,7 @@ export default function SheetClient() {
     }, 50);
   }, [clipboard.pasteCellOrRange, selectedCell, sheetId, rowsHistory.currentState, markSaving, markSaved]);
 
+  // Toggle whether the selected cell wraps text or stays single-line.
   const handleProtectionToggle = useCallback(async () => {
     if (!selectedCell) return;
     const k = protection.getCellKey(selectedCell.row, selectedCell.col);
@@ -474,6 +527,7 @@ export default function SheetClient() {
     markSaved();
   }, [selectedCell, protection, sheetId, markSaving, markSaved]);
 
+  // Toggle text wrap for the selected cell and save the format.
   const handleTextWrapToggle = useCallback(async () => {
     if (!selectedCell) return;
     const cellKey = `${selectedCell.row}-${selectedCell.col}`;
@@ -486,6 +540,7 @@ export default function SheetClient() {
     }, 50);
   }, [selectedCell, textWrap, sheetId, formatting.getCurrentCellFormat, markSaving, markSaved]);
 
+  // Insert a formula into the selected cell, save it, and close the dialog.
   const handleFormulaInsert = useCallback(async (example: string) => {
     if (!selectedCell) { toast.info("Select a cell first, then insert formula"); return; }
     const cellKey = `${selectedCell.row}-${selectedCell.col}`;
@@ -501,6 +556,7 @@ export default function SheetClient() {
     toast.success("Formula inserted — edit as needed");
   }, [selectedCell, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
 
+  // Apply a formula to every row in a column and persist it.
   const handleApplyFormulaToColumn = useCallback(async (columnKey: string, formula: string) => {
     if (!formula.startsWith("=")) { toast.error("Formula must start with ="); return; }
     formulas.setColumnFormulas((p: any) => ({ ...p, [columnKey]: formula }));
@@ -508,6 +564,7 @@ export default function SheetClient() {
     toast.success(`Formula applied to entire "${columnKey}" column`);
   }, [formulas.setColumnFormulas, sheetId, markSaving, markSaved]);
 
+  // Remove a column formula and persist the change.
   const handleRemoveColumnFormula = useCallback(async (columnKey: string) => {
     formulas.setColumnFormulas((p: any) => { const n = { ...p }; delete n[columnKey]; return n; });
     markSaving(); await deleteColumnFormula(sheetId, columnKey); markSaved();
@@ -743,9 +800,9 @@ export default function SheetClient() {
           onDragStart={() => colOps.handleColumnDragStart(col.key)}
           onDragOver={(e) => colOps.handleColumnDragOver(e, col.key, (u: any) => setSheetState((p) => ({ ...p, columns: typeof u === "function" ? u(p.columns) : u })))}
           onDragEnd={sheetColOps.handleColumnDragEnd}>
-          <GripVertical className="h-3 w-3 text-gray-300 flex-shrink-0 cursor-move opacity-0 group-hover/header:opacity-100 transition-opacity" />
+          <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-move opacity-0 group-hover/header:opacity-100 transition-opacity" />
           <span className="flex-1 sheet-col-label truncate">{col.name}</span>
-          {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && <WrapText className="h-3 w-3 text-primary flex-shrink-0 opacity-60" />}
+          {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60" />}
           <ColumnHeaderMenu column={col}
             onChangeType={(t) => sheetColOps.handleChangeColumnType(col.key, t)}
             onDelete={() => sheetColOps.handleDeleteColumn(col.key)}

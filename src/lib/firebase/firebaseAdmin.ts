@@ -14,3 +14,4 @@ export function getAdminMessaging() {
 
   return admin.messaging();
 }
+

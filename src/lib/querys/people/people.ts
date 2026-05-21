@@ -180,3 +180,4 @@ export async function getAllPeople(): Promise<{
     pendingInvites,
   };
 }
+
