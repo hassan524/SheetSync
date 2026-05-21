@@ -72,7 +72,7 @@ const COLUMN_TYPES = [
   { type: "status" as const, label: "Status", icon: AlertCircle },
   { type: "select" as const, label: "Dropdown", icon: ListChecks },
   { type: "progress" as const, label: "Progress", icon: BarChart2 },
-  { type: "image" as const, label: "Image URL", icon: Link },
+  { type: "image" as const, label: "Image", icon: Link },
 ];
 
 const CURRENCY_CODES = [
@@ -344,56 +344,56 @@ export default function ColumnHeaderMenu({
           onDuplicate ||
           onClearColumn ||
           (canSortColumn && (onSortAsc || onSortDesc))) && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
-              Quick actions
-            </DropdownMenuLabel>
-            {onInsertLeft && (
-              <DropdownMenuItem
-                onClick={onInsertLeft}
-                className="text-xs gap-2"
-              >
-                <Plus className="h-3 w-3" />
-                Insert column left
-              </DropdownMenuItem>
-            )}
-            {onInsertRight && (
-              <DropdownMenuItem
-                onClick={onInsertRight}
-                className="text-xs gap-2"
-              >
-                <Plus className="h-3 w-3" />
-                Insert column right
-              </DropdownMenuItem>
-            )}
-            {onDuplicate && (
-              <DropdownMenuItem onClick={onDuplicate} className="text-xs gap-2">
-                <Copy className="h-3 w-3" />
-                Duplicate column
-              </DropdownMenuItem>
-            )}
-            {canSortColumn && onSortAsc && (
-              <DropdownMenuItem onClick={onSortAsc} className="text-xs gap-2">
-                Sort A → Z
-              </DropdownMenuItem>
-            )}
-            {canSortColumn && onSortDesc && (
-              <DropdownMenuItem onClick={onSortDesc} className="text-xs gap-2">
-                Sort Z → A
-              </DropdownMenuItem>
-            )}
-            {onClearColumn && (
-              <DropdownMenuItem
-                onClick={onClearColumn}
-                className="text-xs gap-2 text-amber-700 focus:text-amber-700"
-              >
-                <Trash2 className="h-3 w-3" />
-                Clear column values
-              </DropdownMenuItem>
-            )}
-          </>
-        )}
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
+                Quick actions
+              </DropdownMenuLabel>
+              {onInsertLeft && (
+                <DropdownMenuItem
+                  onClick={onInsertLeft}
+                  className="text-xs gap-2"
+                >
+                  <Plus className="h-3 w-3" />
+                  Insert column left
+                </DropdownMenuItem>
+              )}
+              {onInsertRight && (
+                <DropdownMenuItem
+                  onClick={onInsertRight}
+                  className="text-xs gap-2"
+                >
+                  <Plus className="h-3 w-3" />
+                  Insert column right
+                </DropdownMenuItem>
+              )}
+              {onDuplicate && (
+                <DropdownMenuItem onClick={onDuplicate} className="text-xs gap-2">
+                  <Copy className="h-3 w-3" />
+                  Duplicate column
+                </DropdownMenuItem>
+              )}
+              {canSortColumn && onSortAsc && (
+                <DropdownMenuItem onClick={onSortAsc} className="text-xs gap-2">
+                  Sort A → Z
+                </DropdownMenuItem>
+              )}
+              {canSortColumn && onSortDesc && (
+                <DropdownMenuItem onClick={onSortDesc} className="text-xs gap-2">
+                  Sort Z → A
+                </DropdownMenuItem>
+              )}
+              {onClearColumn && (
+                <DropdownMenuItem
+                  onClick={onClearColumn}
+                  className="text-xs gap-2 text-amber-700 focus:text-amber-700"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear column values
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
 
         {onApplyColumnFormat && (
           <>

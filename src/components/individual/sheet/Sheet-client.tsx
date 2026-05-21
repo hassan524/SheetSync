@@ -101,6 +101,10 @@ export default function SheetClient() {
   const importedFrom = searchParams?.get("imported");
   const sheetId = params?.id ?? "";
 
+  // states 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeCell, setActiveCell] = useState(null);
+
   // This hook gives us the main sheet editor state.
   // It stores the rows, columns, selected cell, panel state, and many UI flags.
   const sv = useSheetStateVars(isOrganizationSheet, importedFrom);
@@ -621,6 +625,36 @@ export default function SheetClient() {
     persistence.handleRowsChange(updatedRows, rows, rowsHistory.pushState);
   }, [persistence.handleRowsChange, rows, rowsHistory.pushState]);
 
+  const handleImageChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file || !activeCell) return;
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result as string;
+        const updatedRows = rows.map((row) =>
+          row.id !== activeCell.rowId
+            ? row
+            : { ...row, [activeCell.colKey]: dataUrl }
+        );
+        rowsHistory.pushState(updatedRows);
+        setSheetState((p) => ({ ...p, rows: updatedRows }));
+        try {
+          markSaving();
+          await saveAllRows(sheetId, updatedRows);
+          markSaved();
+        } catch {
+          toast.error("Image saved locally but failed to persist.");
+          setSaveStatus("saved");
+        }
+      };
+      reader.readAsDataURL(file);
+    },
+    [activeCell, rows, rowsHistory, sheetId, markSaving, markSaved, setSaveStatus],
+  );
+
   const handleSheetImport = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -720,6 +754,8 @@ export default function SheetClient() {
     if (!isOrgSheet && (panel === "comments" || panel === "collaborators")) return;
     setRightPanel((p) => (p === panel ? null : panel));
   }, [isOrgSheet]);
+
+
 
   const groupedCommentsForPanel = useMemo(() => {
     const result: Record<string, any[]> = {};
@@ -860,43 +896,288 @@ export default function SheetClient() {
       },
       renderEditCell(props: RenderEditCellProps<SheetRow>) {
         const { row, column, onRowChange } = props;
+
         const rowIdx = rows.findIndex((r) => r.id === row.id);
         const cellType = cellTypes.getCellType(rowIdx, col.key, col.type || "text");
+
         const cellStyle = getEffectiveCellStyle(rowIdx, column.key, row);
         const cellKey = protection.getCellKey(rowIdx, col.key);
         const isProtected = protection.isCellProtected(rowIdx, col.key);
-        const editVal = formulas.formulas[cellKey] ?? formulas.columnFormulas[col.key] ?? String(row[column.key] ?? "");
-        const inputStyle = { ...cellStyle, background: isDark ? "#131620" : "#ffffff", color: isDark ? "#e2e8f0" : "#1a1d23" };
 
-        if (isProtected) { toast.error("This cell is protected"); return (<div className="h-full w-full flex items-center px-2.5 text-xs bg-gray-50 text-gray-400 gap-1.5"><Lock className="h-3 w-3" /> Protected</div>); }
+        const editVal =
+          formulas.formulas[cellKey] ??
+          formulas.columnFormulas[col.key] ??
+          String(row[column.key] ?? "");
+
+        const inputStyle = {
+          ...cellStyle,
+          background: isDark ? "#131620" : "#ffffff",
+          color: isDark ? "#e2e8f0" : "#1a1d23",
+        };
+
+        if (isProtected) {
+          toast.error("This cell is protected");
+          return (
+            <div className="h-full w-full flex items-center px-2.5 text-xs bg-gray-50 text-gray-400 gap-1.5">
+              <Lock className="h-3 w-3" /> Protected
+            </div>
+          );
+        }
 
         const onTextChange = (v: string) => {
-          if (v.startsWith("=")) formulas.setFormulas((p: any) => ({ ...p, [cellKey]: v }));
-          else { formulas.setFormulas((p: any) => { const n = { ...p }; delete n[cellKey]; return n; }); onRowChange({ ...row, [column.key]: v }); }
-        };
-        const onNumChange = (v: string) => {
-          if (v.startsWith("=")) formulas.setFormulas((p: any) => ({ ...p, [cellKey]: v }));
-          else { formulas.setFormulas((p: any) => { const n = { ...p }; delete n[cellKey]; return n; }); const num = v === "" ? 0 : Number(v); if (!isNaN(num)) onRowChange({ ...row, [column.key]: num }); }
-        };
-        const onBlurSave = async () => {
-          const f = formulas.formulas[cellKey];
-          if (f) await saveFormula(sheetId, cellKey, f); else await deleteFormula(sheetId, cellKey).catch(() => { });
+          if (v.startsWith("=")) {
+            formulas.setFormulas((p: any) => ({ ...p, [cellKey]: v }));
+          } else {
+            formulas.setFormulas((p: any) => {
+              const n = { ...p };
+              delete n[cellKey];
+              return n;
+            });
+            onRowChange({ ...row, [column.key]: v });
+          }
         };
 
-        if (cellType === "checkbox") return (<div className="h-full flex items-center justify-center cursor-pointer" onClick={() => onRowChange({ ...row, [column.key]: !row[column.key] })}>{row[column.key] ? <span className="h-6 w-6 rounded-md bg-emerald-500/15 border border-emerald-600/60 flex items-center justify-center"><Check className="h-4 w-4 text-emerald-700" /></span> : <span className="h-5 w-5 rounded border border-gray-400/80 bg-white" />}</div>);
+        const onNumChange = (v: string) => {
+          if (v.startsWith("=")) {
+            formulas.setFormulas((p: any) => ({ ...p, [cellKey]: v }));
+          } else {
+            formulas.setFormulas((p: any) => {
+              const n = { ...p };
+              delete n[cellKey];
+              return n;
+            });
+            const num = v === "" ? 0 : Number(v);
+            if (!isNaN(num)) {
+              onRowChange({ ...row, [column.key]: num });
+            }
+          }
+        };
+
+        const onBlurSave = async () => {
+          const f = formulas.formulas[cellKey];
+          if (f) await saveFormula(sheetId, cellKey, f);
+          else await deleteFormula(sheetId, cellKey).catch(() => { });
+        };
+
+        // ---------------- IMAGE TYPE ----------------
+        if (cellType === "image") {
+          const handleClick = () => {
+            setActiveCell({
+              rowId: row.id,
+              colKey: column.key,
+            });
+            fileInputRef.current?.click();
+          };
+
+          return (
+            <div
+              className="w-full h-full flex items-center justify-center cursor-pointer"
+              onClick={handleClick}
+              style={inputStyle}
+            >
+              {row[column.key] ? (
+                <img
+                  src={row[column.key]}
+                  alt="cell"
+                  className="max-h-12 max-w-full object-cover rounded"
+                />
+              ) : (
+                <span className="text-xs text-gray-400">
+                  Upload Image
+                </span>
+              )}
+            </div>
+          );
+        }
+
+        // ---------------- CHECKBOX ----------------
+        if (cellType === "checkbox")
+          return (
+            <div
+              className="h-full flex items-center justify-center cursor-pointer"
+              onClick={() =>
+                onRowChange({
+                  ...row,
+                  [column.key]: !row[column.key],
+                })
+              }
+            >
+              {row[column.key] ? (
+                <span className="h-6 w-6 rounded-md bg-emerald-500/15 border border-emerald-600/60 flex items-center justify-center">
+                  <Check className="h-4 w-4 text-emerald-700" />
+                </span>
+              ) : (
+                <span className="h-5 w-5 rounded border border-gray-400/80 bg-white" />
+              )}
+            </div>
+          );
+
+        // ---------------- PRIORITY / STATUS ----------------
         if (cellType === "priority" || cellType === "status") {
-          const opts = cellType === "priority" ? ["Low", "Medium", "High", "Critical"] : ["Not Started", "In Progress", "In Review", "Done", "Blocked"];
-          return (<Select value={String(row[column.key] ?? "")} onValueChange={(v) => onRowChange({ ...row, [column.key]: v })}><SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0"><SelectValue /></SelectTrigger><SelectContent style={selStyle}>{opts.map((value) => { const style = getStatusOptionStyle(value); return (<SelectItem key={value} value={value} style={ddItemStyle(isDark)}><span className="sheet-badge-pill" style={{ color: style?.color, backgroundColor: style?.bgColor }}>{style?.label ?? value}</span></SelectItem>); })}</SelectContent></Select>);
+          const opts =
+            cellType === "priority"
+              ? ["Low", "Medium", "High", "Critical"]
+              : ["Not Started", "In Progress", "In Review", "Done", "Blocked"];
+
+          return (
+            <Select
+              value={String(row[column.key] ?? "")}
+              onValueChange={(v) =>
+                onRowChange({ ...row, [column.key]: v })
+              }
+            >
+              <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent style={selStyle}>
+                {opts.map((value) => {
+                  const style = getStatusOptionStyle(value);
+                  return (
+                    <SelectItem
+                      key={value}
+                      value={value}
+                      style={ddItemStyle(isDark)}
+                    >
+                      <span
+                        className="sheet-badge-pill"
+                        style={{
+                          color: style?.color,
+                          backgroundColor: style?.bgColor,
+                        }}
+                      >
+                        {style?.label ?? value}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          );
         }
+
+        // ---------------- SELECT ----------------
         if (cellType === "select") {
-          const selectOpts = cellSelectOptions[cellKey]?.length > 0 ? cellSelectOptions[cellKey] : (col.selectOptions ?? (col.validation_rules?.type === "dropdown" ? ((col.validation_rules?.options as string[]) ?? []) : []));
-          return (<Select value={String(row[column.key] ?? "")} onValueChange={(v) => onRowChange({ ...row, [column.key]: v })}><SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0"><SelectValue placeholder="Select…" /></SelectTrigger><SelectContent style={selStyle}>{selectOpts.map((opt) => (<SelectItem key={opt} value={opt} style={ddItemStyle(isDark)}><span className="sheet-badge-pill" style={getOptionBgStyle(opt)}>{opt}</span></SelectItem>))}{selectOpts.length === 0 && <div className="px-2.5 py-2 text-[11px] text-gray-400 italic">No options — edit column to add some.</div>}</SelectContent></Select>);
+          const selectOpts =
+            cellSelectOptions[cellKey]?.length > 0
+              ? cellSelectOptions[cellKey]
+              : col.selectOptions ??
+              (col.validation_rules?.type === "dropdown"
+                ? ((col.validation_rules?.options as string[]) ?? [])
+                : []);
+
+          return (
+            <Select
+              value={String(row[column.key] ?? "")}
+              onValueChange={(v) =>
+                onRowChange({ ...row, [column.key]: v })
+              }
+            >
+              <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0">
+                <SelectValue placeholder="Select…" />
+              </SelectTrigger>
+              <SelectContent style={selStyle}>
+                {selectOpts.map((opt) => (
+                  <SelectItem
+                    key={opt}
+                    value={opt}
+                    style={ddItemStyle(isDark)}
+                  >
+                    <span
+                      className="sheet-badge-pill"
+                      style={getOptionBgStyle(opt)}
+                    >
+                      {opt}
+                    </span>
+                  </SelectItem>
+                ))}
+                {selectOpts.length === 0 && (
+                  <div className="px-2.5 py-2 text-[11px] text-gray-400 italic">
+                    No options — edit column to add some.
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          );
         }
-        if (cellType === "number" || cellType === "currency" || cellType === "progress") return (<input className="w-full h-full px-2.5 text-xs outline-none border-0 text-right tabular-nums font-mono" style={inputStyle} type="text" autoFocus value={editVal} onChange={(e) => cellType === "progress" ? (() => { const v = e.target.value; if (v.startsWith("=")) onNumChange(v); else { const n = v === "" ? 0 : Math.min(100, Math.max(0, Number(v))); if (!isNaN(n)) onRowChange({ ...row, [column.key]: n }); } })() : onNumChange(e.target.value)} onBlur={onBlurSave} />);
-        if (cellType === "date") return (<input className="w-full h-full px-2.5 text-xs outline-none border-0" style={inputStyle} type={formulas.formulas[cellKey] ? "text" : "date"} autoFocus value={editVal} onChange={(e) => onTextChange(e.target.value)} onBlur={onBlurSave} />);
-        if (textWrap.textWrapColumns.has(col.key)) return (<textarea className="w-full h-full px-2.5 py-2 text-xs outline-none border-0 resize-none" style={inputStyle} autoFocus value={editVal} onChange={(e) => onTextChange(e.target.value)} onBlur={onBlurSave} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) e.stopPropagation(); }} />);
-        return (<input className="w-full h-full px-2.5 text-xs outline-none border-0" style={inputStyle} autoFocus value={editVal} onChange={(e) => onTextChange(e.target.value)} onBlur={onBlurSave} />);
-      },
+
+        // ---------------- NUMBER / CURRENCY / PROGRESS ----------------
+        if (
+          cellType === "number" ||
+          cellType === "currency" ||
+          cellType === "progress"
+        )
+          return (
+            <input
+              className="w-full h-full px-2.5 text-xs outline-none border-0 text-right tabular-nums font-mono"
+              style={inputStyle}
+              type="text"
+              autoFocus
+              value={editVal}
+              onChange={(e) =>
+                cellType === "progress"
+                  ? (() => {
+                    const v = e.target.value;
+                    if (v.startsWith("=")) onNumChange(v);
+                    else {
+                      const n =
+                        v === ""
+                          ? 0
+                          : Math.min(100, Math.max(0, Number(v)));
+                      if (!isNaN(n))
+                        onRowChange({
+                          ...row,
+                          [column.key]: n,
+                        });
+                    }
+                  })()
+                  : onNumChange(e.target.value)
+              }
+              onBlur={onBlurSave}
+            />
+          );
+
+        // ---------------- DATE ----------------
+        if (cellType === "date")
+          return (
+            <input
+              className="w-full h-full px-2.5 text-xs outline-none border-0"
+              style={inputStyle}
+              type={formulas.formulas[cellKey] ? "text" : "date"}
+              autoFocus
+              value={editVal}
+              onChange={(e) => onTextChange(e.target.value)}
+              onBlur={onBlurSave}
+            />
+          );
+
+        // ---------------- TEXT WRAP ----------------
+        if (textWrap.textWrapColumns.has(col.key))
+          return (
+            <textarea
+              className="w-full h-full px-2.5 py-2 text-xs outline-none border-0 resize-none"
+              style={inputStyle}
+              autoFocus
+              value={editVal}
+              onChange={(e) => onTextChange(e.target.value)}
+              onBlur={onBlurSave}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
+              }}
+            />
+          );
+
+        // ---------------- DEFAULT ----------------
+        return (
+          <input
+            className="w-full h-full px-2.5 text-xs outline-none border-0"
+            style={inputStyle}
+            autoFocus
+            value={editVal}
+            onChange={(e) => onTextChange(e.target.value)}
+            onBlur={onBlurSave}
+          />
+        );
+      }
     }));
 
     return [rowNumberCol, ...dataCols];
@@ -1019,6 +1300,13 @@ export default function SheetClient() {
                 }}
                 headerRowHeight={33}
                 className={`rdg-sheet fill-grid ${isDark ? "rdg-dark" : "rdg-light"}`}
+              />
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleImageChange}
               />
             </div>
             {charts.charts.map((chart) => (
