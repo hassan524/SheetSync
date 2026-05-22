@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListChecks, Plus, Trash2 } from "lucide-react";
-import type { ColumnDef } from "@/types";
-import SelectOptionsDialog from "../dialogs/Select-options-dialog";
+import type { ColumnDef, SelectOption } from "@/types";
+import { getOptionBgStyle, getSelectOptionLabel } from "@/utils/SheetUtils";
 
 type ColumnDraft = {
   key: string;
   name: string;
   type: NonNullable<ColumnDef["type"]>;
   width?: number;
-  selectOptions?: string[];
+  selectOptions?: SelectOption[];
   isNew?: boolean;
 };
 
@@ -45,19 +45,29 @@ export default function ColumnsPanel({
   isDark,
   columns,
   onApply,
+  focusedColumnKey,
 }: {
   isDark: boolean;
   columns: ColumnDef[];
   onApply: (columns: ColumnDef[]) => void;
+  focusedColumnKey?: string | null;
 }) {
   const [drafts, setDrafts] = useState<ColumnDraft[]>([]);
-  const [selectOptionsDraftKey, setSelectOptionsDraftKey] = useState<
-    string | null
-  >(null);
+  const [expandedSelectKey, setExpandedSelectKey] = useState<string | null>(null);
+  const [newOptionLabel, setNewOptionLabel] = useState("");
+  const [newOptionColor, setNewOptionColor] = useState("#dbeafe");
 
   useEffect(() => {
     setDrafts(columns.map(makeDraft));
   }, [columns]);
+
+  useEffect(() => {
+    if (!focusedColumnKey) return;
+    const target = columns.find((column) => column.key === focusedColumnKey);
+    if (target?.type === "select") {
+      setExpandedSelectKey(focusedColumnKey);
+    }
+  }, [columns, focusedColumnKey]);
 
   const updateDraft = (
     key: string,
@@ -71,8 +81,52 @@ export default function ColumnsPanel({
   const updateDraftType = (key: string, type: ColumnDraft["type"]) => {
     updateDraft(key, { type });
     if (type === "select") {
-      setSelectOptionsDraftKey(key);
+      setExpandedSelectKey(key);
     }
+  };
+
+  const updateSelectOption = (
+    key: string,
+    index: number,
+    patch: Partial<Exclude<SelectOption, string>>,
+  ) => {
+    setDrafts((prev) =>
+      prev.map((draft) => {
+        if (draft.key !== key) return draft;
+        const selectOptions = (draft.selectOptions ?? []).map((option, idx) => {
+          if (idx !== index) return option;
+          const normalized =
+            typeof option === "string"
+              ? {
+                  label: option,
+                  bgColor: getOptionBgStyle(option).backgroundColor,
+                }
+              : option;
+          return { ...normalized, ...patch };
+        });
+        return { ...draft, selectOptions };
+      }),
+    );
+  };
+
+  const addSelectOption = (key: string) => {
+    const label = newOptionLabel.trim();
+    if (!label) return;
+    updateDraft(key, {
+      selectOptions: [
+        ...(drafts.find((draft) => draft.key === key)?.selectOptions ?? []),
+        { label, bgColor: newOptionColor },
+      ],
+    });
+    setNewOptionLabel("");
+    setNewOptionColor("#dbeafe");
+  };
+
+  const removeSelectOption = (key: string, index: number) => {
+    const draft = drafts.find((item) => item.key === key);
+    updateDraft(key, {
+      selectOptions: (draft?.selectOptions ?? []).filter((_, idx) => idx !== index),
+    });
   };
 
   const addColumn = () => {
@@ -114,10 +168,6 @@ export default function ColumnsPanel({
       });
     onApply(nextColumns);
   };
-
-  const activeSelectDraft = drafts.find(
-    (draft) => draft.key === selectOptionsDraftKey,
-  );
 
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4">
@@ -193,18 +243,112 @@ export default function ColumnsPanel({
               ))}
             </select>
             {draft.type === "select" && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 w-full justify-start gap-1.5 text-xs"
-                onClick={() => setSelectOptionsDraftKey(draft.key)}
-              >
-                <ListChecks className="h-3.5 w-3.5" />
-                {draft.selectOptions?.length
-                  ? `${draft.selectOptions.length} options`
-                  : "Add select options"}
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-full justify-start gap-1.5 text-xs"
+                  onClick={() =>
+                    setExpandedSelectKey((current) =>
+                      current === draft.key ? null : draft.key,
+                    )
+                  }
+                >
+                  <ListChecks className="h-3.5 w-3.5" />
+                  {draft.selectOptions?.length
+                    ? `${draft.selectOptions.length} options`
+                    : "Add select options"}
+                </Button>
+                {expandedSelectKey === draft.key && (
+                  <div
+                    className={`space-y-2 rounded-md border p-2 ${
+                      isDark
+                        ? "border-gray-800 bg-gray-950"
+                        : "border-border bg-background"
+                    }`}
+                  >
+                    {(draft.selectOptions ?? []).map((option, optionIndex) => {
+                      const label = getSelectOptionLabel(option);
+                      const normalized =
+                        typeof option === "string"
+                          ? {
+                              label,
+                              bgColor: getOptionBgStyle(option).backgroundColor,
+                            }
+                          : option;
+                      return (
+                        <div
+                          key={`${draft.key}-${optionIndex}`}
+                          className="grid grid-cols-[1fr_42px_32px] gap-1.5 items-center"
+                        >
+                          <Input
+                            value={label}
+                            onChange={(event) =>
+                              updateSelectOption(draft.key, optionIndex, {
+                                label: event.target.value,
+                              })
+                            }
+                            className="h-8 text-xs"
+                          />
+                          <input
+                            type="color"
+                            className="h-8 w-full rounded border border-border bg-background cursor-pointer"
+                            value={normalized.bgColor}
+                            onChange={(event) =>
+                              updateSelectOption(draft.key, optionIndex, {
+                                bgColor: event.target.value,
+                              })
+                            }
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500"
+                            onClick={() =>
+                              removeSelectOption(draft.key, optionIndex)
+                            }
+                            aria-label="Remove option"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                    <div className="grid grid-cols-[1fr_42px_32px] gap-1.5 items-center">
+                      <Input
+                        value={newOptionLabel}
+                        onChange={(event) => setNewOptionLabel(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            addSelectOption(draft.key);
+                          }
+                        }}
+                        placeholder="Option label"
+                        className="h-8 text-xs"
+                      />
+                      <input
+                        type="color"
+                        className="h-8 w-full rounded border border-border bg-background cursor-pointer"
+                        value={newOptionColor}
+                        onChange={(event) => setNewOptionColor(event.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => addSelectOption(draft.key)}
+                        disabled={!newOptionLabel.trim()}
+                        aria-label="Add option"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         ))}
@@ -231,17 +375,6 @@ export default function ColumnsPanel({
           Apply
         </Button>
       </div>
-
-      <SelectOptionsDialog
-        open={Boolean(selectOptionsDraftKey)}
-        onClose={() => setSelectOptionsDraftKey(null)}
-        onConfirm={(options) => {
-          if (!selectOptionsDraftKey) return;
-          updateDraft(selectOptionsDraftKey, { selectOptions: options });
-        }}
-        initialOptions={activeSelectDraft?.selectOptions ?? []}
-        isDark={isDark}
-      />
     </div>
   );
 }

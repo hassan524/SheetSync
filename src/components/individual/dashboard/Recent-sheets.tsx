@@ -82,7 +82,7 @@ const RecentSheets = () => {
       {/* Content — scroll inside card (parent caps height on dashboard) */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 -mr-0.5 styled-scrollbar">
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <SheetCardSkeleton key={i} />
             ))}
@@ -90,7 +90,7 @@ const RecentSheets = () => {
         ) : recentSheets.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {recentSheets.map((sheet, index) => (
               <div key={sheet.id} style={{ animationDelay: `${index * 50}ms` }}>
                 <SheetCard

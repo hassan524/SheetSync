@@ -9,7 +9,10 @@ interface FormulaBarProps {
   columns: ColumnDef[];
   rows: SheetRow[];
   formulas: { formulas: Record<string, string>; columnFormulas: Record<string, string>; setFormulas: (updater: any) => void };
-  protection: { getCellKey: (row: number, col: string) => string; isCellProtected: (row: number, col: string) => boolean };
+  protection: {
+    getCellKey: (row: number, col: string) => string;
+    isRowProtected: (rowId: string | number) => boolean;
+  };
   sheetId: string;
   isDark: boolean;
   onRowsChange: (rows: SheetRow[]) => void;
@@ -72,7 +75,11 @@ export function FormulaBar({
         value={formulaValue}
         readOnly={
           !selectedCell ||
-          !!(selectedCell && protection.isCellProtected(selectedCell.row, selectedCell.col))
+          !!(
+            selectedCell &&
+            rows[selectedCell.row]?.id &&
+            protection.isRowProtected(rows[selectedCell.row].id)
+          )
         }
         onChange={(e) => {
           if (!selectedCell || !cellKey) return;

@@ -36,8 +36,9 @@ const CELL_TYPES = [
   { type: "url" as const, label: "URL", icon: Link },
   { type: "priority" as const, label: "Priority", icon: AlertCircle },
   { type: "status" as const, label: "Status", icon: AlertCircle },
-  { type: "select" as const, label: "Dropdown", icon: ListChecks },
+  { type: "select" as const, label: "Select", icon: ListChecks },
   { type: "progress" as const, label: "Progress", icon: BarChart2 },
+  { type: "image" as const, label: "Image", icon: Link },
 ];
 
 export default function CellTypeSelector({

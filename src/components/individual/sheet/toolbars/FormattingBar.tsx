@@ -45,6 +45,8 @@ interface FormattingBarProps {
   onCellTypeChange: (type: ColumnDef["type"]) => void;
   onTextWrapToggle: () => void;
   onProtectionToggle: () => void;
+  onFillColumnNumbers: () => void;
+  onFillColumnHashNumbers: () => void;
   onFormulaOpen: () => void;
   onSearchToggle: () => void;
   onSearchChange: (q: string) => void;
@@ -66,7 +68,7 @@ export function FormattingBar({
   canUndo, canRedo, currentFormat,
   onUndo, onRedo, onZoomChange, onCopy, onCut, onPaste,
   onFontFamilyChange, onFontSizeChange, onFormatChange, onCellTypeChange,
-  onTextWrapToggle, onProtectionToggle, onFormulaOpen,
+  onTextWrapToggle, onProtectionToggle, onFillColumnNumbers = () => {}, onFillColumnHashNumbers = () => {}, onFormulaOpen,
   onSearchToggle, onSearchChange, onSearchClose, onSort, onHideColumn,
 }: FormattingBarProps) {
   const selStyle = ddStyle(isDark);
@@ -202,6 +204,8 @@ export function FormattingBar({
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-[10px] uppercase tracking-wider" style={{ color: isDark ? "#4a5568" : "#9ca3af" }}>Sheet actions</DropdownMenuLabel>
             <DropdownMenuItem className="text-xs" onClick={onTextWrapToggle} style={ddItemStyle(isDark)}>Toggle text wrap</DropdownMenuItem>
+            <DropdownMenuItem className="text-xs" onClick={onFillColumnNumbers} style={ddItemStyle(isDark)}>Fill 1, 2, 3...</DropdownMenuItem>
+            <DropdownMenuItem className="text-xs" onClick={onFillColumnHashNumbers} style={ddItemStyle(isDark)}>Fill #1, #2, #3...</DropdownMenuItem>
             <DropdownMenuItem className="text-xs" onClick={() => onSort("asc")} style={ddItemStyle(isDark)}>Sort A → Z</DropdownMenuItem>
             <DropdownMenuItem className="text-xs" onClick={() => onSort("desc")} style={ddItemStyle(isDark)}>Sort Z → A</DropdownMenuItem>
             <DropdownMenuItem className="text-xs" onClick={onHideColumn} style={ddItemStyle(isDark)}>Hide selected column</DropdownMenuItem>
@@ -211,7 +215,7 @@ export function FormattingBar({
         <IconBtn icon={WrapText} tooltip="Text Wrap" onClick={onTextWrapToggle} disabled={!selectedCell} active={isSelectedColumnWrapped} />
         <IconBtn
           icon={isProtected ? Lock : Unlock}
-          tooltip="Protect Cell"
+          tooltip="Protect row"
           onClick={onProtectionToggle}
           disabled={!selectedCell}
           active={isProtected}

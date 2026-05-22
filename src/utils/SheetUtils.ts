@@ -1,8 +1,30 @@
-import { SheetRow, ColumnDef } from "@/types/index";
+import { SheetRow, ColumnDef, SelectOption } from "@/types/index";
 
 // Central shared sheet helper utilities.
 // This file contains helper functions used across the sheet editor,
 // including column naming, formatting helpers, row buffering, and select option styling.
+export function getSelectOptionLabel(option: string | SelectOption) {
+  return typeof option === "object" ? option.label : option;
+}
+
+export function getOptionBgStyle(option: string | SelectOption) {
+  if (typeof option === "object") {
+    return {
+      color: "#1f2937",
+      backgroundColor: option.bgColor || "#ffffff",
+    };
+  }
+
+  let hash = 0;
+  for (let i = 0; i < option.length; i++) {
+    hash = (hash * 31 + option.charCodeAt(i)) >>> 0;
+  }
+  return {
+    color: "#1f2937",
+    backgroundColor: OPTION_PALETTE[hash % OPTION_PALETTE.length],
+  };
+}
+
 export function columnIndexToName(index: number): string {
   let n = index + 1;
   let name = "";
@@ -40,17 +62,6 @@ export const OPTION_PALETTE = [
   "#e0e7ff",
 ];
 
-export function getOptionBgStyle(label: string) {
-  let hash = 0;
-  for (let i = 0; i < label.length; i++) {
-    hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
-  }
-  return {
-    color: "#1f2937",
-    backgroundColor: OPTION_PALETTE[hash % OPTION_PALETTE.length],
-  };
-}
-
 export function getDefaultValueForType(type: ColumnDef["type"]) {
   if (type === "checkbox") return false;
   if (type === "priority") return "Low";
@@ -68,7 +79,7 @@ export function buildEmptyRow(index: number, columns: ColumnDef[]): SheetRow {
   return row;
 }
 
-export const WORKING_MIN_ROWS = 1200;
+export const WORKING_MIN_ROWS = 120;
 
 export function ensureWorkingRowBuffer(
   inputRows: SheetRow[],

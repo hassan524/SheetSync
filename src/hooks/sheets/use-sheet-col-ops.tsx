@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { SheetRow, ColumnDef, SaveStatus } from "@/types/index";
+import { SheetRow, ColumnDef, SaveStatus, SelectOption } from "@/types/index";
 import { saveAllRows } from "@/lib/querys/sheet/rows";
 import { saveAllColumns, deleteColumn } from "@/lib/querys/sheet/columns";
 import { logActivity } from "@/lib/querys/activity/activity";
@@ -21,7 +21,7 @@ interface UseColOpsProps {
   colOps: {
     insertColumn: (type: ColumnDef["type"]) => void;
     deleteColumn: (key: string) => void;
-    changeColumnType: (key: string, type: ColumnDef["type"]) => void;
+    changeColumnType: (key: string, type: ColumnDef["type"]) => { updatedColumns: ColumnDef[]; updatedRows: SheetRow[] };
     renameColumn: (key: string, name: string) => void;
     handleColumnDragStart: (key: string) => void;
     handleColumnDragOver: (e: any, key: string, setter: any) => void;
@@ -67,10 +67,6 @@ export function useSheetColOps({
 
   const handleInsertColumn = useCallback(
     async (type: ColumnDef["type"]) => {
-      if (type === "select") {
-        setSelectSetupDialog({ open: true, colKey: "__new__", row: null, mode: "insert" });
-        return;
-      }
       colOps.insertColumn(type);
       setTimeout(async () => {
         markSaving();
@@ -91,10 +87,10 @@ export function useSheetColOps({
           organizationId: organizationId ?? undefined,
           action: `added a column (${type ?? "text"})`,
           target: title,
-        }).catch(() => {});
+        }).catch(() => { });
       }, 50);
     },
-    [colOps, sheetId, columnsHistory, rowsHistory, markSaving, markSaved, isOrgSheet, organizationId, title, setSelectSetupDialog, setSheetState],
+    [colOps, sheetId, columnsHistory, rowsHistory, markSaving, markSaved, isOrgSheet, organizationId, title, setSheetState],
   );
 
   const handleDeleteColumn = useCallback(
@@ -115,7 +111,7 @@ export function useSheetColOps({
           organizationId: organizationId ?? undefined,
           action: `deleted column "${colName}"`,
           target: title,
-        }).catch(() => {});
+        }).catch(() => { });
       }, 50);
     },
     [colOps, sheetId, columnsHistory, rowsHistory, markSaving, markSaved, columns, isOrgSheet, organizationId, title],
@@ -123,23 +119,28 @@ export function useSheetColOps({
 
   const handleChangeColumnType = useCallback(
     async (colKey: string, newType: ColumnDef["type"]) => {
-      if (newType === "select") {
-        setSelectSetupDialog({ open: true, colKey, row: null, mode: "change" });
-        return;
-      }
-      colOps.changeColumnType(colKey, newType);
-      setTimeout(async () => {
-        markSaving();
-        await Promise.all([
-          saveAllColumns(sheetId, columnsHistory.currentState),
-          saveAllRows(sheetId, rowsHistory.currentState),
-        ]);
-        markSaved();
-      }, 50);
-    },
-    [colOps, sheetId, columnsHistory, rowsHistory, markSaving, markSaved, setSelectSetupDialog],
-  );
+      if (!newType) return;
 
+      try {
+        markSaving();
+
+        const { updatedColumns, updatedRows } = colOps.changeColumnType(
+          colKey,
+          newType,
+        );
+
+        await Promise.all([
+          saveAllColumns(sheetId, updatedColumns),
+          saveAllRows(sheetId, updatedRows),
+        ]);
+
+        markSaved();
+      } catch (err: any) {
+        console.error(err);
+      }
+    },
+    [colOps, sheetId]
+  );
   const handleColumnDragEnd = useCallback(async () => {
     colOps.handleColumnDragEnd();
     setTimeout(async () => {
@@ -271,7 +272,7 @@ export function useSheetColOps({
   );
 
   const handleUpdateSelectOptions = useCallback(
-    async (colKey: string, options: string[]) => {
+    async (colKey: string, options: SelectOption[]) => {
       setSheetState((p: any) => ({
         ...p,
         columns: p.columns.map((c: ColumnDef) =>

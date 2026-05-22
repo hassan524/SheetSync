@@ -4,6 +4,7 @@ import React from "react";
 import { SlidersHorizontal, Search, Plus, X } from "lucide-react";
 import { ColumnDef } from "@/types/index";
 import { AdvancedFilterRule, FilterOperator } from "@/types/index";
+import type { SavedFilterView } from "@/types";
 
 interface FilterBarProps {
   filterValue: string;
@@ -17,6 +18,10 @@ interface FilterBarProps {
   onUpdateRule: (id: string, update: Partial<AdvancedFilterRule>) => void;
   onRemoveRule: (id: string) => void;
   onClear: () => void;
+  savedViews?: SavedFilterView[];
+  onSaveView?: (name: string) => void;
+  onApplyView?: (view: SavedFilterView) => void;
+  onDeleteView?: (id: string) => void;
 }
 
 function getFilterOperators(columnKey: string, columns: ColumnDef[]): { value: FilterOperator; label: string }[] {
@@ -39,7 +44,10 @@ function getFilterOperators(columnKey: string, columns: ColumnDef[]): { value: F
 export function FilterBar({
   filterValue, advancedFilters, filterColumns, filteredRowsCount, totalRowsCount,
   filterSuggestions, onFilterValueChange, onAddRule, onUpdateRule, onRemoveRule, onClear,
+  savedViews = [], onSaveView, onApplyView, onDeleteView,
 }: FilterBarProps) {
+  const hasFilters = Boolean(filterValue || advancedFilters.length > 0);
+  const deletableViews = savedViews.filter((view) => !view.system);
   return (
     <div className="sheet-filterbar min-h-11 border-b flex items-center px-3 py-1.5 gap-2 shrink-0 overflow-x-auto no-scrollbar">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 shrink-0">
@@ -130,7 +138,45 @@ export function FilterBar({
         <Plus className="h-3 w-3" />
         Rule
       </button>
-      {(filterValue || advancedFilters.length > 0) && (
+      {savedViews.length > 0 && (
+        <select
+          className="h-6 rounded border bg-transparent px-1.5 text-[11px] outline-none shrink-0"
+          defaultValue=""
+          onChange={(event) => {
+            const view = savedViews.find((item) => item.id === event.target.value);
+            if (view) onApplyView?.(view);
+            event.currentTarget.value = "";
+          }}
+        >
+          <option value="">Saved views</option>
+          {savedViews.map((view) => (
+            <option key={view.id} value={view.id}>{view.system ? `${view.name} view` : view.name}</option>
+          ))}
+        </select>
+      )}
+      {hasFilters && onSaveView && (
+        <button
+          className="sheet-action-btn flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium shrink-0"
+          onClick={() => {
+            const name = window.prompt("View name", "Completed");
+            if (name?.trim()) onSaveView(name.trim());
+          }}
+        >
+          Save view
+        </button>
+      )}
+      {deletableViews.length > 0 && onDeleteView && (
+        <button
+          className="sheet-clear-filter flex items-center gap-1 text-[11px] font-medium px-2 h-6 rounded shrink-0"
+          onClick={() => {
+            const view = deletableViews[deletableViews.length - 1];
+            if (view) onDeleteView(view.id);
+          }}
+        >
+          Delete last view
+        </button>
+      )}
+      {hasFilters && (
         <span className="text-[11px] text-amber-600 font-medium shrink-0">
           {filteredRowsCount}/{totalRowsCount} rows
         </span>

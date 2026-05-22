@@ -12,7 +12,7 @@ import type { SheetComment } from "@/lib/querys/sheet/firebase-realtime";
 
 interface CellRendererProps {
   type: ColumnDef["type"];
-  props: RenderCellProps<SheetRow>;
+  props: RenderCellProps<SheetRow, SheetRow>;
   colKey: string;
   rowIdx: number;
   row: SheetRow;
@@ -27,6 +27,10 @@ interface CellRendererProps {
   horizontalAlign?: "left" | "center" | "right";
   onCellClick: () => void;
   onCommentClick: (e: React.MouseEvent) => void;
+  onPointerDown?: (row: number, colKey: string, e: React.PointerEvent) => void;
+  onPointerEnter?: (row: number, colKey: string, e: React.PointerEvent) => void;
+  onFillStart?: (row: number, colKey: string, e: React.PointerEvent) => void;
+  isSelected?: boolean;
 }
 
 export function CellRenderer({
@@ -45,6 +49,8 @@ export function CellRenderer({
   horizontalAlign,
   onCellClick,
   onCommentClick,
+  onPointerDown, onPointerEnter, onFillStart,
+  isSelected
 }: CellRendererProps) {
   const cellContent = (() => {
     switch (type) {
@@ -182,7 +188,8 @@ export function CellRenderer({
 
   return (
     <div
-      className={`h-full w-full flex relative group/cell ${isWrapped ? "items-start pt-1.5" : "items-center"} ${justifyClass} ${type === "checkbox" ? "justify-center" : ""} px-2.5 py-1 gap-1.5`}
+      data-fill-row={rowIdx}
+      className={`h-full w-full flex relative group/cell ${isWrapped ? "items-start pt-1.5" : "items-center"} ${justifyClass} ${type === "checkbox" ? "justify-center" : ""} px-2.5 py-1 gap-1.5 ${isSelected ? "bg-primary/10" : ""}`}
       style={{
         color: "inherit",
         ...cellStyle,
@@ -191,6 +198,8 @@ export function CellRenderer({
           : {}),
       }}
       onClick={onCellClick}
+      onPointerDown={(e) => { if (onPointerDown) onPointerDown(rowIdx, colKey, e); }}
+      onPointerEnter={(e) => { if (onPointerEnter) onPointerEnter(rowIdx, colKey, e); }}
     >
       {isProtected && (
         <Lock className="absolute top-1 right-1 h-2 w-2 text-gray-300 opacity-0 group-hover/cell:opacity-60 transition-opacity" />
@@ -198,6 +207,18 @@ export function CellRenderer({
       {isOrgSheet && cellComments.length > 0 && <CommentDot count={cellComments.length} />}
       {activeCollab && <CollabCursor name={activeCollab.name} color={activeCollab.color} />}
       {cellContent}
+      {isSelected && onFillStart && (
+        <button
+          type="button"
+          className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-sm border border-white bg-primary shadow cursor-crosshair"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onFillStart(rowIdx, colKey, e);
+          }}
+          aria-label="Fill handle"
+        />
+      )}
       {isOrgSheet && (
         <button
           className="absolute bottom-0.5 right-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity duration-100"

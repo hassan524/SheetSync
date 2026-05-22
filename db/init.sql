@@ -119,18 +119,19 @@ create table if not exists public.formulas (
   unique(sheet_id, cell_key)
 );
 
-create table if not exists public.protected_cells (
+create table if not exists public.protected_rows (
   id uuid primary key default gen_random_uuid(),
   sheet_id uuid references public.sheets(id) on delete cascade,
-  cell_key text not null,
+  row_key text not null,
+  user_id uuid references public.profiles(id) on delete set null,
   created_at timestamptz default now(),
-  unique(sheet_id, cell_key)
+  unique(sheet_id, row_key)
 );
 
 create table if not exists public.templates (
   id uuid primary key default gen_random_uuid(),
   name text not null unique
-)
+);
 
 create table organization_invites (
   id uuid primary key default uuid_generate_v4(),
@@ -157,13 +158,12 @@ create index if not exists idx_rows_sheet on public.rows(sheet_id);
 create index if not exists idx_columns_sheet on public.columns(sheet_id);
 create index if not exists idx_cell_formats_sheet on public.cell_formats(sheet_id);
 create index if not exists idx_formulas_sheet on public.formulas(sheet_id);
-create index if not exists idx_protected_cells_sheet on public.protected_cells(sheet_id);
+create index if not exists idx_protected_rows_sheet on public.protected_rows(sheet_id);
 create index if not exists idx_cell_type_overrides_sheet on public.cell_type_overrides(sheet_id);
 create index if not exists idx_organization_members_org on public.organization_members(organization_id);
 create index if not exists idx_organization_members_user on public.organization_members(user_id);
 create index if not exists idx_folders_organization on public.folders(organization_id);
 create index if not exists idx_folders_owner on public.folders(owner_id);
-create index if not exists idx_folders_parent on public.folders(parent_folder_id);
 create unique index if not exists idx_organization_email
 on public.organization_invites(organization_id, email);
 
@@ -314,3 +314,31 @@ ADD COLUMN IF NOT EXISTS forked_by_user_id uuid REFERENCES public.profiles(id) O
 ALTER TABLE public.profiles
 ADD COLUMN IF NOT EXISTS push_enabled BOOLEAN DEFAULT true;
 
+-- ============================================================
+-- Codex: Row Protection
+-- Keeps protection row-scoped instead of cell-scoped.
+-- ============================================================
+DO $$
+BEGIN
+  IF to_regclass('public.protected_cells') IS NOT NULL THEN
+    INSERT INTO public.protected_rows (sheet_id, row_key, created_at)
+    SELECT sheet_id, cell_key, created_at
+    FROM public.protected_cells
+    WHERE cell_key LIKE 'row:%'
+    ON CONFLICT (sheet_id, row_key) DO NOTHING;
+  END IF;
+END $$;
+
+DROP TABLE IF EXISTS public.protected_cells;
+
+CREATE TABLE IF NOT EXISTS public.protected_rows (
+  id uuid primary key default gen_random_uuid(),
+  sheet_id uuid references public.sheets(id) on delete cascade,
+  row_key text not null,
+  user_id uuid references public.profiles(id) on delete set null,
+  created_at timestamptz default now(),
+  unique(sheet_id, row_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_protected_rows_sheet
+ON public.protected_rows(sheet_id);

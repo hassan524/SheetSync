@@ -11,6 +11,8 @@ import {
   Keyboard,
   Paintbrush,
   Columns3,
+  ListChecks,
+  PanelRight,
 } from "lucide-react";
 import CommentsPanel from "./panels/Comments-panel";
 import CollaboratorsPanel from "./panels/Collaborators-panel";
@@ -20,13 +22,16 @@ import ChartsPanel from "./panels/Charts-panel"; // ← new
 import KeyboardShortcutsPanel from "./panels/Keyboard-shortcuts-panel";
 import ConditionalFormattingPanel from "./panels/Conditional-formatting-panel";
 import ColumnsPanel from "./panels/Columns-panel";
+import SelectOptionsPanel from "./panels/Select-options-panel";
+import RowDetailsPanel from "./panels/Row-details-panel";
+import DataValidationPanel from "./panels/Data-validation-panel";
 import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import type {
   TimeTravelState,
   TimeTravelActions,
 } from "@/hooks/use-time-travel";
 import type { SheetChart, ChartPanelTab } from "@/hooks/sheets/use-charts";
-import type { ConditionalFormatRule, SheetRow, ColumnDef } from "@/types/index";
+import type { ConditionalFormatRule, SheetRow, ColumnDef, SelectOption } from "@/types/index";
 
 // ─────────────────────────────────────────────────────────────
 //  TYPES
@@ -41,6 +46,9 @@ export type RightPanelType =
   | "shortcuts"
   | "conditional"
   | "columns"
+  | "select-options"
+  | "row-details"
+  | "validation"
   | null;
 
 interface RightPanelProps {
@@ -91,6 +99,11 @@ interface RightPanelProps {
   onSaveConditionalRule?: (rule: ConditionalFormatRule) => void;
   onDeleteConditionalRule?: (ruleId: string) => void;
   onApplyColumns?: (columns: ColumnDef[]) => void;
+  focusedColumnKey?: string | null;
+  onApplySelectOptions?: (columnKey: string, options: SelectOption[]) => void;
+  selectedRowIndex?: number | null;
+  history?: any[];
+  onApplyValidation?: (columnKey: string, rules: any) => void;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -124,6 +137,21 @@ const PANEL_META: Record<
     label: "Columns",
     icon: Columns3,
     color: "text-blue-500",
+  },
+  "select-options": {
+    label: "Select Options",
+    icon: ListChecks,
+    color: "text-blue-500",
+  },
+  "row-details": {
+    label: "Row Details",
+    icon: PanelRight,
+    color: "text-slate-500",
+  },
+  validation: {
+    label: "Validation",
+    icon: ListChecks,
+    color: "text-emerald-500",
   },
 };
 
@@ -166,10 +194,22 @@ export default function RightPanel({
   onSaveConditionalRule,
   onDeleteConditionalRule,
   onApplyColumns,
+  focusedColumnKey,
+  onApplySelectOptions,
+  selectedRowIndex,
+  history = [],
+  onApplyValidation,
 }: RightPanelProps) {
   const meta = PANEL_META[rightPanel] ?? PANEL_META.developer;
   const Icon = meta.icon;
   const d = isDark;
+  const focusedColumn = focusedColumnKey
+    ? columns.find((column) => column.key === focusedColumnKey) ?? null
+    : null;
+  const selectedRow =
+    selectedRowIndex !== null && selectedRowIndex !== undefined
+      ? rows[selectedRowIndex] ?? null
+      : null;
 
   return (
     <div
@@ -282,6 +322,36 @@ export default function RightPanel({
             isDark={d}
             columns={columns}
             onApply={onApplyColumns ?? (() => {})}
+            focusedColumnKey={focusedColumnKey}
+          />
+        )}
+        {rightPanel === "select-options" && (
+          <SelectOptionsPanel
+            isDark={d}
+            column={focusedColumn}
+            onInsert={(options) => {
+              if (!focusedColumn?.key) return;
+              onApplySelectOptions?.(focusedColumn.key, options);
+            }}
+          />
+        )}
+        {rightPanel === "row-details" && (
+          <RowDetailsPanel
+            isDark={d}
+            row={selectedRow}
+            rowIndex={selectedRowIndex ?? null}
+            columns={columns}
+            comments={selectedRow ? comments[`row:${selectedRow.id}`] ?? [] : []}
+            history={history as any}
+          />
+        )}
+        {rightPanel === "validation" && (
+          <DataValidationPanel
+            isDark={d}
+            column={focusedColumn}
+            onSave={(rules) => {
+              if (focusedColumn?.key) onApplyValidation?.(focusedColumn.key, rules);
+            }}
           />
         )}
       </div>

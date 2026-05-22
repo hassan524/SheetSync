@@ -52,7 +52,7 @@ export interface HistoryEntry {
 export interface SheetComment {
   id: string;
   sheetId: string;
-  cellKey: string; // "rowIdx-colKey"
+  cellKey: string; // row comments use "row:{row_key}"
   userId: string;
   author: string;
   authorColor: string;
@@ -160,6 +160,9 @@ export async function addComment(comment: {
   try {
     const ref = await addDoc(collection(db, "sheet_comments"), {
       ...comment,
+      cellKey: comment.cellKey.startsWith("row:")
+        ? comment.cellKey
+        : `row:${comment.cellKey}`,
       parentId: comment.parentId ?? null,
       resolved: false,
       createdAt: serverTimestamp(),
@@ -200,10 +203,12 @@ export function subscribeToComments(
 
     snapshot.docs.forEach((d) => {
       const data = d.data();
+      const cellKey = String(data.cellKey ?? "");
+      if (!cellKey.startsWith("row:")) return;
       const comment: SheetComment = {
         id: d.id,
         sheetId: data.sheetId,
-        cellKey: data.cellKey,
+        cellKey,
         userId: data.userId,
         author: data.author,
         authorColor: data.authorColor || "#0d7c5f",
@@ -213,8 +218,8 @@ export function subscribeToComments(
         createdAt: formatTimestamp(data.createdAt),
       };
 
-      if (!grouped[data.cellKey]) grouped[data.cellKey] = [];
-      grouped[data.cellKey].push(comment);
+      if (!grouped[cellKey]) grouped[cellKey] = [];
+      grouped[cellKey].push(comment);
     });
 
     callback(grouped);

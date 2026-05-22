@@ -4,7 +4,7 @@ import React from "react";
 import {
   Plus, Trash2, ArrowDownAZ, ArrowUpAZ, SlidersHorizontal, Eye, EyeOff,
   BarChart3, MessageSquare, Users, Clock, Columns3, Code2, Paintbrush,
-  Sun, Moon, Keyboard, ChevronDown,
+  Sun, Moon, Keyboard, ChevronDown, Rows3,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -34,6 +34,7 @@ interface ActionBarProps {
   effectiveRightPanel: RightPanelType;
   totalComments: number;
   historyLength: number;
+  frozenRowsCount?: number;
   onInsertRow: () => void;
   onInsertColumn: (type: ColumnDef["type"]) => void;
   onDeleteRow: () => void;
@@ -44,22 +45,23 @@ interface ActionBarProps {
   onToggleChartPicker: () => void;
   onTogglePanel: (panel: RightPanelType) => void;
   onToggleDark: () => void;
+  onToggleFreezeRows?: () => void;
   chartBtnRef: React.RefObject<HTMLButtonElement>;
 }
 
 const COLUMN_TYPES: ColumnDef["type"][] = [
   "text", "number", "currency", "date", "checkbox",
-  "status", "priority", "url", "image",
+  "status", "priority", "url", "image", "select", "progress",
 ];
 
 export function ActionBar({
   isDark, isOrgSheet, userRole, ownerId, currentUserId,
   selectedRows, selectedCell, columns, showFilters, filterValue,
   advancedFiltersCount, chartCount, showChartPicker, conditionalRulesCount,
-  effectiveRightPanel, totalComments,
+  effectiveRightPanel, totalComments, frozenRowsCount = 0,
   onInsertRow, onInsertColumn, onDeleteRow, onSortAsc, onSortDesc,
   onToggleFilters, onHideColumn, onToggleChartPicker, onTogglePanel,
-  onToggleDark, chartBtnRef,
+  onToggleDark, onToggleFreezeRows, chartBtnRef,
 }: ActionBarProps) {
   const selStyle = ddStyle(isDark);
   const isViewer = userRole === "viewer";
@@ -137,6 +139,22 @@ export function ActionBar({
                 Delete selected rows
               </TooltipContent>
             </Tooltip>
+            {onToggleFreezeRows && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={`sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0 ${frozenRowsCount > 0 ? "sheet-action-btn--active" : ""}`}
+                    onClick={onToggleFreezeRows}
+                  >
+                    <Rows3 className="h-3.5 w-3.5" />
+                    {frozenRowsCount > 0 ? "Unfreeze row" : "Freeze row"}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
+                  Keep the first row visible while scrolling
+                </TooltipContent>
+              </Tooltip>
+            )}
             <ToolSep />
 
             <Tooltip>

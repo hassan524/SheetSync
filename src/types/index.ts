@@ -140,6 +140,13 @@ export interface SheetRow {
   [key: string]: any;
 }
 
+export type SelectOption =
+  | string
+  | {
+      label: string;
+      bgColor: string;
+    };
+
 export interface ColumnDef {
   key: string;
   name: string;
@@ -162,13 +169,21 @@ export interface ColumnDef {
     | "select"
     | "image"; // supports image URL rendering in-cell
 
-  selectOptions?: string[]; // ✅ ADDED (dropdown values)
+  selectOptions?: SelectOption[]; // ✅ ADDED (dropdown values)
   currencyCode?: string; // used when type === "currency"
   frozen?: boolean; // Freeze column in place
   hidden?: boolean; // Hide column from view
   conditional_formatting?: any; // Conditional formatting rules
   group_id?: string; // Group ID for column grouping
   validation_rules?: any; // Validation rules for column
+}
+
+export interface SavedFilterView {
+  id: string;
+  name: string;
+  filterValue: string;
+  advancedFilters: AdvancedFilterRule[];
+  system?: boolean;
 }
 
 /* ============================================================

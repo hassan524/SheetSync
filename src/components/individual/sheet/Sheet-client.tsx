@@ -14,7 +14,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { Check, Loader2, GripVertical, WrapText, Lock } from "lucide-react";
+import { Check, Loader2, GripVertical, WrapText, Lock, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -57,18 +57,17 @@ import ShareDialog from "./dialogs/Share-dialog";
 import RightPanel from "./Right-panel";
 import type { RightPanelType } from "./Right-panel";
 import FormulaDialog from "./dialogs/Formula-dialog";
-import SelectOptionsDialog from "./dialogs/Select-options-dialog";
 import { ddStyle, ddItemStyle, getMemberColor, CommentDot, CollabCursor, SheetAvatar } from "@/components/individual/sheet/sheet-ui-helpers";
 
 // ── Lib ────────────────────────────────────────────────────────────────────
-import { SheetRow, ColumnDef, CellFormat, SaveStatus, ConditionalFormatRule } from "@/types/index";
+import { SheetRow, ColumnDef, CellFormat, SaveStatus, ConditionalFormatRule, SelectOption, SavedFilterView } from "@/types/index";
 import { getTemplateData } from "@/lib/sheet-templates";
 import { updateSheetTitle, updateSheetStarred, loadSheet, updateSheetCharts, updateSheetRowHeights } from "@/lib/querys/sheet/sheet";
 import { saveRow, saveAllRows } from "@/lib/querys/sheet/rows";
 import { saveAllColumns } from "@/lib/querys/sheet/columns";
 import { saveAllCellFormats, saveCellFormat } from "@/lib/querys/sheet/format";
 import { saveAllFormulas, saveFormula, deleteFormula, saveColumnFormula, deleteColumnFormula } from "@/lib/querys/sheet/formulas";
-import { protectCell, unprotectCell } from "@/lib/querys/sheet/protection";
+import { protectRow, unprotectRow } from "@/lib/querys/sheet/protection";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { exportSheet } from "@/lib/querys/export";
 import { buildImportedSheetData, getImportedSheetTitle, MAX_IMPORT_BYTES } from "@/lib/import-sheet";
@@ -77,7 +76,7 @@ import { supabase } from "@/lib/supabase/client";
 import { trackSheetOpen } from "@/lib/querys/sheet/track-open";
 import { subscribeToHistory, subscribeToComments, addComment, resolveComment, logCellEdit, logRowAdd, logFormulaSet, logColumnRename } from "@/lib/querys/sheet/firebase-realtime";
 import { maybeAutoSnapshot } from "@/lib/querys/sheet/snapshots";
-import { ensureWorkingRowBuffer, normalizeGeneratedColumnNames, columnIndexToName, ROW_CELL_TYPES_KEY, ROW_CELL_SELECT_OPTIONS_KEY, getDefaultValueForType, getOptionBgStyle } from "@/utils/SheetUtils";
+import { ensureWorkingRowBuffer, normalizeGeneratedColumnNames, columnIndexToName, ROW_CELL_TYPES_KEY, ROW_CELL_SELECT_OPTIONS_KEY, getDefaultValueForType, getOptionBgStyle, getSelectOptionLabel } from "@/utils/SheetUtils";
 import { getStatusOptionStyle, isCellInConditionalRange, conditionalRuleMatches } from "@/lib/sheet-formatting-helpers";
 // @ts-ignore
 import "@/app/sheet.css";
@@ -103,7 +102,8 @@ export default function SheetClient() {
 
   // states 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [activeCell, setActiveCell] = useState(null);
+  const [activeCell, setActiveCell] = useState<{ rowId: string; colKey: string } | null>(null);
+  const [focusedColumnKey, setFocusedColumnKey] = useState<string | null>(null);
 
   // This hook gives us the main sheet editor state.
   // It stores the rows, columns, selected cell, panel state, and many UI flags.
@@ -146,6 +146,11 @@ export default function SheetClient() {
 
   const [, setIsLoading] = useState(true);
 
+  // Drag selection state (rectangular selection)
+  const selectionAnchorRef = useRef<{ row: number; colIndex: number } | null>(null);
+  const isDraggingRef = useRef(false);
+  const [selectionRange, setSelectionRange] = useState<{ start: { row: number; colIndex: number }; end: { row: number; colIndex: number } } | null>(null);
+
   // Local undo/redo history stacks for rows and columns.
   const rowsHistory = useHistory<SheetRow[]>([]);
   const columnsHistory = useHistory<ColumnDef[]>([]);
@@ -155,6 +160,16 @@ export default function SheetClient() {
   const chartBtnRef = useRef<HTMLButtonElement | null>(null);
   const chartsHydratedRef = useRef(false);
   const rowResizeRef = useRef<{ rowId: string; startY: number; startH: number; pointerId: number } | null>(null);
+  const fillDragRef = useRef<{ row: number; colKey: string; pointerId: number } | null>(null);
+  const fillTargetRowRef = useRef<number | null>(null);
+  const smartClipboardRef = useRef<{
+    value: any;
+    formula?: string;
+    format?: CellFormat;
+    source: { row: number; col: string };
+  } | null>(null);
+  const [savedViews, setSavedViews] = useState<SavedFilterView[]>([]);
+  const [frozenRowsCount, setFrozenRowsCount] = useState(0);
 
   // Sub-hooks
   // Formatting hook for bold / italic / colors and cell style logic.
@@ -206,7 +221,35 @@ export default function SheetClient() {
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.body.dataset.sheetDark = isDark ? "true" : "false";
+    return () => {
+      if (typeof document !== "undefined") {
+        document.body.removeAttribute("data-sheet-dark");
+      }
+    };
   }, [isDark]);
+
+  useEffect(() => {
+    if (!sheetId || typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(`sheetsync:${sheetId}:filter-views`);
+      setSavedViews(raw ? JSON.parse(raw) : []);
+    } catch {
+      setSavedViews([]);
+    }
+  }, [sheetId]);
+
+  useEffect(() => {
+    if (!sheetId || typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(`sheetsync:${sheetId}:frozen-rows`);
+    setFrozenRowsCount(raw === "1" ? 1 : 0);
+  }, [sheetId]);
+
+  const persistSavedViews = useCallback((views: SavedFilterView[]) => {
+    setSavedViews(views);
+    if (sheetId && typeof window !== "undefined") {
+      window.localStorage.setItem(`sheetsync:${sheetId}:filter-views`, JSON.stringify(views));
+    }
+  }, [sheetId]);
 
   // ── Persistence hook ───────────────────────────────────────────────────
   // This hook saves sheet changes and keeps the backend in sync.
@@ -370,7 +413,7 @@ export default function SheetClient() {
 
   // ── Derived / computed ─────────────────────────────────────────────────
   const effectiveRightPanel = useMemo((): RightPanelType => {
-    if (!isOrgSheet && (rightPanel === "comments" || rightPanel === "collaborators")) return null;
+    if (!isOrgSheet && rightPanel === "collaborators") return null;
     return rightPanel;
   }, [isOrgSheet, rightPanel]);
 
@@ -444,6 +487,16 @@ export default function SheetClient() {
     });
   }, [rows, columns, timeTravelState.previewRows, timeTravelState.previewColumns, searchQuery, filterValue, advancedFilters]);
 
+  const topFrozenRows = useMemo(
+    () => frozenRowsCount > 0 ? filteredRows.slice(0, frozenRowsCount) : [],
+    [filteredRows, frozenRowsCount],
+  );
+
+  const gridRows = useMemo(
+    () => frozenRowsCount > 0 ? filteredRows.slice(frozenRowsCount) : filteredRows,
+    [filteredRows, frozenRowsCount],
+  );
+
   const filterColumns = useMemo(() => columns.filter((col) => !col.hidden), [columns]);
 
   const filterSuggestions = useMemo(() => {
@@ -455,10 +508,58 @@ export default function SheetClient() {
     return map;
   }, [filterColumns, rows, timeTravelState.previewRows]);
 
+  const builtInFilterViews = useMemo<SavedFilterView[]>(() => {
+    const statusColumn = filterColumns.find((column) => {
+      const name = column.name.toLowerCase();
+      return column.type === "status" || name.includes("status") || name.includes("complete");
+    });
+    const assigneeColumn = filterColumns.find((column) => {
+      const name = column.name.toLowerCase();
+      return name.includes("assign") || name.includes("owner") || name.includes("person");
+    });
+    const views: SavedFilterView[] = [];
+    if (statusColumn) {
+      views.push({
+        id: "system_completed",
+        name: "Completed",
+        filterValue: "",
+        system: true,
+        advancedFilters: [{
+          id: "system_completed_rule",
+          columnKey: statusColumn.key,
+          operator: "equals",
+          value: "Done",
+        }],
+      });
+    }
+    if (assigneeColumn) {
+      views.push({
+        id: "system_assigned",
+        name: "Assigned",
+        filterValue: "",
+        system: true,
+        advancedFilters: [{
+          id: "system_assigned_rule",
+          columnKey: assigneeColumn.key,
+          operator: "not_empty",
+          value: "",
+        }],
+      });
+    }
+    return views;
+  }, [filterColumns]);
+
+  const availableFilterViews = useMemo(
+    () => [
+      ...builtInFilterViews,
+      ...savedViews.filter((view) => !builtInFilterViews.some((builtIn) => builtIn.name === view.name)),
+    ],
+    [builtInFilterViews, savedViews],
+  );
+
   const totalComments = useMemo(() => {
-    if (!isOrgSheet) return 0;
     return Object.values(comments).reduce((a, b) => a + b.filter((c) => !c.resolved).length, 0);
-  }, [comments, isOrgSheet]);
+  }, [comments]);
 
   // Derived values used by the sheet UI.
   // These values are memoized to keep grid and toolbar performance fast.
@@ -472,6 +573,12 @@ export default function SheetClient() {
     () => selectedCell ? textWrap.textWrapColumns.has(`${selectedCell.row}-${selectedCell.col}`) : false,
     [selectedCell, textWrap.textWrapColumns],
   );
+
+  const isSelectedRowProtected = useMemo(() => {
+    if (!selectedCell) return false;
+    const rowId = rows[selectedCell.row]?.id;
+    return rowId ? protection.isRowProtected(rowId) : false;
+  }, [selectedCell, rows, protection.isRowProtected]);
 
   const getSuggestedChartPreset = useCallback((kind: any) => {
     const usableCols = columns.filter((c) => !c.hidden);
@@ -502,6 +609,30 @@ export default function SheetClient() {
 
   // Apply a formatting change to the selected cell and persist it.
   const handleFormatChange = useCallback(async (format: any) => {
+    // If there's an active rectangular selection, apply format to every cell in the range.
+    if (selectionRange) {
+      const startRow = Math.min(selectionRange.start.row, selectionRange.end.row);
+      const endRow = Math.max(selectionRange.start.row, selectionRange.end.row);
+      const startCol = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
+      const endCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+      const ops: Promise<any>[] = [];
+      for (let r = startRow; r <= endRow; r++) {
+        for (let c = startCol; c <= endCol; c++) {
+          const colKey = columns[c]?.key;
+          if (!colKey) continue;
+          const cellPos = { row: r, col: colKey } as any;
+          formatting.applyFormat(cellPos, format);
+          const merged = { ...formatting.getCurrentCellFormat(cellPos), ...format };
+          const cellKey = `${r}-${colKey}`;
+          ops.push(saveCellFormat(sheetId, cellKey, merged));
+        }
+      }
+      markSaving();
+      try { await Promise.all(ops); } catch { toast.error("Failed to persist some formats."); }
+      markSaved();
+      return;
+    }
+
     if (!selectedCell) return;
     formatting.applyFormat(selectedCell, format);
     const merged = { ...formatting.getCurrentCellFormat(selectedCell), ...format };
@@ -509,27 +640,241 @@ export default function SheetClient() {
     markSaving();
     await saveCellFormat(sheetId, cellKey, merged);
     markSaved();
-  }, [selectedCell, sheetId, markSaving, markSaved, formatting.applyFormat, formatting.getCurrentCellFormat]);
+  }, [selectedCell, selectionRange, sheetId, markSaving, markSaved, formatting.applyFormat, formatting.getCurrentCellFormat, columns]);
 
   // Paste the copied or cut cell range, then save the new row state.
+  const handleSmartCopy = useCallback(() => {
+    if (!selectedCell) {
+      toast.error("Select a cell to copy");
+      return;
+    }
+    const cellKey = `${selectedCell.row}-${selectedCell.col}`;
+    smartClipboardRef.current = {
+      value: rows[selectedCell.row]?.[selectedCell.col],
+      formula: formulas.formulas[cellKey] ?? formulas.columnFormulas[selectedCell.col],
+      format: formatting.cellFormats[cellKey],
+      source: selectedCell,
+    };
+    clipboard.copyCellOrRange(selectedCell);
+  }, [selectedCell, rows, formulas.formulas, formulas.columnFormulas, formatting.cellFormats, clipboard.copyCellOrRange]);
+
   const handlePaste = useCallback(async () => {
+    if (selectedCell) {
+      const rowId = rows[selectedCell.row]?.id;
+      if (rowId && protection.isRowProtected(rowId)) {
+        toast.error("This row is protected");
+        return;
+      }
+    }
+    const payload = smartClipboardRef.current;
+    if (selectedCell && payload) {
+      const cellKey = `${selectedCell.row}-${selectedCell.col}`;
+      const nextRows = rows.map((row, idx) =>
+        idx === selectedCell.row ? { ...row, [selectedCell.col]: payload.value } : row,
+      );
+      rowsHistory.pushState(nextRows);
+      setSheetState((prev) => ({ ...prev, rows: nextRows }));
+      const nextFormulas = { ...formulas.formulas };
+      if (payload.formula?.startsWith("=")) nextFormulas[cellKey] = payload.formula;
+      else delete nextFormulas[cellKey];
+      formulas.setFormulas(nextFormulas);
+      if (payload.format) formatting.applyFormat(selectedCell, payload.format);
+      try {
+        markSaving();
+        await Promise.all([
+          saveAllRows(sheetId, nextRows),
+          payload.formula?.startsWith("=") ? saveFormula(sheetId, cellKey, payload.formula) : deleteFormula(sheetId, cellKey).catch(() => {}),
+          payload.format ? saveCellFormat(sheetId, cellKey, payload.format) : Promise.resolve(),
+        ]);
+        markSaved();
+        toast.success("Pasted value, formula, and formatting");
+      } catch {
+        toast.error("Paste saved locally but failed to persist.");
+        setSaveStatus("saved");
+      }
+      return;
+    }
     clipboard.pasteCellOrRange(selectedCell);
     setTimeout(async () => {
       try { markSaving(); await saveAllRows(sheetId, rowsHistory.currentState); markSaved(); }
       catch { toast.error("Paste saved locally but failed to persist."); setSaveStatus("saved"); }
     }, 50);
-  }, [clipboard.pasteCellOrRange, selectedCell, sheetId, rowsHistory.currentState, markSaving, markSaved]);
+  }, [clipboard.pasteCellOrRange, selectedCell, rows, protection.isRowProtected, sheetId, rowsHistory, markSaving, markSaved, setSaveStatus, formulas, formatting, setSheetState]);
+
+  const onCellPointerDown = useCallback((rowIdx: number, colKey: string, e: React.PointerEvent) => {
+    e.preventDefault();
+    const colIndex = columns.findIndex((c) => c.key === colKey);
+    if (colIndex === -1) return;
+    selectionAnchorRef.current = { row: rowIdx, colIndex };
+    setSelectionRange({ start: { row: rowIdx, colIndex }, end: { row: rowIdx, colIndex } });
+    isDraggingRef.current = true;
+    const onUp = () => { isDraggingRef.current = false; selectionAnchorRef.current = null; window.removeEventListener("pointerup", onUp); };
+    window.addEventListener("pointerup", onUp);
+  }, [columns]);
+
+  const onCellPointerEnter = useCallback((rowIdx: number, colKey: string) => {
+    if (!isDraggingRef.current || !selectionAnchorRef.current) return;
+    const colIndex = columns.findIndex((c) => c.key === colKey);
+    if (colIndex === -1) return;
+    setSelectionRange({ start: selectionAnchorRef.current, end: { row: rowIdx, colIndex } });
+  }, [columns]);
+
+  const buildFillValue = useCallback((base: any, offset: number, step = 1) => {
+    const raw = String(base ?? "");
+    const numeric = Number(raw);
+    if (raw !== "" && !Number.isNaN(numeric)) return numeric + offset * step;
+
+    const date = new Date(raw);
+    if (raw && !Number.isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const next = new Date(date);
+      next.setDate(next.getDate() + offset * step);
+      return next.toISOString().slice(0, 10);
+    }
+
+    const match = raw.match(/^(.*?)(\d+)$/);
+    if (match) {
+      const prefix = match[1];
+      const start = Number(match[2]);
+      const width = match[2].length;
+      return `${prefix}${String(start + offset * step).padStart(width, "0")}`;
+    }
+    return base;
+  }, []);
+
+  const validateRows = useCallback((nextRows: SheetRow[], prevRows: SheetRow[]) => {
+    for (const row of nextRows) {
+      const previous = prevRows.find((item) => item.id === row.id);
+      for (const column of columns) {
+        const rules = column.validation_rules;
+        if (!rules) continue;
+        const value = row[column.key];
+        const previousValue = previous?.[column.key];
+        if (value === previousValue) continue;
+
+        if (rules.type === "dropdown") {
+          const allowed = (rules.options ?? []).map(String);
+          if (value !== "" && value !== null && value !== undefined && !allowed.includes(String(value))) {
+            return { ok: false, message: `"${column.name}" only allows listed dropdown values.` };
+          }
+        }
+
+        if (rules.type === "number") {
+          const n = Number(value);
+          if (value !== "" && Number.isNaN(n)) return { ok: false, message: `"${column.name}" requires a number.` };
+          if (rules.min !== undefined && n < Number(rules.min)) return { ok: false, message: `"${column.name}" must be at least ${rules.min}.` };
+          if (rules.max !== undefined && n > Number(rules.max)) return { ok: false, message: `"${column.name}" must be at most ${rules.max}.` };
+        }
+      }
+    }
+    return { ok: true, message: "" };
+  }, [columns]);
+
+  const applyFill = useCallback(async (startRow: number, endRow: number, colKey: string) => {
+    if (endRow <= startRow) return;
+    const base = rows[startRow]?.[colKey];
+    const previous = rows[startRow - 1]?.[colKey];
+    const numericStep = previous !== undefined && !Number.isNaN(Number(base)) && !Number.isNaN(Number(previous))
+      ? Number(base) - Number(previous)
+      : 1;
+    const dateStep = (() => {
+      if (previous === undefined) return 1;
+      const baseDate = new Date(String(base));
+      const previousDate = new Date(String(previous));
+      if (
+        Number.isNaN(baseDate.getTime()) ||
+        Number.isNaN(previousDate.getTime()) ||
+        !/^\d{4}-\d{2}-\d{2}/.test(String(base)) ||
+        !/^\d{4}-\d{2}-\d{2}/.test(String(previous))
+      ) {
+        return 1;
+      }
+      return Math.max(1, Math.round((baseDate.getTime() - previousDate.getTime()) / 86400000));
+    })();
+    const textStep = (() => {
+      const baseMatch = String(base ?? "").match(/^(.*?)(\d+)$/);
+      const previousMatch = String(previous ?? "").match(/^(.*?)(\d+)$/);
+      if (!baseMatch || !previousMatch || baseMatch[1] !== previousMatch[1]) return 1;
+      return Number(baseMatch[2]) - Number(previousMatch[2]) || 1;
+    })();
+    const step = !Number.isNaN(Number(base)) ? numericStep || 1 : /^\d{4}-\d{2}-\d{2}/.test(String(base)) ? dateStep : textStep;
+    const nextRows = rows.map((row, idx) => {
+      if (idx <= startRow || idx > endRow) return row;
+      if (protection.isRowProtected(row.id)) return row;
+      return { ...row, [colKey]: buildFillValue(base, idx - startRow, step) };
+    });
+    const validation = validateRows(nextRows, rows);
+    if (!validation.ok) {
+      toast.error(validation.message);
+      return;
+    }
+    rowsHistory.pushState(nextRows);
+    setSheetState((prev) => ({ ...prev, rows: nextRows }));
+    markSaving();
+    try {
+      await saveAllRows(sheetId, nextRows);
+      toast.success("Series filled");
+    } catch {
+      toast.error("Fill saved locally but failed to persist.");
+    } finally {
+      markSaved();
+    }
+  }, [rows, protection.isRowProtected, buildFillValue, validateRows, rowsHistory, setSheetState, markSaving, markSaved, sheetId]);
+
+  const onFillStart = useCallback((rowIdx: number, colKey: string, e: React.PointerEvent) => {
+    fillDragRef.current = { row: rowIdx, colKey, pointerId: e.pointerId };
+    const onMove = (event: PointerEvent) => {
+      const target = document.elementFromPoint(event.clientX, event.clientY);
+      const rowAttr = target?.closest("[data-fill-row]")?.getAttribute("data-fill-row");
+      if (!rowAttr) return;
+      const endRow = Number(rowAttr);
+      const colIndex = columns.findIndex((column) => column.key === colKey);
+      if (Number.isFinite(endRow) && colIndex >= 0) {
+        fillTargetRowRef.current = endRow;
+        setSelectionRange({ start: { row: rowIdx, colIndex }, end: { row: endRow, colIndex } });
+      }
+    };
+    const onUp = () => {
+      const endRow = fillTargetRowRef.current ?? rowIdx;
+      applyFill(rowIdx, Math.max(rowIdx, endRow), colKey);
+      fillDragRef.current = null;
+      fillTargetRowRef.current = null;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [applyFill, columns]);
 
   // Toggle whether the selected cell wraps text or stays single-line.
-  const handleProtectionToggle = useCallback(async () => {
-    if (!selectedCell) return;
-    const k = protection.getCellKey(selectedCell.row, selectedCell.col);
-    const isProt = protection.isCellProtected(selectedCell.row, selectedCell.col);
-    protection.toggleProtectCell(selectedCell);
+  const handleToggleRowProtection = useCallback(async () => {
+    if (!selectedCell) {
+      toast.info("Select a row first to protect it");
+      return;
+    }
+    const rowIdx = selectedCell.row;
+    const row = rows[rowIdx];
+    if (!row) return;
+    const rowKey = protection.getRowKey(row.id);
+    const nextSet = new Set(protection.protectedCells);
+    const rowIsProtected = protection.isRowProtected(row.id);
     markSaving();
-    if (isProt) await unprotectCell(sheetId, k); else await protectCell(sheetId, k);
-    markSaved();
-  }, [selectedCell, protection, sheetId, markSaving, markSaved]);
+    try {
+      if (rowIsProtected) {
+        nextSet.delete(rowKey);
+        await unprotectRow(sheetId, rowKey);
+      } else {
+        nextSet.add(rowKey);
+        await protectRow(sheetId, rowKey);
+      }
+      protection.setProtectedCells(nextSet);
+      toast.success(rowIsProtected ? "Row unlocked" : "Row protected");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update row protection.");
+    } finally {
+      markSaved();
+    }
+  }, [selectedCell, rows, protection, sheetId, markSaving, markSaved]);
 
   // Toggle text wrap for the selected cell and save the format.
   const handleTextWrapToggle = useCallback(async () => {
@@ -547,6 +892,11 @@ export default function SheetClient() {
   // Insert a formula into the selected cell, save it, and close the dialog.
   const handleFormulaInsert = useCallback(async (example: string) => {
     if (!selectedCell) { toast.info("Select a cell first, then insert formula"); return; }
+    const rowId = rows[selectedCell.row]?.id;
+    if (rowId && protection.isRowProtected(rowId)) {
+      toast.error("This row is protected");
+      return;
+    }
     const cellKey = `${selectedCell.row}-${selectedCell.col}`;
     formulas.setFormulas((p: any) => ({ ...p, [cellKey]: example }));
     markSaving();
@@ -558,7 +908,7 @@ export default function SheetClient() {
     markSaved();
     setShowFormulaDialog(false);
     toast.success("Formula inserted — edit as needed");
-  }, [selectedCell, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
+  }, [selectedCell, rows, protection.isRowProtected, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
 
   // Apply a formula to every row in a column and persist it.
   const handleApplyFormulaToColumn = useCallback(async (columnKey: string, formula: string) => {
@@ -601,6 +951,107 @@ export default function SheetClient() {
     await sheetColOps.persistColumns(nextColumns);
   }, [columns, sheetColOps.persistColumns]);
 
+  const handleToggleFreezeColumn = useCallback(async (columnKey: string) => {
+    const nextColumns = columns.map((column) =>
+      column.key === columnKey ? { ...column, frozen: !column.frozen } : column,
+    );
+    await sheetColOps.persistColumns(nextColumns);
+    toast.success(nextColumns.find((column) => column.key === columnKey)?.frozen ? "Column frozen" : "Column unfrozen");
+  }, [columns, sheetColOps.persistColumns]);
+
+  const handleToggleFreezeRows = useCallback(() => {
+    const nextCount = frozenRowsCount > 0 ? 0 : 1;
+    setFrozenRowsCount(nextCount);
+    if (sheetId && typeof window !== "undefined") {
+      window.localStorage.setItem(`sheetsync:${sheetId}:frozen-rows`, String(nextCount));
+    }
+    toast.success(nextCount > 0 ? "Top row frozen" : "Rows unfrozen");
+  }, [frozenRowsCount, sheetId]);
+
+  const handleApplyValidation = useCallback(async (columnKey: string, rules: any) => {
+    const nextColumns = columns.map((column) =>
+      column.key === columnKey ? { ...column, validation_rules: rules } : column,
+    );
+    await sheetColOps.persistColumns(nextColumns);
+    setRightPanel(null);
+    toast.success("Validation saved");
+  }, [columns, sheetColOps.persistColumns, setRightPanel]);
+
+  const handleApplySelectOptions = useCallback(async (columnKey: string, options: SelectOption[]) => {
+    const cleanedOptions = options
+      .map((option) =>
+        typeof option === "string"
+          ? {
+              label: option.trim(),
+              bgColor: getOptionBgStyle(option).backgroundColor,
+            }
+          : { label: option.label.trim(), bgColor: option.bgColor },
+      )
+      .filter((option) => option.label);
+    const nextColumns = columns.map((column) =>
+      column.key === columnKey
+        ? { ...column, type: "select" as ColumnDef["type"], selectOptions: cleanedOptions }
+        : column,
+    );
+    await sheetColOps.persistColumns(nextColumns);
+    setRightPanel(null);
+    toast.success("Select options inserted");
+  }, [columns, sheetColOps.persistColumns, setRightPanel]);
+
+  const handleFillColumnNumbers = useCallback(async (columnKey: string) => {
+    const nextRows = rows.map((row, index) => ({ ...row, [columnKey]: index + 1 }));
+    rowsHistory.pushState(nextRows);
+    setSheetState((p) => ({ ...p, rows: nextRows }));
+    markSaving();
+    try {
+      await saveAllRows(sheetId, nextRows);
+      toast.success("Column filled with sequential row numbers");
+    } catch (err) {
+      toast.error("Failed to persist row numbers.");
+    } finally {
+      markSaved();
+    }
+  }, [rows, rowsHistory, sheetId, markSaving, markSaved, setSheetState]);
+
+  const handleFillColumnHashNumbers = useCallback(async (columnKey: string) => {
+    const nextRows = rows.map((row, index) => ({ ...row, [columnKey]: `#${index + 1}` }));
+    rowsHistory.pushState(nextRows);
+    setSheetState((p) => ({ ...p, rows: nextRows }));
+    markSaving();
+    try {
+      await saveAllRows(sheetId, nextRows);
+      toast.success("Column filled with hashtag sequence");
+    } catch (err) {
+      toast.error("Failed to persist row numbers.");
+    } finally {
+      markSaved();
+    }
+  }, [rows, rowsHistory, sheetId, markSaving, markSaved, setSheetState]);
+
+  const toggleRowProtectionById = useCallback(async (rowId: string) => {
+    if (!sheetId) return;
+    const rowKey = protection.getRowKey ? protection.getRowKey(rowId) : `row:${rowId}`;
+    const nextSet = new Set(protection.protectedCells);
+    const rowIsProtected = protection.isRowProtected ? protection.isRowProtected(rowId) : [...protection.protectedCells].some((k) => k === rowKey);
+    markSaving();
+    try {
+      if (rowIsProtected) {
+        nextSet.delete(rowKey);
+        await unprotectRow(sheetId, rowKey);
+      } else {
+        nextSet.add(rowKey);
+        await protectRow(sheetId, rowKey);
+      }
+      protection.setProtectedCells(nextSet);
+      toast.success(rowIsProtected ? "Row unlocked" : "Row protected");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update row protection.");
+    } finally {
+      markSaved();
+    }
+  }, [protection, sheetId, markSaving, markSaved]);
+
   const handleApplyColumns = useCallback(async (nextColumns: ColumnDef[]) => {
     if (nextColumns.length === 0) { toast.error("Keep at least one column."); return; }
     const normalizedColumns = nextColumns.map((column, index) => ({
@@ -622,8 +1073,29 @@ export default function SheetClient() {
   }, [columnsHistory, markSaved, markSaving, rows, rowsHistory, sheetId, setSaveStatus]);
 
   const handleRowsChange = useCallback((updatedRows: SheetRow[]) => {
-    persistence.handleRowsChange(updatedRows, rows, rowsHistory.pushState);
-  }, [persistence.handleRowsChange, rows, rowsHistory.pushState]);
+    const updatedById = new Map(updatedRows.map((row) => [row.id, row]));
+    const mergedRows = updatedRows.length === rows.length
+      ? updatedRows
+      : rows.map((row) => updatedById.get(row.id) ?? row);
+    let blocked = false;
+    const guardedRows = mergedRows.map((row) => {
+      if (!protection.isRowProtected(row.id)) return row;
+      const originalRow = rows.find((item) => item.id === row.id);
+      if (originalRow && JSON.stringify(originalRow) !== JSON.stringify(row)) {
+        blocked = true;
+      }
+      return originalRow ?? row;
+    });
+    if (blocked) {
+      toast.error("This row is protected");
+    }
+    const validation = validateRows(guardedRows, rows);
+    if (!validation.ok) {
+      toast.error(validation.message);
+      return;
+    }
+    persistence.handleRowsChange(guardedRows, rows, rowsHistory.pushState);
+  }, [persistence.handleRowsChange, rows, rowsHistory.pushState, protection.isRowProtected, validateRows]);
 
   const handleImageChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -683,18 +1155,39 @@ export default function SheetClient() {
 
   const handleSelectedCellTypeChange = useCallback((type: ColumnDef["type"]) => {
     if (!selectedCell) return;
-    if (type === "select") { setSelectSetupDialog({ open: true, colKey: selectedCell.col, row: selectedCell.row, mode: "cell" }); return; }
+    const rowId = rows[selectedCell.row]?.id;
+    if (rowId && protection.isRowProtected(rowId)) {
+      toast.error("This row is protected");
+      return;
+    }
     const cellKey = `${selectedCell.row}-${selectedCell.col}`;
     cellTypes.setCellTypeOverrides((prev: any) => ({ ...prev, [cellKey]: type }));
+    const selectOptions = columns.find((column) => column.key === selectedCell.col)?.selectOptions ?? [];
+    const selectOptionLabels = selectOptions.map(getSelectOptionLabel);
+    if (type === "select") {
+      setCellSelectOptions((prev) => ({ ...prev, [cellKey]: selectOptionLabels }));
+    }
     const updatedRows = rows.map((row, idx) => {
       if (idx !== selectedCell.row) return row;
-      return { ...row, [selectedCell.col]: getDefaultValueForType(type), [ROW_CELL_TYPES_KEY]: { ...(row[ROW_CELL_TYPES_KEY] ?? {}), [selectedCell.col]: type } };
+      return {
+        ...row,
+        [selectedCell.col]: getDefaultValueForType(type),
+        [ROW_CELL_TYPES_KEY]: { ...(row[ROW_CELL_TYPES_KEY] ?? {}), [selectedCell.col]: type },
+        ...(type === "select"
+          ? {
+              [ROW_CELL_SELECT_OPTIONS_KEY]: {
+                ...(row[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}),
+                [selectedCell.col]: selectOptionLabels,
+              },
+            }
+          : {}),
+      };
     });
     rowsHistory.pushState(updatedRows);
     setSheetState((p) => ({ ...p, rows: updatedRows }));
     saveAllRows(sheetId, updatedRows).catch(() => { toast.error("Failed to save cell type"); });
     toast.success(`Cell changed to ${type}`);
-  }, [selectedCell, cellTypes, rows, rowsHistory, sheetId, setSelectSetupDialog]);
+  }, [selectedCell, cellTypes, rows, rowsHistory, sheetId, columns, setCellSelectOptions, protection.isRowProtected]);
 
   const handleSelectSetupConfirm = useCallback(async (options: string[]) => {
     const { colKey, mode, row } = selectSetupDialog;
@@ -751,7 +1244,7 @@ export default function SheetClient() {
   }, []);
 
   const toggleRightPanel = useCallback((panel: RightPanelType) => {
-    if (!isOrgSheet && (panel === "comments" || panel === "collaborators")) return;
+    if (!isOrgSheet && panel === "collaborators") return;
     setRightPanel((p) => (p === panel ? null : panel));
   }, [isOrgSheet]);
 
@@ -777,7 +1270,7 @@ export default function SheetClient() {
     selectedCell, rowsHistory,
     getCurrentCellFormat: formatting.getCurrentCellFormat,
     applyFormat: formatting.applyFormat,
-    copyCellOrRange: clipboard.copyCellOrRange,
+    copyCellOrRange: () => handleSmartCopy(),
     pasteCellOrRange: handlePaste,
     cutCellOrRange: clipboard.cutCellOrRange,
   });
@@ -801,10 +1294,10 @@ export default function SheetClient() {
 
   // ── Grid columns ───────────────────────────────────────────────────────
   const selStyle = ddStyle(isDark);
-  const gridColumns = useMemo<Column<SheetRow>[]>(() => {
+  const gridColumns = useMemo<Column<SheetRow, SheetRow>[]>(() => {
     const activeRows = timeTravelState.previewRows || rows;
 
-    const rowNumberCol: Column<SheetRow> = {
+    const rowNumberCol: Column<SheetRow, SheetRow> = {
       key: "row-number", name: "", width: 46, frozen: true, resizable: false,
       renderHeaderCell: () => (
         <div className="h-full w-full flex items-center justify-center sheet-header-cell border-r">
@@ -813,12 +1306,56 @@ export default function SheetClient() {
             onChange={(e) => setSelectedRows(e.target.checked ? new Set(activeRows.map((r) => r.id)) : new Set())} />
         </div>
       ),
-      renderCell(props: RenderCellProps<SheetRow>) {
+      renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
         const rowIdx = activeRows.findIndex((r) => r.id === props.row.id);
         const isSel = selectedRows.has(props.row.id);
+        const isRowProtected = protection.isRowProtected(props.row.id);
+        const rowComments = comments[`row:${props.row.id}`]?.length ?? 0;
         return (
           <div className={`h-full w-full flex items-center justify-center sheet-row-num border-r group/rownum ${isSel ? "sheet-row-num--selected" : ""} relative`}>
             <span className={`${isSel ? "hidden" : "group-hover/rownum:hidden"} sheet-row-num-text`}>{rowIdx + 1}</span>
+            <div className="absolute right-1 top-1 hidden flex-row items-center gap-1 group-hover/rownum:flex">
+              <button
+                type="button"
+                className="h-6 w-6 rounded-full border border-border/70 bg-background text-[11px] font-semibold text-gray-600 hover:bg-muted"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedCell((prev) => ({ row: rowIdx, col: prev?.col ?? columns[0]?.key ?? "" }));
+                  setRightPanel("row-details");
+                }}
+                title="Row details"
+              >
+                i
+              </button>
+              <button
+                type="button"
+                className="h-6 w-6 rounded-full border border-border/70 bg-background text-gray-600 hover:bg-muted relative"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveCommentCell(`row:${props.row.id}`);
+                  setRightPanel("comments");
+                }}
+                title="Comment on row"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                {rowComments > 0 && (
+                  <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-amber-400 border border-white text-[9px] leading-none flex items-center justify-center">
+                    {Math.min(9, rowComments)}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                className={`h-6 w-6 rounded-full border border-border/70 bg-background ${isRowProtected ? "text-emerald-600" : "text-gray-600"} hover:bg-muted`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleRowProtectionById(props.row.id);
+                }}
+                title={isRowProtected ? "Unlock row" : "Protect row"}
+              >
+                <Lock className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <input type="checkbox" className={`h-3.5 w-3.5 rounded border-gray-300 cursor-pointer ${isSel ? "" : "hidden group-hover/rownum:block"}`}
               style={{ accentColor: "var(--primary)" }} checked={isSel}
               onChange={(e) => { const s = new Set(selectedRows); e.target.checked ? s.add(props.row.id) : s.delete(props.row.id); setSelectedRows(s); }} />
@@ -827,12 +1364,20 @@ export default function SheetClient() {
           </div>
         );
       },
+      renderSummaryCell(props: any) {
+        const rowIdx = activeRows.findIndex((r) => r.id === props.row.id);
+        return (
+          <div className="h-full w-full flex items-center justify-center sheet-row-num sheet-row-num--selected border-r">
+            <span className="sheet-row-num-text">{rowIdx + 1}</span>
+          </div>
+        );
+      },
     };
 
-    const dataCols = columns.filter((col) => !col.hidden).map((col): Column<SheetRow> => ({
-      key: col.key, name: col.name, width: col.width || 160, resizable: true,
+    const dataCols = columns.filter((col) => !col.hidden).map((col): Column<SheetRow, SheetRow> => ({
+      key: col.key, name: col.name, width: col.width || 160, resizable: true, frozen: col.frozen,
       renderHeaderCell: () => (
-        <div className="h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer" draggable
+        <div className={`h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer ${selectedCell && selectedCell.col === col.key ? "bg-primary/10" : ""}`} draggable
           onDragStart={() => colOps.handleColumnDragStart(col.key)}
           onDragOver={(e) => colOps.handleColumnDragOver(e, col.key, (u: any) => setSheetState((p) => ({ ...p, columns: typeof u === "function" ? u(p.columns) : u })))}
           onDragEnd={sheetColOps.handleColumnDragEnd}>
@@ -840,7 +1385,17 @@ export default function SheetClient() {
           <span className="flex-1 sheet-col-label truncate">{col.name}</span>
           {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60" />}
           <ColumnHeaderMenu column={col}
-            onChangeType={(t) => sheetColOps.handleChangeColumnType(col.key, t)}
+            onChangeType={(t) => {
+              sheetColOps.handleChangeColumnType(col.key, t);
+              if (t === "select") {
+                setFocusedColumnKey(col.key);
+                setRightPanel("select-options");
+              }
+            }}
+            onOpenColumnPanel={() => {
+              setFocusedColumnKey(col.key);
+              setRightPanel(col.type === "select" ? "select-options" : "columns");
+            }}
             onDelete={() => sheetColOps.handleDeleteColumn(col.key)}
             onRename={(newName) => sheetColOps.handleRenameColumn(col.key, newName)}
             onToggleTextWrap={handleTextWrapToggle}
@@ -850,6 +1405,8 @@ export default function SheetClient() {
             onRemoveColumnFormula={() => handleRemoveColumnFormula(col.key)}
             selectOptions={col.selectOptions}
             onUpdateSelectOptions={(opts) => sheetColOps.handleUpdateSelectOptions(col.key, opts)}
+            onFillColumnNumbers={() => handleFillColumnNumbers(col.key)}
+            onFillColumnHashNumbers={() => handleFillColumnHashNumbers(col.key)}
             onSetWidth={(w) => {
               const updated = columns.map((c) => c.key === col.key ? { ...c, width: w } : c);
               setSheetState((p) => ({ ...p, columns: updated })); columnsHistory.pushState(updated);
@@ -867,10 +1424,15 @@ export default function SheetClient() {
               setTimeout(async () => { markSaving(); await saveAllColumns(sheetId, columnsHistory.currentState); markSaved(); }, 50);
             }}
             onApplyColumnFormat={(fmt) => handleApplyColumnFormat(col.key, fmt)}
+            onToggleFreeze={() => handleToggleFreezeColumn(col.key)}
+            onOpenValidationPanel={() => {
+              setFocusedColumnKey(col.key);
+              setRightPanel("validation");
+            }}
           />
         </div>
       ),
-      renderCell(props: RenderCellProps<SheetRow>) {
+      renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
         const rowIdx = rows.findIndex((r) => r.id === props.row.id);
         const type = cellTypes.getCellType(rowIdx, col.key, col.type || "text");
         const cellKey = protection.getCellKey(rowIdx, col.key);
@@ -878,23 +1440,55 @@ export default function SheetClient() {
         let displayValue = props.row[col.key];
         if (formula?.startsWith("=")) displayValue = formulas.evaluateFormula(formula, rowIdx);
         const activeCollabEntry = Object.values(activeCursors).find((c) => c.row === rowIdx && c.col === col.key);
+        const colIndex = columns.findIndex((c) => c.key === col.key);
+        const inSelection = selectionRange ? (
+          (() => {
+            const sr = Math.min(selectionRange.start.row, selectionRange.end.row);
+            const er = Math.max(selectionRange.start.row, selectionRange.end.row);
+            const sc = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
+            const ec = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+            return rowIdx >= sr && rowIdx <= er && colIndex >= sc && colIndex <= ec;
+          })()
+        ) : false;
+
         return (
           <CellRenderer
             type={type} props={props} colKey={col.key} rowIdx={rowIdx} row={props.row}
             displayValue={displayValue} colDef={col}
             isWrapped={textWrap.textWrapColumns.has(`${rowIdx}-${col.key}`)}
-            isProtected={protection.isCellProtected(rowIdx, col.key)}
+            isProtected={protection.isRowProtected(props.row.id)}
             isOrgSheet={isOrgSheet}
             cellStyle={getEffectiveCellStyle(rowIdx, col.key, props.row)}
-            cellComments={comments[`${rowIdx}-${col.key}`] || []}
+            cellComments={[...(comments[`${rowIdx}-${col.key}`] || []), ...(comments[`row:${props.row.id}`] || [])]}
             activeCollab={activeCollabEntry ? { name: activeCollabEntry.name, color: activeCollabEntry.color } : null}
             horizontalAlign={(getEffectiveCellStyle(rowIdx, col.key, props.row).textAlign as any) ?? undefined}
-            onCellClick={() => { setSelectedCell({ row: rowIdx, col: col.key }); setActiveCommentCell(`${rowIdx}-${col.key}`); }}
-            onCommentClick={(e) => { e.stopPropagation(); setActiveCommentCell(`${rowIdx}-${col.key}`); setRightPanel("comments"); }}
+              onCellClick={() => { setSelectedCell({ row: rowIdx, col: col.key }); setActiveCommentCell(`row:${rows[rowIdx]?.id}`); }}
+              onCommentClick={(e) => { e.stopPropagation(); setActiveCommentCell(`row:${rows[rowIdx]?.id}`); setRightPanel("comments"); }}
+              onPointerDown={onCellPointerDown}
+              onPointerEnter={onCellPointerEnter}
+              onFillStart={onFillStart}
+              isSelected={inSelection}
           />
         );
       },
-      renderEditCell(props: RenderEditCellProps<SheetRow>) {
+      renderSummaryCell(props: any) {
+        const rowIdx = rows.findIndex((r) => r.id === props.row.id);
+        const type = cellTypes.getCellType(rowIdx, col.key, col.type || "text");
+        const formula = formulas.getFormula(rowIdx, col.key);
+        let displayValue = props.row[col.key];
+        if (formula?.startsWith("=")) displayValue = formulas.evaluateFormula(formula, rowIdx);
+        return (
+          <div
+            className="h-full w-full flex items-center px-2.5 py-1 gap-1.5 border-r bg-primary/5"
+            style={getEffectiveCellStyle(rowIdx, col.key, props.row)}
+          >
+            <span className={`truncate sheet-cell-text ${type === "number" || type === "currency" ? "ml-auto tabular-nums" : ""}`}>
+              {String(displayValue ?? "")}
+            </span>
+          </div>
+        );
+      },
+      renderEditCell(props: RenderEditCellProps<SheetRow, SheetRow>) {
         const { row, column, onRowChange } = props;
 
         const rowIdx = rows.findIndex((r) => r.id === row.id);
@@ -902,7 +1496,7 @@ export default function SheetClient() {
 
         const cellStyle = getEffectiveCellStyle(rowIdx, column.key, row);
         const cellKey = protection.getCellKey(rowIdx, col.key);
-        const isProtected = protection.isCellProtected(rowIdx, col.key);
+        const isProtected = protection.isRowProtected(row.id);
 
         const editVal =
           formulas.formulas[cellKey] ??
@@ -1076,20 +1670,23 @@ export default function SheetClient() {
                 <SelectValue placeholder="Select…" />
               </SelectTrigger>
               <SelectContent style={selStyle}>
-                {selectOpts.map((opt) => (
+                {selectOpts.map((opt) => {
+                  const optionLabel = getSelectOptionLabel(opt);
+                  return (
                   <SelectItem
-                    key={opt}
-                    value={opt}
+                    key={optionLabel}
+                    value={optionLabel}
                     style={ddItemStyle(isDark)}
                   >
                     <span
                       className="sheet-badge-pill"
                       style={getOptionBgStyle(opt)}
                     >
-                      {opt}
+                      {optionLabel}
                     </span>
                   </SelectItem>
-                ))}
+                  );
+                })}
                 {selectOpts.length === 0 && (
                   <div className="px-2.5 py-2 text-[11px] text-gray-400 italic">
                     No options — edit column to add some.
@@ -1181,7 +1778,7 @@ export default function SheetClient() {
     }));
 
     return [rowNumberCol, ...dataCols];
-  }, [columns, rows, selectedRows, textWrap.textWrapColumns, cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas, formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey, protection.isCellProtected, sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, colOps, markSaving, markSaved, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat, isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove, endRowResize]);
+  }, [columns, rows, selectedRows, textWrap.textWrapColumns, cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas, formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey, protection.isCellProtected, protection.isRowProtected, sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, colOps, markSaving, markSaved, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat, handleToggleFreezeColumn, isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove, endRowResize, toggleRowProtectionById, onFillStart]);
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -1202,20 +1799,29 @@ export default function SheetClient() {
         <FormattingBar
           isDark={isDark} selectedCell={selectedCell} selectedCellType={selectedCellType}
           isSelectedColumnWrapped={isSelectedColumnWrapped}
-          isProtected={!!(selectedCell && protection.isCellProtected(selectedCell.row, selectedCell.col))}
+          isProtected={isSelectedRowProtected}
           fontFamily={fontFamily} fontSize={fontSize} zoomLevel={zoomLevel}
           filteredRowsCount={filteredRows.length} searchQuery={searchQuery} showSearch={showSearch}
           canUndo={rowsHistory.canUndo} canRedo={rowsHistory.canRedo}
           currentFormat={formatting.getCurrentCellFormat(selectedCell)}
           onUndo={rowsHistory.undo} onRedo={rowsHistory.redo}
           onZoomChange={(z) => setZoomLevel(Math.max(50, Math.min(200, z)))}
-          onCopy={() => clipboard.copyCellOrRange(selectedCell)}
-          onCut={() => clipboard.cutCellOrRange(selectedCell)}
+          onCopy={handleSmartCopy}
+          onCut={() => {
+            if (selectedCell) {
+              const rowId = rows[selectedCell.row]?.id;
+              if (rowId && protection.isRowProtected(rowId)) {
+                toast.error("This row is protected");
+                return;
+              }
+            }
+            clipboard.cutCellOrRange(selectedCell);
+          }}
           onPaste={handlePaste}
           onFontFamilyChange={(f) => { setFontFamily(f); if (selectedCell) handleFormatChange({ fontFamily: f }); }}
           onFontSizeChange={(s) => { setFontSize(s); if (selectedCell) handleFormatChange({ fontSize: Number(s) }); }}
           onFormatChange={handleFormatChange} onCellTypeChange={handleSelectedCellTypeChange}
-          onTextWrapToggle={handleTextWrapToggle} onProtectionToggle={handleProtectionToggle}
+          onTextWrapToggle={handleTextWrapToggle} onProtectionToggle={handleToggleRowProtection}
           onFormulaOpen={() => { if (!selectedCell) { toast.info("Select a cell first."); return; } setShowFormulaDialog(true); }}
           onSearchToggle={() => setShowSearch(true)} onSearchChange={setSearchQuery}
           onSearchClose={() => { setShowSearch(false); setSearchQuery(""); }}
@@ -1225,6 +1831,8 @@ export default function SheetClient() {
             rowsHistory.pushState(sorted); toast.success(`Sorted ${dir === "asc" ? "A → Z" : "Z → A"}`);
           }}
           onHideColumn={sheetColOps.handleHideColumn}
+          onFillColumnNumbers={() => selectedCell && handleFillColumnNumbers(selectedCell.col)}
+          onFillColumnHashNumbers={() => selectedCell && handleFillColumnHashNumbers(selectedCell.col)}
         />
 
         <FormulaBar
@@ -1241,7 +1849,7 @@ export default function SheetClient() {
           advancedFiltersCount={advancedFilters.length} chartCount={charts.charts.length}
           showChartPicker={charts.showPicker} conditionalRulesCount={conditionalRules.length}
           effectiveRightPanel={effectiveRightPanel} totalComments={totalComments}
-          historyLength={history.length}
+          historyLength={history.length} frozenRowsCount={frozenRowsCount}
           onInsertRow={sheetRowOps.handleInsertRow}
           onInsertColumn={sheetColOps.handleInsertColumn}
           onDeleteRow={sheetRowOps.handleDeleteRow}
@@ -1252,6 +1860,7 @@ export default function SheetClient() {
           onToggleChartPicker={charts.showPicker ? charts.closePicker : charts.openPicker}
           onTogglePanel={(panel) => { toggleRightPanel(panel); if (panel === "timetravel") { if (rightPanel !== "timetravel") timeTravelActions.openPanel(); else timeTravelActions.closePanel(); } }}
           onToggleDark={() => setIsDark(!isDark)}
+          onToggleFreezeRows={handleToggleFreezeRows}
           chartBtnRef={chartBtnRef as any}
         />
 
@@ -1268,6 +1877,25 @@ export default function SheetClient() {
             onUpdateRule={(id, update) => setAdvancedFilters((prev) => prev.map((item) => item.id === id ? { ...item, ...update } : item))}
             onRemoveRule={(id) => setAdvancedFilters((prev) => prev.filter((item) => item.id !== id))}
             onClear={() => { setFilterValue(""); setAdvancedFilters([]); setShowFilters(false); }}
+            savedViews={availableFilterViews}
+            onSaveView={(name) => {
+              persistSavedViews([
+                ...savedViews.filter((view) => view.name !== name),
+                {
+                  id: `view_${Date.now()}`,
+                  name,
+                  filterValue,
+                  advancedFilters,
+                },
+              ]);
+              toast.success("Filter view saved");
+            }}
+            onApplyView={(view) => {
+              setFilterValue(view.filterValue);
+              setAdvancedFilters(view.advancedFilters);
+              setShowFilters(true);
+            }}
+            onDeleteView={(id) => persistSavedViews(savedViews.filter((view) => view.id !== id))}
           />
         )}
 
@@ -1276,7 +1904,9 @@ export default function SheetClient() {
           <div className="flex-1 overflow-hidden relative">
             <div className="h-full w-full" style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top left", width: `${(100 * 100) / zoomLevel}%`, height: `${(100 * 100) / zoomLevel}%` }}>
               <DataGrid
-                columns={gridColumns} rows={filteredRows}
+                columns={gridColumns} rows={gridRows}
+                topSummaryRows={topFrozenRows}
+                summaryRowHeight={32}
                 rowKeyGetter={(row: SheetRow) => row.id}
                 onRowsChange={handleRowsChange}
                 selectedRows={selectedRows} onSelectedRowsChange={setSelectedRows}
@@ -1318,7 +1948,7 @@ export default function SheetClient() {
             ))}
           </div>
 
-          {effectiveRightPanel && (rightPanel === "developer" || rightPanel === "timetravel" || rightPanel === "charts" || rightPanel === "conditional" || rightPanel === "columns" || rightPanel === "shortcuts" || isOrgSheet) && (
+          {effectiveRightPanel && (rightPanel === "comments" || rightPanel === "developer" || rightPanel === "timetravel" || rightPanel === "charts" || rightPanel === "conditional" || rightPanel === "columns" || rightPanel === "select-options" || rightPanel === "row-details" || rightPanel === "validation" || rightPanel === "shortcuts" || isOrgSheet) && (
             <>
               <div className="fixed inset-0 bg-black/40 z-20 sm:hidden backdrop-blur-[1px]" onClick={() => setRightPanel(null)} />
               <div className="fixed right-0 top-0 bottom-0 z-30 sm:static sm:z-auto w-80 max-w-[88vw] shadow-2xl sm:shadow-none transition-transform duration-200 ease-out">
@@ -1341,6 +1971,11 @@ export default function SheetClient() {
                   onSaveConditionalRule={handleSaveConditionalRule}
                   onDeleteConditionalRule={handleDeleteConditionalRule}
                   onApplyColumns={handleApplyColumns}
+                  focusedColumnKey={focusedColumnKey}
+                  onApplySelectOptions={handleApplySelectOptions}
+                  selectedRowIndex={selectedCell?.row ?? null}
+                  history={history}
+                  onApplyValidation={handleApplyValidation}
                 />
               </div>
             </>
@@ -1357,14 +1992,6 @@ export default function SheetClient() {
 
         {/* Modals */}
         {isOrgSheet && <ShareDialog showShareDialog={showShareDialog} setShowShareDialog={setShowShareDialog} sheetId={sheetId} isDark={isDark} />}
-        <SelectOptionsDialog
-          open={selectSetupDialog.open} onClose={() => setSelectSetupDialog((p) => ({ ...p, open: false }))}
-          onConfirm={handleSelectSetupConfirm} isDark={isDark}
-          initialOptions={selectSetupDialog.mode === "cell" && selectSetupDialog.row !== null && selectSetupDialog.colKey
-            ? (cellSelectOptions[`${selectSetupDialog.row}-${selectSetupDialog.colKey}`] ?? [])
-            : selectSetupDialog.colKey && selectSetupDialog.colKey !== "__new__"
-              ? (columns.find((c) => c.key === selectSetupDialog.colKey)?.selectOptions ?? []) : []}
-        />
         <Dialog open={showDesktopTip} onOpenChange={setShowDesktopTip}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
@@ -1388,7 +2015,13 @@ export default function SheetClient() {
           .sheet-root *::-webkit-scrollbar-thumb { background: #c7cdd8; border-radius: 999px; }
           .sheet-root *::-webkit-scrollbar-track { background: transparent; }
           .no-scrollbar { -ms-overflow-style: auto; scrollbar-width: thin; }
-          @media (max-width: 640px) { .rdg-sheet { font-size: 11px !important; } }
+          @media (max-width: 640px) {
+            .rdg-sheet { font-size: 11px !important; }
+            .sheet-column-type-submenu {
+              transform: translate3d(0, 6px, 0) !important;
+              max-width: calc(100vw - 24px);
+            }
+          }
         `}</style>
       </div>
     </TooltipProvider>
