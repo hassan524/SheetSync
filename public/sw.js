@@ -1,67 +1,36 @@
-const CACHE_NAME = "sheetsync-v2";
-const STATIC_ASSETS = ["/manifest.json", "/icon-192.png", "/icon-512.png"];
+importScripts(
+  "https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"
+);
+importScripts(
+  "https://www.gstatic.com/firebasejs/10.0.0/firebase-messaging-compat.js"
+);
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
-  self.skipWaiting();
+firebase.initializeApp({
+  apiKey: "AIzaSyB4jElJykK5BCXkyfYSusHcw7H4vdaz0-U",
+  authDomain: "sheetsync-d4c0a.firebaseapp.com",
+  projectId: "sheetsync-d4c0a",
+  storageBucket: "sheetsync-d4c0a.firebasestorage.app",
+  messagingSenderId: "1078156094571",
+  appId: "1:1078156094571:web:330f4380b3e56e95d0952e",
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      )
-    )
-  );
-  self.clients.claim();
-});
+const messaging = firebase.messaging();
 
-self.addEventListener("message", (event) => {
-  if (event.data?.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
-});
-
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  const url = new URL(event.request.url);
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/"))
-    return;
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
-  );
-});
-
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
-  let data = {};
-  try {
-    data = event.data.json();
-  } catch {
-    data = { title: "SheetSync", body: event.data.text() };
-  }
-  const title = data.title || "SheetSync";
+// Background notifications (app is closed or in background)
+messaging.onBackgroundMessage((payload) => {
+  const title = payload.notification?.title || "SheetSync";
   const options = {
-    body: data.body || "You have a new notification.",
-    icon: "/icon-192.png",
-    badge: "/icon-192.png",
-    tag: data.tag || "sheetsync-notification",
-    data: { url: data.url || "/" },
+    body: payload.notification?.body || "You have a new notification.",
+    icon: "/icon.png",
+    badge: "/icon.png",
+    tag: payload.data?.tag || "sheetsync-bg",
+    data: { url: payload.data?.url || payload.fcmOptions?.link || "/" },
     vibrate: [100, 50, 100],
-    actions: data.actions || [],
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  self.registration.showNotification(title, options);
 });
 
+// Click handler — open the relevant page
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = event.notification.data?.url || "/";

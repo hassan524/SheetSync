@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 interface SendNotificationOptions {
@@ -38,8 +38,8 @@ export async function sendNotification({
     webpush: {
       fcmOptions: { link: url || "/" },
       notification: {
-        icon: icon || "/icon-192.png",
-        badge: "/icon-192.png",
+        icon: icon || "/icon.png",
+        badge: "/icon.png",
         requireInteraction: false,
       },
     },
@@ -49,7 +49,7 @@ export async function sendNotification({
     },
   });
 
-  // Clean up stale tokens that Firebase rejected
+  // Clean up stale tokens
   const staleTokens: string[] = [];
   result.responses.forEach((res, idx) => {
     if (
@@ -67,4 +67,3 @@ export async function sendNotification({
 
   return result;
 }
-

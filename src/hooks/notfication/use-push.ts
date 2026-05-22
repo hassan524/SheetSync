@@ -11,35 +11,27 @@ export function usePush(userId?: string) {
 
     const init = async () => {
       try {
-        // Check if notifications are supported
         if (!("Notification" in window)) return;
 
-        // Ask permission
         const permission = await Notification.requestPermission();
         if (permission !== "granted") return;
 
-        // Get messaging instance (null if not supported)
         const messaging = await getFirebaseMessaging();
         if (!messaging) return;
 
-        // Get FCM token
         const token = await getToken(messaging, {
           vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY!,
         });
 
         if (!token) return;
 
-        // Save token to backend
         await fetch("/api/save-token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId, token }),
         });
 
-        // Foreground notifications
         onMessage(messaging, (payload) => {
-          console.log("Foreground notification:", payload);
-
           const notifTitle = payload.notification?.title || "SheetSync";
           const notifBody =
             payload.notification?.body || "You have a new notification.";
@@ -47,8 +39,8 @@ export function usePush(userId?: string) {
 
           new Notification(notifTitle, {
             body: notifBody,
-            icon: "/icon-192.png",
-            badge: "/icon-192.png",
+            icon: "/icon.png",
+            badge: "/icon.png",
             tag: "sheetsync-foreground",
             data: { url: notifUrl },
           });
@@ -61,4 +53,3 @@ export function usePush(userId?: string) {
     init();
   }, [userId]);
 }
-

@@ -1,15 +1,9 @@
-// ─────────────────────────────────────────────────────────────
-//  Professional Notification Templates for SheetSync
-// ─────────────────────────────────────────────────────────────
-
 export interface NotificationPayload {
   title: string;
   body: string;
   url?: string;
   icon?: string;
 }
-
-// ─── Member Joined Organization ──────────────────────────────
 
 export function memberJoinedTemplate({
   memberName,
@@ -24,11 +18,9 @@ export function memberJoinedTemplate({
     title: "🎉 New team member joined!",
     body: `${memberName} just joined ${orgName} as ${formatRole(role)}.`,
     url: "/organizations",
-    icon: "/icon-192.png",
+    icon: "/icon.png",
   };
 }
-
-// ─── Deadline Approaching (within 24h) ──────────────────────
 
 export function deadlineApproachingTemplate({
   itemTitle,
@@ -43,11 +35,9 @@ export function deadlineApproachingTemplate({
     title: "⏰ Deadline approaching",
     body: `"${itemTitle}" in ${sheetName} is due ${formatDeadlineDistance(deadline)}.`,
     url: "/dashboard",
-    icon: "/icon-192.png",
+    icon: "/icon.png",
   };
 }
-
-// ─── Deadline Overdue ────────────────────────────────────────
 
 export function deadlineOverdueTemplate({
   itemTitle,
@@ -62,11 +52,9 @@ export function deadlineOverdueTemplate({
     title: "🚨 Deadline missed",
     body: `"${itemTitle}" in ${sheetName} was due on ${formatDate(deadline)} and is now overdue.`,
     url: "/dashboard",
-    icon: "/icon-192.png",
+    icon: "/icon.png",
   };
 }
-
-// ─── Inactive Reminder ──────────────────────────────────────
 
 export function inactiveReminderTemplate({
   userName,
@@ -78,11 +66,9 @@ export function inactiveReminderTemplate({
     title: `${greeting} 👋`,
     body: "You haven't checked SheetSync in a while. Your team might have updates waiting for you.",
     url: "/dashboard",
-    icon: "/icon-192.png",
+    icon: "/icon.png",
   };
 }
-
-// ─── Invite Received ────────────────────────────────────────
 
 export function inviteReceivedTemplate({
   orgName,
@@ -95,7 +81,7 @@ export function inviteReceivedTemplate({
     title: "📩 You've been invited!",
     body: `${inviterName} invited you to join ${orgName} on SheetSync.`,
     url: "/dashboard",
-    icon: "/icon-192.png",
+    icon: "/icon.png",
   };
 }
 
@@ -138,4 +124,3 @@ function formatDeadlineDistance(dateStr: string): string {
     return "soon";
   }
 }
-

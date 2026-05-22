@@ -64,11 +64,8 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
   icons: {
-    icon: [
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
-    ],
-    apple: [{ url: "/icon-192.png", sizes: "192x192" }],
+    icon: [{ url: "/icon.png", type: "image/png" }],
+    apple: [{ url: "/icon.png" }],
   },
   appleWebApp: {
     capable: true,
@@ -95,12 +92,12 @@ export default function RootLayout({
           position="top-right"
           toastOptions={{
             style: {
-              background: '#ffffff',
-              border: 'none',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-              color: '#1a1a1a',
-              fontSize: '13px',
-              fontFamily: 'Manrope, sans-serif',
+              background: "#ffffff",
+              border: "none",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+              color: "#1a1a1a",
+              fontSize: "13px",
+              fontFamily: "Manrope, sans-serif",
             },
           }}
         />
@@ -109,4 +106,3 @@ export default function RootLayout({
     </html>
   );
 }
-

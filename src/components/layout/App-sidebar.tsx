@@ -37,6 +37,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SettingsDialog from "@/components/header/Settings-dialog";
 import { useAuth } from "@/context/AuthContext";
 import { getAllOrganizations } from "@/lib/querys/organization/organization";
+import Image from "next/image";
 
 const mainNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
@@ -83,18 +84,23 @@ export function AppSidebar() {
   const isActive = (path: string) => pathname === path;
 
   const getLinkClasses = (path: string) =>
-    `flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 ${
-      isActive(path)
-        ? "bg-primary text-primary-foreground"
-        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+    `flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 ${isActive(path)
+      ? "bg-primary text-primary-foreground"
+      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
     }`;
 
   return (
     <Sidebar className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-            <FileSpreadsheet className="h-5 w-5 text-primary-foreground" />
+          <div className="h-9 w-9 rounded-lg overflow-hidden bg-primary flex items-center justify-center">
+            <Image
+              src="/icon.png"
+              alt="SheetSync"
+              className="h-full w-full object-cover"
+              width={36}
+              height={36}
+            />
           </div>
           {!collapsed && (
             <div className="animate-fade-in">
@@ -164,9 +170,8 @@ export function AppSidebar() {
             <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 text-xs text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
               <span>My Organizations</span>
               <ChevronDown
-                className={`h-3 w-3 transition-transform duration-200 ${
-                  orgsOpen ? "rotate-180" : ""
-                }`}
+                className={`h-3 w-3 transition-transform duration-200 ${orgsOpen ? "rotate-180" : ""
+                  }`}
               />
             </CollapsibleTrigger>
             <CollapsibleContent className="animate-accordion-down">
@@ -242,13 +247,13 @@ export function AppSidebar() {
               <p className="text-sm font-medium truncate">
                 {user?.name
                   ? user.name
-                      .toLowerCase()
-                      .split(" ")
-                      .map(
-                        (word: string) =>
-                          word.charAt(0).toUpperCase() + word.slice(1),
-                      )
-                      .join(" ")
+                    .toLowerCase()
+                    .split(" ")
+                    .map(
+                      (word: string) =>
+                        word.charAt(0).toUpperCase() + word.slice(1),
+                    )
+                    .join(" ")
                   : "Unknown User"}
               </p>
 

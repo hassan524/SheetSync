@@ -1,11 +1,8 @@
-// Firebase Messaging Service Worker
-// NOTE: Service workers cannot use process.env — values are hardcoded from Firebase config
-
 importScripts(
-  "https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js",
+  "https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"
 );
 importScripts(
-  "https://www.gstatic.com/firebasejs/10.0.0/firebase-messaging-compat.js",
+  "https://www.gstatic.com/firebasejs/10.0.0/firebase-messaging-compat.js"
 );
 
 firebase.initializeApp({
@@ -19,13 +16,13 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Background notifications
+// Background notifications (app is closed or in background)
 messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title || "SheetSync";
   const options = {
     body: payload.notification?.body || "You have a new notification.",
-    icon: "/icon-192.png",
-    badge: "/icon-192.png",
+    icon: "/icon.png",
+    badge: "/icon.png",
     tag: payload.data?.tag || "sheetsync-bg",
     data: { url: payload.data?.url || payload.fcmOptions?.link || "/" },
     vibrate: [100, 50, 100],
@@ -44,6 +41,6 @@ self.addEventListener("notificationclick", (event) => {
         const existing = clients.find((c) => c.url.includes(url));
         if (existing) return existing.focus();
         return self.clients.openWindow(url);
-      }),
+      })
   );
 });

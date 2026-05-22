@@ -1,15 +1,17 @@
 import type { NextConfig } from "next";
+import withPWA from "next-pwa";
 
-const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
+const devDomain = process.env.REPLIT_DEV_DOMAIN;
 
 const nextConfig: NextConfig = {
-  turbopack: {},
   compress: true,
+  turbopack: {},
+
   experimental: {
     serverActions: {
       allowedOrigins: [
-        "localhost:3001",
         "localhost:3000",
+        "localhost:3001",
         "*.replit.dev",
         "*.replit.dev:*",
         "*.pike.replit.dev",
@@ -21,6 +23,7 @@ const nextConfig: NextConfig = {
       ],
     },
   },
+
   allowedDevOrigins: [
     "*.replit.dev",
     "*.pike.replit.dev",
@@ -28,11 +31,19 @@ const nextConfig: NextConfig = {
     "why-latrine-swizzle.ngrok-free.dev",
     ...(devDomain ? [devDomain] : []),
   ],
+
   webpack: (config) => {
-    config.output = config.output || {};
-    config.output.chunkLoadTimeout = 120000;
+    config.output = {
+      ...config.output,
+      chunkLoadTimeout: 120000,
+    };
     return config;
   },
 };
 
-export default nextConfig;
+export default (withPWA({
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === "development",
+}) as any)(nextConfig);
