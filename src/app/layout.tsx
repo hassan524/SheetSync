@@ -7,10 +7,10 @@ import { Toaster } from "sonner";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sheetsync.app";
 
 export const viewport: Viewport = {
-  themeColor: "#0d7c5f",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  maximumScale: 1,
 };
 
 export const metadata: Metadata = {

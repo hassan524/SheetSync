@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Zap, Rocket, Play, CheckCircle2 } from "lucide-react";
+import { Zap, Play, ArrowRight, CheckCircle2 } from "lucide-react";
 
 interface HeroSectionProps {
   onDemoOpen: () => void;
@@ -10,55 +10,76 @@ interface HeroSectionProps {
 
 const HeroSection = ({ onDemoOpen, onGetStarted }: HeroSectionProps) => {
   return (
-    <section className="hero-gradient pt-28 pb-20 sm:pt-36 sm:pb-28 px-5 sm:px-6 lg:px-8">
-      <div className="max-w-5xl w-full flex flex-col gap-7 mx-auto text-center">
-        <div className="animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary rounded-full px-4 py-1.5 text-sm font-medium mx-auto">
-            <Zap className="h-3.5 w-3.5 flex-shrink-0" />
-            Real-time collaboration for modern teams
+    <section className="relative pt-20 pb-24 lg:pb-32 px-5 sm:px-6 lg:px-8 bg-gradient-to-b from-white via-blue-50/30 to-white overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 right-1/4 w-96 h-96 bg-blue-100/20 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-green-100/20 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-6xl w-full mx-auto relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Left: Text Content */}
+          <div className="flex flex-col gap-8">
+            <div className="space-y-8 animate-fade-in-up">
+              <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-4 py-2 text-sm font-medium w-fit">
+                <Zap className="h-4 w-4" />
+                Real-time collaboration
+              </div>
+
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 leading-tight tracking-tight">
+                Spreadsheets made for{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-green-600 to-blue-600">
+                  teams
+                </span>
+              </h1>
+
+              <p className="text-lg sm:text-xl text-gray-600 leading-relaxed max-w-lg">
+                Work together in real-time. Build spreadsheets with 100+ formulas, beautiful templates, and powerful collaboration. Simple to use, powerful when needed.
+              </p>
+
+              <div className="flex flex-wrap gap-4 pt-2">
+                {["Real-time", "100+ Functions", "Free Forever"].map((t) => (
+                  <span key={t} className="flex items-center gap-2 text-gray-700 text-sm font-medium">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    {t}
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                <Button
+                  onClick={onGetStarted}
+                  className="btn-primary text-white px-10 py-6 text-lg font-semibold h-auto group hover:gap-3 transition-all shadow-lg hover:shadow-xl"
+                >
+                  Start Free
+                  <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={onDemoOpen}
+                  className="px-10 py-6 text-lg font-semibold border-2 border-gray-300 text-gray-700 hover:border-blue-600 hover:text-blue-600 h-auto transition-colors"
+                >
+                  <Play className="mr-2 h-5 w-5" />
+                  See Demo
+                </Button>
+              </div>
+
+              <p className="text-sm text-gray-500">
+                ✓ No credit card • ✓ Free forever • ✓ 2-minute setup
+              </p>
+            </div>
           </div>
-        </div>
 
-        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-bold text-gray-900 leading-[1.1] tracking-tight animate-fade-in-up delay-100">
-          Spreadsheets built for{" "}
-          <span className="text-primary">real teams</span>, in real time
-        </h1>
-
-        <p className="text-lg sm:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
-          SheetSync is a cloud spreadsheet platform with live collaboration,
-          100+ formulas, ready-made templates, team organizations, and full
-          import/export — all in one workspace.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-400 animate-fade-in-up delay-300">
-          {[
-            "No credit card required",
-            "Free forever plan",
-            "Ready in 60 seconds",
-          ].map((t) => (
-            <span key={t} className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
-              {t}
-            </span>
-          ))}
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center animate-fade-in-up delay-400">
-          <Button
-            onClick={onGetStarted}
-            className="btn-primary text-white px-8 py-4 text-base font-semibold h-auto w-full sm:w-auto"
-          >
-            <Rocket className="mr-2 h-5 w-5" />
-            Start Free — It&apos;s Free
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onDemoOpen}
-            className="px-8 py-4 text-base font-semibold border-2 border-gray-200 text-gray-700 hover:border-primary hover:text-primary h-auto w-full sm:w-auto transition-colors"
-          >
-            <Play className="mr-2 h-5 w-5" />
-            Watch Demo
-          </Button>
+          {/* Right: Space for user to add image */}
+          <div className="hidden lg:block relative h-[600px]">
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl border-2 border-gray-200 flex items-center justify-center">
+              <div className="text-center text-gray-400">
+                <p className="text-lg font-semibold mb-2">Your spreadsheet screenshot here</p>
+                <p className="text-sm">Add your image to this space</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

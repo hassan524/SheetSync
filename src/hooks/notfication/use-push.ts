@@ -12,47 +12,78 @@ export function usePush(userId?: string) {
     const init = async () => {
       try {
         // Check if notifications are supported
-        if (!("Notification" in window)) return;
+        if (!("Notification" in window)) {
+          console.log("Notifications not supported in this browser");
+          return;
+        }
 
-        // Ask permission
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") return;
+        // Ask permission only if not already granted or denied
+        if (Notification.permission === "default") {
+          const permission = await Notification.requestPermission();
+          if (permission !== "granted") {
+            console.log("Notification permission:", permission);
+            return;
+          }
+        } else if (Notification.permission !== "granted") {
+          console.log("Notifications already denied by user");
+          return;
+        }
 
         // Get messaging instance (null if not supported)
         const messaging = await getFirebaseMessaging();
-        if (!messaging) return;
+        if (!messaging) {
+          console.log("Firebase messaging not supported");
+          return;
+        }
 
         // Get FCM token
         const token = await getToken(messaging, {
           vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY!,
         });
 
-        if (!token) return;
+        if (!token) {
+          console.log("Failed to get FCM token");
+          return;
+        }
+
+        console.log("FCM token obtained, saving to backend");
 
         // Save token to backend
-        await fetch("/api/save-token", {
+        const response = await fetch("/api/save-token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId, token }),
         });
 
+        if (!response.ok) {
+          console.error("Failed to save token:", response.status);
+        }
+
         // Foreground notifications
         onMessage(messaging, (payload) => {
-          console.log("Foreground notification:", payload);
+          console.log("Foreground notification received:", payload);
 
           const notifTitle = payload.notification?.title || "SheetSync";
           const notifBody =
             payload.notification?.body || "You have a new notification.";
           const notifUrl = payload.data?.url || "/";
 
-          new Notification(notifTitle, {
+          const notification = new Notification(notifTitle, {
             body: notifBody,
             icon: "/icon-192.png",
             badge: "/icon-192.png",
             tag: "sheetsync-foreground",
             data: { url: notifUrl },
           });
+
+          // Handle notification click
+          notification.onclick = () => {
+            window.focus();
+            window.location.href = notifUrl;
+          };
         });
+
+        console.log("Push notifications initialized successfully");
       } catch (err) {
         console.error("Push notification init error:", err);
       }

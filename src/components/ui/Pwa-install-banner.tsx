@@ -152,63 +152,60 @@ export function PwaInstallBanner() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -40, opacity: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="pwa-install-banner"
+          className="fixed top-0 left-0 right-0 z-50 hidden sm:flex sm:flex-col gap-1 p-3 bg-white border-b border-gray-200 shadow-sm md:hidden"
         >
           <button
             onClick={handleDismiss}
-            className="pwa-install-close"
-            aria-label="Dismiss install banner"
+            className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            aria-label="Dismiss"
           >
             <X size={16} />
           </button>
 
-          <div className="pwa-install-icon">
-            <Image src="/icon-192.png" alt="" width={28} height={28} priority />
+          <div className="flex items-start gap-2 pr-8">
+            <div className="flex-shrink-0 mt-0.5">
+              <Image src="/icon-192.png" alt="" width={24} height={24} priority />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900">
+                {updateReady ? "Update available" : "Install SheetSync"}
+              </p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                {updateReady
+                  ? "Tap update to get the latest version"
+                  : isIos
+                    ? 'Tap Share then "Add to Home Screen"'
+                    : deferredPrompt
+                      ? "Add to your home screen"
+                      : 'Tap menu then "Add to Home Screen"'}
+              </p>
+            </div>
           </div>
 
-          <div className="pwa-install-content">
-            <h3 className="pwa-install-title">
-              {updateReady ? "SheetSync is ready to update" : "Install SheetSync"}
-            </h3>
+          <div className="flex gap-2 px-0.5">
             {updateReady ? (
-              <p className="pwa-install-desc">
-                Reload once to use the newest app version.
-              </p>
-            ) : isIos ? (
-              <p className="pwa-install-desc">
-                Tap <span style={{ fontWeight: 600 }}>Share</span> then{" "}
-                <span style={{ fontWeight: 600 }}>
-                  &quot;Add to Home Screen&quot;
-                </span>
-              </p>
+              <button
+                onClick={handleUpdate}
+                className="flex-1 px-3 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+              >
+                Update
+              </button>
             ) : deferredPrompt ? (
-              <p className="pwa-install-desc">Add the app to your device.</p>
-            ) : (
-              <p className="pwa-install-desc">
-                Open browser menu and tap{" "}
-                <span style={{ fontWeight: 600 }}>
-                  &quot;Add to Home Screen&quot;
-                </span>
-                .
-              </p>
-            )}
-          </div>
-
-          {updateReady ? (
-            <button onClick={handleUpdate} className="pwa-install-btn">
-              <RefreshCw size={16} />
-              Update
-            </button>
-          ) : !isIos && (
+              <button
+                onClick={handleInstall}
+                disabled={isInstalling}
+                className="flex-1 px-3 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded transition-colors"
+              >
+                {isInstalling ? "Installing..." : "Install"}
+              </button>
+            ) : null}
             <button
-              onClick={deferredPrompt ? handleInstall : handleDismiss}
-              className="pwa-install-btn"
-              disabled={isInstalling}
+              onClick={handleDismiss}
+              className="px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded transition-colors"
             >
-              {isInstalling ? <RefreshCw size={16} /> : deferredPrompt ? <Download size={16} /> : <Check size={16} />}
-              {isInstalling ? "Opening" : deferredPrompt ? "Install" : "Got it"}
+              Not now
             </button>
-          )}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

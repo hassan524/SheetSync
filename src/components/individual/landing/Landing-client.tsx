@@ -52,9 +52,9 @@ const LandingClient = () => {
       />
       <ValuePropsBar />
       <FeaturesSection onDemoOpen={() => setDemoOpen(true)} />
+      <FeatureTilesSection />
       <HowItWorksSection onGetStarted={handleGetStarted} />
       <WhatsIncludedSection />
-      <FeatureTilesSection />
       <CtaBannerSection
         onDemoOpen={() => setDemoOpen(true)}
         onGetStarted={handleGetStarted}
