@@ -26,6 +26,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.74.0",
     "@tanstack/react-table": "^8.21.3",
+    "@types/minimatch": "^6.0.0",
     "ag-grid-community": "^34.3.0",
     "ag-grid-react": "^34.3.0",
     "apexcharts": "^5.10.6",

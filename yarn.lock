@@ -4691,6 +4691,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/minimatch@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "@types/minimatch@npm:6.0.0"
+  dependencies:
+    minimatch: "npm:*"
+  checksum: 10c0/901fc4208cf6f5ab0e86bf86504055fb387f76092e06e604a3f2403db1c20e613c42104b235fde05552e0632d8f82e4ceacb83351d8700c7ffc5c31010a80804
+  languageName: node
+  linkType: hard
+
 "@types/ms@npm:*":
   version: 2.1.0
   resolution: "@types/ms@npm:2.1.0"
@@ -5098,6 +5107,7 @@ __metadata:
     "@tailwindcss/postcss": "npm:^4"
     "@tanstack/react-table": "npm:^8.21.3"
     "@types/js-cookie": "npm:^3.0.6"
+    "@types/minimatch": "npm:^6.0.0"
     "@types/next-pwa": "npm:^5"
     "@types/node": "npm:^20"
     "@types/react": "npm:^19"
@@ -9176,7 +9186,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"minimatch@npm:^10.2.2":
+"minimatch@npm:*, minimatch@npm:^10.2.2":
   version: 10.2.5
   resolution: "minimatch@npm:10.2.5"
   dependencies:
