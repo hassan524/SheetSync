@@ -139,3 +139,4 @@ const StatsRow: React.FC<StatsRowProps> = ({ organizations }) => {
 };
 
 export default StatsRow;
+

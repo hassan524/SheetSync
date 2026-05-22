@@ -66,3 +66,4 @@ const LandingClient = () => {
 };
 
 export default LandingClient;
+

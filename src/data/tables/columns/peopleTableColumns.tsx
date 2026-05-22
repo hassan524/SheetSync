@@ -230,3 +230,4 @@ function PeopleActionMenu({ person }: { person: PersonData }) {
 export const peopleAction = {
   render: (person: PersonData) => <PeopleActionMenu person={person} />,
 };
+

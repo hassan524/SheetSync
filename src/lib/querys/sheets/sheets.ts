@@ -173,7 +173,7 @@ export async function importPersonalSheetToOrganization({
     { data: rows, error: rowsError },
     { data: formulas, error: formulasError },
     { data: formats, error: formatsError },
-    { data: protectedCells, error: protectedError },
+    { data: protectedRows, error: protectedError },
   ] = await Promise.all([
     supabase
       .from("columns")
@@ -187,7 +187,7 @@ export async function importPersonalSheetToOrganization({
       .order("position"),
     supabase.from("formulas").select("*").eq("sheet_id", sourceSheetId),
     supabase.from("cell_formats").select("*").eq("sheet_id", sourceSheetId),
-    supabase.from("protected_cells").select("*").eq("sheet_id", sourceSheetId),
+    supabase.from("protected_rows").select("*").eq("sheet_id", sourceSheetId),
   ]);
 
   const readError =
@@ -228,7 +228,11 @@ export async function importPersonalSheetToOrganization({
             position: col.position,
             select_options: col.select_options,
             currency_code: col.currency_code,
+            frozen: col.frozen,
+            hidden: col.hidden,
             conditional_formatting: col.conditional_formatting,
+            group_id: col.group_id,
+            validation_rules: col.validation_rules,
           })),
         )
       : Promise.resolve({ error: null }),
@@ -273,13 +277,13 @@ export async function importPersonalSheetToOrganization({
           })),
         )
       : Promise.resolve({ error: null }),
-    protectedCells?.length
-      ? supabase.from("protected_cells").insert(
-          protectedCells.map((cell: any) => ({
+    protectedRows?.length
+      ? supabase.from("protected_rows").insert(
+          protectedRows.map((row: any) => ({
             sheet_id: created.id,
-            cell_key: cell.cell_key,
-            user_id: cell.user_id,
-            created_at: cell.created_at,
+            row_key: row.row_key,
+            user_id: row.user_id,
+            created_at: row.created_at,
           })),
         )
       : Promise.resolve({ error: null }),
@@ -564,3 +568,4 @@ export async function getStarredSheets() {
     };
   });
 }
+

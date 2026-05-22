@@ -468,3 +468,4 @@ export const recalculateFinance = (rows: SheetRow[]): SheetRow[] => {
     return { ...row, balance: income || expense || row.date ? balance : 0 };
   });
 };
+

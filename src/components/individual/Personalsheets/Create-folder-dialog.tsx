@@ -115,3 +115,4 @@ const CreateFolderDialog = ({ open, onOpenChange, onConfirm }: Props) => {
 };
 
 export default CreateFolderDialog;
+

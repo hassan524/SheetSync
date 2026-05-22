@@ -131,3 +131,4 @@ const CreateOrgModal = ({ open, onOpenChange }: CreateOrgModalProps) => {
 };
 
 export default CreateOrgModal;
+

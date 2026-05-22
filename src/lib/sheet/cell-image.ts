@@ -4,3 +4,4 @@ export const MAX_CELL_EMBEDDED_IMAGE_BYTES = 450_000;
 export function isEmbeddedImageCellValue(v: unknown): v is string {
   return typeof v === "string" && v.startsWith("data:image/");
 }
+

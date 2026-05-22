@@ -30,3 +30,4 @@ export const faqs = [
       "Simply sign up for a free account, and you'll be able to create your first spreadsheet immediately. No credit card required!",
   },
 ];
+

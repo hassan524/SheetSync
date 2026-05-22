@@ -86,38 +86,69 @@ export function useColumnOperations(
     },
     [columns, columnsHistory, onSave],
   );
-
   const changeColumnType = useCallback(
     (colKey: string, newType: ColumnDef["type"]) => {
-      columnsHistory.pushState(
-        columns.map((col) =>
-          col.key === colKey ? { ...col, type: newType } : col,
-        ),
+      const updatedColumns = columns.map((col) =>
+        col.key === colKey
+          ? {
+              ...col,
+              type: newType,
+              ...(newType === "select" ? { selectOptions: col.selectOptions ?? [] } : {}),
+            }
+          : col
       );
 
-      const newRows = rows.map((row) => {
+      // 1. convert all rows safely
+      const updatedRows = rows.map((row) => {
         const updatedRow = { ...row };
-        if (newType === "checkbox") updatedRow[colKey] = false;
-        else if (newType === "priority") updatedRow[colKey] = "Medium";
-        else if (newType === "status") updatedRow[colKey] = "Not Started";
-        else if (newType === "date")
-          updatedRow[colKey] = new Date().toISOString().split("T")[0];
-        else if (
-          newType === "number" ||
-          newType === "currency" ||
-          newType === "progress"
-        )
-          updatedRow[colKey] = 0;
-        else if (newType === "select") updatedRow[colKey] = "";
-        else updatedRow[colKey] = String(updatedRow[colKey] || "");
+
+        switch (newType) {
+          case "checkbox":
+            updatedRow[colKey] = false;
+            break;
+
+          case "priority":
+            updatedRow[colKey] = "Medium";
+            break;
+
+          case "status":
+            updatedRow[colKey] = "Not Started";
+            break;
+
+          case "date":
+            updatedRow[colKey] = new Date().toISOString().split("T")[0];
+            break;
+
+          case "number":
+          case "currency":
+          case "progress":
+            updatedRow[colKey] = 0;
+            break;
+
+          case "select":
+            updatedRow[colKey] = "";
+            break;
+
+          case "image":
+            updatedRow[colKey] = "";
+            break;
+
+          default:
+            updatedRow[colKey] = String(updatedRow[colKey] || "");
+        }
+
         return updatedRow;
       });
 
-      rowsHistory.pushState(newRows);
+      columnsHistory.pushState(updatedColumns);
+      rowsHistory.pushState(updatedRows);
+
       onSave();
       toast.success(`Column changed to ${newType}`);
+
+      return { updatedColumns, updatedRows };
     },
-    [columns, rows, columnsHistory, rowsHistory, onSave],
+    [columns, rows, columnsHistory, rowsHistory, onSave]
   );
 
   const handleColumnResize = useCallback(
@@ -175,3 +206,4 @@ export function useColumnOperations(
     handleColumnDragEnd,
   };
 }
+

@@ -25,7 +25,11 @@ export async function saveAllColumns(sheetId: string, columns: ColumnDef[], clie
         ? JSON.stringify(col.selectOptions)
         : null,
     currency_code: col.currencyCode ?? "USD",
+    frozen: col.frozen ?? false,
+    hidden: col.hidden ?? false,
     conditional_formatting: col.conditional_formatting ?? null,
+    group_id: col.group_id ?? null,
+    validation_rules: col.validation_rules ?? null,
   }));
 
   const { error: insertError } = await client
@@ -36,6 +40,28 @@ export async function saveAllColumns(sheetId: string, columns: ColumnDef[], clie
     throw new Error(`Failed to save columns: ${insertError.message}`);
 }
 
+// Change column type function
+export async function updateColumnType(
+  sheetId: string,
+  columnKey: string,
+  newType: string
+) {
+  const { data, error } = await defaultSupabase
+    .from("columns")
+    .update({ type: newType })
+    .eq("sheet_id", sheetId)
+    .eq("column_key", columnKey)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update column type: ${error.message}`);
+  }
+
+  return data;
+}
+
+
 export async function deleteColumn(sheetId: string, columnKey: string) {
   const { error } = await defaultSupabase
     .from("columns")
@@ -45,3 +71,4 @@ export async function deleteColumn(sheetId: string, columnKey: string) {
 
   if (error) throw new Error(`Failed to delete column: ${error.message}`);
 }
+

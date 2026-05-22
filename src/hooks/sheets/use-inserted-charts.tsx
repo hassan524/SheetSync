@@ -110,3 +110,4 @@ export function useInsertedCharts(): UseInsertedChartsReturn {
     clearAll,
   };
 }
+

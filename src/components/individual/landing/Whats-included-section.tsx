@@ -55,3 +55,4 @@ const WhatsIncludedSection = () => {
 };
 
 export default WhatsIncludedSection;
+

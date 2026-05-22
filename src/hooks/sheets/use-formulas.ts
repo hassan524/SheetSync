@@ -1294,6 +1294,24 @@ function evaluateArithmetic(
     return `__S${literals.length - 1}__`;
   });
 
+  // 1b. Handle Excel-style concatenation operator '&'
+  // Split top-level (not inside parens) on '&' and rewrite as (+) concatenation
+  // e.g.  "Bug #" & ROW()-1  => ("Bug #") + (ROW()-1)
+  const parts: string[] = [];
+  let depth = 0;
+  let cur = "";
+  for (let i = 0; i < safe.length; i++) {
+    const ch = safe[i];
+    if (ch === "(") { depth++; cur += ch; }
+    else if (ch === ")") { depth = Math.max(0, depth - 1); cur += ch; }
+    else if (ch === "&" && depth === 0) { parts.push(cur); cur = ""; }
+    else { cur += ch; }
+  }
+  if (cur !== "") parts.push(cur);
+  if (parts.length > 1) {
+    safe = parts.map((p) => `(${p.trim()})`).join(" + ");
+  }
+
   // 2. Replace A1 refs FIRST (they match [A-Z]+\d+, must come before col name replace)
   safe = safe.replace(/\b([A-Z]+\d+)\b/gi, (match) => {
     if (/^__S\d+__$/.test(match)) return match;
@@ -1673,3 +1691,4 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
     getFormula,
   };
 }
+

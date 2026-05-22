@@ -21,3 +21,4 @@ export const Templates: TemplateInterface[] = [
     bgColor: "bg-purple-100",
   },
 ];
+

@@ -78,6 +78,9 @@ function Avatar({
 // "2-status" → "status · 3"
 function formatCellLabel(key: string): string {
     if (!key) return "";
+    if (key.startsWith("row:")) {
+        return "Row comment";
+    }
     const parts = key.split("-");
     const rowNum = parseInt(parts[0] ?? "0") + 1;
     const colKey = parts.slice(1).join("-");

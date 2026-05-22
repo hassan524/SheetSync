@@ -19,3 +19,4 @@ export async function ensureUserProfile(supabase: any, user: User) {
 
   if (error) throw new Error(error.message);
 }
+

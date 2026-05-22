@@ -118,6 +118,11 @@
   .sheet-root {
     overflow-x: hidden;
   }
+
+  .sheet-mobile-submenu {
+    max-width: calc(100vw - 1rem);
+    transform: translateY(4px) !important;
+  }
 }
 
 /* ─── Header / Title ─────────────────────────────────────────────────────── */

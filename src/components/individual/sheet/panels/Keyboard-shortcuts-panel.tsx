@@ -87,3 +87,4 @@ export default function KeyboardShortcutsPanel({
     </div>
   );
 }
+

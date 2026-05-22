@@ -74,3 +74,4 @@ const HowItWorksSection = ({ onGetStarted }: HowItWorksSectionProps) => {
 };
 
 export default HowItWorksSection;
+

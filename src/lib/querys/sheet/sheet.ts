@@ -2,7 +2,7 @@
 import { supabase } from "../../supabase/client";
 
 export async function loadSheet(sheetId: string) {
-  const [sheet, columns, rows, formats, formulas, protectedCells, forks] =
+  const [sheet, columns, rows, formats, formulas, protectedRows, forks] =
     await Promise.all([
       supabase.from("sheets").select("*").eq("id", sheetId).single(),
       supabase
@@ -17,7 +17,7 @@ export async function loadSheet(sheetId: string) {
         .order("position"),
       supabase.from("cell_formats").select("*").eq("sheet_id", sheetId),
       supabase.from("formulas").select("*").eq("sheet_id", sheetId),
-      supabase.from("protected_cells").select("*").eq("sheet_id", sheetId),
+      supabase.from("protected_rows").select("*").eq("sheet_id", sheetId),
       supabase
         .from("sheets")
         .select("id, title, forked_at")
@@ -66,13 +66,17 @@ export async function loadSheet(sheetId: string) {
             : col.select_options
           : undefined,
         currencyCode: col.currency_code ?? "USD",
+        frozen: col.frozen ?? false,
+        hidden: col.hidden ?? false,
         conditional_formatting: col.conditional_formatting ?? null,
+        group_id: col.group_id ?? null,
+        validation_rules: col.validation_rules ?? null,
       })) ?? [],
 
     rows:
       rows.data?.map((row) => ({
         id: row.row_key,
-        ...row.data,
+        ...(row.data ?? {}),
       })) ?? [],
 
     cellFormats: Object.fromEntries(
@@ -108,7 +112,7 @@ export async function loadSheet(sheetId: string) {
         .map((f) => [f.cell_key.replace("col:", ""), f.formula]),
     ),
 
-    protectedCells: new Set((protectedCells.data ?? []).map((p) => p.cell_key)),
+    protectedCells: new Set((protectedRows.data ?? []).map((p) => p.row_key)),
 
     textWrapColumns: new Set<string>(),
   };
@@ -148,3 +152,4 @@ export async function updateSheetStarred(sheetId: string, isStarred: boolean) {
     .eq("id", sheetId);
   if (error) throw new Error(`Failed to update starred: ${error.message}`);
 }
+

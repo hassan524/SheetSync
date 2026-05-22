@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,10 +94,21 @@ const SheetCard = ({
 }: SheetCardProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const { openSheet } = useSheetTransition();
 
   const [showDelete, setShowDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [prefetched, setPrefetched] = useState(false);
+
+  const prefetchSheet = useCallback(() => {
+    if (prefetched) return;
+    const url = isOrganization
+      ? `/sheet/${id}?template=${templateId}&org=true`
+      : `/sheet/${id}?template=${templateId}`;
+    router.prefetch(url);
+    setPrefetched(true);
+  }, [id, isOrganization, templateId, prefetched, router]);
 
   const templateTitle =
     SHEET_TEMPLATES.find((t) => t.id === templateId)?.title || "Sheet";
@@ -136,6 +148,7 @@ const SheetCard = ({
       <div
         ref={cardRef}
         onClick={() => openSheet(id, templateId, cardRef)}
+        onMouseEnter={prefetchSheet}
         className="group cursor-pointer"
       >
         <div className="relative rounded-xl overflow-hidden border border-border bg-white h-[140px] sm:h-[150px] transition-all group-hover:shadow-md">
@@ -233,3 +246,4 @@ const SheetCard = ({
 };
 
 export default SheetCard;
+

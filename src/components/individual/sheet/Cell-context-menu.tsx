@@ -49,7 +49,7 @@ export default function CellContextMenu({
           <DropdownMenuSubTrigger className="text-xs">
             Change Cell Type
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
+          <DropdownMenuSubContent className="sheet-mobile-submenu w-40">
             {CELL_TYPES.map(({ type, label, icon: Icon }) => (
               <DropdownMenuItem
                 key={type}
@@ -66,3 +66,4 @@ export default function CellContextMenu({
     </DropdownMenu>
   );
 }
+

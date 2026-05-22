@@ -67,3 +67,4 @@ export function useTextWrap(rows: SheetRow[], onSave: () => void) {
     calculateRowHeight,
   };
 }
+

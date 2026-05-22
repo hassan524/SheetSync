@@ -364,3 +364,4 @@ const InviteTeamModal = ({
 };
 
 export default InviteTeamModal;
+

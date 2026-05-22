@@ -45,3 +45,4 @@ export async function trackOrganizationOffline(organizationId: string) {
     .eq("organization_id", organizationId)
     .eq("user_id", user.id);
 }
+

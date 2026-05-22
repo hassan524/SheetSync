@@ -6,6 +6,7 @@ export function useProtectedCells(onSave: () => void) {
   const [protectedCells, setProtectedCells] = useState<Set<string>>(new Set());
 
   const getCellKey = (rowIdx: number, colKey: string) => `${rowIdx}-${colKey}`;
+  const getRowKey = (rowId: string | number) => `row:${rowId}`;
 
   const toggleProtectCell = useCallback(
     (selectedCell: { row: number; col: string } | null) => {
@@ -31,9 +32,17 @@ export function useProtectedCells(onSave: () => void) {
   );
 
   const isCellProtected = useCallback(
-    (rowIdx: number, colKey: string): boolean => {
-      return protectedCells.has(getCellKey(rowIdx, colKey));
+    (rowIdx: number, colKey: string, rowId?: string | number): boolean => {
+      return (
+        protectedCells.has(getCellKey(rowIdx, colKey)) ||
+        (rowId !== undefined && protectedCells.has(getRowKey(rowId)))
+      );
     },
+    [protectedCells],
+  );
+
+  const isRowProtected = useCallback(
+    (rowId: string | number) => protectedCells.has(getRowKey(rowId)),
     [protectedCells],
   );
 
@@ -43,5 +52,8 @@ export function useProtectedCells(onSave: () => void) {
     toggleProtectCell,
     isCellProtected,
     getCellKey,
+    isRowProtected,
+    getRowKey,
   };
 }
+
