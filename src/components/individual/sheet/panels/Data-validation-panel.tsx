@@ -25,8 +25,8 @@ export default function DataValidationPanel({
     const rules = column?.validation_rules;
     setType(rules?.type === "number" ? "number" : "dropdown");
     setOptions(Array.isArray(rules?.options) ? rules.options.join(", ") : "");
-    setMin(rules?.min ?? "");
-    setMax(rules?.max ?? "");
+    setMin(rules?.min === undefined || rules?.min === null ? "" : String(rules.min));
+    setMax(rules?.max === undefined || rules?.max === null ? "" : String(rules.max));
   }, [column?.key, column?.validation_rules]);
 
   if (!column) {
@@ -93,7 +93,10 @@ export default function DataValidationPanel({
             if (type === "dropdown") {
               onSave({
                 type: "dropdown",
-                options: options.split(",").map((item) => item.trim()).filter(Boolean),
+                options: options
+                  .split(/[,\n]/)
+                  .map((item) => item.trim())
+                  .filter(Boolean),
               });
             } else {
               onSave({

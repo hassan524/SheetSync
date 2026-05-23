@@ -1170,7 +1170,43 @@ export default function SheetClient() {
     } finally {
       markSaved();
     }
+<<<<<<< HEAD
   }, [rows, validateRows, rowsHistory, setSheetState, sheetId, markSaving, markSaved, isOrgSheet, columns, currentUser, runAutomationsForRows]);
+=======
+  }, [rows, rowsHistory, setSheetState, sheetId, markSaving, markSaved, isOrgSheet, columns, currentUser]);
+
+  const runAutomationsForRow = useCallback(async (row: SheetRow) => {
+    if (!row) return;
+    const statusColumn = columns.find((column) =>
+      column.type === "status" || /status|state|stage/i.test(`${column.key} ${column.name}`),
+    );
+    const statusKey = statusColumn?.key;
+    const status = statusKey ? String(row[statusKey] ?? "").toLowerCase() : "";
+    if (statusKey && ["done", "completed", "finished"].includes(status)) {
+      if (status !== "archived") {
+        await handleUpdateRow(row.id, { [statusKey]: "Archived" });
+        toast.info(`Row ${rows.findIndex((r) => r.id === row.id) + 1} archived by automation`);
+        return;
+      }
+    }
+
+    const dateCol = columns.find((c) => c.type === "date" || /due|date|deadline/i.test(`${c.key} ${c.name}`));
+    if (dateCol) {
+      const val = row[dateCol.key];
+      if (val) {
+        const d = new Date(String(val));
+        if (!isNaN(d.getTime())) {
+          const today = new Date();
+          if (d < today && !row._reminderSent) {
+            // mark reminder sent to avoid repeats
+            await handleUpdateRow(row.id, { _reminderSent: true });
+            toast.info(`Automation: reminder for row ${rows.findIndex((r) => r.id === row.id) + 1}`);
+          }
+        }
+      }
+    }
+  }, [columns, handleUpdateRow, rows]);
+>>>>>>> c0227322bc6adc40345c91f376eb5d28e320e9f7
 
   const handleTogglePinRow = useCallback(async () => {
     if (!selectedCell) { toast.info("Select a row first"); return; }
@@ -1233,6 +1269,7 @@ export default function SheetClient() {
   }, [frozenRowsCount, sheetId]);
 
   const handleApplyValidation = useCallback(async (columnKey: string, rules: any) => {
+<<<<<<< HEAD
     const dropdownOptions = Array.isArray(rules?.options)
       ? rules.options.map((option: any) => String(option).trim()).filter(Boolean)
       : [];
@@ -1245,11 +1282,73 @@ export default function SheetClient() {
           validation_rules: rules?.type === "dropdown" ? { ...rules, options: dropdownOptions } : rules,
         }
         : column,
+=======
+    type NormalizedValidationRule =
+      | { type: "dropdown"; options: string[] }
+      | { type: "number"; min?: number; max?: number };
+
+    const normalizedRules =
+      rules?.type === "dropdown"
+        ? {
+            type: "dropdown",
+            options: Array.from(
+              new Set(
+                (rules.options ?? [])
+                  .map((item: any) => String(item).trim())
+                  .filter(Boolean),
+              ),
+            ),
+          } as NormalizedValidationRule
+        : {
+            type: "number",
+            ...(rules.min === undefined || Number.isNaN(Number(rules.min))
+              ? {}
+              : { min: Number(rules.min) }),
+            ...(rules.max === undefined || Number.isNaN(Number(rules.max))
+              ? {}
+              : { max: Number(rules.max) }),
+          } as NormalizedValidationRule;
+    const nextColumns = columns.map((column) =>
+      column.key === columnKey ? { ...column, validation_rules: normalizedRules } : column,
+>>>>>>> c0227322bc6adc40345c91f376eb5d28e320e9f7
     );
+    const nextRows = rows.map((row) => {
+      const value = row[columnKey];
+      if (value === null || value === undefined || value === "") return row;
+
+      if (
+        normalizedRules.type === "dropdown" &&
+        !normalizedRules.options.includes(String(value))
+      ) {
+        return { ...row, [columnKey]: "" };
+      }
+
+      if (normalizedRules.type === "number") {
+        const numberValue = Number(value);
+        if (Number.isNaN(numberValue)) return { ...row, [columnKey]: "" };
+        if (normalizedRules.min !== undefined && numberValue < normalizedRules.min) {
+          return { ...row, [columnKey]: normalizedRules.min };
+        }
+        if (normalizedRules.max !== undefined && numberValue > normalizedRules.max) {
+          return { ...row, [columnKey]: normalizedRules.max };
+        }
+      }
+
+      return row;
+    });
+    const rowsChanged = nextRows.some((row, index) => row !== rows[index]);
+
     await sheetColOps.persistColumns(nextColumns);
+    if (rowsChanged) {
+      rowsHistory.pushState(nextRows);
+      setSheetState((prev) => ({ ...prev, rows: nextRows }));
+      markSaving();
+      await saveAllRows(sheetId, nextRows);
+      markSaved();
+    }
     setRightPanel(null);
-    toast.success("Validation saved");
-  }, [columns, sheetColOps.persistColumns, setRightPanel]);
+    toast.success(rowsChanged ? "Validation saved and existing values cleaned" : "Validation saved");
+  }, [columns, markSaved, markSaving, rows, rowsHistory, sheetColOps.persistColumns, setRightPanel, setSheetState, sheetId]);
 
   const handleApplySelectOptions = useCallback(async (columnKey: string, options: SelectOption[]) => {
     const cleanedOptions = options
@@ -1659,8 +1758,8 @@ export default function SheetClient() {
             onInsertRight={() => { const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, null, "blank"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
             onDuplicate={() => { const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, col, "duplicate"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
             onClearColumn={() => sheetColOps.clearColumnValues(col)}
-            onSortAsc={() => sheetColOps.clearColumnValues(col)}
-            onSortDesc={() => sheetColOps.clearColumnValues(col)}
+            onSortAsc={() => sheetRowOps.handleSortByColumn(col.key, "asc")}
+            onSortDesc={() => sheetRowOps.handleSortByColumn(col.key, "desc")}
             onSetCurrency={(currencyCode) => {
               const updated = columns.map((c) => c.key === col.key ? { ...c, currencyCode } : c);
               setSheetState((p) => ({ ...p, columns: updated })); columnsHistory.pushState(updated);
