@@ -234,6 +234,44 @@ export interface ConditionalFormatRule {
   format: Pick<CellFormat, "bold" | "italic" | "textColor" | "bgColor">;
 }
 
+export type AutomationConditionOperator =
+  | "always"
+  | "equals"
+  | "not_equals"
+  | "contains"
+  | "empty"
+  | "not_empty"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "date_before_today"
+  | "date_in_next_days";
+
+export type AutomationActionType =
+  | "notify"
+  | "update_cell"
+  | "archive_row"
+  | "pin_row";
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  condition: {
+    columnKey: string;
+    operator: AutomationConditionOperator;
+    value?: string;
+  };
+  actions: Array<{
+    id: string;
+    type: AutomationActionType;
+    columnKey?: string;
+    value?: string;
+    message?: string;
+  }>;
+}
+
 /* ============================================================
    History
 ============================================================ */

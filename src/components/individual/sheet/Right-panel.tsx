@@ -36,7 +36,7 @@ import type {
   TimeTravelActions,
 } from "@/hooks/use-time-travel";
 import type { SheetChart, ChartPanelTab } from "@/hooks/sheets/use-charts";
-import type { ConditionalFormatRule, SheetRow, ColumnDef, SelectOption } from "@/types/index";
+import type { AutomationRule, ConditionalFormatRule, SheetRow, ColumnDef, SelectOption } from "@/types/index";
 
 // ─────────────────────────────────────────────────────────────
 //  TYPES
@@ -116,6 +116,8 @@ interface RightPanelProps {
 
   onUpdateRow?: (rowId: string, updates: Record<string, any>) => void;
   onRunAutomation?: () => void;
+  automationRules?: AutomationRule[];
+  onChangeAutomationRules?: (rules: AutomationRule[]) => void;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -217,6 +219,8 @@ export default function RightPanel({
   onApplyValidation,
   onUpdateRow,
   onRunAutomation,
+  automationRules = [],
+  onChangeAutomationRules,
 }: RightPanelProps) {
   const meta = PANEL_META[rightPanel] ?? PANEL_META.developer;
   const Icon = meta.icon;
@@ -326,7 +330,16 @@ export default function RightPanel({
           />
         )}
 
-        {rightPanel === "automation" && <AutomationPanel isDark={d} selectedCell={selectedCell ?? null} onRun={onRunAutomation} />}
+        {rightPanel === "automation" && (
+          <AutomationPanel
+            isDark={d}
+            selectedCell={selectedCell ?? null}
+            columns={columns}
+            rules={automationRules}
+            onChangeRules={onChangeAutomationRules ?? (() => {})}
+            onRun={onRunAutomation}
+          />
+        )}
         {rightPanel === "aiassistant" && <AiAssistantPanel isDark={d} />}
         {rightPanel === "shortcuts" && <KeyboardShortcutsPanel isDark={d} />}
         {rightPanel === "conditional" && (

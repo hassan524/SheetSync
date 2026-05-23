@@ -60,7 +60,16 @@ import FormulaDialog from "./dialogs/Formula-dialog";
 import { ddStyle, ddItemStyle, getMemberColor, CommentDot, CollabCursor, SheetAvatar } from "@/components/individual/sheet/sheet-ui-helpers";
 
 // ── Lib ────────────────────────────────────────────────────────────────────
-import { SheetRow, ColumnDef, CellFormat, SaveStatus, ConditionalFormatRule, SelectOption, SavedFilterView } from "@/types/index";
+import {
+  SheetRow,
+  ColumnDef,
+  CellFormat,
+  SaveStatus,
+  ConditionalFormatRule,
+  SelectOption,
+  SavedFilterView,
+  AutomationRule,
+} from "@/types/index";
 import { getTemplateData } from "@/lib/sheet-templates";
 import { updateSheetTitle, updateSheetStarred, loadSheet, updateSheetCharts, updateSheetRowHeights } from "@/lib/querys/sheet/sheet";
 import { saveRow, saveAllRows } from "@/lib/querys/sheet/rows";
@@ -181,6 +190,7 @@ export default function SheetClient() {
   } | null>(null);
   const [savedViews, setSavedViews] = useState<SavedFilterView[]>([]);
   const [frozenRowsCount, setFrozenRowsCount] = useState(0);
+  const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
 
   // Sub-hooks
   // Formatting hook for bold / italic / colors and cell style logic.
@@ -255,10 +265,27 @@ export default function SheetClient() {
     setFrozenRowsCount(raw === "1" ? 1 : 0);
   }, [sheetId]);
 
+  useEffect(() => {
+    if (!sheetId || typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(`sheetsync:${sheetId}:automation-rules`);
+      setAutomationRules(raw ? JSON.parse(raw) : []);
+    } catch {
+      setAutomationRules([]);
+    }
+  }, [sheetId]);
+
   const persistSavedViews = useCallback((views: SavedFilterView[]) => {
     setSavedViews(views);
     if (sheetId && typeof window !== "undefined") {
       window.localStorage.setItem(`sheetsync:${sheetId}:filter-views`, JSON.stringify(views));
+    }
+  }, [sheetId]);
+
+  const persistAutomationRules = useCallback((rules: AutomationRule[]) => {
+    setAutomationRules(rules);
+    if (sheetId && typeof window !== "undefined") {
+      window.localStorage.setItem(`sheetsync:${sheetId}:automation-rules`, JSON.stringify(rules));
     }
   }, [sheetId]);
 
@@ -942,9 +969,170 @@ export default function SheetClient() {
     toast.success("Formula inserted — edit as needed");
   }, [selectedCell, rows, protection.isRowProtected, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
 
+  const showAutomationNotification = useCallback((title: string, body: string) => {
+    toast.info(body || title);
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      new Notification(title, { body: body || title, icon: "/icon.png" });
+      return;
+    }
+    if (Notification.permission === "default") {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification(title, { body: body || title, icon: "/icon.png" });
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  const automationConditionMatches = useCallback((rule: AutomationRule, row: SheetRow) => {
+    const { columnKey, operator, value } = rule.condition;
+    if (operator === "always") return true;
+    const rawValue = row[columnKey];
+    const current = String(rawValue ?? "").trim();
+    const compare = String(value ?? "").trim();
+    const currentLower = current.toLowerCase();
+    const compareLower = compare.toLowerCase();
+    const currentNumber = Number(current);
+    const compareNumber = Number(compare);
+
+    switch (operator) {
+      case "equals":
+        return currentLower === compareLower;
+      case "not_equals":
+        return currentLower !== compareLower;
+      case "contains":
+        return currentLower.includes(compareLower);
+      case "empty":
+        return current === "";
+      case "not_empty":
+        return current !== "";
+      case "gt":
+        return !Number.isNaN(currentNumber) && !Number.isNaN(compareNumber) && currentNumber > compareNumber;
+      case "gte":
+        return !Number.isNaN(currentNumber) && !Number.isNaN(compareNumber) && currentNumber >= compareNumber;
+      case "lt":
+        return !Number.isNaN(currentNumber) && !Number.isNaN(compareNumber) && currentNumber < compareNumber;
+      case "lte":
+        return !Number.isNaN(currentNumber) && !Number.isNaN(compareNumber) && currentNumber <= compareNumber;
+      case "date_before_today": {
+        const date = new Date(current);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return !Number.isNaN(date.getTime()) && date < today;
+      }
+      case "date_in_next_days": {
+        const date = new Date(current);
+        const days = Number(compare || 0);
+        if (Number.isNaN(date.getTime()) || Number.isNaN(days)) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const limit = new Date(today);
+        limit.setDate(limit.getDate() + days);
+        return date >= today && date <= limit;
+      }
+      default:
+        return false;
+    }
+  }, []);
+
+  const buildAutomationSignature = useCallback((rule: AutomationRule, row: SheetRow) => {
+    const watchedValue = rule.condition.operator === "always"
+      ? JSON.stringify(columns.map((column) => row[column.key] ?? ""))
+      : String(row[rule.condition.columnKey] ?? "");
+    return `${rule.id}:${rule.condition.operator}:${watchedValue}:${rule.actions.map((action) => `${action.type}:${action.columnKey ?? ""}:${action.value ?? ""}:${action.message ?? ""}`).join("|")}`;
+  }, [columns]);
+
+  const runAutomationsForRows = useCallback(async (targetRows: SheetRow[], baseRows: SheetRow[] = rows) => {
+    const activeRules = automationRules.filter((rule) => rule.enabled && rule.actions.length > 0);
+    if (activeRules.length === 0 || targetRows.length === 0) return;
+
+    let changed = false;
+    let notificationCount = 0;
+    const targetIds = new Set(targetRows.map((row) => row.id));
+    const nextRows = baseRows.map((row) => {
+      if (!targetIds.has(row.id) || protection.isRowProtected(row.id)) return row;
+      let nextRow = row;
+      const automationRuns: Record<string, string> = { ...(row._automationRuns ?? {}) };
+
+      activeRules.forEach((rule) => {
+        if (!automationConditionMatches(rule, nextRow)) return;
+        const signature = buildAutomationSignature(rule, nextRow);
+        if (automationRuns[rule.id] === signature) return;
+
+        rule.actions.forEach((action) => {
+          if (action.type === "notify") {
+            const rowNumber = baseRows.findIndex((item) => item.id === row.id) + 1;
+            showAutomationNotification(rule.name, action.message || `Automation matched row ${rowNumber}`);
+            notificationCount += 1;
+          }
+          if (action.type === "update_cell" && action.columnKey) {
+            nextRow = { ...nextRow, [action.columnKey]: action.value ?? "" };
+            changed = true;
+          }
+          if (action.type === "archive_row") {
+            nextRow = { ...nextRow, _archived: true, status: nextRow.status === undefined ? "Archived" : nextRow.status };
+            changed = true;
+          }
+          if (action.type === "pin_row") {
+            nextRow = { ...nextRow, pinned: true };
+            changed = true;
+          }
+        });
+
+        automationRuns[rule.id] = signature;
+        nextRow = { ...nextRow, _automationRuns: automationRuns };
+        changed = true;
+      });
+
+      return nextRow;
+    });
+
+    if (!changed) {
+      if (notificationCount === 0) toast.info("No automation matched this row.");
+      return;
+    }
+
+    const validation = validateRows(nextRows, baseRows);
+    if (!validation.ok) {
+      toast.error(`Automation blocked: ${validation.message}`);
+      return;
+    }
+
+    rowsHistory.pushState(nextRows);
+    setSheetState((prev) => ({ ...prev, rows: nextRows }));
+    markSaving();
+    try {
+      await saveAllRows(sheetId, nextRows);
+      toast.success("Automation applied");
+    } catch {
+      toast.error("Automation ran locally but failed to save.");
+    } finally {
+      markSaved();
+    }
+  }, [
+    automationRules,
+    automationConditionMatches,
+    buildAutomationSignature,
+    rows,
+    protection.isRowProtected,
+    validateRows,
+    rowsHistory,
+    setSheetState,
+    markSaving,
+    sheetId,
+    markSaved,
+    showAutomationNotification,
+  ]);
+
   const handleUpdateRow = useCallback(async (rowId: string, updates: Record<string, any>) => {
     const prevRow = rows.find((r) => r.id === rowId);
     const updatedRows = rows.map((row) => (row.id === rowId ? { ...row, ...updates } : row));
+    const validation = validateRows(updatedRows, rows);
+    if (!validation.ok) {
+      toast.error(validation.message);
+      return;
+    }
     rowsHistory.pushState(updatedRows);
     setSheetState((prev) => ({ ...prev, rows: updatedRows }));
     markSaving();
@@ -975,44 +1163,14 @@ export default function SheetClient() {
           }
         });
       }
+      const updatedRow = updatedRows.find((r) => r.id === rowId);
+      if (updatedRow) setTimeout(() => { runAutomationsForRows([updatedRow], updatedRows).catch(() => {}); }, 60);
     } catch {
       toast.error("Failed to save row update.");
     } finally {
       markSaved();
-      const updatedRow = updatedRows.find((r) => r.id === rowId);
-      if (updatedRow) setTimeout(() => { try { runAutomationsForRow(updatedRow); } catch (e) { /* ignore */ } }, 60);
     }
-  }, [rows, rowsHistory, setSheetState, sheetId, markSaving, markSaved, isOrgSheet, columns, currentUser]);
-
-  const runAutomationsForRow = useCallback(async (row: SheetRow) => {
-    if (!row) return;
-    // Example automation: if status == Done/finished => archive
-    const status = String(row.status ?? "").toLowerCase();
-    if (status === "done" || status === "completed" || status === "finished") {
-      if (row.status !== "archived") {
-        await handleUpdateRow(row.id, { status: "archived" });
-        toast.info(`Row ${rows.findIndex((r) => r.id === row.id) + 1} archived by automation`);
-        return;
-      }
-    }
-
-    // Example automation: due date passed => send reminder (UI-only: create history entry)
-    const dateCol = columns.find((c) => c.type === "date" || /due|date|deadline/i.test(c.key));
-    if (dateCol) {
-      const val = row[dateCol.key];
-      if (val) {
-        const d = new Date(String(val));
-        if (!isNaN(d.getTime())) {
-          const today = new Date();
-          if (d < today && !row._reminderSent) {
-            // mark reminder sent to avoid repeats
-            await handleUpdateRow(row.id, { _reminderSent: true });
-            toast.info(`Automation: reminder for row ${rows.findIndex((r) => r.id === row.id) + 1}`);
-          }
-        }
-      }
-    }
-  }, [columns, handleUpdateRow, rows]);
+  }, [rows, validateRows, rowsHistory, setSheetState, sheetId, markSaving, markSaved, isOrgSheet, columns, currentUser, runAutomationsForRows]);
 
   const handleTogglePinRow = useCallback(async () => {
     if (!selectedCell) { toast.info("Select a row first"); return; }
@@ -1075,8 +1233,18 @@ export default function SheetClient() {
   }, [frozenRowsCount, sheetId]);
 
   const handleApplyValidation = useCallback(async (columnKey: string, rules: any) => {
+    const dropdownOptions = Array.isArray(rules?.options)
+      ? rules.options.map((option: any) => String(option).trim()).filter(Boolean)
+      : [];
     const nextColumns = columns.map((column) =>
-      column.key === columnKey ? { ...column, validation_rules: rules } : column,
+      column.key === columnKey
+        ? {
+          ...column,
+          type: rules?.type === "dropdown" ? "select" as ColumnDef["type"] : rules?.type === "number" ? "number" as ColumnDef["type"] : column.type,
+          selectOptions: rules?.type === "dropdown" ? dropdownOptions : column.selectOptions,
+          validation_rules: rules?.type === "dropdown" ? { ...rules, options: dropdownOptions } : rules,
+        }
+        : column,
     );
     await sheetColOps.persistColumns(nextColumns);
     setRightPanel(null);
@@ -1201,7 +1369,11 @@ export default function SheetClient() {
       return;
     }
     persistence.handleRowsChange(guardedRows, rows, rowsHistory.pushState);
-  }, [persistence.handleRowsChange, rows, rowsHistory.pushState, protection.isRowProtected, validateRows]);
+    const changedRows = guardedRows.filter((row, index) => JSON.stringify(row) !== JSON.stringify(rows[index]));
+    if (changedRows.length > 0) {
+      setTimeout(() => { runAutomationsForRows(changedRows, guardedRows).catch(() => {}); }, 80);
+    }
+  }, [persistence.handleRowsChange, rows, rowsHistory.pushState, protection.isRowProtected, validateRows, runAutomationsForRows]);
 
   const handleImageChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1970,7 +2142,13 @@ export default function SheetClient() {
           onToggleFilters={() => setShowFilters(!showFilters)}
           onHideColumn={sheetColOps.handleHideColumn}
           onToggleChartPicker={charts.showPicker ? charts.closePicker : charts.openPicker}
-          onTogglePanel={(panel) => { toggleRightPanel(panel); if (panel === "timetravel") { if (rightPanel !== "timetravel") timeTravelActions.openPanel(); else timeTravelActions.closePanel(); } }}
+          onTogglePanel={(panel) => {
+            if ((panel === "validation" || panel === "automation") && selectedCell?.col) {
+              setFocusedColumnKey(selectedCell.col);
+            }
+            toggleRightPanel(panel);
+            if (panel === "timetravel") { if (rightPanel !== "timetravel") timeTravelActions.openPanel(); else timeTravelActions.closePanel(); }
+          }}
           onToggleRowProtection={handleToggleRowProtection}
           onTogglePinRow={handleTogglePinRow}
           selectedRowPinned={selectedCell ? rows[selectedCell.row]?.pinned ?? false : false}
@@ -2087,13 +2265,15 @@ export default function SheetClient() {
                   onSaveConditionalRule={handleSaveConditionalRule}
                   onDeleteConditionalRule={handleDeleteConditionalRule}
                   onApplyColumns={handleApplyColumns}
-                  focusedColumnKey={focusedColumnKey}
+                  focusedColumnKey={focusedColumnKey ?? selectedCell?.col ?? null}
                   onApplySelectOptions={handleApplySelectOptions}
                   selectedRowIndex={selectedCell?.row ?? null}
                   history={history}
                   onApplyValidation={handleApplyValidation}
                   onUpdateRow={handleUpdateRow}
-                  onRunAutomation={() => { if (selectedCell) runAutomationsForRow(rows[selectedCell.row]); }}
+                  automationRules={automationRules}
+                  onChangeAutomationRules={persistAutomationRules}
+                  onRunAutomation={() => { if (selectedCell && rows[selectedCell.row]) runAutomationsForRows([rows[selectedCell.row]]); }}
                 />
               </div>
             </>
