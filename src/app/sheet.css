@@ -119,9 +119,21 @@
     overflow-x: hidden;
   }
 
+  /* Center submenu portal on mobile screens to prevent horizontal overflow */
+  body [data-radix-popper-content-wrapper]:has(.sheet-mobile-submenu) {
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    position: fixed !important;
+  }
+
   .sheet-mobile-submenu {
-    max-width: calc(100vw - 1rem);
-    transform: translateY(4px) !important;
+    width: 200px !important;
+    max-height: 320px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+    background: var(--popover-bg) !important;
+    border: 1px solid var(--popover-border) !important;
   }
 }
 

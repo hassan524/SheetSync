@@ -114,6 +114,7 @@ export default function SheetClient() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeCell, setActiveCell] = useState<{ rowId: string; colKey: string } | null>(null);
   const [focusedColumnKey, setFocusedColumnKey] = useState<string | null>(null);
+  const [selectedColumnKey, setSelectedColumnKey] = useState<string | null>(null);
 
   // This hook gives us the main sheet editor state.
   // It stores the rows, columns, selected cell, panel state, and many UI flags.
@@ -621,8 +622,24 @@ export default function SheetClient() {
     setSheetState((p) => { const n = !p.starred; updateSheetStarred(sheetId, n); return { ...p, starred: n }; });
   }, [sheetId]);
 
+  const handleApplyColumnFormat = useCallback(async (columnKey: string, formatUpdate: Partial<CellFormat>) => {
+    const nextColumns = columns.map((col) => {
+      if (col.key !== columnKey) return col;
+      return { ...col, conditional_formatting: { ...(col.conditional_formatting ?? {}), columnFormat: { ...(col.conditional_formatting?.columnFormat ?? {}), ...formatUpdate } } };
+    });
+    await sheetColOps.persistColumns(nextColumns);
+  }, [columns, sheetColOps.persistColumns]);
+
   // Apply a formatting change to the selected cell and persist it.
   const handleFormatChange = useCallback(async (format: any) => {
+    if (selectedColumnKey) {
+      await handleApplyColumnFormat(selectedColumnKey, format);
+      toast.success("Applied format to entire column");
+      return;
+    }
+
+
+
     // If there's an active rectangular selection, apply format to every cell in the range.
     if (selectionRange) {
       const startRow = Math.min(selectionRange.start.row, selectionRange.end.row);
@@ -654,7 +671,7 @@ export default function SheetClient() {
     markSaving();
     await saveCellFormat(sheetId, cellKey, merged);
     markSaved();
-  }, [selectedCell, selectionRange, sheetId, markSaving, markSaved, formatting.applyFormat, formatting.getCurrentCellFormat, columns]);
+  }, [selectedCell, selectionRange, sheetId, markSaving, markSaved, formatting.applyFormat, formatting.getCurrentCellFormat, columns, selectedColumnKey, handleApplyColumnFormat]);
 
   // Paste the copied or cut cell range, then save the new row state.
   const handleSmartCopy = useCallback(() => {
@@ -697,7 +714,7 @@ export default function SheetClient() {
         markSaving();
         await Promise.all([
           saveAllRows(sheetId, nextRows),
-          payload.formula?.startsWith("=") ? saveFormula(sheetId, cellKey, payload.formula) : deleteFormula(sheetId, cellKey).catch(() => {}),
+          payload.formula?.startsWith("=") ? saveFormula(sheetId, cellKey, payload.formula) : deleteFormula(sheetId, cellKey).catch(() => { }),
           payload.format ? saveCellFormat(sheetId, cellKey, payload.format) : Promise.resolve(),
         ]);
         markSaved();
@@ -717,6 +734,7 @@ export default function SheetClient() {
 
   const onCellPointerDown = useCallback((rowIdx: number, colKey: string, e: React.PointerEvent) => {
     e.preventDefault();
+    setSelectedColumnKey(null);
     const colIndex = columns.findIndex((c) => c.key === colKey);
     if (colIndex === -1) return;
     selectionAnchorRef.current = { row: rowIdx, colIndex };
@@ -1038,13 +1056,6 @@ export default function SheetClient() {
     await sheetColOps.persistColumns(nextColumns);
   }, [columns, sheetColOps.persistColumns]);
 
-  const handleApplyColumnFormat = useCallback(async (columnKey: string, formatUpdate: Partial<CellFormat>) => {
-    const nextColumns = columns.map((col) => {
-      if (col.key !== columnKey) return col;
-      return { ...col, conditional_formatting: { ...(col.conditional_formatting ?? {}), columnFormat: { ...(col.conditional_formatting?.columnFormat ?? {}), ...formatUpdate } } };
-    });
-    await sheetColOps.persistColumns(nextColumns);
-  }, [columns, sheetColOps.persistColumns]);
 
   const handleToggleFreezeColumn = useCallback(async (columnKey: string) => {
     const nextColumns = columns.map((column) =>
@@ -1077,9 +1088,9 @@ export default function SheetClient() {
       .map((option) =>
         typeof option === "string"
           ? {
-              label: option.trim(),
-              bgColor: getOptionBgStyle(option).backgroundColor,
-            }
+            label: option.trim(),
+            bgColor: getOptionBgStyle(option).backgroundColor,
+          }
           : { label: option.label.trim(), bgColor: option.bgColor },
       )
       .filter((option) => option.label);
@@ -1270,11 +1281,11 @@ export default function SheetClient() {
         [ROW_CELL_TYPES_KEY]: { ...(row[ROW_CELL_TYPES_KEY] ?? {}), [selectedCell.col]: type },
         ...(type === "select"
           ? {
-              [ROW_CELL_SELECT_OPTIONS_KEY]: {
-                ...(row[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}),
-                [selectedCell.col]: selectOptionLabels,
-              },
-            }
+            [ROW_CELL_SELECT_OPTIONS_KEY]: {
+              ...(row[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}),
+              [selectedCell.col]: selectOptionLabels,
+            },
+          }
           : {}),
       };
     });
@@ -1429,7 +1440,20 @@ export default function SheetClient() {
     const dataCols = columns.filter((col) => !col.hidden).map((col): Column<SheetRow, SheetRow> => ({
       key: col.key, name: col.name, width: col.width || 160, resizable: true, frozen: col.frozen,
       renderHeaderCell: () => (
-        <div className={`h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer ${selectedCell && selectedCell.col === col.key ? "bg-primary/10" : ""}`} draggable
+        <div className={`h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer ${selectedColumnKey === col.key ? "bg-primary/15" : (selectedCell && selectedCell.col === col.key ? "bg-primary/10" : "")}`}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("button")) return;
+            setSelectedColumnKey(col.key);
+            setSelectedCell({ row: 0, col: col.key });
+            const colIdx = columns.findIndex((c) => c.key === col.key);
+            if (colIdx >= 0) {
+              setSelectionRange({
+                start: { row: 0, colIndex: colIdx },
+                end: { row: rows.length - 1, colIndex: colIdx }
+              });
+            }
+          }}
+          draggable
           onDragStart={() => colOps.handleColumnDragStart(col.key)}
           onDragOver={(e) => colOps.handleColumnDragOver(e, col.key, (u: any) => setSheetState((p) => ({ ...p, columns: typeof u === "function" ? u(p.columns) : u })))}
           onDragEnd={sheetColOps.handleColumnDragEnd}>
@@ -1459,11 +1483,6 @@ export default function SheetClient() {
             onUpdateSelectOptions={(opts) => sheetColOps.handleUpdateSelectOptions(col.key, opts)}
             onFillColumnNumbers={() => handleFillColumnNumbers(col.key)}
             onFillColumnHashNumbers={() => handleFillColumnHashNumbers(col.key)}
-            onSetWidth={(w) => {
-              const updated = columns.map((c) => c.key === col.key ? { ...c, width: w } : c);
-              setSheetState((p) => ({ ...p, columns: updated })); columnsHistory.pushState(updated);
-              setTimeout(async () => { markSaving(); await saveAllColumns(sheetId, columnsHistory.currentState); markSaved(); }, 50);
-            }}
             onInsertLeft={() => { const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx, null, "blank"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
             onInsertRight={() => { const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, null, "blank"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
             onDuplicate={() => { const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, col, "duplicate"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
@@ -1514,12 +1533,16 @@ export default function SheetClient() {
             cellComments={[...(comments[`${rowIdx}-${col.key}`] || []), ...(comments[`row:${props.row.id}`] || [])]}
             activeCollab={activeCollabEntry ? { name: activeCollabEntry.name, color: activeCollabEntry.color } : null}
             horizontalAlign={(getEffectiveCellStyle(rowIdx, col.key, props.row).textAlign as any) ?? undefined}
-              onCellClick={() => { setSelectedCell({ row: rowIdx, col: col.key }); setActiveCommentCell(`row:${rows[rowIdx]?.id}`); }}
-              onCommentClick={(e) => { e.stopPropagation(); setActiveCommentCell(`row:${rows[rowIdx]?.id}`); setRightPanel("comments"); }}
-              onPointerDown={onCellPointerDown}
-              onPointerEnter={onCellPointerEnter}
-              onFillStart={onFillStart}
-              isSelected={inSelection}
+            onCellClick={() => {
+              setSelectedColumnKey(null);
+              setSelectedCell({ row: rowIdx, col: col.key });
+              setActiveCommentCell(`row:${rows[rowIdx]?.id}`);
+            }}
+            onCommentClick={(e) => { e.stopPropagation(); setActiveCommentCell(`row:${rows[rowIdx]?.id}`); setRightPanel("comments"); }}
+            onPointerDown={onCellPointerDown}
+            onPointerEnter={onCellPointerEnter}
+            onFillStart={onFillStart}
+            isSelected={inSelection}
           />
         );
       },
@@ -1720,18 +1743,18 @@ export default function SheetClient() {
                 {selectOpts.map((opt) => {
                   const optionLabel = getSelectOptionLabel(opt);
                   return (
-                  <SelectItem
-                    key={optionLabel}
-                    value={optionLabel}
-                    style={ddItemStyle(isDark)}
-                  >
-                    <span
-                      className="sheet-badge-pill"
-                      style={getOptionBgStyle(opt)}
+                    <SelectItem
+                      key={optionLabel}
+                      value={optionLabel}
+                      style={ddItemStyle(isDark)}
                     >
-                      {optionLabel}
-                    </span>
-                  </SelectItem>
+                      <span
+                        className="sheet-badge-pill"
+                        style={getOptionBgStyle(opt)}
+                      >
+                        {optionLabel}
+                      </span>
+                    </SelectItem>
                   );
                 })}
                 {selectOpts.length === 0 && (
@@ -1825,7 +1848,7 @@ export default function SheetClient() {
     }));
 
     return [rowNumberCol, ...dataCols];
-  }, [columns, rows, selectedRows, textWrap.textWrapColumns, cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas, formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey, protection.isCellProtected, protection.isRowProtected, sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, colOps, markSaving, markSaved, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat, handleToggleFreezeColumn, isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove, endRowResize, toggleRowProtectionById, onFillStart]);
+  }, [columns, rows, selectedRows, selectedColumnKey, textWrap.textWrapColumns, cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas, formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey, protection.isCellProtected, protection.isRowProtected, sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, colOps, markSaving, markSaved, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat, handleToggleFreezeColumn, isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove, endRowResize, toggleRowProtectionById, onFillStart]);
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -1880,6 +1903,48 @@ export default function SheetClient() {
           onHideColumn={sheetColOps.handleHideColumn}
           onFillColumnNumbers={() => selectedCell && handleFillColumnNumbers(selectedCell.col)}
           onFillColumnHashNumbers={() => selectedCell && handleFillColumnHashNumbers(selectedCell.col)}
+          selectedColumnKey={selectedColumnKey}
+          selectedColumnWidth={selectedColumnKey ? (columns.find((c) => c.key === selectedColumnKey)?.width ?? 160) : null}
+          onSetColumnWidth={(w) => {
+            if (selectedColumnKey) {
+              const updated = columns.map((c) => c.key === selectedColumnKey ? { ...c, width: w } : c);
+              setSheetState((p) => ({ ...p, columns: updated }));
+              columnsHistory.pushState(updated);
+              setTimeout(async () => {
+                markSaving();
+                await saveAllColumns(sheetId, columnsHistory.currentState);
+                markSaved();
+              }, 50);
+            }
+          }}
+          onExpandAllColumns={(amount) => {
+            const updated = columns.map((c) => ({ ...c, width: Math.max(30, (c.width ?? 160) + amount) }));
+            setSheetState((p) => ({ ...p, columns: updated }));
+            columnsHistory.pushState(updated);
+            setTimeout(async () => {
+              markSaving();
+              await saveAllColumns(sheetId, columnsHistory.currentState);
+              markSaved();
+            }, 50);
+          }}
+          onDragResizeAllColumns={(amount) => {
+            const updated = columns.map((c) => ({ ...c, width: Math.max(30, Math.min(600, (c.width ?? 160) + amount)) }));
+            setSheetState((p) => ({ ...p, columns: updated }));
+            columnsHistory.pushState(updated);
+          }}
+          onEndResizeAllColumns={() => {
+            setTimeout(async () => {
+              markSaving();
+              await saveAllColumns(sheetId, columnsHistory.currentState);
+              markSaved();
+            }, 50);
+          }}
+          onOpenValidation={() => {
+            if (selectedColumnKey) {
+              setFocusedColumnKey(selectedColumnKey);
+              setRightPanel("validation");
+            }
+          }}
         />
 
         <FormulaBar

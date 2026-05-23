@@ -3,7 +3,7 @@
 import React from "react";
 import {
   Undo2, Redo2, Copy, Scissors, Clipboard, WrapText, Lock, Unlock,
-  Sigma, SlidersHorizontal, Search, X,
+  Sigma, SlidersHorizontal, Search, X, ChevronsLeftRight, ChevronsRightLeft, Maximize2,
 } from "lucide-react";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -53,6 +53,13 @@ interface FormattingBarProps {
   onSearchClose: () => void;
   onSort: (dir: "asc" | "desc") => void;
   onHideColumn: () => void;
+  selectedColumnKey?: string | null;
+  selectedColumnWidth?: number | null;
+  onSetColumnWidth?: (w: number) => void;
+  onExpandAllColumns?: (amount: number) => void;
+  onDragResizeAllColumns?: (delta: number) => void;
+  onEndResizeAllColumns?: () => void;
+  onOpenValidation?: () => void;
 }
 
 const FONT_FAMILIES = [
@@ -70,8 +77,44 @@ export function FormattingBar({
   onFontFamilyChange, onFontSizeChange, onFormatChange, onCellTypeChange,
   onTextWrapToggle, onProtectionToggle, onFillColumnNumbers = () => {}, onFillColumnHashNumbers = () => {}, onFormulaOpen,
   onSearchToggle, onSearchChange, onSearchClose, onSort, onHideColumn,
+  selectedColumnKey, selectedColumnWidth, onSetColumnWidth, onExpandAllColumns,
+  onDragResizeAllColumns, onEndResizeAllColumns, onOpenValidation,
 }: FormattingBarProps) {
   const selStyle = ddStyle(isDark);
+
+  const dragResizeStartX = React.useRef<number | null>(null);
+  const [isDraggingAll, setIsDraggingAll] = React.useState(false);
+
+  const handleAllColumnsPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragResizeStartX.current = e.clientX;
+    setIsDraggingAll(true);
+  };
+
+  const handleAllColumnsPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (dragResizeStartX.current === null) return;
+    const deltaX = e.clientX - dragResizeStartX.current;
+    if (Math.abs(deltaX) >= 8) {
+      onDragResizeAllColumns?.(Math.sign(deltaX) * 10);
+      dragResizeStartX.current = e.clientX;
+    }
+  };
+
+  const handleAllColumnsPointerEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    dragResizeStartX.current = null;
+    setIsDraggingAll(false);
+    onEndResizeAllColumns?.();
+  };
+
+  const [widthVal, setWidthVal] = React.useState(String(selectedColumnWidth ?? 160));
+
+  React.useEffect(() => {
+    setWidthVal(String(selectedColumnWidth ?? 160));
+  }, [selectedColumnWidth]);
 
   return (
     <div className="sheet-toolbar sheet-formatting-bar border-b shrink-0" style={{ height: "40px" }}>
@@ -94,6 +137,53 @@ export function FormattingBar({
             ))}
           </SelectContent>
         </Select>
+
+        {/* Global Column Width Expand/Shrink buttons */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => onExpandAllColumns?.(-15)}
+              className="sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0 ml-1"
+            >
+              <ChevronsRightLeft className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
+            Shrink all columns
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => onExpandAllColumns?.(15)}
+              className="sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0"
+            >
+              <ChevronsLeftRight className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
+            Expand all columns
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onPointerDown={handleAllColumnsPointerDown}
+              onPointerMove={handleAllColumnsPointerMove}
+              onPointerUp={handleAllColumnsPointerEnd}
+              onPointerCancel={handleAllColumnsPointerEnd}
+              className={`sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0 ${isDraggingAll ? "bg-primary/15" : ""}`}
+              title="Drag to resize all columns"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
+            Drag to resize all columns
+          </TooltipContent>
+        </Tooltip>
+
         <ToolSep />
         <IconBtn icon={Copy} tooltip="Copy" shortcut="Ctrl+C" onClick={onCopy} />
         <IconBtn icon={Scissors} tooltip="Cut" shortcut="Ctrl+X" onClick={onCut} />
@@ -235,6 +325,51 @@ export function FormattingBar({
             Browse and insert formulas
           </TooltipContent>
         </Tooltip>
+
+        {/* Selected Column Specific Controls (Width & Validation) */}
+        {selectedColumnKey && (
+          <>
+            <ToolSep />
+            <div className="flex items-center gap-1.5 shrink-0 ml-1">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider select-none">Col Width</span>
+              <input
+                type="text"
+                className="h-7 w-12 rounded-md border border-border bg-background px-1 text-xs text-center outline-none focus:ring-2 focus:ring-primary/30 font-mono font-medium"
+                value={widthVal}
+                onChange={(e) => setWidthVal(e.target.value)}
+                onBlur={() => {
+                  const val = Number(widthVal.replace(/[^\d]/g, ""));
+                  if (!Number.isNaN(val) && val >= 30 && val <= 600) {
+                    onSetColumnWidth?.(val);
+                  } else {
+                    setWidthVal(String(selectedColumnWidth ?? 160));
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  }
+                }}
+              />
+            </div>
+            <ToolSep />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onOpenValidation}
+                  className="sheet-icon-btn h-7 px-2.5 rounded-md flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all shrink-0 font-semibold"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  <span className="text-[11px]">Validation</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
+                Add data validation for this column
+              </TooltipContent>
+            </Tooltip>
+          </>
+        )}
+
         <ToolSep />
         {showSearch ? (
           <div className="flex items-center gap-1 shrink-0">
