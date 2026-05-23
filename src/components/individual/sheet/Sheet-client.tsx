@@ -76,7 +76,17 @@ import { supabase } from "@/lib/supabase/client";
 import { trackSheetOpen } from "@/lib/querys/sheet/track-open";
 import { subscribeToHistory, subscribeToComments, addComment, resolveComment, logCellEdit, logRowAdd, logFormulaSet, logColumnRename } from "@/lib/querys/sheet/firebase-realtime";
 import { maybeAutoSnapshot } from "@/lib/querys/sheet/snapshots";
-import { ensureWorkingRowBuffer, normalizeGeneratedColumnNames, columnIndexToName, ROW_CELL_TYPES_KEY, ROW_CELL_SELECT_OPTIONS_KEY, getDefaultValueForType, getOptionBgStyle, getSelectOptionLabel } from "@/utils/SheetUtils";
+import {
+  ensureWorkingRowBuffer,
+  normalizeGeneratedColumnNames,
+  columnIndexToName,
+  ROW_CELL_TYPES_KEY,
+  ROW_CELL_SELECT_OPTIONS_KEY,
+  getDefaultValueForType,
+  getOptionBgStyle,
+  getSelectOptionLabel,
+  getChoiceOptionsForColumn,
+} from "@/utils/SheetUtils";
 import { getStatusOptionStyle, isCellInConditionalRange, conditionalRuleMatches } from "@/lib/sheet-formatting-helpers";
 // @ts-ignore
 import "@/app/sheet.css";
@@ -255,7 +265,7 @@ export default function SheetClient() {
   // This hook saves sheet changes and keeps the backend in sync.
   const persistence = useSheetPersistence({
     sheetId, organizationId, isOrgSheet, title, rows, columns,
-    currentUserId: currentUser?.id, setSaveStatus, rowsHistoryCurrentState: rowsHistory.currentState,
+    currentUserId: currentUser?.id, currentUser, setSaveStatus, rowsHistoryCurrentState: rowsHistory.currentState,
   });
 
   // ── Row ops hook ───────────────────────────────────────────────────────
@@ -458,8 +468,7 @@ export default function SheetClient() {
     const activeCols = timeTravelState.previewColumns || columns;
     const q = (searchQuery || filterValue).trim().toLowerCase();
     const activeRules = advancedFilters.filter((rule) => rule.columnKey);
-    if (!q && activeRules.length === 0) return activeRows;
-    return activeRows.filter((row) => {
+    const matchingRows = !q && activeRules.length === 0 ? activeRows : activeRows.filter((row) => {
       const matchesSearch = !q || activeCols.some((col) => {
         const v = row[col.key];
         return v && String(v).toLowerCase().includes(q);
@@ -484,6 +493,11 @@ export default function SheetClient() {
         if (rule.operator === "lte") return left <= right;
         return true;
       });
+    });
+    const sourceIndex = new Map(activeRows.map((row, index) => [row.id, index]));
+    return [...matchingRows].sort((a, b) => {
+      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+      return (sourceIndex.get(a.id) ?? 0) - (sourceIndex.get(b.id) ?? 0);
     });
   }, [rows, columns, timeTravelState.previewRows, timeTravelState.previewColumns, searchQuery, filterValue, advancedFilters]);
 
@@ -911,6 +925,7 @@ export default function SheetClient() {
   }, [selectedCell, rows, protection.isRowProtected, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
 
   const handleUpdateRow = useCallback(async (rowId: string, updates: Record<string, any>) => {
+    const prevRow = rows.find((r) => r.id === rowId);
     const updatedRows = rows.map((row) => (row.id === rowId ? { ...row, ...updates } : row));
     rowsHistory.pushState(updatedRows);
     setSheetState((prev) => ({ ...prev, rows: updatedRows }));
@@ -918,6 +933,30 @@ export default function SheetClient() {
     try {
       await saveAllRows(sheetId, updatedRows);
       toast.success("Row updated");
+      if (isOrgSheet && prevRow) {
+        Object.entries(updates).forEach(([key, newVal]) => {
+          const oldVal = prevRow[key];
+          if (oldVal !== newVal) {
+            const col = columns.find((c) => c.key === key);
+            if (col) {
+              const colIdx = columns.findIndex((c) => c.key === key);
+              const cl = String.fromCharCode(65 + colIdx);
+              const rowIndex = rows.findIndex((r) => r.id === rowId);
+              logCellEdit(
+                sheetId,
+                `${cl}${rowIndex + 1}`,
+                col.name,
+                oldVal ?? null,
+                newVal ?? null,
+                currentUser?.name ?? "You",
+                currentUser ? getMemberColor(currentUser.id) : "#0d7c5f",
+                currentUser?.id ?? "local",
+                rowId
+              );
+            }
+          }
+        });
+      }
     } catch {
       toast.error("Failed to save row update.");
     } finally {
@@ -925,7 +964,7 @@ export default function SheetClient() {
       const updatedRow = updatedRows.find((r) => r.id === rowId);
       if (updatedRow) setTimeout(() => { try { runAutomationsForRow(updatedRow); } catch (e) { /* ignore */ } }, 60);
     }
-  }, [rows, rowsHistory, setSheetState, sheetId, markSaving, markSaved]);
+  }, [rows, rowsHistory, setSheetState, sheetId, markSaving, markSaved, isOrgSheet, columns, currentUser]);
 
   const runAutomationsForRow = useCallback(async (row: SheetRow) => {
     if (!row) return;
@@ -1621,10 +1660,7 @@ export default function SheetClient() {
 
         // ---------------- PRIORITY / STATUS ----------------
         if (cellType === "priority" || cellType === "status") {
-          const opts =
-            cellType === "priority"
-              ? ["Low", "Medium", "High", "Critical"]
-              : ["Not Started", "In Progress", "In Review", "Done", "Blocked"];
+          const opts = getChoiceOptionsForColumn({ ...col, type: cellType });
 
           return (
             <Select
@@ -1637,7 +1673,8 @@ export default function SheetClient() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent style={selStyle}>
-                {opts.map((value) => {
+                {opts.map((option) => {
+                  const value = getSelectOptionLabel(option);
                   const style = getStatusOptionStyle(value);
                   return (
                     <SelectItem
@@ -1664,13 +1701,10 @@ export default function SheetClient() {
 
         // ---------------- SELECT ----------------
         if (cellType === "select") {
-          const selectOpts =
-            cellSelectOptions[cellKey]?.length > 0
-              ? cellSelectOptions[cellKey]
-              : col.selectOptions ??
-              (col.validation_rules?.type === "dropdown"
-                ? ((col.validation_rules?.options as string[]) ?? [])
-                : []);
+          const selectOpts = getChoiceOptionsForColumn(
+            col,
+            cellSelectOptions[cellKey] ?? [],
+          );
 
           return (
             <Select
@@ -1964,7 +1998,7 @@ export default function SheetClient() {
             ))}
           </div>
 
-          {effectiveRightPanel && (rightPanel === "comments" || rightPanel === "developer" || rightPanel === "timetravel" || rightPanel === "charts" || rightPanel === "conditional" || rightPanel === "columns" || rightPanel === "select-options" || rightPanel === "row-details" || rightPanel === "validation" || rightPanel === "shortcuts" || rightPanel === "formulas" || rightPanel === "automation" || rightPanel === "aiassistant" || isOrgSheet) && (
+          {effectiveRightPanel && (rightPanel === "comments" || rightPanel === "developer" || rightPanel === "timetravel" || rightPanel === "charts" || rightPanel === "conditional" || rightPanel === "columns" || rightPanel === "select-options" || rightPanel === "row-details" || rightPanel === "validation" || rightPanel === "shortcuts" || rightPanel === "automation" || rightPanel === "aiassistant" || isOrgSheet) && (
             <>
               <div className="fixed inset-0 bg-black/40 z-20 sm:hidden backdrop-blur-[1px]" onClick={() => setRightPanel(null)} />
               <div className="fixed right-0 top-0 bottom-0 z-30 sm:static sm:z-auto w-80 max-w-[88vw] shadow-2xl sm:shadow-none transition-transform duration-200 ease-out">
@@ -1993,7 +2027,6 @@ export default function SheetClient() {
                   selectedRowIndex={selectedCell?.row ?? null}
                   history={history}
                   onApplyValidation={handleApplyValidation}
-                  onInsertFormula={handleFormulaInsert}
                   onUpdateRow={handleUpdateRow}
                   onRunAutomation={() => { if (selectedCell) runAutomationsForRow(rows[selectedCell.row]); }}
                 />

@@ -73,6 +73,7 @@ export default function ConditionalFormattingPanel({
   isDark,
   columns,
   selectedCell,
+  selectionRange,
   rules,
   onSaveRule,
   onDeleteRule,

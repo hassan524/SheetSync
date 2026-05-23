@@ -25,7 +25,7 @@ const DEFAULT_RULES = [
   },
 ];
 
-export default function AutomationPanel({ isDark, selectedCell }: AutomationPanelProps) {
+export default function AutomationPanel({ isDark, selectedCell, onRun }: AutomationPanelProps) {
   const [rules, setRules] = useState(DEFAULT_RULES);
 
   return (

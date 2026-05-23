@@ -2,8 +2,6 @@
 
 import React from 'react'
 import ActivityLogPanel from './ActivityLogPanel'
-import FormulaEnginePanel from './FormulaEnginePanel'
-import DataValidationPanel from './DataValidationPanel'
 
 export default function RowExpandView({ rowId, rowData }: { rowId: string; rowData: Record<string, any> }) {
   return (
@@ -22,8 +20,6 @@ export default function RowExpandView({ rowId, rowData }: { rowId: string; rowDa
             <pre className="text-xs text-gray-700">{JSON.stringify(rowData, null, 2)}</pre>
           </div>
 
-          <FormulaEnginePanel />
-          <DataValidationPanel />
         </div>
 
         <div className="space-y-3">

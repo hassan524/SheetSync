@@ -354,3 +354,18 @@ export interface OrganizationTableData {
   createdAt: string;
 }
 
+export const STATUS_VALUES = [
+  "Not Started",
+  "In Progress",
+  "In Review",
+  "Done",
+  "Blocked",
+] as const;
+
+export const PRIORITY_VALUES = [
+  "Low",
+  "Medium",
+  "High",
+  "Critical",
+] as const;
+

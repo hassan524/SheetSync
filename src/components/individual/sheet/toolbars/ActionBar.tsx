@@ -4,7 +4,7 @@ import React from "react";
 import {
   Plus, Trash2, ArrowDownAZ, ArrowUpAZ, SlidersHorizontal, Eye, EyeOff,
   BarChart3, MessageSquare, Users, Clock, Columns3, Code2, Paintbrush,
-  Sun, Moon, Keyboard, ChevronDown, Rows3, PanelRight, Lock, Sigma, Zap, Sparkles, ListChecks,
+  Sun, Moon, Keyboard, ChevronDown, Rows3, PanelRight, Lock, Zap, Sparkles, ListChecks,
   Pin,
 } from "lucide-react";
 import {
@@ -294,7 +294,6 @@ export function ActionBar({
         )}
         <IconBtn icon={Clock} tooltip="Time Travel — replay & branch" onClick={() => onTogglePanel("timetravel")} active={effectiveRightPanel === "timetravel"} />
         <IconBtn icon={Columns3} tooltip="Columns" onClick={() => onTogglePanel("columns")} active={effectiveRightPanel === "columns"} />
-        <IconBtn icon={Sigma} tooltip="Formula library" onClick={() => onTogglePanel("formulas")} active={effectiveRightPanel === "formulas"} />
         <IconBtn icon={ListChecks} tooltip="Validation rules" onClick={() => onTogglePanel("validation")} active={effectiveRightPanel === "validation"} />
         <IconBtn icon={Zap} tooltip="Automation rules" onClick={() => onTogglePanel("automation")} active={effectiveRightPanel === "automation"} />
         <IconBtn icon={Sparkles} tooltip="AI assistant" onClick={() => onTogglePanel("aiassistant")} active={effectiveRightPanel === "aiassistant"} />
