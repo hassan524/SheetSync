@@ -910,6 +910,62 @@ export default function SheetClient() {
     toast.success("Formula inserted — edit as needed");
   }, [selectedCell, rows, protection.isRowProtected, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
 
+  const handleUpdateRow = useCallback(async (rowId: string, updates: Record<string, any>) => {
+    const updatedRows = rows.map((row) => (row.id === rowId ? { ...row, ...updates } : row));
+    rowsHistory.pushState(updatedRows);
+    setSheetState((prev) => ({ ...prev, rows: updatedRows }));
+    markSaving();
+    try {
+      await saveAllRows(sheetId, updatedRows);
+      toast.success("Row updated");
+    } catch {
+      toast.error("Failed to save row update.");
+    } finally {
+      markSaved();
+      const updatedRow = updatedRows.find((r) => r.id === rowId);
+      if (updatedRow) setTimeout(() => { try { runAutomationsForRow(updatedRow); } catch (e) { /* ignore */ } }, 60);
+    }
+  }, [rows, rowsHistory, setSheetState, sheetId, markSaving, markSaved]);
+
+  const runAutomationsForRow = useCallback(async (row: SheetRow) => {
+    if (!row) return;
+    // Example automation: if status == Done/finished => archive
+    const status = String(row.status ?? "").toLowerCase();
+    if (status === "done" || status === "completed" || status === "finished") {
+      if (row.status !== "archived") {
+        await handleUpdateRow(row.id, { status: "archived" });
+        toast.info(`Row ${rows.findIndex((r) => r.id === row.id) + 1} archived by automation`);
+        return;
+      }
+    }
+
+    // Example automation: due date passed => send reminder (UI-only: create history entry)
+    const dateCol = columns.find((c) => c.type === "date" || /due|date|deadline/i.test(c.key));
+    if (dateCol) {
+      const val = row[dateCol.key];
+      if (val) {
+        const d = new Date(String(val));
+        if (!isNaN(d.getTime())) {
+          const today = new Date();
+          if (d < today && !row._reminderSent) {
+            // mark reminder sent to avoid repeats
+            await handleUpdateRow(row.id, { _reminderSent: true });
+            toast.info(`Automation: reminder for row ${rows.findIndex((r) => r.id === row.id) + 1}`);
+          }
+        }
+      }
+    }
+  }, [columns, handleUpdateRow, rows]);
+
+  const handleTogglePinRow = useCallback(async () => {
+    if (!selectedCell) { toast.info("Select a row first"); return; }
+    const row = rows[selectedCell.row];
+    if (!row) return;
+    const rowId = row.id;
+    const newPinned = !(row.pinned ?? false);
+    await handleUpdateRow(rowId, { pinned: newPinned });
+  }, [selectedCell, rows, handleUpdateRow]);
+
   // Apply a formula to every row in a column and persist it.
   const handleApplyFormulaToColumn = useCallback(async (columnKey: string, formula: string) => {
     if (!formula.startsWith("=")) { toast.error("Formula must start with ="); return; }
@@ -1310,52 +1366,9 @@ export default function SheetClient() {
         const rowIdx = activeRows.findIndex((r) => r.id === props.row.id);
         const isSel = selectedRows.has(props.row.id);
         const isRowProtected = protection.isRowProtected(props.row.id);
-        const rowComments = comments[`row:${props.row.id}`]?.length ?? 0;
         return (
           <div className={`h-full w-full flex items-center justify-center sheet-row-num border-r group/rownum ${isSel ? "sheet-row-num--selected" : ""} relative`}>
             <span className={`${isSel ? "hidden" : "group-hover/rownum:hidden"} sheet-row-num-text`}>{rowIdx + 1}</span>
-            <div className="absolute right-1 top-1 hidden flex-row items-center gap-1 group-hover/rownum:flex">
-              <button
-                type="button"
-                className="h-6 w-6 rounded-full border border-border/70 bg-background text-[11px] font-semibold text-gray-600 hover:bg-muted"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedCell((prev) => ({ row: rowIdx, col: prev?.col ?? columns[0]?.key ?? "" }));
-                  setRightPanel("row-details");
-                }}
-                title="Row details"
-              >
-                i
-              </button>
-              <button
-                type="button"
-                className="h-6 w-6 rounded-full border border-border/70 bg-background text-gray-600 hover:bg-muted relative"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveCommentCell(`row:${props.row.id}`);
-                  setRightPanel("comments");
-                }}
-                title="Comment on row"
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-                {rowComments > 0 && (
-                  <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-amber-400 border border-white text-[9px] leading-none flex items-center justify-center">
-                    {Math.min(9, rowComments)}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                className={`h-6 w-6 rounded-full border border-border/70 bg-background ${isRowProtected ? "text-emerald-600" : "text-gray-600"} hover:bg-muted`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleRowProtectionById(props.row.id);
-                }}
-                title={isRowProtected ? "Unlock row" : "Protect row"}
-              >
-                <Lock className="h-3.5 w-3.5" />
-              </button>
-            </div>
             <input type="checkbox" className={`h-3.5 w-3.5 rounded border-gray-300 cursor-pointer ${isSel ? "" : "hidden group-hover/rownum:block"}`}
               style={{ accentColor: "var(--primary)" }} checked={isSel}
               onChange={(e) => { const s = new Set(selectedRows); e.target.checked ? s.add(props.row.id) : s.delete(props.row.id); setSelectedRows(s); }} />
@@ -1859,6 +1872,9 @@ export default function SheetClient() {
           onHideColumn={sheetColOps.handleHideColumn}
           onToggleChartPicker={charts.showPicker ? charts.closePicker : charts.openPicker}
           onTogglePanel={(panel) => { toggleRightPanel(panel); if (panel === "timetravel") { if (rightPanel !== "timetravel") timeTravelActions.openPanel(); else timeTravelActions.closePanel(); } }}
+          onToggleRowProtection={handleToggleRowProtection}
+          onTogglePinRow={handleTogglePinRow}
+          selectedRowPinned={selectedCell ? rows[selectedCell.row]?.pinned ?? false : false}
           onToggleDark={() => setIsDark(!isDark)}
           onToggleFreezeRows={handleToggleFreezeRows}
           chartBtnRef={chartBtnRef as any}
@@ -1948,7 +1964,7 @@ export default function SheetClient() {
             ))}
           </div>
 
-          {effectiveRightPanel && (rightPanel === "comments" || rightPanel === "developer" || rightPanel === "timetravel" || rightPanel === "charts" || rightPanel === "conditional" || rightPanel === "columns" || rightPanel === "select-options" || rightPanel === "row-details" || rightPanel === "validation" || rightPanel === "shortcuts" || isOrgSheet) && (
+          {effectiveRightPanel && (rightPanel === "comments" || rightPanel === "developer" || rightPanel === "timetravel" || rightPanel === "charts" || rightPanel === "conditional" || rightPanel === "columns" || rightPanel === "select-options" || rightPanel === "row-details" || rightPanel === "validation" || rightPanel === "shortcuts" || rightPanel === "formulas" || rightPanel === "automation" || rightPanel === "aiassistant" || isOrgSheet) && (
             <>
               <div className="fixed inset-0 bg-black/40 z-20 sm:hidden backdrop-blur-[1px]" onClick={() => setRightPanel(null)} />
               <div className="fixed right-0 top-0 bottom-0 z-30 sm:static sm:z-auto w-80 max-w-[88vw] shadow-2xl sm:shadow-none transition-transform duration-200 ease-out">
@@ -1968,6 +1984,7 @@ export default function SheetClient() {
                   onUpdateChart={(patch) => { if (charts.activeChartId) charts.updateChart(charts.activeChartId, patch); }}
                   onRemoveChart={() => { if (charts.activeChartId) { charts.removeChart(charts.activeChartId); setRightPanel(null); } }}
                   selectedCell={selectedCell} conditionalRules={conditionalRules}
+                  selectionRange={selectionRange}
                   onSaveConditionalRule={handleSaveConditionalRule}
                   onDeleteConditionalRule={handleDeleteConditionalRule}
                   onApplyColumns={handleApplyColumns}
@@ -1976,6 +1993,9 @@ export default function SheetClient() {
                   selectedRowIndex={selectedCell?.row ?? null}
                   history={history}
                   onApplyValidation={handleApplyValidation}
+                  onInsertFormula={handleFormulaInsert}
+                  onUpdateRow={handleUpdateRow}
+                  onRunAutomation={() => { if (selectedCell) runAutomationsForRow(rows[selectedCell.row]); }}
                 />
               </div>
             </>

@@ -2,6 +2,7 @@
 
 import { Send, Check, MessageSquare, Reply, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
+import type { SheetRow } from "@/types";
 
 // ── Types ──────────────────────────────────────────────────────
 interface ReplyItem {
@@ -76,13 +77,15 @@ function Avatar({
 
 // ── Cell key → readable label ──────────────────────────────────
 // "2-status" → "status · 3"
-function formatCellLabel(key: string): string {
+function formatCellLabel(key: string, rows: SheetRow[]): string {
     if (!key) return "";
     if (key.startsWith("row:")) {
-        return "Row comment";
+        const rowId = key.slice(4);
+        const rowIndex = rows.findIndex((row) => row.id === rowId);
+        return rowIndex >= 0 ? `Row ${rowIndex + 1}` : "Row comment";
     }
     const parts = key.split("-");
-    const rowNum = parseInt(parts[0] ?? "0") + 1;
+    const rowNum = parseInt(parts[0] ?? "0", 10) + 1;
     const colKey = parts.slice(1).join("-");
     return `${colKey} · ${rowNum}`;
 }
@@ -90,6 +93,7 @@ function formatCellLabel(key: string): string {
 // ── Props ──────────────────────────────────────────────────────
 interface CommentsPanelProps {
     isDark: boolean;
+    rows: SheetRow[];
     /** Full map: cellKey → root comments (each with .thread injected) */
     comments: Record<string, SheetComment[]>;
     activeCommentCell: string | null;
@@ -105,6 +109,7 @@ interface CommentsPanelProps {
 // ── Main ───────────────────────────────────────────────────────
 export default function CommentsPanel({
     isDark,
+    rows,
     comments,
     activeCommentCell,
     newCommentText,
@@ -127,6 +132,8 @@ export default function CommentsPanel({
         viewMode === "cell" && activeCommentCell
             ? ([[activeCommentCell, comments[activeCommentCell] ?? []]] as [string, SheetComment[]][])
             : (Object.entries(comments) as [string, SheetComment[]][]);
+
+    const activeLabel = activeCommentCell?.startsWith("row:") ? "This row" : "This cell";
 
     // Root comments only — replies live inside comment.thread
     const rootComments: (SheetComment & { cellKey: string })[] =
@@ -168,7 +175,7 @@ export default function CommentsPanel({
                         : t("text-gray-500 hover:bg-gray-100", "text-gray-500 hover:bg-gray-800")
                         }`}
                 >
-                    This cell
+                    {activeLabel}
                     {cellOpenCount > 0 && (
                         <span
                             className={`h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center ${viewMode === "cell"
@@ -209,7 +216,7 @@ export default function CommentsPanel({
                             "bg-gray-800 text-gray-500"
                         )}`}
                     >
-                        {formatCellLabel(activeCommentCell)}
+                        {formatCellLabel(activeCommentCell, rows)}
                     </span>
                 )}
             </div>
@@ -226,7 +233,9 @@ export default function CommentsPanel({
                         />
                         <p className={`text-[12px] font-medium ${t("text-gray-500", "text-gray-400")}`}>
                             {viewMode === "cell" && activeCommentCell
-                                ? "No comments on this cell"
+                                ? activeCommentCell?.startsWith("row:")
+                                    ? "No comments on this row"
+                                    : "No comments on this cell"
                                 : "No comments yet"}
                         </p>
                         {viewMode === "cell" && (
@@ -257,7 +266,7 @@ export default function CommentsPanel({
                                                 "bg-gray-800 text-gray-500"
                                             )}`}
                                         >
-                                            {formatCellLabel(comment.cellKey)}
+                                            {formatCellLabel(comment.cellKey, rows)}
                                             {comment.resolved && (
                                                 <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />
                                             )}
@@ -461,7 +470,7 @@ export default function CommentsPanel({
                         )}`}
                     >
                         <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                        {formatCellLabel(activeCommentCell)}
+                        {formatCellLabel(activeCommentCell, rows)}
                     </p>
                 ) : (
                     <p className={`text-[10px] mb-2 ${t("text-gray-400", "text-gray-600")}`}>

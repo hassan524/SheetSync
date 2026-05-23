@@ -13,12 +13,18 @@ import {
   Columns3,
   ListChecks,
   PanelRight,
+  Sigma,
+  Zap,
+  Sparkles,
 } from "lucide-react";
 import CommentsPanel from "./panels/Comments-panel";
 import CollaboratorsPanel from "./panels/Collaborators-panel";
 import DeveloperPanel from "./panels/Developers-panel";
 import TimeTravelPanel from "./panels/TimeTravel-panel";
 import ChartsPanel from "./panels/Charts-panel"; // ← new
+import FormulaPanel from "./panels/Formula-panel";
+import AutomationPanel from "./panels/Automation-panel";
+import AiAssistantPanel from "./panels/Ai-assistant-panel";
 import KeyboardShortcutsPanel from "./panels/Keyboard-shortcuts-panel";
 import ConditionalFormattingPanel from "./panels/Conditional-formatting-panel";
 import ColumnsPanel from "./panels/Columns-panel";
@@ -49,6 +55,9 @@ export type RightPanelType =
   | "select-options"
   | "row-details"
   | "validation"
+  | "formulas"
+  | "automation"
+  | "aiassistant"
   | null;
 
 interface RightPanelProps {
@@ -95,6 +104,7 @@ interface RightPanelProps {
   onRemoveChart?: () => void;
 
   selectedCell?: { row: number; col: string } | null;
+  selectionRange?: { start: { row: number; colIndex: number }; end: { row: number; colIndex: number } } | null;
   conditionalRules?: ConditionalFormatRule[];
   onSaveConditionalRule?: (rule: ConditionalFormatRule) => void;
   onDeleteConditionalRule?: (ruleId: string) => void;
@@ -104,6 +114,9 @@ interface RightPanelProps {
   selectedRowIndex?: number | null;
   history?: any[];
   onApplyValidation?: (columnKey: string, rules: any) => void;
+  onInsertFormula?: (formula: string) => void;
+  onUpdateRow?: (rowId: string, updates: Record<string, any>) => void;
+  onRunAutomation?: () => void;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -153,6 +166,9 @@ const PANEL_META: Record<
     icon: ListChecks,
     color: "text-emerald-500",
   },
+  formulas: { label: "Formula Library", icon: Sigma, color: "text-sky-500" },
+  automation: { label: "Automation Rules", icon: Zap, color: "text-amber-500" },
+  aiassistant: { label: "AI Assistant", icon: Sparkles, color: "text-fuchsia-500" },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -199,6 +215,7 @@ export default function RightPanel({
   selectedRowIndex,
   history = [],
   onApplyValidation,
+  onUpdateRow,
 }: RightPanelProps) {
   const meta = PANEL_META[rightPanel] ?? PANEL_META.developer;
   const Icon = meta.icon;
@@ -249,6 +266,7 @@ export default function RightPanel({
           <CommentsPanel
             isDark={d}
             comments={comments}
+            rows={rows}
             activeCommentCell={activeCommentCell}
             newCommentText={newCommentText}
             replyText={replyText}
@@ -306,6 +324,18 @@ export default function RightPanel({
             onRemoveChart={onRemoveChart ?? (() => {})}
           />
         )}
+        {rightPanel === "formulas" && (
+          <FormulaPanel
+            isDark={d}
+            selectedCell={selectedCell}
+            columns={columns}
+            onInsert={(formula) => {
+              onInsertFormula?.(formula);
+            }}
+          />
+        )}
+        {rightPanel === "automation" && <AutomationPanel isDark={d} selectedCell={selectedCell} onRun={onRunAutomation} />}
+        {rightPanel === "aiassistant" && <AiAssistantPanel isDark={d} />}
         {rightPanel === "shortcuts" && <KeyboardShortcutsPanel isDark={d} />}
         {rightPanel === "conditional" && (
           <ConditionalFormattingPanel
@@ -343,6 +373,7 @@ export default function RightPanel({
             columns={columns}
             comments={selectedRow ? comments[`row:${selectedRow.id}`] ?? [] : []}
             history={history as any}
+            onUpdateRow={onUpdateRow}
           />
         )}
         {rightPanel === "validation" && (

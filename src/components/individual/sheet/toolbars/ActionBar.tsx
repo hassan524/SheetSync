@@ -4,7 +4,8 @@ import React from "react";
 import {
   Plus, Trash2, ArrowDownAZ, ArrowUpAZ, SlidersHorizontal, Eye, EyeOff,
   BarChart3, MessageSquare, Users, Clock, Columns3, Code2, Paintbrush,
-  Sun, Moon, Keyboard, ChevronDown, Rows3,
+  Sun, Moon, Keyboard, ChevronDown, Rows3, PanelRight, Lock, Sigma, Zap, Sparkles, ListChecks,
+  Pin,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -44,6 +45,9 @@ interface ActionBarProps {
   onHideColumn: () => void;
   onToggleChartPicker: () => void;
   onTogglePanel: (panel: RightPanelType) => void;
+  onToggleRowProtection?: () => void;
+  onTogglePinRow?: () => void;
+  selectedRowPinned?: boolean;
   onToggleDark: () => void;
   onToggleFreezeRows?: () => void;
   chartBtnRef: React.RefObject<HTMLButtonElement>;
@@ -61,7 +65,8 @@ export function ActionBar({
   effectiveRightPanel, totalComments, frozenRowsCount = 0,
   onInsertRow, onInsertColumn, onDeleteRow, onSortAsc, onSortDesc,
   onToggleFilters, onHideColumn, onToggleChartPicker, onTogglePanel,
-  onToggleDark, onToggleFreezeRows, chartBtnRef,
+  onToggleRowProtection, onToggleDark, onToggleFreezeRows, chartBtnRef,
+  onTogglePinRow, selectedRowPinned,
 }: ActionBarProps) {
   const selStyle = ddStyle(isDark);
   const isViewer = userRole === "viewer";
@@ -252,25 +257,47 @@ export function ActionBar({
         )}
 
         {/* Panel toggles */}
+        <IconBtn
+          icon={MessageSquare}
+          tooltip="Comments"
+          onClick={() => onTogglePanel("comments")}
+          active={effectiveRightPanel === "comments"}
+          badge={totalComments}
+        />
+        <IconBtn
+          icon={PanelRight}
+          tooltip="Row details"
+          onClick={() => onTogglePanel("row-details")}
+          active={effectiveRightPanel === "row-details"}
+          disabled={!selectedCell}
+        />
+        <IconBtn
+          icon={Pin}
+          tooltip="Pin row"
+          onClick={onTogglePinRow}
+          active={!!selectedRowPinned}
+          disabled={!selectedCell || !onTogglePinRow}
+        />
+        <IconBtn
+          icon={Lock}
+          tooltip="Protect/unprotect selected row"
+          onClick={onToggleRowProtection}
+          disabled={!selectedCell || !onToggleRowProtection}
+        />
         {isOrgSheet && (
-          <>
-            <IconBtn
-              icon={MessageSquare}
-              tooltip="Comments"
-              onClick={() => onTogglePanel("comments")}
-              active={effectiveRightPanel === "comments"}
-              badge={totalComments}
-            />
-            <IconBtn
-              icon={Users}
-              tooltip="Collaborators"
-              onClick={() => onTogglePanel("collaborators")}
-              active={effectiveRightPanel === "collaborators"}
-            />
-          </>
+          <IconBtn
+            icon={Users}
+            tooltip="Collaborators"
+            onClick={() => onTogglePanel("collaborators")}
+            active={effectiveRightPanel === "collaborators"}
+          />
         )}
         <IconBtn icon={Clock} tooltip="Time Travel — replay & branch" onClick={() => onTogglePanel("timetravel")} active={effectiveRightPanel === "timetravel"} />
         <IconBtn icon={Columns3} tooltip="Columns" onClick={() => onTogglePanel("columns")} active={effectiveRightPanel === "columns"} />
+        <IconBtn icon={Sigma} tooltip="Formula library" onClick={() => onTogglePanel("formulas")} active={effectiveRightPanel === "formulas"} />
+        <IconBtn icon={ListChecks} tooltip="Validation rules" onClick={() => onTogglePanel("validation")} active={effectiveRightPanel === "validation"} />
+        <IconBtn icon={Zap} tooltip="Automation rules" onClick={() => onTogglePanel("automation")} active={effectiveRightPanel === "automation"} />
+        <IconBtn icon={Sparkles} tooltip="AI assistant" onClick={() => onTogglePanel("aiassistant")} active={effectiveRightPanel === "aiassistant"} />
         <IconBtn icon={Code2} tooltip="Developer tools" onClick={() => onTogglePanel("developer")} active={effectiveRightPanel === "developer"} />
         <IconBtn
           icon={BarChart3}
