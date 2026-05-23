@@ -156,6 +156,7 @@ export default function ColumnHeaderMenu({
 }: ColumnHeaderMenuProps) {
   const [renameValue, setRenameValue] = useState(column.name);
   const [open, setOpen] = useState(false);
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [colFormulaValue, setColFormulaValue] = useState(columnFormula || "");
   const [currencySearch, setCurrencySearch] = useState("");
 
@@ -179,6 +180,7 @@ export default function ColumnHeaderMenu({
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
+        if (!v) setTypeMenuOpen(false);
         if (v) {
           setColFormulaValue(columnFormula || "");
           setCurrencySearch("");
@@ -233,8 +235,15 @@ export default function ColumnHeaderMenu({
           </>
         )}
 
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs gap-2">
+        <DropdownMenuSub open={typeMenuOpen} onOpenChange={setTypeMenuOpen}>
+          <DropdownMenuSubTrigger
+            className="text-xs gap-2"
+            onPointerEnter={() => setTypeMenuOpen(true)}
+            onClick={(event) => {
+              event.preventDefault();
+              setTypeMenuOpen((value) => !value);
+            }}
+          >
             <Type className="h-3 w-3" />
             Change type
             <span className="ml-auto text-muted-foreground capitalize">
@@ -242,8 +251,9 @@ export default function ColumnHeaderMenu({
             </span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent
+            sideOffset={0}
             collisionPadding={10}
-            className="sheet-column-type-submenu sheet-mobile-submenu sheet-scrollbar w-44 max-h-72 overflow-y-auto"
+            className="sheet-column-type-submenu sheet-mobile-submenu sheet-scrollbar w-44 max-h-72 overflow-y-auto z-[150]"
           >
             {COLUMN_TYPES.map(({ type, label, icon: Icon }) => (
               <DropdownMenuItem

@@ -152,11 +152,11 @@ export function ActionBar({
                     onClick={onToggleFreezeRows}
                   >
                     <Rows3 className="h-3.5 w-3.5" />
-                    {frozenRowsCount > 0 ? "Unfreeze row" : "Freeze row"}
+                    {frozenRowsCount > 0 ? "Unfreeze top row" : "Freeze top row"}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
-                  Keep the first row visible while scrolling
+                  Freeze keeps the top row visible while scrolling; it does not lock editing
                 </TooltipContent>
               </Tooltip>
             )}
@@ -280,7 +280,7 @@ export function ActionBar({
         />
         <IconBtn
           icon={Lock}
-          tooltip="Protect/unprotect selected row"
+          tooltip="Lock/unlock editing for the selected row"
           onClick={onToggleRowProtection}
           disabled={!selectedCell || !onToggleRowProtection}
         />

@@ -36,6 +36,22 @@ export function useSheetRowOps({
   markSaving,
   markSaved,
 }: UseRowOpsProps) {
+  const persistSortedRows = useCallback(
+    (sorted: SheetRow[]) => {
+      setTimeout(async () => {
+        try {
+          markSaving();
+          await saveAllRows(sheetId, sorted);
+          markSaved();
+        } catch {
+          toast.error("Sort saved locally but failed to persist.");
+          setSaveStatus("saved");
+        }
+      }, 50);
+    },
+    [markSaved, markSaving, setSaveStatus, sheetId],
+  );
+
   const handleInsertRow = useCallback(async () => {
     rowOps.insertRow();
     setTimeout(async () => {
@@ -55,7 +71,17 @@ export function useSheetRowOps({
         setSaveStatus("saved");
       }
     }, 50);
-  }, [rowOps, sheetId, rowsHistory, markSaving, markSaved, isOrgSheet, organizationId, title, setSaveStatus]);
+  }, [
+    rowOps,
+    sheetId,
+    rowsHistory,
+    markSaving,
+    markSaved,
+    isOrgSheet,
+    organizationId,
+    title,
+    setSaveStatus,
+  ]);
 
   const handleDeleteRow = useCallback(async () => {
     if (selectedRows.size === 0) return;
@@ -81,7 +107,19 @@ export function useSheetRowOps({
       toast.error("Row deleted locally but failed to persist.");
       setSaveStatus("saved");
     }
-  }, [selectedRows, rowOps, sheetId, rowsHistory, markSaving, markSaved, setSelectedRows, isOrgSheet, organizationId, title, setSaveStatus]);
+  }, [
+    selectedRows,
+    rowOps,
+    sheetId,
+    rowsHistory,
+    markSaving,
+    markSaved,
+    setSelectedRows,
+    isOrgSheet,
+    organizationId,
+    title,
+    setSaveStatus,
+  ]);
 
   const handleSort = useCallback(
     (dir: "asc" | "desc") => {
@@ -89,23 +127,41 @@ export function useSheetRowOps({
         toast.info("Select a column first to sort");
         return;
       }
-      // sort happens externally via selectedCell — kept here for action bar
+      void dir;
       toast.info("Select a cell in the column you want to sort");
     },
     [rows],
   );
 
+  const sortRows = useCallback(
+    (colKey: string, dir: "asc" | "desc") => {
+      const column = columns.find((item) => item.key === colKey);
+      const numeric = ["number", "currency", "progress", "percent"].includes(
+        column?.type ?? "",
+      );
+      const sorted = [...rows].sort((a, b) => {
+        const va = a[colKey];
+        const vb = b[colKey];
+        if (numeric) {
+          return dir === "asc" ? Number(va) - Number(vb) : Number(vb) - Number(va);
+        }
+        return dir === "asc"
+          ? String(va ?? "").localeCompare(String(vb ?? ""))
+          : String(vb ?? "").localeCompare(String(va ?? ""));
+      });
+
+      rowsHistory.pushState(sorted);
+      persistSortedRows(sorted);
+      toast.success(`Sorted ${dir === "asc" ? "A-Z" : "Z-A"}`);
+    },
+    [columns, persistSortedRows, rows, rowsHistory],
+  );
+
   const handleSortByColumn = useCallback(
     (colKey: string, dir: "asc" | "desc") => {
-      const sorted = [...rows].sort((a, b) => {
-        const va = String(a[colKey] ?? "");
-        const vb = String(b[colKey] ?? "");
-        return dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
-      });
-      rowsHistory.pushState(sorted);
-      toast.success(`Sorted ${dir === "asc" ? "A → Z" : "Z → A"}`);
+      sortRows(colKey, dir);
     },
-    [rows, rowsHistory],
+    [sortRows],
   );
 
   const handleSortBySelectedCell = useCallback(
@@ -114,15 +170,9 @@ export function useSheetRowOps({
         toast.info("Select a column first to sort");
         return;
       }
-      const sorted = [...rows].sort((a, b) => {
-        const va = String(a[selectedCell.col] ?? "");
-        const vb = String(b[selectedCell.col] ?? "");
-        return dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
-      });
-      rowsHistory.pushState(sorted);
-      toast.success(`Sorted ${dir === "asc" ? "A → Z" : "Z → A"}`);
+      sortRows(selectedCell.col, dir);
     },
-    [rows, rowsHistory],
+    [sortRows],
   );
 
   return {
