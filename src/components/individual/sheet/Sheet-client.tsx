@@ -981,7 +981,7 @@ export default function SheetClient() {
         if (permission === "granted") {
           new Notification(title, { body: body || title, icon: "/icon.png" });
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, []);
 
@@ -1164,15 +1164,12 @@ export default function SheetClient() {
         });
       }
       const updatedRow = updatedRows.find((r) => r.id === rowId);
-      if (updatedRow) setTimeout(() => { runAutomationsForRows([updatedRow], updatedRows).catch(() => {}); }, 60);
+      if (updatedRow) setTimeout(() => { runAutomationsForRows([updatedRow], updatedRows).catch(() => { }); }, 60);
     } catch {
       toast.error("Failed to save row update.");
     } finally {
       markSaved();
     }
-<<<<<<< HEAD
-  }, [rows, validateRows, rowsHistory, setSheetState, sheetId, markSaving, markSaved, isOrgSheet, columns, currentUser, runAutomationsForRows]);
-=======
   }, [rows, rowsHistory, setSheetState, sheetId, markSaving, markSaved, isOrgSheet, columns, currentUser]);
 
   const runAutomationsForRow = useCallback(async (row: SheetRow) => {
@@ -1206,7 +1203,19 @@ export default function SheetClient() {
       }
     }
   }, [columns, handleUpdateRow, rows]);
->>>>>>> c0227322bc6adc40345c91f376eb5d28e320e9f7
+
+const handleRangeSelect = useCallback(
+  (startColKey: string, endColKey: string, startRow: number, endRow: number) => {
+    const startColIdx = columns.findIndex((c) => c.key === startColKey);
+    const endColIdx   = columns.findIndex((c) => c.key === endColKey);
+    if (startColIdx < 0 || endColIdx < 0) return;
+    setSelectionRange({
+      start: { row: startRow, colIndex: Math.min(startColIdx, endColIdx) },
+      end:   { row: endRow,   colIndex: Math.max(startColIdx, endColIdx) },
+    });
+  },
+  [columns],
+);
 
   const handleTogglePinRow = useCallback(async () => {
     if (!selectedCell) { toast.info("Select a row first"); return; }
@@ -1269,20 +1278,6 @@ export default function SheetClient() {
   }, [frozenRowsCount, sheetId]);
 
   const handleApplyValidation = useCallback(async (columnKey: string, rules: any) => {
-<<<<<<< HEAD
-    const dropdownOptions = Array.isArray(rules?.options)
-      ? rules.options.map((option: any) => String(option).trim()).filter(Boolean)
-      : [];
-    const nextColumns = columns.map((column) =>
-      column.key === columnKey
-        ? {
-          ...column,
-          type: rules?.type === "dropdown" ? "select" as ColumnDef["type"] : rules?.type === "number" ? "number" as ColumnDef["type"] : column.type,
-          selectOptions: rules?.type === "dropdown" ? dropdownOptions : column.selectOptions,
-          validation_rules: rules?.type === "dropdown" ? { ...rules, options: dropdownOptions } : rules,
-        }
-        : column,
-=======
     type NormalizedValidationRule =
       | { type: "dropdown"; options: string[] }
       | { type: "number"; min?: number; max?: number };
@@ -1290,27 +1285,26 @@ export default function SheetClient() {
     const normalizedRules =
       rules?.type === "dropdown"
         ? {
-            type: "dropdown",
-            options: Array.from(
-              new Set(
-                (rules.options ?? [])
-                  .map((item: any) => String(item).trim())
-                  .filter(Boolean),
-              ),
+          type: "dropdown",
+          options: Array.from(
+            new Set(
+              (rules.options ?? [])
+                .map((item: any) => String(item).trim())
+                .filter(Boolean),
             ),
-          } as NormalizedValidationRule
+          ),
+        } as NormalizedValidationRule
         : {
-            type: "number",
-            ...(rules.min === undefined || Number.isNaN(Number(rules.min))
-              ? {}
-              : { min: Number(rules.min) }),
-            ...(rules.max === undefined || Number.isNaN(Number(rules.max))
-              ? {}
-              : { max: Number(rules.max) }),
-          } as NormalizedValidationRule;
+          type: "number",
+          ...(rules.min === undefined || Number.isNaN(Number(rules.min))
+            ? {}
+            : { min: Number(rules.min) }),
+          ...(rules.max === undefined || Number.isNaN(Number(rules.max))
+            ? {}
+            : { max: Number(rules.max) }),
+        } as NormalizedValidationRule;
     const nextColumns = columns.map((column) =>
       column.key === columnKey ? { ...column, validation_rules: normalizedRules } : column,
->>>>>>> c0227322bc6adc40345c91f376eb5d28e320e9f7
     );
     const nextRows = rows.map((row) => {
       const value = row[columnKey];
@@ -1470,7 +1464,7 @@ export default function SheetClient() {
     persistence.handleRowsChange(guardedRows, rows, rowsHistory.pushState);
     const changedRows = guardedRows.filter((row, index) => JSON.stringify(row) !== JSON.stringify(rows[index]));
     if (changedRows.length > 0) {
-      setTimeout(() => { runAutomationsForRows(changedRows, guardedRows).catch(() => {}); }, 80);
+      setTimeout(() => { runAutomationsForRows(changedRows, guardedRows).catch(() => { }); }, 80);
     }
   }, [persistence.handleRowsChange, rows, rowsHistory.pushState, protection.isRowProtected, validateRows, runAutomationsForRows]);
 
@@ -2370,9 +2364,11 @@ export default function SheetClient() {
                   history={history}
                   onApplyValidation={handleApplyValidation}
                   onUpdateRow={handleUpdateRow}
-                  automationRules={automationRules}
-                  onChangeAutomationRules={persistAutomationRules}
+                  // automationRules={automationRules}
+                  // onChangeAutomationRules={persistAutomationRules}
                   onRunAutomation={() => { if (selectedCell && rows[selectedCell.row]) runAutomationsForRows([rows[selectedCell.row]]); }}
+                  allColumns={columns}                  // ← ADD
+                  onRangeSelect={handleRangeSelect}
                 />
               </div>
             </>

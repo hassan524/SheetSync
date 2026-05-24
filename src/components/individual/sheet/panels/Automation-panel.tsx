@@ -10,9 +10,9 @@ import type { ComponentType } from "react";
 interface AutomationPanelProps {
   isDark: boolean;
   selectedCell: { row: number; col: string } | null;
-  columns: ColumnDef[];
-  rules: AutomationRule[];
-  onChangeRules: (rules: AutomationRule[]) => void;
+  columns?: ColumnDef[];
+  rules?: AutomationRule[];
+  onChangeRules?: (rules: AutomationRule[]) => void;
   onRun?: () => void;
 }
 

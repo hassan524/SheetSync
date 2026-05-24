@@ -13,6 +13,7 @@ import {
   Columns3,
   ListChecks,
   PanelRight,
+  Sigma,
   Zap,
   Sparkles,
 } from "lucide-react";
@@ -21,7 +22,7 @@ import CollaboratorsPanel from "./panels/Collaborators-panel";
 import DeveloperPanel from "./panels/Developers-panel";
 import TimeTravelPanel from "./panels/TimeTravel-panel";
 import ChartsPanel from "./panels/Charts-panel"; // ← new
-
+// import FormulaPanel from "./panels/Formula-panel";
 import AutomationPanel from "./panels/Automation-panel";
 import AiAssistantPanel from "./panels/Ai-assistant-panel";
 import KeyboardShortcutsPanel from "./panels/Keyboard-shortcuts-panel";
@@ -36,7 +37,7 @@ import type {
   TimeTravelActions,
 } from "@/hooks/use-time-travel";
 import type { SheetChart, ChartPanelTab } from "@/hooks/sheets/use-charts";
-import type { AutomationRule, ConditionalFormatRule, SheetRow, ColumnDef, SelectOption } from "@/types/index";
+import type { ConditionalFormatRule, SheetRow, ColumnDef, SelectOption } from "@/types/index";
 
 // ─────────────────────────────────────────────────────────────
 //  TYPES
@@ -54,7 +55,7 @@ export type RightPanelType =
   | "select-options"
   | "row-details"
   | "validation"
-
+  | "formulas"
   | "automation"
   | "aiassistant"
   | null;
@@ -90,6 +91,7 @@ interface RightPanelProps {
 
   // Members
   members: OrgMember[];
+  allColumns?: ColumnDef[];
 
   // Time Travel
   timeTravelState?: TimeTravelState;
@@ -102,7 +104,7 @@ interface RightPanelProps {
   onUpdateChart?: (patch: Partial<SheetChart>) => void;
   onRemoveChart?: () => void;
 
-  selectedCell?: { row: number; col: string } | null;
+  selectedCell: { row: number; col: string } | null;
   selectionRange?: { start: { row: number; colIndex: number }; end: { row: number; colIndex: number } } | null;
   conditionalRules?: ConditionalFormatRule[];
   onSaveConditionalRule?: (rule: ConditionalFormatRule) => void;
@@ -113,11 +115,10 @@ interface RightPanelProps {
   selectedRowIndex?: number | null;
   history?: any[];
   onApplyValidation?: (columnKey: string, rules: any) => void;
-
+  onInsertFormula?: (formula: string) => void;
   onUpdateRow?: (rowId: string, updates: Record<string, any>) => void;
   onRunAutomation?: () => void;
-  automationRules?: AutomationRule[];
-  onChangeAutomationRules?: (rules: AutomationRule[]) => void;
+  onRangeSelect?: (colKey: string, startRow: number, endRow: number) => void;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ const PANEL_META: Record<
     icon: ListChecks,
     color: "text-emerald-500",
   },
-
+  formulas: { label: "Formula Library", icon: Sigma, color: "text-sky-500" },
   automation: { label: "Automation Rules", icon: Zap, color: "text-amber-500" },
   aiassistant: { label: "AI Assistant", icon: Sparkles, color: "text-fuchsia-500" },
 };
@@ -207,7 +208,6 @@ export default function RightPanel({
   onUpdateChart,
   onRemoveChart,
   selectedCell,
-  selectionRange,
   conditionalRules = [],
   onSaveConditionalRule,
   onDeleteConditionalRule,
@@ -218,9 +218,9 @@ export default function RightPanel({
   history = [],
   onApplyValidation,
   onUpdateRow,
-  onRunAutomation,
-  automationRules = [],
-  onChangeAutomationRules,
+  allColumns = [],
+  onRangeSelect,
+  onRunAutomation
 }: RightPanelProps) {
   const meta = PANEL_META[rightPanel] ?? PANEL_META.developer;
   const Icon = meta.icon;
@@ -235,15 +235,13 @@ export default function RightPanel({
 
   return (
     <div
-      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${
-        d ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"
-      }`}
+      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${d ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"
+        }`}
     >
       {/* ── Panel header ── */}
       <div
-        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${
-          d ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"
-        }`}
+        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${d ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"
+          }`}
       >
         <div className="flex items-center gap-2">
           <Icon className={`h-3.5 w-3.5 ${meta.color}`} />
@@ -322,24 +320,24 @@ export default function RightPanel({
             isDark={d}
             activeChart={activeChart ?? null}
             panelTab={chartPanelTab}
-            setPanelTab={setChartPanelTab ?? (() => {})}
+            setPanelTab={setChartPanelTab ?? (() => { })}
             rows={rows}
             columns={columns}
-            onUpdateChart={onUpdateChart ?? (() => {})}
-            onRemoveChart={onRemoveChart ?? (() => {})}
+            onUpdateChart={onUpdateChart ?? (() => { })}
+            onRemoveChart={onRemoveChart ?? (() => { })}
           />
         )}
-
-        {rightPanel === "automation" && (
-          <AutomationPanel
+        {/* {rightPanel === "formulas" && (
+          <FormulaPanel
             isDark={d}
-            selectedCell={selectedCell ?? null}
+            selectedCell={selectedCell}
             columns={columns}
-            rules={automationRules}
-            onChangeRules={onChangeAutomationRules ?? (() => {})}
-            onRun={onRunAutomation}
+            onInsert={(formula) => {
+              onInsertFormula?.(formula);
+            }}
           />
-        )}
+        )} */}
+        {rightPanel === "automation" && <AutomationPanel isDark={d} selectedCell={selectedCell} onRun={onRunAutomation} />}
         {rightPanel === "aiassistant" && <AiAssistantPanel isDark={d} />}
         {rightPanel === "shortcuts" && <KeyboardShortcutsPanel isDark={d} />}
         {rightPanel === "conditional" && (
@@ -347,17 +345,16 @@ export default function RightPanel({
             isDark={d}
             columns={columns}
             selectedCell={selectedCell ?? null}
-            selectionRange={selectionRange ?? null}
             rules={conditionalRules}
-            onSaveRule={onSaveConditionalRule ?? (() => {})}
-            onDeleteRule={onDeleteConditionalRule ?? (() => {})}
+            onSaveRule={onSaveConditionalRule ?? (() => { })}
+            onDeleteRule={onDeleteConditionalRule ?? (() => { })}
           />
         )}
         {rightPanel === "columns" && (
           <ColumnsPanel
             isDark={d}
             columns={columns}
-            onApply={onApplyColumns ?? (() => {})}
+            onApply={onApplyColumns ?? (() => { })}
             focusedColumnKey={focusedColumnKey}
           />
         )}
@@ -387,6 +384,9 @@ export default function RightPanel({
           <DataValidationPanel
             isDark={d}
             column={focusedColumn}
+            columns={allColumns}           // ← NEW  (letter conversion)
+            totalRows={rows.length}        // ← NEW  (range default)
+            onRangeSelect={onRangeSelect}  // ← NEW  (cell highlight)
             onSave={(rules) => {
               if (focusedColumn?.key) onApplyValidation?.(focusedColumn.key, rules);
             }}
