@@ -99,6 +99,26 @@
   background: var(--sh-div);
 }
 
+.sheet-header-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+}
+
+.sheet-header-scrollbar::-webkit-scrollbar {
+  height: 8px;
+}
+
+.sheet-header-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sheet-header-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.45);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
 /* ─── Mobile: fixed toolbar height & no scrollbar ────────────────────────── */
 @media (max-width: 768px) {
   .sheet-toolbar,
@@ -106,13 +126,6 @@
     max-height: 44px;
     overflow-x: auto;
     overflow-y: hidden;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .sheet-toolbar::-webkit-scrollbar,
-  .sheet-formatting-bar::-webkit-scrollbar {
-    display: none;
   }
 
   .sheet-root {
@@ -131,7 +144,9 @@
     width: 200px !important;
     max-height: 320px !important;
     border-radius: 12px !important;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+    box-shadow:
+      0 10px 25px -5px rgba(0, 0, 0, 0.1),
+      0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
     background: var(--popover-bg) !important;
     border: 1px solid var(--popover-border) !important;
   }
@@ -348,8 +363,10 @@
 }
 
 .sheet-cell-mono {
-  font-family: "Geist Mono", "Courier New", monospace;
-  font-size: 11.5px;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
 .sheet-link {
@@ -407,6 +424,31 @@
 }
 
 /* ─── DataGrid ───────────────────────────────────────────────────────────── */
+.sheet-cell-validation-warning {
+  background:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.24) 0 12px, transparent 12px),
+    rgba(254, 243, 199, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.55);
+}
+
+.sheet-validation-marker {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #b45309;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.group\/cell:hover .sheet-validation-marker,
+.sheet-cell-validation-warning:hover .sheet-validation-marker {
+  opacity: 1;
+}
+
 .rdg-sheet {
   border: none;
   --rdg-selection-color: var(--primary);
@@ -468,6 +510,13 @@
   z-index: 1;
 }
 
+.sheet-cell-active-selected {
+  background: rgba(13, 124, 95, 0.08) !important;
+  box-shadow:
+    inset 0 0 0 2px var(--primary),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.85);
+}
+
 .fill-grid {
   block-size: 100%;
 }
@@ -518,6 +567,29 @@
 .rdg-dark .rdg-cell[aria-selected="true"] {
   background-color: rgba(13, 124, 95, 0.08) !important;
   outline-color: var(--primary) !important;
+}
+
+.rdg-dark,
+.rdg-dark .rdg-row,
+.rdg-dark .rdg-summary-row,
+.rdg-dark .rdg-viewport,
+.rdg-dark .rdg-cell[role="gridcell"],
+.rdg-dark .rdg-cell[role="columnheader"] {
+  background-color: #0f1117 !important;
+  color: #e2e8f0 !important;
+}
+
+.rdg-dark .rdg-cell input,
+.rdg-dark .rdg-cell textarea,
+.rdg-dark .rdg-cell select,
+.rdg-dark .rdg-text-editor {
+  background-color: #0a0d13 !important;
+  color: #e2e8f0 !important;
+  border-color: #2a3045 !important;
+}
+
+.rdg-dark .rdg-cell .bg-white {
+  background-color: #0f1117 !important;
 }
 
 /* Smooth cursor on non-editing cells */

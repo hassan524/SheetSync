@@ -113,6 +113,7 @@ const UseTemplateModal = ({
       toast.success(`"${sheetName}" created`);
       router.refresh();
       onOpenChange(false);
+      router.push(`/sheet/${createdSheet.id}${isOrg ? "?org=true" : ""}`);
     } catch (err: any) {
       toast.error(err.message || "Failed to create sheet");
     } finally {

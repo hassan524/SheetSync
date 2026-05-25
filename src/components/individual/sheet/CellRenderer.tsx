@@ -2,7 +2,7 @@
 
 import React, { useCallback } from "react";
 import Image from "next/image";
-import { Check, Calendar, Lock, MessageSquare } from "lucide-react";
+import { AlertTriangle, Check, Calendar, Lock, MessageSquare } from "lucide-react";
 import { RenderCellProps } from "react-data-grid";
 import { SheetRow, ColumnDef } from "@/types/index";
 import { getStatusOptionStyle } from "@/lib/sheet-formatting-helpers";
@@ -31,6 +31,8 @@ interface CellRendererProps {
   onPointerEnter?: (row: number, colKey: string, e: React.PointerEvent) => void;
   onFillStart?: (row: number, colKey: string, e: React.PointerEvent) => void;
   isSelected?: boolean;
+  isActiveSelected?: boolean;
+  validationWarning?: string | null;
 }
 
 export function CellRenderer({
@@ -50,7 +52,9 @@ export function CellRenderer({
   onCellClick,
   onCommentClick,
   onPointerDown, onPointerEnter, onFillStart,
-  isSelected
+  isSelected,
+  isActiveSelected,
+  validationWarning
 }: CellRendererProps) {
   const cellContent = (() => {
     switch (type) {
@@ -107,17 +111,22 @@ export function CellRenderer({
         ) : (
           <span className="text-gray-300 text-[10px] italic">Image URL…</span>
         );
-      case "url":
-        return displayValue ? (
+      case "url": {
+        if (!displayValue) return null;
+        const raw = String(displayValue).trim();
+        const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+        return (
           <a
-            href={String(displayValue)}
+            href={href}
             target="_blank"
             rel="noopener noreferrer"
             className="sheet-link truncate"
+            onClick={(e) => e.stopPropagation()}
           >
-            {String(displayValue)}
+            {raw}
           </a>
-        ) : null;
+        );
+      }
       case "progress": {
         const pct = Math.min(100, Math.max(0, Number(displayValue ?? 0)));
         const color =
@@ -189,7 +198,7 @@ export function CellRenderer({
   return (
     <div
       data-fill-row={rowIdx}
-      className={`h-full w-full flex relative group/cell ${isWrapped ? "items-start pt-1.5" : "items-center"} ${justifyClass} ${type === "checkbox" ? "justify-center" : ""} px-2.5 py-1 gap-1.5 ${isSelected ? "bg-primary/10" : ""}`}
+      className={`h-full w-full flex relative group/cell ${isWrapped ? "items-start pt-1.5" : "items-center"} ${justifyClass} ${type === "checkbox" ? "justify-center" : ""} px-2.5 py-1 gap-1.5 ${isSelected ? "bg-primary/10" : ""} ${isActiveSelected ? "sheet-cell-active-selected" : ""} ${validationWarning ? "sheet-cell-validation-warning" : ""}`}
       style={{
         color: "inherit",
         ...cellStyle,
@@ -200,7 +209,13 @@ export function CellRenderer({
       onClick={onCellClick}
       onPointerDown={(e) => { if (onPointerDown) onPointerDown(rowIdx, colKey, e); }}
       onPointerEnter={(e) => { if (onPointerEnter) onPointerEnter(rowIdx, colKey, e); }}
+      title={validationWarning ?? undefined}
     >
+      {validationWarning && (
+        <span className="sheet-validation-marker" aria-label={validationWarning}>
+          <AlertTriangle className="h-3 w-3" />
+        </span>
+      )}
       {isProtected && (
         <Lock className="absolute top-1 right-1 h-2 w-2 text-gray-300 opacity-0 group-hover/cell:opacity-60 transition-opacity" />
       )}

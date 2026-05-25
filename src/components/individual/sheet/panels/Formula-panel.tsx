@@ -52,8 +52,8 @@ export default function FormulaPanel({
         </p>
       </div>
 
-      <div className="flex gap-3 p-4 overflow-hidden min-h-0">
-        <div className="w-44 overflow-y-auto rounded-xl border border-border bg-background" style={{ maxHeight: "calc(100vh - 140px)" }}>
+      <div className="flex flex-col gap-3 p-4 overflow-hidden min-h-0">
+        <div className="w-full overflow-y-auto rounded-xl border border-border bg-background max-h-56">
           <div className="px-3 py-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -91,7 +91,7 @@ export default function FormulaPanel({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto rounded-xl border border-border bg-background p-4">
+        <div className="flex-1 overflow-y-auto rounded-xl border border-border bg-background p-4 min-h-0">
           {selected ? (
             <div className="space-y-4">
               <div>

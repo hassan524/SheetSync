@@ -3,6 +3,7 @@
 import { Send, Check, MessageSquare, Reply, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import type { SheetRow } from "@/types";
+import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 
 // ── Types ──────────────────────────────────────────────────────
 interface ReplyItem {
@@ -104,6 +105,8 @@ interface CommentsPanelProps {
     handleReply: (cellKey: string, commentId: string) => void;
     handleResolveComment: (cellKey: string, commentId: string) => void;
     setReplyText: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+    members?: OrgMember[];
+    isOrganizationSheet?: boolean;
 }
 
 // ── Main ───────────────────────────────────────────────────────
@@ -119,6 +122,8 @@ export default function CommentsPanel({
     handleReply,
     handleResolveComment,
     setReplyText,
+    members = [],
+    isOrganizationSheet = false,
 }: CommentsPanelProps) {
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"cell" | "all">("cell");
@@ -157,6 +162,16 @@ export default function CommentsPanel({
             (c) => !c.parentId && !c.resolved
         ).length
         : 0;
+    const mentionQuery = newCommentText.match(/@([^\s@]*)$/)?.[1]?.toLowerCase();
+    const mentionMatches =
+        isOrganizationSheet && mentionQuery !== undefined
+            ? members
+                .filter((member) =>
+                    member.name.toLowerCase().includes(mentionQuery) ||
+                    member.email.toLowerCase().includes(mentionQuery)
+                )
+                .slice(0, 6)
+            : [];
 
     return (
         <div className="flex flex-col h-full">
@@ -478,11 +493,47 @@ export default function CommentsPanel({
                     </p>
                 )}
                 <div
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2 transition-colors ${t(
+                    className={`relative flex items-center gap-2 rounded-xl px-3 py-2 transition-colors ${t(
                         "border border-gray-200 bg-gray-50 focus-within:border-primary/50 focus-within:bg-white",
                         "border border-gray-700 bg-gray-900 focus-within:border-primary/40"
                     )}`}
                 >
+                    {mentionMatches.length > 0 && (
+                        <div
+                            className={`absolute left-0 right-0 bottom-full mb-2 overflow-hidden rounded-lg border shadow-lg ${t(
+                                "border-gray-200 bg-white",
+                                "border-gray-700 bg-gray-900"
+                            )}`}
+                        >
+                            {mentionMatches.map((member) => (
+                                <button
+                                    key={member.id}
+                                    type="button"
+                                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] ${t(
+                                        "hover:bg-gray-50",
+                                        "hover:bg-gray-800"
+                                    )}`}
+                                    onClick={() => {
+                                        setNewCommentText(
+                                            newCommentText.replace(/@([^\s@]*)$/, `@${member.name} `),
+                                        );
+                                    }}
+                                >
+                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                        {member.name.slice(0, 2).toUpperCase()}
+                                    </span>
+                                    <span className="min-w-0">
+                                        <span className={`block truncate font-medium ${t("text-gray-800", "text-gray-100")}`}>
+                                            {member.name}
+                                        </span>
+                                        <span className={`block truncate text-[10px] ${t("text-gray-400", "text-gray-500")}`}>
+                                            {member.email}
+                                        </span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <input
                         value={newCommentText}
                         onChange={(e) => setNewCommentText(e.target.value)}

@@ -258,9 +258,10 @@ export default function ColumnHeaderMenu({
             {COLUMN_TYPES.map(({ type, label, icon: Icon }) => (
               <DropdownMenuItem
                 key={type}
-                onClick={() => {
+                onSelect={(event) => {
+                  event.preventDefault();
                   onChangeType(type);
-                  setOpen(false);
+                  setTypeMenuOpen(true);
                 }}
                 className="text-xs gap-2"
               >

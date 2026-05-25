@@ -42,7 +42,7 @@ const CreateOrganizationDialog: React.FC<CreateOrganizationDialogProps> = ({
     try {
       setLoading(true);
 
-      const newOrg = await createOrganization(orgName.trim());
+      const newOrg = await createOrganization(orgName.trim(), orgDescription.trim());
 
       if (onCreated) onCreated(newOrg); 
 
@@ -52,7 +52,8 @@ const CreateOrganizationDialog: React.FC<CreateOrganizationDialogProps> = ({
       setOrgDescription("");
       onOpenChange(false);
 
-      if (!onCreated) router.push(`/organizations/${newOrg.id}`);
+      router.push(`/organizations/${newOrg.id}`);
+      router.refresh();
 
     } catch (err: any) {
       console.error(err);

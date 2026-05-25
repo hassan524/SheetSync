@@ -140,6 +140,17 @@ function criteriaToLegacyRule(rule: ValidationRule) {
         .map((s) => s.trim())
         .filter(Boolean),
       invalidAction: rule.invalidAction,
+      helpText: rule.helpText,
+      showHelpText: rule.showHelpText,
+    };
+  }
+  if (rule.criteria === "dropdown_range") {
+    return {
+      type: "dropdown_range",
+      sourceRange: rule.value,
+      invalidAction: rule.invalidAction,
+      helpText: rule.helpText,
+      showHelpText: rule.showHelpText,
     };
   }
   if (rule.criteria.startsWith("number_")) {
@@ -162,6 +173,8 @@ function criteriaToLegacyRule(rule: ValidationRule) {
           ? Number(rule.value2)
           : undefined,
       invalidAction: rule.invalidAction,
+      helpText: rule.helpText,
+      showHelpText: rule.showHelpText,
     };
   }
   // Text / date criteria — pass through for future handler expansion
@@ -170,6 +183,8 @@ function criteriaToLegacyRule(rule: ValidationRule) {
     value: rule.value,
     value2: DUAL_INPUT.has(rule.criteria) ? rule.value2 : undefined,
     invalidAction: rule.invalidAction,
+    helpText: rule.helpText,
+    showHelpText: rule.showHelpText,
   };
 }
 
@@ -512,6 +527,12 @@ export default function DataValidationPanel({
   const [rules, setRules] = useState<ValidationRule[]>([makeRule()]);
   const [rangeInput, setRangeInput] = useState("");
   const [hasRules, setHasRules] = useState(false);
+  const [applyRange, setApplyRange] = useState<{
+    startColKey: string;
+    endColKey: string;
+    startRow: number;
+    endRow: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!column) return;
@@ -521,6 +542,7 @@ export default function DataValidationPanel({
       ? `${letter}1:${letter}${totalRows}`
       : `${column.name}1:${column.name}${totalRows}`;
     setRangeInput(defaultRange);
+    setApplyRange({ startColKey: column.key, endColKey: column.key, startRow: 0, endRow: totalRows - 1 });
 
     // FIXED: now passes 4 args — same start and end col for single column
     if (onRangeSelect) {
@@ -534,16 +556,54 @@ export default function DataValidationPanel({
       return;
     }
 
-    let seedCriteria = "dropdown";
-    let seedValue = "";
-    let seedValue2 = "";
+    const existingRules = Array.isArray(existing?.rules)
+      ? existing.rules
+      : Array.isArray(existing)
+        ? existing
+        : [existing];
+    const firstExistingRule = existingRules[0] as any;
+    if (firstExistingRule?.startColKey && firstExistingRule?.endColKey) {
+      const startLetter = columnKeyToLetter(firstExistingRule.startColKey, columns);
+      const endLetter = columnKeyToLetter(firstExistingRule.endColKey, columns);
+      const savedStartRow = Number.isFinite(Number(firstExistingRule.startRow))
+        ? Number(firstExistingRule.startRow)
+        : 0;
+      const savedEndRow = Number.isFinite(Number(firstExistingRule.endRow))
+        ? Number(firstExistingRule.endRow)
+        : totalRows - 1;
+      if (startLetter && endLetter) {
+        setRangeInput(`${startLetter}${savedStartRow + 1}:${endLetter}${savedEndRow + 1}`);
+        setApplyRange({
+          startColKey: firstExistingRule.startColKey,
+          endColKey: firstExistingRule.endColKey,
+          startRow: savedStartRow,
+          endRow: savedEndRow,
+        });
+      }
+    } else if (firstExistingRule?.startRow !== undefined || firstExistingRule?.endRow !== undefined) {
+      const savedStartRow = Number.isFinite(Number(firstExistingRule.startRow))
+        ? Number(firstExistingRule.startRow)
+        : 0;
+      const savedEndRow = Number.isFinite(Number(firstExistingRule.endRow))
+        ? Number(firstExistingRule.endRow)
+        : totalRows - 1;
+      setRangeInput(`${letter}${savedStartRow + 1}:${letter}${savedEndRow + 1}`);
+      setApplyRange({ startColKey: column.key, endColKey: column.key, startRow: savedStartRow, endRow: savedEndRow });
+    }
+    const seededRules = existingRules.map((sourceRule: any) => {
+      let seedCriteria = "dropdown";
+      let seedValue = "";
+      let seedValue2 = "";
 
-    if (existing.type === "dropdown") {
+      if (sourceRule.type === "dropdown") {
       seedCriteria = "dropdown";
-      seedValue = Array.isArray(existing.options)
-        ? existing.options.join(", ")
+      seedValue = Array.isArray(sourceRule.options)
+        ? sourceRule.options.join(", ")
         : "";
-    } else if (existing.type === "number") {
+    } else if (sourceRule.type === "dropdown_range") {
+      seedCriteria = "dropdown_range";
+      seedValue = sourceRule.sourceRange ?? sourceRule.value ?? "";
+    } else if (sourceRule.type === "number") {
       const opBack: Record<string, string> = {
         gt: "number_gt",
         gte: "number_gte",
@@ -554,18 +614,29 @@ export default function DataValidationPanel({
         between: "number_between",
         not_between: "number_not_between",
       };
-      seedCriteria = opBack[existing.operator ?? "gt"] ?? "number_gt";
-      seedValue = existing.min !== undefined ? String(existing.min) : "";
-      seedValue2 = existing.max !== undefined ? String(existing.max) : "";
+      seedCriteria = opBack[sourceRule.operator ?? "gt"] ?? "number_gt";
+      seedValue = sourceRule.min !== undefined ? String(sourceRule.min) : "";
+      seedValue2 = sourceRule.max !== undefined ? String(sourceRule.max) : "";
     } else {
-      seedCriteria = existing.type ?? "dropdown";
-      seedValue = existing.value ?? "";
-      seedValue2 = existing.value2 ?? "";
+      seedCriteria = sourceRule.type ?? "dropdown";
+      seedValue = sourceRule.value ?? "";
+      seedValue2 = sourceRule.value2 ?? "";
     }
 
-    setRules([{ ...makeRule(), criteria: seedCriteria, value: seedValue, value2: seedValue2 }]);
+      return {
+        ...makeRule(),
+        criteria: seedCriteria,
+        value: seedValue,
+        value2: seedValue2,
+        invalidAction: sourceRule.invalidAction === "reject" ? "reject" : "warn",
+        helpText: sourceRule.helpText ?? "",
+        showHelpText: Boolean(sourceRule.showHelpText),
+      };
+    });
+
+    setRules(seededRules.length > 0 ? seededRules : [makeRule()]);
     setHasRules(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [column?.key]);
 
   // FIXED: parses D1:F20 style ranges and calls 4-arg onRangeSelect
@@ -590,6 +661,7 @@ export default function DataValidationPanel({
       const startRow = startRowStr ? Math.max(0, Number(startRowStr) - 1) : 0;
       const endRow   = endRowStr   ? Math.min(totalRows - 1, Number(endRowStr) - 1) : totalRows - 1;
 
+      setApplyRange({ startColKey, endColKey, startRow, endRow });
       onRangeSelect(startColKey, endColKey, startRow, endRow);
     },
     [columns, onRangeSelect, totalRows],
@@ -611,16 +683,35 @@ export default function DataValidationPanel({
   }, []);
 
   const handleDone = useCallback(() => {
-    const first = rules[0];
-    if (!first) return;
-    onSave(criteriaToLegacyRule(first));
-  }, [rules, onSave]);
+    if (!column) return;
+    const activeRules = rules.map(criteriaToLegacyRule);
+    if (activeRules.length === 0) return;
+    onSave({
+      type: "ruleSet",
+      rules: activeRules,
+      _applyTo: applyRange ?? {
+        startColKey: column.key,
+        endColKey: column.key,
+        startRow: 0,
+        endRow: totalRows - 1,
+      },
+    });
+  }, [applyRange, column, rules, onSave, totalRows]);
 
   const handleRemoveAll = useCallback(() => {
+    if (!column) return;
     setRules([makeRule()]);
     setHasRules(false);
-    onSave(null);
-  }, [onSave]);
+    onSave({
+      _remove: true,
+      _applyTo: applyRange ?? {
+        startColKey: column.key,
+        endColKey: column.key,
+        startRow: 0,
+        endRow: totalRows - 1,
+      },
+    });
+  }, [applyRange, column, onSave, totalRows]);
 
   if (!column) {
     return (
@@ -662,6 +753,7 @@ export default function DataValidationPanel({
                   : rangeInput;
                 setRangeInput(full);
                 // FIXED: 4-arg call
+                setApplyRange({ startColKey: column.key, endColKey: column.key, startRow: 0, endRow: totalRows - 1 });
                 if (onRangeSelect) onRangeSelect(column.key, column.key, 0, totalRows - 1);
               }}
               className={`h-8 w-8 shrink-0 rounded border flex items-center justify-center

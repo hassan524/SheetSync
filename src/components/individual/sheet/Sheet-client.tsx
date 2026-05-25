@@ -103,6 +103,297 @@ import "@/app/sheet.css";
 // ── Types ──────────────────────────────────────────────────────────────────
 import { SheetState, AdvancedFilterRule } from "@/types/index";
 
+type ValidationAction = "warn" | "reject";
+
+type ValidationRule = {
+  type: string;
+  operator?: string;
+  options?: string[];
+  value?: string;
+  value2?: string;
+  min?: number;
+  max?: number;
+  invalidAction?: ValidationAction;
+  helpText?: string;
+  showHelpText?: boolean;
+  sourceRange?: string;
+  startColKey?: string;
+  endColKey?: string;
+  startRow?: number;
+  endRow?: number;
+};
+
+type ValidationApplyRange = {
+  startColKey: string;
+  endColKey: string;
+  startRow: number;
+  endRow: number;
+};
+
+const SHEET_TOUR_STEPS = [
+  {
+    title: "Formula bar",
+    body: "Select a cell, then edit its value or formula here. Formulas start with =.",
+  },
+  {
+    title: "Toolbar options",
+    body: "Use the top controls for formatting, search, undo, sorting, cell types, and column tools.",
+  },
+  {
+    title: "Bottom controls",
+    body: "The bottom bar shows sheet counts and opens chart tools or keyboard shortcuts.",
+  },
+  {
+    title: "Charts",
+    body: "Use the chart button to create a chart from sheet columns, then click the chart to edit it.",
+  },
+  {
+    title: "Right panels",
+    body: "Open comments, columns, formulas, validation, automation, and other panels from the toolbar.",
+  },
+];
+
+function getValidationRuleList(validationRules: any): ValidationRule[] {
+  if (!validationRules) return [];
+  if (Array.isArray(validationRules)) return validationRules;
+  if (Array.isArray(validationRules.rules)) return validationRules.rules;
+  return [validationRules];
+}
+
+function validationRuleAppliesToRow(rule: ValidationRule, rowIdx: number) {
+  if (rule.startRow !== undefined && rowIdx < rule.startRow) return false;
+  if (rule.endRow !== undefined && rowIdx > rule.endRow) return false;
+  return true;
+}
+
+function parseA1Range(range?: string) {
+  const match = range?.trim().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i);
+  if (!match) return null;
+  const toIndex = (letter: string) =>
+    letter.toUpperCase().split("").reduce((sum, char) => sum * 26 + char.charCodeAt(0) - 64, 0) - 1;
+  return {
+    startCol: toIndex(match[1]),
+    startRow: Number(match[2]) - 1,
+    endCol: toIndex(match[3]),
+    endRow: Number(match[4]) - 1,
+  };
+}
+
+function getDropdownRangeOptions(rule: ValidationRule, rows: SheetRow[], columns: ColumnDef[]) {
+  const parsed = parseA1Range(rule.sourceRange ?? rule.value);
+  if (!parsed) return [];
+  const startCol = Math.min(parsed.startCol, parsed.endCol);
+  const endCol = Math.max(parsed.startCol, parsed.endCol);
+  const startRow = Math.max(0, Math.min(parsed.startRow, parsed.endRow));
+  const endRow = Math.min(rows.length - 1, Math.max(parsed.startRow, parsed.endRow));
+  const values = new Set<string>();
+  for (let rowIdx = startRow; rowIdx <= endRow; rowIdx += 1) {
+    for (let colIdx = startCol; colIdx <= endCol; colIdx += 1) {
+      const colKey = columns[colIdx]?.key;
+      const value = colKey ? rows[rowIdx]?.[colKey] : "";
+      if (value !== "" && value !== null && value !== undefined) values.add(String(value));
+    }
+  }
+  return [...values];
+}
+
+function parseDateValue(value: any) {
+  if (value === "" || value === null || value === undefined) return null;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function isValidUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function validationFailureMessage(columnName: string, rule: ValidationRule) {
+  if (rule.showHelpText && rule.helpText?.trim()) return rule.helpText.trim();
+  const value = rule.value ?? rule.min ?? "";
+  const value2 = rule.value2 ?? rule.max ?? "";
+  switch (rule.type) {
+    case "dropdown":
+    case "dropdown_range":
+      return `"${columnName}" only allows values from the dropdown.`;
+    case "text_contains":
+      return `"${columnName}" must contain "${value}".`;
+    case "text_not_contains":
+      return `"${columnName}" must not contain "${value}".`;
+    case "text_exactly":
+      return `"${columnName}" must be exactly "${value}".`;
+    case "text_email":
+      return `"${columnName}" must be a valid email address.`;
+    case "text_url":
+      return `"${columnName}" must be a valid URL.`;
+    case "date_valid":
+      return `"${columnName}" must be a valid date.`;
+    case "date_is":
+      return `"${columnName}" must be ${value}.`;
+    case "date_before":
+      return `"${columnName}" must be before ${value}.`;
+    case "date_on_or_before":
+      return `"${columnName}" must be on or before ${value}.`;
+    case "date_after":
+      return `"${columnName}" must be after ${value}.`;
+    case "date_on_or_after":
+      return `"${columnName}" must be on or after ${value}.`;
+    case "date_between":
+      return `"${columnName}" must be between ${value} and ${value2}.`;
+    case "date_not_between":
+      return `"${columnName}" must not be between ${value} and ${value2}.`;
+    case "number":
+      return `"${columnName}" must match the number rule.`;
+    default:
+      return `"${columnName}" does not match the validation rule.`;
+  }
+}
+
+function ruleIsValid(rule: ValidationRule, value: any, rows: SheetRow[], columns: ColumnDef[]) {
+  if (value === "" || value === null || value === undefined) return true;
+  const text = String(value);
+
+  if (rule.type === "dropdown") return (rule.options ?? []).map(String).includes(text);
+  if (rule.type === "dropdown_range") return getDropdownRangeOptions(rule, rows, columns).includes(text);
+  if (rule.type === "text_contains") return text.includes(String(rule.value ?? ""));
+  if (rule.type === "text_not_contains") return !text.includes(String(rule.value ?? ""));
+  if (rule.type === "text_exactly") return text === String(rule.value ?? "");
+  if (rule.type === "text_email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+  if (rule.type === "text_url") return isValidUrl(text);
+
+  if (rule.type.startsWith("date_")) {
+    const current = parseDateValue(value);
+    const first = parseDateValue(rule.value);
+    const second = parseDateValue(rule.value2);
+    if (rule.type === "date_valid") return current !== null;
+    if (current === null || first === null) return false;
+    if (rule.type === "date_is") return current === first;
+    if (rule.type === "date_before") return current < first;
+    if (rule.type === "date_on_or_before") return current <= first;
+    if (rule.type === "date_after") return current > first;
+    if (rule.type === "date_on_or_after") return current >= first;
+    if (rule.type === "date_between") return second !== null && current >= first && current <= second;
+    if (rule.type === "date_not_between") return second !== null && (current < first || current > second);
+  }
+
+  if (rule.type === "number") {
+    const numberValue = Number(value);
+    if (Number.isNaN(numberValue)) return false;
+    const min = rule.min;
+    const max = rule.max;
+    switch (rule.operator) {
+      case "gt":
+        return min === undefined || numberValue > min;
+      case "gte":
+        return min === undefined || numberValue >= min;
+      case "lt":
+        return min === undefined || numberValue < min;
+      case "lte":
+        return min === undefined || numberValue <= min;
+      case "eq":
+        return min === undefined || numberValue === min;
+      case "neq":
+        return min === undefined || numberValue !== min;
+      case "between":
+        return (min === undefined || numberValue >= min) && (max === undefined || numberValue <= max);
+      case "not_between":
+        return !((min === undefined || numberValue >= min) && (max === undefined || numberValue <= max));
+      default:
+        return (min === undefined || numberValue >= min) && (max === undefined || numberValue <= max);
+    }
+  }
+
+  return true;
+}
+
+function getCellValidationFailure(
+  rules: any,
+  value: any,
+  rowIdx: number,
+  columnName: string,
+  rows: SheetRow[],
+  columns: ColumnDef[],
+) {
+  for (const rule of getValidationRuleList(rules)) {
+    if (!validationRuleAppliesToRow(rule, rowIdx)) continue;
+    if (!ruleIsValid(rule, value, rows, columns)) {
+      return {
+        action: rule.invalidAction ?? "warn",
+        message: validationFailureMessage(columnName, rule),
+      };
+    }
+  }
+  return null;
+}
+
+function normalizeValidationRules(input: any, applyRange?: ValidationApplyRange) {
+  if (!input || input._remove) return null;
+  const rawRules = Array.isArray(input?.rules) ? input.rules : Array.isArray(input) ? input : [input];
+  const normalized = rawRules
+    .map((rule: any): ValidationRule | null => {
+      const base = {
+        invalidAction: rule.invalidAction === "reject" ? "reject" as const : "warn" as const,
+        helpText: typeof rule.helpText === "string" ? rule.helpText : "",
+        showHelpText: Boolean(rule.showHelpText),
+        startColKey: applyRange?.startColKey,
+        endColKey: applyRange?.endColKey,
+        startRow: applyRange?.startRow,
+        endRow: applyRange?.endRow,
+      };
+      if (rule.type === "dropdown") {
+        return {
+          ...base,
+          type: "dropdown",
+          options: Array.from(new Set((rule.options ?? []).map((item: any) => String(item).trim()).filter(Boolean))),
+        };
+      }
+      if (rule.type === "dropdown_range") {
+        return { ...base, type: "dropdown_range", sourceRange: String(rule.sourceRange ?? rule.value ?? "").trim() };
+      }
+      if (rule.type === "number") {
+        return {
+          ...base,
+          type: "number",
+          operator: rule.operator ?? "between",
+          ...(rule.min === undefined || Number.isNaN(Number(rule.min)) ? {} : { min: Number(rule.min) }),
+          ...(rule.max === undefined || Number.isNaN(Number(rule.max)) ? {} : { max: Number(rule.max) }),
+        };
+      }
+      if (typeof rule.type === "string") {
+        return {
+          ...base,
+          type: rule.type,
+          value: rule.value === undefined ? "" : String(rule.value),
+          value2: rule.value2 === undefined ? "" : String(rule.value2),
+        };
+      }
+      return null;
+    })
+    .filter(Boolean) as ValidationRule[];
+  if (normalized.length === 0) return null;
+  return normalized.length === 1 ? normalized[0] : { type: "ruleSet", rules: normalized };
+}
+
+function getValidationDrivenCellType(rules: any): ColumnDef["type"] | null {
+  const firstRule = getValidationRuleList(rules)[0];
+  if (!firstRule) return null;
+  if (firstRule.type === "dropdown" || firstRule.type === "dropdown_range") return "select";
+  if (firstRule.type === "number") return "number";
+  if (firstRule.type.startsWith("date_")) return "date";
+  return null;
+}
+
+function getValidationDropdownOptions(rules: any): string[] {
+  const dropdownRule = getValidationRuleList(rules).find((rule) => rule.type === "dropdown");
+  return dropdownRule?.options ?? [];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main client-side sheet editor component
 // - Loads and persists the sheet content.
@@ -163,6 +454,10 @@ export default function SheetClient() {
   } = sv;
 
   const { title, isOrgSheet, liveTracking, starred, rows, columns, organizationId } = sheetState;
+  const canProtectRows = Boolean(
+    currentUser &&
+      (sheetState.ownerId === currentUser.id || sheetState.userRole === "owner"),
+  );
 
   const [, setIsLoading] = useState(true);
 
@@ -191,6 +486,8 @@ export default function SheetClient() {
   const [savedViews, setSavedViews] = useState<SavedFilterView[]>([]);
   const [frozenRowsCount, setFrozenRowsCount] = useState(0);
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
+  const [showSheetTour, setShowSheetTour] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
 
   // Sub-hooks
   // Formatting hook for bold / italic / colors and cell style logic.
@@ -417,8 +714,20 @@ export default function SheetClient() {
   // If this is an organization sheet, load the member list.
   useEffect(() => {
     if (!sheetId || !isOrgSheet) { setOrgMembers([]); return; }
-    getSheetOrgMembers(sheetId).then((data) => { if (data) setOrgMembers(data.members); }).catch(console.error);
-  }, [sheetId, isOrgSheet]);
+    getSheetOrgMembers(sheetId).then((data) => {
+      if (!data) return;
+      setOrgMembers(data.members);
+      const currentMember = currentUser
+        ? data.members.find((member) => member.id === currentUser.id)
+        : null;
+      if (currentMember) {
+        setSheetState((prev) => ({
+          ...prev,
+          userRole: currentMember.role as SheetState["userRole"],
+        }));
+      }
+    }).catch(console.error);
+  }, [sheetId, isOrgSheet, currentUser, setSheetState]);
   // Subscribe to shared sheet history updates.
   useEffect(() => {
     if (!sheetId) return;
@@ -430,9 +739,32 @@ export default function SheetClient() {
     if (!sheetId) return;
     return subscribeToComments(sheetId, (grouped) => setComments(grouped));
   }, [sheetId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (!isMobile) {
+      setShowDesktopTip(false);
+      return;
+    }
+    const key = "sheetsync:mobile-sheet-tip";
+    if (!window.localStorage.getItem(key)) {
+      setShowDesktopTip(true);
+      window.localStorage.setItem(key, "1");
+    }
+  }, [setShowDesktopTip]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !sheetId) return;
+    const key = "sheetsync:first-sheet-tour";
+    if (!window.localStorage.getItem(key)) {
+      setShowSheetTour(true);
+      window.localStorage.setItem(key, "1");
+    }
+  }, [sheetId]);
   // Subscribe to collaborator cursor presence for organization sheets.
   useEffect(() => {
-    if (!sheetId || !isOrgSheet || !currentUser) return;
+    if (!sheetId || !isOrgSheet || !currentUser || !liveTracking) return;
     const ch = supabase.channel(`sheet-cursors:${sheetId}`, { config: { presence: { key: currentUser.id } } });
     ch.on("presence", { event: "sync" }, () => {
       const state = ch.presenceState<{ name: string; color: string; row: number; col: string }>();
@@ -441,13 +773,13 @@ export default function SheetClient() {
       setActiveCursors(cursors);
     }).subscribe((status) => { if (status === "SUBSCRIBED") presenceChannelRef.current = ch; });
     return () => { supabase.removeChannel(ch); presenceChannelRef.current = null; };
-  }, [sheetId, isOrgSheet, currentUser]);
+  }, [sheetId, isOrgSheet, currentUser, liveTracking]);
 
   // Track my current selected cell in the live cursor presence channel.
   useEffect(() => {
-    if (!presenceChannelRef.current || !currentUser || !selectedCell) return;
+    if (!presenceChannelRef.current || !currentUser || !selectedCell || !liveTracking) return;
     presenceChannelRef.current.track({ name: currentUser.name, color: getMemberColor(currentUser.id), row: selectedCell.row, col: selectedCell.col });
-  }, [selectedCell, currentUser]);
+  }, [selectedCell, currentUser, liveTracking]);
 
   // ── Derived / computed ─────────────────────────────────────────────────
   const effectiveRightPanel = useMemo((): RightPanelType => {
@@ -462,6 +794,24 @@ export default function SheetClient() {
     });
     return Array.from(new Map(rules.map((rule) => [rule.id, rule])).values());
   }, [columns]);
+
+  const normalizeDarkCellBackground = useCallback(
+    (value: any) => {
+      if (!isDark || !value) return value;
+      const normalized = String(value).trim().toLowerCase().replace(/\s+/g, "");
+      if (
+        normalized === "#fff" ||
+        normalized === "#ffffff" ||
+        normalized === "white" ||
+        normalized === "rgb(255,255,255)" ||
+        normalized === "rgba(255,255,255,1)"
+      ) {
+        return undefined;
+      }
+      return value;
+    },
+    [isDark],
+  );
 
   const getEffectiveCellStyle = useCallback(
     (rowIdx: number, colKey: string, row: SheetRow): React.CSSProperties => {
@@ -478,17 +828,22 @@ export default function SheetClient() {
           fontWeight: rule.format.bold ? 700 : style.fontWeight,
           fontStyle: rule.format.italic ? "italic" : style.fontStyle,
         }), {});
-      return {
+      const resolved = {
         ...base,
         fontWeight: columnFormat.bold ? 700 : base.fontWeight,
         fontStyle: columnFormat.italic ? "italic" : base.fontStyle,
+        fontFamily: columnFormat.fontFamily ?? base.fontFamily,
         fontSize: columnFormat.fontSize ? `${columnFormat.fontSize}px` : base.fontSize,
         color: columnFormat.textColor ?? base.color,
         backgroundColor: columnFormat.bgColor ?? base.backgroundColor,
         ...conditionalFormat,
       };
+      return {
+        ...resolved,
+        backgroundColor: normalizeDarkCellBackground(resolved.backgroundColor),
+      };
     },
-    [columns, conditionalRules, formatting.getCellStyle, textWrap.textWrapColumns],
+    [columns, conditionalRules, formatting.getCellStyle, normalizeDarkCellBackground, textWrap.textWrapColumns],
   );
 
   const filteredRows = useMemo<SheetRow[]>(() => {
@@ -801,7 +1156,8 @@ export default function SheetClient() {
   }, []);
 
   const validateRows = useCallback((nextRows: SheetRow[], prevRows: SheetRow[]) => {
-    for (const row of nextRows) {
+    for (let rowIdx = 0; rowIdx < nextRows.length; rowIdx += 1) {
+      const row = nextRows[rowIdx];
       const previous = prevRows.find((item) => item.id === row.id);
       for (const column of columns) {
         const rules = column.validation_rules;
@@ -809,19 +1165,9 @@ export default function SheetClient() {
         const value = row[column.key];
         const previousValue = previous?.[column.key];
         if (value === previousValue) continue;
-
-        if (rules.type === "dropdown") {
-          const allowed = (rules.options ?? []).map(String);
-          if (value !== "" && value !== null && value !== undefined && !allowed.includes(String(value))) {
-            return { ok: false, message: `"${column.name}" only allows listed dropdown values.` };
-          }
-        }
-
-        if (rules.type === "number") {
-          const n = Number(value);
-          if (value !== "" && Number.isNaN(n)) return { ok: false, message: `"${column.name}" requires a number.` };
-          if (rules.min !== undefined && n < Number(rules.min)) return { ok: false, message: `"${column.name}" must be at least ${rules.min}.` };
-          if (rules.max !== undefined && n > Number(rules.max)) return { ok: false, message: `"${column.name}" must be at most ${rules.max}.` };
+        const failure = getCellValidationFailure(rules, value, rowIdx, column.name, nextRows, columns);
+        if (failure?.action === "reject") {
+          return { ok: false, message: failure.message };
         }
       }
     }
@@ -906,6 +1252,10 @@ export default function SheetClient() {
 
   // Toggle whether the selected cell wraps text or stays single-line.
   const handleToggleRowProtection = useCallback(async () => {
+    if (!canProtectRows) {
+      toast.error("Only the sheet owner can protect rows.");
+      return;
+    }
     if (!selectedCell) {
       toast.info("Select a row first to protect it");
       return;
@@ -933,7 +1283,7 @@ export default function SheetClient() {
     } finally {
       markSaved();
     }
-  }, [selectedCell, rows, protection, sheetId, markSaving, markSaved]);
+  }, [canProtectRows, selectedCell, rows, protection, sheetId, markSaving, markSaved]);
 
   // Toggle text wrap for the selected cell and save the format.
   const handleTextWrapToggle = useCallback(async () => {
@@ -1278,59 +1628,55 @@ const handleRangeSelect = useCallback(
   }, [frozenRowsCount, sheetId]);
 
   const handleApplyValidation = useCallback(async (columnKey: string, rules: any) => {
-    type NormalizedValidationRule =
-      | { type: "dropdown"; options: string[] }
-      | { type: "number"; min?: number; max?: number };
-
-    const normalizedRules =
-      rules?.type === "dropdown"
-        ? {
-          type: "dropdown",
-          options: Array.from(
-            new Set(
-              (rules.options ?? [])
-                .map((item: any) => String(item).trim())
-                .filter(Boolean),
-            ),
-          ),
-        } as NormalizedValidationRule
-        : {
-          type: "number",
-          ...(rules.min === undefined || Number.isNaN(Number(rules.min))
-            ? {}
-            : { min: Number(rules.min) }),
-          ...(rules.max === undefined || Number.isNaN(Number(rules.max))
-            ? {}
-            : { max: Number(rules.max) }),
-        } as NormalizedValidationRule;
-    const nextColumns = columns.map((column) =>
-      column.key === columnKey ? { ...column, validation_rules: normalizedRules } : column,
+    const applyTo: ValidationApplyRange = rules?._applyTo ?? {
+      startColKey: columnKey,
+      endColKey: columnKey,
+      startRow: 0,
+      endRow: Math.max(0, rows.length - 1),
+    };
+    const startColIdx = columns.findIndex((column) => column.key === applyTo.startColKey);
+    const endColIdx = columns.findIndex((column) => column.key === applyTo.endColKey);
+    const minColIdx = Math.min(startColIdx, endColIdx);
+    const maxColIdx = Math.max(startColIdx, endColIdx);
+    const targetColumnKeys = new Set(
+      columns
+        .slice(minColIdx < 0 ? 0 : minColIdx, maxColIdx < 0 ? minColIdx + 1 : maxColIdx + 1)
+        .map((column) => column.key),
     );
-    const nextRows = rows.map((row) => {
-      const value = row[columnKey];
-      if (value === null || value === undefined || value === "") return row;
+    if (targetColumnKeys.size === 0) targetColumnKeys.add(columnKey);
 
-      if (
-        normalizedRules.type === "dropdown" &&
-        !normalizedRules.options.includes(String(value))
-      ) {
-        return { ...row, [columnKey]: "" };
-      }
-
-      if (normalizedRules.type === "number") {
-        const numberValue = Number(value);
-        if (Number.isNaN(numberValue)) return { ...row, [columnKey]: "" };
-        if (normalizedRules.min !== undefined && numberValue < normalizedRules.min) {
-          return { ...row, [columnKey]: normalizedRules.min };
+    const normalizedRules = normalizeValidationRules(rules, applyTo);
+    const drivenType = getValidationDrivenCellType(normalizedRules);
+    const firstNormalizedRule = getValidationRuleList(normalizedRules)[0];
+    const dropdownOptions = getValidationDropdownOptions(normalizedRules);
+    const selectOptions = dropdownOptions.map((option) => ({
+      label: option,
+      bgColor: getOptionBgStyle(option).backgroundColor,
+    }));
+    const nextColumns = columns.map((column) =>
+      targetColumnKeys.has(column.key)
+        ? {
+          ...column,
+          validation_rules: normalizedRules,
+          ...(drivenType ? { type: drivenType } : {}),
+          ...(drivenType === "select" && selectOptions.length > 0 ? { selectOptions } : {}),
         }
-        if (normalizedRules.max !== undefined && numberValue > normalizedRules.max) {
-          return { ...row, [columnKey]: normalizedRules.max };
-        }
-      }
-
-      return row;
-    });
-    const rowsChanged = nextRows.some((row, index) => row !== rows[index]);
+        : column,
+    );
+    const startRow = Math.min(applyTo.startRow, applyTo.endRow);
+    const endRow = Math.max(applyTo.startRow, applyTo.endRow);
+    const fullColumnRange = startRow <= 0 && endRow >= rows.length - 1;
+    const nextRows = drivenType && !fullColumnRange
+      ? rows.map((row, rowIdx) => {
+        if (rowIdx < startRow || rowIdx > endRow) return row;
+        const nextCellTypes = { ...(row[ROW_CELL_TYPES_KEY] ?? {}) };
+        targetColumnKeys.forEach((targetKey) => {
+          nextCellTypes[targetKey] = drivenType;
+        });
+        return { ...row, [ROW_CELL_TYPES_KEY]: nextCellTypes };
+      })
+      : rows;
+    const rowsChanged = nextRows !== rows;
 
     await sheetColOps.persistColumns(nextColumns);
     if (rowsChanged) {
@@ -1340,8 +1686,14 @@ const handleRangeSelect = useCallback(
       await saveAllRows(sheetId, nextRows);
       markSaved();
     }
+    if (drivenType === "select" && firstNormalizedRule?.type === "dropdown" && selectOptions.length === 0) {
+      setFocusedColumnKey(columnKey);
+      setRightPanel("select-options");
+      toast.success("Validation saved. Add dropdown options next.");
+      return;
+    }
     setRightPanel(null);
-    toast.success(rowsChanged ? "Validation saved and existing values cleaned" : "Validation saved");
+    toast.success(normalizedRules ? "Validation saved" : "Validation removed");
   }, [columns, markSaved, markSaving, rows, rowsHistory, sheetColOps.persistColumns, setRightPanel, setSheetState, sheetId]);
 
   const handleApplySelectOptions = useCallback(async (columnKey: string, options: SelectOption[]) => {
@@ -1397,6 +1749,10 @@ const handleRangeSelect = useCallback(
 
   const toggleRowProtectionById = useCallback(async (rowId: string) => {
     if (!sheetId) return;
+    if (!canProtectRows) {
+      toast.error("Only the sheet owner can protect rows.");
+      return;
+    }
     const rowKey = protection.getRowKey ? protection.getRowKey(rowId) : `row:${rowId}`;
     const nextSet = new Set(protection.protectedCells);
     const rowIsProtected = protection.isRowProtected ? protection.isRowProtected(rowId) : [...protection.protectedCells].some((k) => k === rowKey);
@@ -1417,7 +1773,7 @@ const handleRangeSelect = useCallback(
     } finally {
       markSaved();
     }
-  }, [protection, sheetId, markSaving, markSaved]);
+  }, [canProtectRows, protection, sheetId, markSaving, markSaved]);
 
   const handleApplyColumns = useCallback(async (nextColumns: ColumnDef[]) => {
     if (nextColumns.length === 0) { toast.error("Keep at least one column."); return; }
@@ -1438,6 +1794,36 @@ const handleRangeSelect = useCallback(
       markSaved(); toast.success("Columns updated");
     } catch (error: any) { setSaveStatus("saved"); toast.error(error?.message ?? "Failed to update columns."); }
   }, [columnsHistory, markSaved, markSaving, rows, rowsHistory, sheetId, setSaveStatus]);
+
+  const handleBulkUpdateColumn = useCallback(async (columnKey: string, limit: number | "all", value: string) => {
+    const column = columns.find((item) => item.key === columnKey);
+    if (!column) return;
+    const maxRows = limit === "all" ? rows.length : Math.min(limit, rows.length);
+    if (maxRows <= 0) return;
+
+    const updatedRows = rows.map((row, index) => {
+      if (index >= maxRows || protection.isRowProtected(row.id)) return row;
+      return { ...row, [columnKey]: value };
+    });
+    const validation = validateRows(updatedRows, rows);
+    if (!validation.ok) {
+      toast.error(validation.message);
+      return;
+    }
+
+    rowsHistory.pushState(updatedRows);
+    setSheetState((prev) => ({ ...prev, rows: updatedRows }));
+    markSaving();
+    try {
+      await saveAllRows(sheetId, updatedRows);
+      toast.success(`Updated ${maxRows} ${maxRows === 1 ? "cell" : "cells"} in ${column.name}`);
+    } catch {
+      toast.error("Column update saved locally but failed to persist.");
+      setSaveStatus("saved");
+    } finally {
+      markSaved();
+    }
+  }, [columns, markSaved, markSaving, protection.isRowProtected, rows, rowsHistory, setSaveStatus, setSheetState, sheetId, validateRows]);
 
   const handleRowsChange = useCallback((updatedRows: SheetRow[]) => {
     const updatedById = new Map(updatedRows.map((row) => [row.id, row]));
@@ -1775,6 +2161,14 @@ const handleRangeSelect = useCallback(
         const formula = formulas.getFormula(rowIdx, col.key);
         let displayValue = props.row[col.key];
         if (formula?.startsWith("=")) displayValue = formulas.evaluateFormula(formula, rowIdx);
+        const validationWarning = getCellValidationFailure(
+          col.validation_rules,
+          props.row[col.key],
+          rowIdx,
+          col.name,
+          rows,
+          columns,
+        )?.message ?? null;
         const activeCollabEntry = Object.values(activeCursors).find((c) => c.row === rowIdx && c.col === col.key);
         const colIndex = columns.findIndex((c) => c.key === col.key);
         const inSelection = selectionRange ? (
@@ -1801,13 +2195,16 @@ const handleRangeSelect = useCallback(
             onCellClick={() => {
               setSelectedColumnKey(null);
               setSelectedCell({ row: rowIdx, col: col.key });
+              if (rightPanel === "validation") setFocusedColumnKey(col.key);
               setActiveCommentCell(`row:${rows[rowIdx]?.id}`);
             }}
             onCommentClick={(e) => { e.stopPropagation(); setActiveCommentCell(`row:${rows[rowIdx]?.id}`); setRightPanel("comments"); }}
             onPointerDown={onCellPointerDown}
             onPointerEnter={onCellPointerEnter}
             onFillStart={onFillStart}
-            isSelected={inSelection}
+            isSelected={inSelection || (selectedCell?.row === rowIdx && selectedCell.col === col.key)}
+            isActiveSelected={selectedCell?.row === rowIdx && selectedCell.col === col.key}
+            validationWarning={validationWarning}
           />
         );
       },
@@ -1880,11 +2277,24 @@ const handleRangeSelect = useCallback(
               delete n[cellKey];
               return n;
             });
-            const num = v === "" ? 0 : Number(v);
-            if (!isNaN(num)) {
-              onRowChange({ ...row, [column.key]: num });
+            if (/^-?\d*\.?\d*$/.test(v)) {
+              onRowChange({ ...row, [column.key]: v });
             }
           }
+        };
+
+        const onProgressChange = (v: string) => {
+          if (v.startsWith("=")) {
+            onNumChange(v);
+            return;
+          }
+          if (!/^\d*\.?\d*$/.test(v)) return;
+          if (v === "" || v === "." || v.endsWith(".")) {
+            onRowChange({ ...row, [column.key]: v });
+            return;
+          }
+          const n = Math.min(100, Math.max(0, Number(v)));
+          if (!Number.isNaN(n)) onRowChange({ ...row, [column.key]: String(n) });
         };
 
         const onBlurSave = async () => {
@@ -2047,21 +2457,7 @@ const handleRangeSelect = useCallback(
               value={editVal}
               onChange={(e) =>
                 cellType === "progress"
-                  ? (() => {
-                    const v = e.target.value;
-                    if (v.startsWith("=")) onNumChange(v);
-                    else {
-                      const n =
-                        v === ""
-                          ? 0
-                          : Math.min(100, Math.max(0, Number(v)));
-                      if (!isNaN(n))
-                        onRowChange({
-                          ...row,
-                          [column.key]: n,
-                        });
-                    }
-                  })()
+                  ? onProgressChange(e.target.value)
                   : onNumChange(e.target.value)
               }
               onBlur={onBlurSave}
@@ -2113,7 +2509,7 @@ const handleRangeSelect = useCallback(
     }));
 
     return [rowNumberCol, ...dataCols];
-  }, [columns, rows, selectedRows, selectedColumnKey, textWrap.textWrapColumns, cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas, formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey, protection.isCellProtected, protection.isRowProtected, sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, colOps, markSaving, markSaved, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat, handleToggleFreezeColumn, isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove, endRowResize, toggleRowProtectionById, onFillStart]);
+  }, [columns, rows, selectedRows, selectedColumnKey, textWrap.textWrapColumns, cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas, formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey, protection.isCellProtected, protection.isRowProtected, sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, colOps, markSaving, markSaved, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat, handleToggleFreezeColumn, isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove, endRowResize, toggleRowProtectionById, onFillStart, rightPanel]);
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -2135,6 +2531,7 @@ const handleRangeSelect = useCallback(
           isDark={isDark} selectedCell={selectedCell} selectedCellType={selectedCellType}
           isSelectedColumnWrapped={isSelectedColumnWrapped}
           isProtected={isSelectedRowProtected}
+          canProtectRows={canProtectRows}
           fontFamily={fontFamily} fontSize={fontSize} zoomLevel={zoomLevel}
           filteredRowsCount={filteredRows.length} searchQuery={searchQuery} showSearch={showSearch}
           canUndo={rowsHistory.canUndo} canRedo={rowsHistory.canRedo}
@@ -2243,6 +2640,7 @@ const handleRangeSelect = useCallback(
             if (panel === "timetravel") { if (rightPanel !== "timetravel") timeTravelActions.openPanel(); else timeTravelActions.closePanel(); }
           }}
           onToggleRowProtection={handleToggleRowProtection}
+          canProtectRows={canProtectRows}
           onTogglePinRow={handleTogglePinRow}
           selectedRowPinned={selectedCell ? rows[selectedCell.row]?.pinned ?? false : false}
           onToggleDark={() => setIsDark(!isDark)}
@@ -2334,7 +2732,7 @@ const handleRangeSelect = useCallback(
             ))}
           </div>
 
-          {effectiveRightPanel && (rightPanel === "comments" || rightPanel === "developer" || rightPanel === "timetravel" || rightPanel === "charts" || rightPanel === "conditional" || rightPanel === "columns" || rightPanel === "select-options" || rightPanel === "row-details" || rightPanel === "validation" || rightPanel === "shortcuts" || rightPanel === "automation" || rightPanel === "aiassistant" || isOrgSheet) && (
+          {effectiveRightPanel && (rightPanel === "comments" || rightPanel === "developer" || rightPanel === "timetravel" || rightPanel === "charts" || rightPanel === "conditional" || rightPanel === "columns" || rightPanel === "select-options" || rightPanel === "row-details" || rightPanel === "validation" || rightPanel === "shortcuts" || rightPanel === "formulas" || rightPanel === "automation" || rightPanel === "aiassistant" || isOrgSheet) && (
             <>
               <div className="fixed inset-0 bg-black/40 z-20 sm:hidden backdrop-blur-[1px]" onClick={() => setRightPanel(null)} />
               <div className="fixed right-0 top-0 bottom-0 z-30 sm:static sm:z-auto w-80 max-w-[88vw] shadow-2xl sm:shadow-none transition-transform duration-200 ease-out">
@@ -2358,12 +2756,14 @@ const handleRangeSelect = useCallback(
                   onSaveConditionalRule={handleSaveConditionalRule}
                   onDeleteConditionalRule={handleDeleteConditionalRule}
                   onApplyColumns={handleApplyColumns}
+                  onBulkUpdateColumn={handleBulkUpdateColumn}
                   focusedColumnKey={focusedColumnKey ?? selectedCell?.col ?? null}
                   onApplySelectOptions={handleApplySelectOptions}
                   selectedRowIndex={selectedCell?.row ?? null}
                   history={history}
                   onApplyValidation={handleApplyValidation}
                   onUpdateRow={handleUpdateRow}
+                  onInsertFormula={handleFormulaInsert}
                   // automationRules={automationRules}
                   // onChangeAutomationRules={persistAutomationRules}
                   onRunAutomation={() => { if (selectedCell && rows[selectedCell.row]) runAutomationsForRows([rows[selectedCell.row]]); }}
@@ -2400,6 +2800,47 @@ const handleRangeSelect = useCallback(
             onSelect={(kind, preset) => { charts.insertChart(kind, rows, columns, { ...getSuggestedChartPreset(kind), ...preset }); toast.success(`${kind.charAt(0).toUpperCase() + kind.slice(1)} chart inserted — click to edit`); }}
             onClose={charts.closePicker}
           />
+        )}
+
+        {showSheetTour && (
+          <div className="fixed inset-0 z-[80] bg-black/55 backdrop-blur-[1px] pointer-events-auto">
+            <div
+              className={`absolute left-1/2 top-1/2 w-[min(92vw,380px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border p-4 shadow-2xl ${
+                isDark ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-200 bg-white text-gray-900"
+              }`}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                Sheet guide {tourStep + 1} of {SHEET_TOUR_STEPS.length}
+              </div>
+              <h2 className="mt-2 text-base font-semibold">{SHEET_TOUR_STEPS[tourStep].title}</h2>
+              <p className={`mt-2 text-sm leading-relaxed ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                {SHEET_TOUR_STEPS[tourStep].body}
+              </p>
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  className={`rounded-md px-3 py-1.5 text-xs ${
+                    isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-100"
+                  }`}
+                  onClick={() => setShowSheetTour(false)}
+                >
+                  Skip
+                </button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (tourStep >= SHEET_TOUR_STEPS.length - 1) {
+                      setShowSheetTour(false);
+                      return;
+                    }
+                    setTourStep((step) => step + 1);
+                  }}
+                >
+                  {tourStep >= SHEET_TOUR_STEPS.length - 1 ? "Done" : "Next"}
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
         <style jsx global>{`

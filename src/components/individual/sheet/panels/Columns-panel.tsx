@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListChecks, Plus, Trash2 } from "lucide-react";
-import type { ColumnDef, SelectOption } from "@/types";
+import type { ColumnDef, SelectOption, SheetRow } from "@/types";
 import { getOptionBgStyle, getSelectOptionLabel } from "@/utils/SheetUtils";
 
 type ColumnDraft = {
@@ -44,18 +44,25 @@ function makeDraft(col: ColumnDef): ColumnDraft {
 export default function ColumnsPanel({
   isDark,
   columns,
+  rows,
   onApply,
+  onBulkUpdate,
   focusedColumnKey,
 }: {
   isDark: boolean;
   columns: ColumnDef[];
+  rows: SheetRow[];
   onApply: (columns: ColumnDef[]) => void;
+  onBulkUpdate?: (columnKey: string, limit: number | "all", value: string) => void;
   focusedColumnKey?: string | null;
 }) {
   const [drafts, setDrafts] = useState<ColumnDraft[]>([]);
   const [expandedSelectKey, setExpandedSelectKey] = useState<string | null>(null);
   const [newOptionLabel, setNewOptionLabel] = useState("");
   const [newOptionColor, setNewOptionColor] = useState("#dbeafe");
+  const [activeColumnKey, setActiveColumnKey] = useState<string | null>(focusedColumnKey ?? null);
+  const [bulkLimit, setBulkLimit] = useState<"all" | "10">("10");
+  const [bulkValue, setBulkValue] = useState("");
 
   useEffect(() => {
     setDrafts(columns.map(makeDraft));
@@ -67,7 +74,16 @@ export default function ColumnsPanel({
     if (target?.type === "select") {
       setExpandedSelectKey(focusedColumnKey);
     }
+    setActiveColumnKey(focusedColumnKey);
   }, [columns, focusedColumnKey]);
+
+  const activeColumn = drafts.find((draft) => draft.key === activeColumnKey) ?? drafts[0] ?? null;
+  const activeColumnValues = activeColumn
+    ? rows.map((row, index) => ({
+        index,
+        value: row[activeColumn.key] ?? "",
+      }))
+    : [];
 
   const updateDraft = (
     key: string,
@@ -186,8 +202,11 @@ export default function ColumnsPanel({
         {drafts.map((draft, index) => (
           <div
             key={draft.key}
+            onClick={() => setActiveColumnKey(draft.key)}
             className={`rounded-lg border p-2.5 space-y-2 ${
-              isDark
+              activeColumnKey === draft.key
+                ? "border-primary bg-primary/5"
+                : isDark
                 ? "border-gray-800 bg-gray-900/60"
                 : "border-border bg-card"
             }`}
@@ -353,6 +372,71 @@ export default function ColumnsPanel({
           </div>
         ))}
       </div>
+
+      {activeColumn && (
+        <div
+          className={`rounded-lg border p-3 space-y-3 ${
+            isDark ? "border-gray-800 bg-gray-900/60" : "border-border bg-card"
+          }`}
+        >
+          <div>
+            <p className={`text-xs font-semibold ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+              {activeColumn.name || activeColumn.key} values
+            </p>
+            <p className={`mt-1 text-[11px] ${isDark ? "text-gray-500" : "text-muted-foreground"}`}>
+              Review this column and update all rows or only the first 10 cells.
+            </p>
+          </div>
+          <div
+            className={`max-h-44 overflow-y-auto rounded-md border ${
+              isDark ? "border-gray-800" : "border-border"
+            }`}
+          >
+            {activeColumnValues.slice(0, 50).map(({ index, value }) => (
+              <div
+                key={`${activeColumn.key}-${index}`}
+                className={`grid grid-cols-[42px_1fr] gap-2 border-b px-2 py-1.5 text-[11px] last:border-b-0 ${
+                  isDark ? "border-gray-800 text-gray-300" : "border-border text-gray-700"
+                }`}
+              >
+                <span className={isDark ? "text-gray-500" : "text-muted-foreground"}>
+                  {index + 1}
+                </span>
+                <span className="truncate">{String(value || "")}</span>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-[96px_1fr] gap-2">
+            <select
+              value={bulkLimit}
+              onChange={(event) => setBulkLimit(event.target.value as "all" | "10")}
+              className={`h-8 rounded-md border px-2 text-xs outline-none ${
+                isDark
+                  ? "border-gray-800 bg-gray-950 text-gray-200"
+                  : "border-border bg-background"
+              }`}
+            >
+              <option value="10">First 10</option>
+              <option value="all">All rows</option>
+            </select>
+            <Input
+              value={bulkValue}
+              onChange={(event) => setBulkValue(event.target.value)}
+              placeholder='Value, e.g. "done"'
+              className="h-8 text-xs"
+            />
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="w-full"
+            disabled={!onBulkUpdate}
+            onClick={() => onBulkUpdate?.(activeColumn.key, bulkLimit === "all" ? "all" : 10, bulkValue)}
+          >
+            Update {bulkLimit === "all" ? "all cells" : "first 10 cells"}
+          </Button>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 sticky bottom-0 bg-inherit pt-2">
         <Button

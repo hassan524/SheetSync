@@ -59,6 +59,68 @@ The grid receives:
 
 Each data cell renders through `src/components/individual/sheet/CellRenderer.tsx`.
 
+## Cell Editing And Types
+
+Cell type comes from the column definition unless a row stores a per-cell override in `__cellTypes`.
+
+Supported visible types include:
+
+- `text`: free text input.
+- `number`: numeric text input; decimals are preserved while typing.
+- `currency`: numeric input rendered with `Intl.NumberFormat` and the column `currencyCode`.
+- `date`: date input when editing.
+- `checkbox`: boolean toggle.
+- `select`: dropdown using `column.selectOptions` or cell-level select options.
+- `status` and `priority`: preset dropdown-style badge values.
+- `progress`: numeric input clamped to 0-100 for display.
+- `image`: image upload/render flow.
+- `url`: rendered as a link.
+
+Currency columns support decimal values. During edit, the cell keeps valid decimal text such as `1.`, `1.25`, or `-4.50`; on display it formats through the column currency code.
+
+## Formatting
+
+Formatting is handled by `useSheetFormatting` and persisted through `cell_formats`.
+
+Cell-level formatting supports:
+
+- bold, italic, underline, strikethrough
+- font size and font family
+- text color and background color
+- alignment
+- wrapping
+- borders
+
+Column-level formatting is stored in `column.conditional_formatting.columnFormat` and is applied in `getEffectiveCellStyle`. It now includes font family, font size, bold, italic, color, and background. Conditional formatting rules are applied after normal and column formatting so matching rules can override visual styles.
+
+Formatting from the toolbar applies to:
+
+- the selected column when a whole column is selected
+- every cell in a rectangular selection when a range is selected
+- the active selected cell otherwise
+
+## Column Header Menu
+
+The column header menu lives in `src/components/individual/sheet/Column-header-menu.tsx`.
+
+It controls:
+
+- column rename
+- type changes
+- currency code changes for currency columns
+- insert left/right
+- duplicate
+- sort
+- fill numbers
+- clear values
+- column formula
+- select options
+- freeze/unfreeze
+- validation panel opening
+- delete column
+
+On mobile, the column type submenu stays open after a type is selected so the user can keep working in the same menu position.
+
 ## Row Flow
 
 Rows are managed through:

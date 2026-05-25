@@ -347,7 +347,7 @@ export interface SheetState {
   forkedFromSnapshotLabel?: string | null;
   forkedAt?: string | null;
   forkedByUserId?: string | null;
-  userRole?: "owner" | "editor" | "viewer";
+  userRole?: Role;
 }
 
 export type FilterOperator =

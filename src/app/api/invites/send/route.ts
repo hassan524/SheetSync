@@ -11,13 +11,9 @@ function isValidEmail(email: string) {
 }
 
 export async function POST(req: NextRequest) {
-  console.log("API /invites/send hit");
-
   try {
     const body = await req.json();
-    const { orgId, orgName, emails, role } = body;
-
-    console.log("Request body:", body);
+    const { orgId, emails, role } = body;
 
     // -----------------------------
     // Basic validation
@@ -25,12 +21,6 @@ export async function POST(req: NextRequest) {
     if (!orgId)
       return NextResponse.json(
         { error: "Organization ID is required" },
-        { status: 400 },
-      );
-
-    if (!orgName)
-      return NextResponse.json(
-        { error: "Organization name is required" },
         { status: 400 },
       );
 
@@ -59,8 +49,6 @@ export async function POST(req: NextRequest) {
       error: userError,
     } = await supabase.auth.getUser();
 
-    console.log("Authenticated user:", user);
-
     if (userError || !user)
       return NextResponse.json(
         { error: "Unauthorized. Please login again." },
@@ -69,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     const { data: inviterMember, error: inviterMemberError } = await supabase
       .from("organization_members")
-      .select("role")
+      .select("role, organizations(name)")
       .eq("organization_id", orgId)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -88,6 +76,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const orgName =
+      (inviterMember as any).organizations?.name ?? "your organization";
+
     const results: any[] = [];
 
     // -----------------------------
@@ -95,8 +86,6 @@ export async function POST(req: NextRequest) {
     // -----------------------------
     for (const email of emails) {
       const cleanEmail = email.trim().toLowerCase();
-
-      console.log("Processing email:", cleanEmail);
 
       if (!isValidEmail(cleanEmail)) {
         results.push({
@@ -158,17 +147,16 @@ export async function POST(req: NextRequest) {
       // -----------------------------
       const { data: existingInvite, error: inviteError } = await supabase
         .from("organization_invites")
-        .select("id")
+        .select("id, status")
         .eq("organization_id", orgId)
         .eq("email", cleanEmail)
-        .eq("status", "pending")
         .maybeSingle();
 
       if (inviteError) {
         console.error("Existing invite check error:", inviteError);
       }
 
-      if (existingInvite) {
+      if (existingInvite?.status === "pending") {
         results.push({
           email: cleanEmail,
           status: "skipped",
@@ -181,14 +169,11 @@ export async function POST(req: NextRequest) {
       // Generate invite token
       // -----------------------------
       const token = randomUUID();
-      console.log("Generated token:", token);
 
       // -----------------------------
       // Store invite
       // -----------------------------
-      const { error: insertError } = await supabase
-        .from("organization_invites")
-        .insert({
+      const invitePayload = {
           organization_id: orgId,
           email: cleanEmail,
           role,
@@ -199,7 +184,16 @@ export async function POST(req: NextRequest) {
           expires_at: new Date(
             Date.now() + 7 * 24 * 60 * 60 * 1000,
           ).toISOString(),
-        });
+        };
+
+      const inviteWrite = existingInvite
+        ? await supabase
+            .from("organization_invites")
+            .update(invitePayload)
+            .eq("id", existingInvite.id)
+        : await supabase.from("organization_invites").insert(invitePayload);
+
+      const insertError = inviteWrite.error;
 
       if (insertError) {
         console.error("Invite insert error:", insertError);
@@ -217,8 +211,6 @@ export async function POST(req: NextRequest) {
       // Send invite email
       // -----------------------------
       try {
-        console.log("Sending invite email to:", cleanEmail);
-
         await sendInviteEmail({
           email: cleanEmail,
           organizationName: orgName,
@@ -255,8 +247,6 @@ export async function POST(req: NextRequest) {
     // Return results
     // -----------------------------
     const sentCount = results.filter((r) => r.status === "sent").length;
-
-    console.log("Results:", results);
 
     return NextResponse.json({
       success: true,

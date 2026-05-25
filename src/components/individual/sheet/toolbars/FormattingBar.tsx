@@ -24,6 +24,7 @@ interface FormattingBarProps {
   selectedCellType: ColumnDef["type"] | null;
   isSelectedColumnWrapped: boolean;
   isProtected: boolean;
+  canProtectRows?: boolean;
   fontFamily: string;
   fontSize: string;
   zoomLevel: number;
@@ -70,7 +71,7 @@ const FONT_FAMILIES = [
 const FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "24", "36"];
 
 export function FormattingBar({
-  isDark, selectedCell, selectedCellType, isSelectedColumnWrapped, isProtected,
+  isDark, selectedCell, selectedCellType, isSelectedColumnWrapped, isProtected, canProtectRows = true,
   fontFamily, fontSize, zoomLevel, filteredRowsCount, searchQuery, showSearch,
   canUndo, canRedo, currentFormat,
   onUndo, onRedo, onZoomChange, onCopy, onCut, onPaste,
@@ -118,7 +119,7 @@ export function FormattingBar({
 
   return (
     <div className="sheet-toolbar sheet-formatting-bar border-b shrink-0" style={{ height: "40px" }}>
-      <div className="h-full flex items-center px-2 gap-0.5 overflow-x-auto hide-scrollbar min-w-0">
+      <div className="sheet-header-scrollbar h-full flex items-center px-2 gap-0.5 overflow-x-auto min-w-0">
         <IconBtn icon={Undo2} tooltip="Undo" shortcut="Ctrl+Z" onClick={onUndo} disabled={!canUndo} />
         <IconBtn icon={Redo2} tooltip="Redo" shortcut="Ctrl+Y" onClick={onRedo} disabled={!canRedo} />
         <ToolSep />
@@ -305,9 +306,9 @@ export function FormattingBar({
         <IconBtn icon={WrapText} tooltip="Text Wrap" onClick={onTextWrapToggle} disabled={!selectedCell} active={isSelectedColumnWrapped} />
         <IconBtn
           icon={isProtected ? Lock : Unlock}
-          tooltip="Protect row"
+          tooltip={canProtectRows ? "Protect row" : "Protect row is owner-only"}
           onClick={onProtectionToggle}
-          disabled={!selectedCell}
+          disabled={!selectedCell || !canProtectRows}
           active={isProtected}
         />
         <ToolSep />
