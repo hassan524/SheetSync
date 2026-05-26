@@ -33,14 +33,14 @@ messaging.onBackgroundMessage((payload) => {
 // Click handler — open the relevant page
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/";
+  const targetUrl = new URL(event.notification.data?.url || "/", self.location.origin).href;
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clients) => {
-        const existing = clients.find((c) => c.url.includes(url));
+        const existing = clients.find((c) => c.url === targetUrl);
         if (existing) return existing.focus();
-        return self.clients.openWindow(url);
+        return self.clients.openWindow(targetUrl);
       })
   );
 });

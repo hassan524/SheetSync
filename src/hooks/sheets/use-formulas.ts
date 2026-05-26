@@ -1339,6 +1339,11 @@ function evaluateArithmetic(
   // 4. Restore string literals
   safe = safe.replace(/__S(\d+)__/g, (_, i) => literals[parseInt(i, 10)]);
 
+  // 5. Normalize Excel comparison operators for JavaScript evaluation.
+  safe = safe
+    .replace(/<>/g, "!=")
+    .replace(/(?<![<>=!])=(?![=>])/g, "==");
+
   try {
     return Function(`"use strict"; return (${safe})`)();
   } catch {
@@ -1386,6 +1391,15 @@ function resolveArg(
   // Nested function call  e.g. UPPER(name), IF(done, 1, 0)
   if (/^[A-Z_][A-Z0-9_]*\s*\(/i.test(t)) {
     return { ...blank, raw: t, value: evalFn(t, rowIdx) };
+  }
+
+  // Inline expression / comparison, e.g. price > 10 or status = "Done".
+  if (/[+\-*/<>=&]/.test(t)) {
+    return {
+      ...blank,
+      raw: t,
+      value: evaluateArithmetic(t, rowIdx, rows, columns, findColumnIndex),
+    };
   }
 
   // A1-style cell reference  e.g. B3, AA12
@@ -1657,10 +1671,8 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
 
       // Let hot-formula-parser handle standard Excel formulas first.
       // If it cannot parse a SheetSync column-name formula, fall back below.
-      if (/[A-Z]+\d+/i.test(expr)) {
-        const { error, result } = parser.parse(expr);
-        if (!error) return result;
-      }
+      const { error, result } = parser.parse(expr);
+      if (!error) return result;
 
       return parseAndEval(
         expr,

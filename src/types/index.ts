@@ -234,6 +234,44 @@ export interface ConditionalFormatRule {
   format: Pick<CellFormat, "bold" | "italic" | "textColor" | "bgColor">;
 }
 
+export type AutomationConditionOperator =
+  | "always"
+  | "equals"
+  | "not_equals"
+  | "contains"
+  | "empty"
+  | "not_empty"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "date_before_today"
+  | "date_in_next_days";
+
+export type AutomationActionType =
+  | "notify"
+  | "update_cell"
+  | "archive_row"
+  | "pin_row";
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  condition: {
+    columnKey: string;
+    operator: AutomationConditionOperator;
+    value?: string;
+  };
+  actions: Array<{
+    id: string;
+    type: AutomationActionType;
+    columnKey?: string;
+    value?: string;
+    message?: string;
+  }>;
+}
+
 /* ============================================================
    History
 ============================================================ */
@@ -309,7 +347,7 @@ export interface SheetState {
   forkedFromSnapshotLabel?: string | null;
   forkedAt?: string | null;
   forkedByUserId?: string | null;
-  userRole?: "owner" | "editor" | "viewer";
+  userRole?: Role;
 }
 
 export type FilterOperator =
@@ -353,4 +391,19 @@ export interface OrganizationTableData {
   lastModified: string;
   createdAt: string;
 }
+
+export const STATUS_VALUES = [
+  "Not Started",
+  "In Progress",
+  "In Review",
+  "Done",
+  "Blocked",
+] as const;
+
+export const PRIORITY_VALUES = [
+  "Low",
+  "Medium",
+  "High",
+  "Critical",
+] as const;
 

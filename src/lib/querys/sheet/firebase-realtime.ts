@@ -44,6 +44,7 @@ export interface HistoryEntry {
   userColor: string;
   action: HistoryAction;
   detail: string; // human readable e.g. "Changed B3: 'Pending' → 'Active'"
+  rowId?: string; // row identifier for easier filtering
   oldValue?: any;
   newValue?: any;
   createdAt: string; // ISO string — already formatted for UI
@@ -93,6 +94,7 @@ export async function logHistory(entry: {
   userColor: string;
   action: HistoryAction;
   detail: string;
+  rowId?: string;
   oldValue?: any;
   newValue?: any;
 }) {
@@ -133,6 +135,7 @@ export function subscribeToHistory(
         userColor: data.userColor || "#0d7c5f",
         action: data.action,
         detail: data.detail,
+        rowId: data.rowId || undefined,
         oldValue: data.oldValue,
         newValue: data.newValue,
         createdAt: formatTimestamp(data.createdAt),
@@ -243,6 +246,7 @@ export function logCellEdit(
   userName = "You",
   userColor = "#0d7c5f",
   userId = "local",
+  rowId?: string,
 ) {
   return logHistory({
     sheetId,
@@ -253,6 +257,7 @@ export function logCellEdit(
     detail: `Edited ${cellRef} (${colName}): "${String(oldVal ?? "")}" → "${String(newVal ?? "")}"`,
     oldValue: oldVal,
     newValue: newVal,
+    rowId,
   });
 }
 

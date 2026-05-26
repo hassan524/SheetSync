@@ -72,7 +72,7 @@ export function CommentDot({ count }: { count: number }) {
 // ── CollabCursor ─────────────────────────────────────────────────────────────
 export function CollabCursor({ name, color }: { name: string; color: string }) {
   return (
-    <div className="absolute -top-5 left-0 z-50 pointer-events-none flex items-center gap-1">
+    <div className="sheet-collab-cursor absolute -top-5 left-0 z-50 pointer-events-none flex items-center gap-1 opacity-0 group-hover/cell:opacity-100 transition-opacity">
       <div
         className="w-0.5 h-5 rounded-full"
         style={{ backgroundColor: color }}

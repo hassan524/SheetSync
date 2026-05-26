@@ -195,7 +195,7 @@ export function TitleBar({
       </div>
 
       {/* Right: actions */}
-      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 ml-1 min-w-0 overflow-visible [&_[data-slot=dropdown-menu-trigger]]:shrink-0 hide-scrollbar">
+      <div className="sheet-header-scrollbar flex items-center gap-0.5 sm:gap-1 shrink-0 ml-1 min-w-0 overflow-x-auto overflow-y-visible [&_[data-slot=dropdown-menu-trigger]]:shrink-0">
         {isOrgSheet && (
           <>
             <div className="hidden sm:flex -space-x-2 shrink-0">

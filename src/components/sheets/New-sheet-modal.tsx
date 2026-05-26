@@ -141,7 +141,7 @@ const NewSheetModal = ({
       );
 
       toast.success(`Sheet "${sheetName}" created`);
-      router.push(`/sheet/${createdSheet.id}`);
+      router.push(`/sheet/${createdSheet.id}${organizationId ? "?org=true" : ""}`);
       setSheetName("");
       onOpenChange(false);
     } catch (err: any) {

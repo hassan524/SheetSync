@@ -2,6 +2,8 @@
 
 import { Send, Check, MessageSquare, Reply, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
+import type { SheetRow } from "@/types";
+import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 
 // ── Types ──────────────────────────────────────────────────────
 interface ReplyItem {
@@ -76,13 +78,15 @@ function Avatar({
 
 // ── Cell key → readable label ──────────────────────────────────
 // "2-status" → "status · 3"
-function formatCellLabel(key: string): string {
+function formatCellLabel(key: string, rows: SheetRow[]): string {
     if (!key) return "";
     if (key.startsWith("row:")) {
-        return "Row comment";
+        const rowId = key.slice(4);
+        const rowIndex = rows.findIndex((row) => row.id === rowId);
+        return rowIndex >= 0 ? `Row ${rowIndex + 1}` : "Row comment";
     }
     const parts = key.split("-");
-    const rowNum = parseInt(parts[0] ?? "0") + 1;
+    const rowNum = parseInt(parts[0] ?? "0", 10) + 1;
     const colKey = parts.slice(1).join("-");
     return `${colKey} · ${rowNum}`;
 }
@@ -90,6 +94,7 @@ function formatCellLabel(key: string): string {
 // ── Props ──────────────────────────────────────────────────────
 interface CommentsPanelProps {
     isDark: boolean;
+    rows: SheetRow[];
     /** Full map: cellKey → root comments (each with .thread injected) */
     comments: Record<string, SheetComment[]>;
     activeCommentCell: string | null;
@@ -100,11 +105,14 @@ interface CommentsPanelProps {
     handleReply: (cellKey: string, commentId: string) => void;
     handleResolveComment: (cellKey: string, commentId: string) => void;
     setReplyText: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+    members?: OrgMember[];
+    isOrganizationSheet?: boolean;
 }
 
 // ── Main ───────────────────────────────────────────────────────
 export default function CommentsPanel({
     isDark,
+    rows,
     comments,
     activeCommentCell,
     newCommentText,
@@ -114,6 +122,8 @@ export default function CommentsPanel({
     handleReply,
     handleResolveComment,
     setReplyText,
+    members = [],
+    isOrganizationSheet = false,
 }: CommentsPanelProps) {
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"cell" | "all">("cell");
@@ -127,6 +137,8 @@ export default function CommentsPanel({
         viewMode === "cell" && activeCommentCell
             ? ([[activeCommentCell, comments[activeCommentCell] ?? []]] as [string, SheetComment[]][])
             : (Object.entries(comments) as [string, SheetComment[]][]);
+
+    const activeLabel = activeCommentCell?.startsWith("row:") ? "This row" : "This cell";
 
     // Root comments only — replies live inside comment.thread
     const rootComments: (SheetComment & { cellKey: string })[] =
@@ -150,6 +162,16 @@ export default function CommentsPanel({
             (c) => !c.parentId && !c.resolved
         ).length
         : 0;
+    const mentionQuery = newCommentText.match(/@([^\s@]*)$/)?.[1]?.toLowerCase();
+    const mentionMatches =
+        isOrganizationSheet && mentionQuery !== undefined
+            ? members
+                .filter((member) =>
+                    member.name.toLowerCase().includes(mentionQuery) ||
+                    member.email.toLowerCase().includes(mentionQuery)
+                )
+                .slice(0, 6)
+            : [];
 
     return (
         <div className="flex flex-col h-full">
@@ -168,7 +190,7 @@ export default function CommentsPanel({
                         : t("text-gray-500 hover:bg-gray-100", "text-gray-500 hover:bg-gray-800")
                         }`}
                 >
-                    This cell
+                    {activeLabel}
                     {cellOpenCount > 0 && (
                         <span
                             className={`h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center ${viewMode === "cell"
@@ -209,7 +231,7 @@ export default function CommentsPanel({
                             "bg-gray-800 text-gray-500"
                         )}`}
                     >
-                        {formatCellLabel(activeCommentCell)}
+                        {formatCellLabel(activeCommentCell, rows)}
                     </span>
                 )}
             </div>
@@ -226,7 +248,9 @@ export default function CommentsPanel({
                         />
                         <p className={`text-[12px] font-medium ${t("text-gray-500", "text-gray-400")}`}>
                             {viewMode === "cell" && activeCommentCell
-                                ? "No comments on this cell"
+                                ? activeCommentCell?.startsWith("row:")
+                                    ? "No comments on this row"
+                                    : "No comments on this cell"
                                 : "No comments yet"}
                         </p>
                         {viewMode === "cell" && (
@@ -257,7 +281,7 @@ export default function CommentsPanel({
                                                 "bg-gray-800 text-gray-500"
                                             )}`}
                                         >
-                                            {formatCellLabel(comment.cellKey)}
+                                            {formatCellLabel(comment.cellKey, rows)}
                                             {comment.resolved && (
                                                 <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />
                                             )}
@@ -461,7 +485,7 @@ export default function CommentsPanel({
                         )}`}
                     >
                         <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                        {formatCellLabel(activeCommentCell)}
+                        {formatCellLabel(activeCommentCell, rows)}
                     </p>
                 ) : (
                     <p className={`text-[10px] mb-2 ${t("text-gray-400", "text-gray-600")}`}>
@@ -469,11 +493,47 @@ export default function CommentsPanel({
                     </p>
                 )}
                 <div
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2 transition-colors ${t(
+                    className={`relative flex items-center gap-2 rounded-xl px-3 py-2 transition-colors ${t(
                         "border border-gray-200 bg-gray-50 focus-within:border-primary/50 focus-within:bg-white",
                         "border border-gray-700 bg-gray-900 focus-within:border-primary/40"
                     )}`}
                 >
+                    {mentionMatches.length > 0 && (
+                        <div
+                            className={`absolute left-0 right-0 bottom-full mb-2 overflow-hidden rounded-lg border shadow-lg ${t(
+                                "border-gray-200 bg-white",
+                                "border-gray-700 bg-gray-900"
+                            )}`}
+                        >
+                            {mentionMatches.map((member) => (
+                                <button
+                                    key={member.id}
+                                    type="button"
+                                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] ${t(
+                                        "hover:bg-gray-50",
+                                        "hover:bg-gray-800"
+                                    )}`}
+                                    onClick={() => {
+                                        setNewCommentText(
+                                            newCommentText.replace(/@([^\s@]*)$/, `@${member.name} `),
+                                        );
+                                    }}
+                                >
+                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                        {member.name.slice(0, 2).toUpperCase()}
+                                    </span>
+                                    <span className="min-w-0">
+                                        <span className={`block truncate font-medium ${t("text-gray-800", "text-gray-100")}`}>
+                                            {member.name}
+                                        </span>
+                                        <span className={`block truncate text-[10px] ${t("text-gray-400", "text-gray-500")}`}>
+                                            {member.email}
+                                        </span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <input
                         value={newCommentText}
                         onChange={(e) => setNewCommentText(e.target.value)}

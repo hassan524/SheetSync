@@ -56,7 +56,7 @@ export function useSheetStateVars(isOrganizationSheet: boolean, importedFrom: st
   const [forks, setForks] = useState<{ id: string; title: string; forked_at: string | null }[]>([]);
   const [cellSelectOptions, setCellSelectOptions] = useState<Record<string, string[]>>({});
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
-  const [showDesktopTip, setShowDesktopTip] = useState(true);
+  const [showDesktopTip, setShowDesktopTip] = useState(false);
   const [isImportingSheet, setIsImportingSheet] = useState(false);
   const [importSource, setImportSource] = useState<"csv" | "excel" | null>(
     importedFrom === "csv" || importedFrom === "excel" ? importedFrom : null,

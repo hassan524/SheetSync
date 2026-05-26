@@ -12,6 +12,7 @@ interface ConditionalFormattingPanelProps {
   isDark: boolean;
   columns: ColumnDef[];
   selectedCell: { row: number; col: string } | null;
+  selectionRange?: { start: { row: number; colIndex: number }; end: { row: number; colIndex: number } } | null;
   rules: ConditionalFormatRule[];
   onSaveRule: (rule: ConditionalFormatRule) => void;
   onDeleteRule: (ruleId: string) => void;
@@ -72,6 +73,7 @@ export default function ConditionalFormattingPanel({
   isDark,
   columns,
   selectedCell,
+  selectionRange,
   rules,
   onSaveRule,
   onDeleteRule,
@@ -79,10 +81,17 @@ export default function ConditionalFormattingPanel({
   const selectedColIndex = selectedCell
     ? columns.findIndex((col) => col.key === selectedCell.col)
     : 0;
-  const defaultRange =
-    selectedCell && selectedColIndex >= 0
-      ? `${columnIndexToName(selectedColIndex)}${selectedCell.row + 1}`
-      : "A1:A10";
+  const defaultRange = (() => {
+    if (selectionRange) {
+      const sr = Math.min(selectionRange.start.row, selectionRange.end.row);
+      const er = Math.max(selectionRange.start.row, selectionRange.end.row);
+      const sc = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
+      const ec = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+      return `${columnIndexToName(sc)}${sr + 1}:${columnIndexToName(ec)}${er + 1}`;
+    }
+    if (selectedCell && selectedColIndex >= 0) return `${columnIndexToName(selectedColIndex)}${selectedCell.row + 1}`;
+    return "A1:A10";
+  })();
 
   const [range, setRange] = useState(defaultRange);
   const [operator, setOperator] =
@@ -202,6 +211,30 @@ export default function ConditionalFormattingPanel({
               }}
             >
               Preview
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-background p-3 space-y-3">
+          <div className="text-[11px] font-semibold">Suggested rule examples</div>
+          <div className="rounded-md border border-dashed border-border p-3 bg-slate-50 text-sm text-slate-700">
+            <div className="font-semibold">Overdue status red highlight</div>
+            <div className="text-[11px] text-muted-foreground">If the status column equals <span className="font-semibold">overdue</span>, color the row red.</div>
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" onClick={() => {
+                const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+                onSaveRule({ id, range: "A1:Z9999", startRow: 0, endRow: 9998, startCol: 0, endCol: 25, operator: "equals", value: "overdue", value2: "", format: { bgColor: "#fee2e2", textColor: "#7f1d1d", bold: true, italic: false } });
+              }}>Apply</Button>
+            </div>
+          </div>
+          <div className="rounded-md border border-dashed border-border p-3 bg-slate-50 text-sm text-slate-700">
+            <div className="font-semibold">Completed rows dim</div>
+            <div className="text-[11px] text-muted-foreground">If status equals <span className="font-semibold">completed</span>, apply a softer style.</div>
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" onClick={() => {
+                const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+                onSaveRule({ id, range: "A1:Z9999", startRow: 0, endRow: 9998, startCol: 0, endCol: 25, operator: "equals", value: "completed", value2: "", format: { bgColor: "#f8fafc", textColor: "#475569", bold: false, italic: false } });
+              }}>Apply</Button>
             </div>
           </div>
         </div>

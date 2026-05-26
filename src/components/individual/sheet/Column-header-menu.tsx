@@ -45,7 +45,6 @@ interface ColumnHeaderMenuProps {
   onOpenColumnPanel?: () => void;
   onDelete: () => void;
   onRename?: (newName: string) => void;
-  onSetWidth?: (width: number) => void;
   onToggleTextWrap?: () => void;
   textWrapEnabled?: boolean;
   columnFormula?: string;
@@ -135,7 +134,6 @@ export default function ColumnHeaderMenu({
   onOpenColumnPanel,
   onDelete,
   onRename,
-  onSetWidth,
   onToggleTextWrap,
   textWrapEnabled,
   columnFormula,
@@ -158,8 +156,8 @@ export default function ColumnHeaderMenu({
 }: ColumnHeaderMenuProps) {
   const [renameValue, setRenameValue] = useState(column.name);
   const [open, setOpen] = useState(false);
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [colFormulaValue, setColFormulaValue] = useState(columnFormula || "");
-  const [widthValue, setWidthValue] = useState(String(column.width ?? 160));
   const [currencySearch, setCurrencySearch] = useState("");
 
   const filteredCurrencies = CURRENCY_CODES.filter((c) =>
@@ -182,9 +180,9 @@ export default function ColumnHeaderMenu({
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
+        if (!v) setTypeMenuOpen(false);
         if (v) {
           setColFormulaValue(columnFormula || "");
-          setWidthValue(String(column.width ?? 160));
           setCurrencySearch("");
         }
       }}
@@ -202,7 +200,7 @@ export default function ColumnHeaderMenu({
       <DropdownMenuContent
         align="start"
         collisionPadding={10}
-        className="sheet-scrollbar w-64 z-[130] rounded-xl border border-border/70 shadow-xl p-1.5 overflow-y-auto overscroll-contain"
+        className="sheet-scrollbar w-52 z-[130] rounded-xl border border-border/70 shadow-xl p-1.5 overflow-y-auto overscroll-contain"
         style={{
           maxHeight:
             "min(var(--radix-dropdown-menu-content-available-height), calc(100vh - 7rem), 26rem)",
@@ -237,8 +235,15 @@ export default function ColumnHeaderMenu({
           </>
         )}
 
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs gap-2">
+        <DropdownMenuSub open={typeMenuOpen} onOpenChange={setTypeMenuOpen}>
+          <DropdownMenuSubTrigger
+            className="text-xs gap-2"
+            onPointerEnter={() => setTypeMenuOpen(true)}
+            onClick={(event) => {
+              event.preventDefault();
+              setTypeMenuOpen((value) => !value);
+            }}
+          >
             <Type className="h-3 w-3" />
             Change type
             <span className="ml-auto text-muted-foreground capitalize">
@@ -246,15 +251,17 @@ export default function ColumnHeaderMenu({
             </span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent
+            sideOffset={0}
             collisionPadding={10}
-            className="sheet-column-type-submenu sheet-mobile-submenu sheet-scrollbar w-44 max-h-72 overflow-y-auto"
+            className="sheet-column-type-submenu sheet-mobile-submenu sheet-scrollbar w-44 max-h-72 overflow-y-auto z-[150]"
           >
             {COLUMN_TYPES.map(({ type, label, icon: Icon }) => (
               <DropdownMenuItem
                 key={type}
-                onClick={() => {
+                onSelect={(event) => {
+                  event.preventDefault();
                   onChangeType(type);
-                  setOpen(false);
+                  setTypeMenuOpen(true);
                 }}
                 className="text-xs gap-2"
               >
@@ -267,56 +274,8 @@ export default function ColumnHeaderMenu({
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-xs gap-2"
-          onClick={() => {
-            if (onOpenColumnPanel) onOpenColumnPanel();
-          }}
-        >
-          <Type className="h-3 w-3" />
-          Column properties
-        </DropdownMenuItem>
 
-        {/* Column width */}
-        {onSetWidth && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
-              Column width
-            </DropdownMenuLabel>
-            <div className="px-2 pb-2">
-              <input
-                className="w-full h-8 px-2.5 text-xs rounded-md border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
-                value={widthValue}
-                inputMode="numeric"
-                onChange={(e) =>
-                  setWidthValue(e.target.value.replace(/[^\d]/g, ""))
-                }
-                onBlur={() => {
-                  const w = Math.max(
-                    60,
-                    Math.min(800, Number(widthValue || 0)),
-                  );
-                  if (!isNaN(w)) onSetWidth(w);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const w = Math.max(
-                      60,
-                      Math.min(800, Number(widthValue || 0)),
-                    );
-                    if (!isNaN(w)) onSetWidth(w);
-                    setOpen(false);
-                  }
-                  e.stopPropagation();
-                }}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="160"
-              />
-            </div>
-          </>
-        )}
+
 
         {column.type === "currency" && onSetCurrency && (
           <>
@@ -443,109 +402,7 @@ export default function ColumnHeaderMenu({
           </>
         )}
 
-        {onApplyColumnFormat && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
-              Edit column
-            </DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => onApplyColumnFormat({ bold: !columnFormat.bold })}
-              className="text-xs gap-2"
-            >
-              <Bold className="h-3 w-3" />
-              Bold column
-              {columnFormat.bold && (
-                <span className="ml-auto text-primary">✓</span>
-              )}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() =>
-                onApplyColumnFormat({ italic: !columnFormat.italic })
-              }
-              className="text-xs gap-2"
-            >
-              <Italic className="h-3 w-3" />
-              Italic column
-              {columnFormat.italic && (
-                <span className="ml-auto text-primary">On</span>
-              )}
-            </DropdownMenuItem>
-            <div className="px-2 py-2 space-y-2">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  className="h-8 w-8 rounded-md border border-border hover:bg-muted flex items-center justify-center"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onApplyColumnFormat({
-                      fontSize: Math.max(8, (columnFormat.fontSize ?? 12) - 1),
-                    });
-                  }}
-                >
-                  <Minus className="h-3 w-3" />
-                </button>
-                <input
-                  className="h-8 flex-1 min-w-0 rounded-md border border-border bg-background px-2 text-xs text-center outline-none focus:ring-2 focus:ring-primary/30"
-                  value={columnFormat.fontSize ?? 12}
-                  inputMode="numeric"
-                  onChange={(e) => {
-                    const value = Number(e.target.value.replace(/[^\d]/g, ""));
-                    if (!Number.isNaN(value)) {
-                      onApplyColumnFormat({
-                        fontSize: Math.max(8, Math.min(72, value)),
-                      });
-                    }
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-                <button
-                  type="button"
-                  className="h-8 w-8 rounded-md border border-border hover:bg-muted flex items-center justify-center"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onApplyColumnFormat({
-                      fontSize: Math.min(72, (columnFormat.fontSize ?? 12) + 1),
-                    });
-                  }}
-                >
-                  <Plus className="h-3 w-3" />
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="space-y-1">
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                    Text
-                  </span>
-                  <input
-                    type="color"
-                    className="h-8 w-full rounded border border-border bg-background cursor-pointer"
-                    value={columnFormat.textColor ?? "#000000"}
-                    onChange={(e) =>
-                      onApplyColumnFormat({ textColor: e.target.value })
-                    }
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                    Fill
-                  </span>
-                  <input
-                    type="color"
-                    className="h-8 w-full rounded border border-border bg-background cursor-pointer"
-                    value={columnFormat.bgColor ?? "#ffffff"}
-                    onChange={(e) =>
-                      onApplyColumnFormat({ bgColor: e.target.value })
-                    }
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </label>
-              </div>
-            </div>
-          </>
-        )}
+
 
         {/* ── Column Formula ── */}
         {canUseColumnFormula && onApplyColumnFormula && (
@@ -620,39 +477,17 @@ export default function ColumnHeaderMenu({
           </>
         )}
 
-        {(onToggleFreeze || onOpenValidationPanel) && (
+        {onToggleFreeze && (
           <>
             <DropdownMenuSeparator />
-            {onToggleFreeze && (
-              <DropdownMenuItem className="text-xs gap-2" onClick={onToggleFreeze}>
-                {column.frozen ? "Unfreeze column" : "Freeze column"}
-                {column.frozen && <span className="ml-auto text-primary">✓</span>}
-              </DropdownMenuItem>
-            )}
-            {onOpenValidationPanel && (
-              <DropdownMenuItem className="text-xs gap-2" onClick={onOpenValidationPanel}>
-                Data validation
-              </DropdownMenuItem>
-            )}
-          </>
-        )}
-
-        {/* ── Text wrap toggle ── */}
-        {onToggleTextWrap && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={onToggleTextWrap}
-              className="text-xs gap-2"
-            >
-              <WrapText className="h-3 w-3" />
-              {textWrapEnabled ? "Disable" : "Enable"} Text Wrap
-              {textWrapEnabled && (
-                <span className="ml-auto text-primary">✓</span>
-              )}
+            <DropdownMenuItem className="text-xs gap-2" onClick={onToggleFreeze}>
+              {column.frozen ? "Unfreeze column" : "Freeze column"}
+              {column.frozen && <span className="ml-auto text-primary">✓</span>}
             </DropdownMenuItem>
           </>
         )}
+
+
 
         <DropdownMenuSeparator />
 

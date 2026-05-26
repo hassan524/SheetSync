@@ -33,6 +33,8 @@ export async function getAllOrganizations() {
         id,
         name,
         created_at,
+        description,
+        storage_limit,
         updated_at,
         sheets (
           id,
@@ -263,7 +265,7 @@ export async function getOrganizationById(
     (sum, s) => sum + Number(s.size_mb ?? 0),
     0,
   );
-  const storageLimit = 10;
+  const storageLimit = Number(org.storage_limit ?? 10);
 
   /* ---------------- WEEKLY STATS ---------------- */
   const now = new Date();
@@ -288,6 +290,7 @@ export async function getOrganizationById(
   return {
     id: org.id,
     name: org.name,
+    description: org.description ?? undefined,
     role: data.role,
     created_at: org.created_at,
     sheets,
@@ -310,7 +313,7 @@ export async function getOrganizationById(
  * 1. Insert organization
  * 2. Add creator as "owner" in organization_members
  */
-export async function createOrganization(name: string) {
+export async function createOrganization(name: string, description?: string) {
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -323,6 +326,7 @@ export async function createOrganization(name: string) {
     .from("organizations")
     .insert({
       name,
+      description: description?.trim() || null,
       created_by: user.id,
     })
     .select()

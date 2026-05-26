@@ -13,14 +13,24 @@ export function usePush(userId?: string) {
       try {
         if (!("Notification" in window)) return;
 
-        const permission = await Notification.requestPermission();
+        if (!("serviceWorker" in navigator)) return;
+
+        const permission =
+          Notification.permission === "default"
+            ? await Notification.requestPermission()
+            : Notification.permission;
         if (permission !== "granted") return;
 
         const messaging = await getFirebaseMessaging();
         if (!messaging) return;
 
+        const registration = await navigator.serviceWorker.register(
+          "/firebase-messaging-sw.js",
+        );
+
         const token = await getToken(messaging, {
           vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY!,
+          serviceWorkerRegistration: registration,
         });
 
         if (!token) return;
@@ -31,25 +41,36 @@ export function usePush(userId?: string) {
           body: JSON.stringify({ userId, token }),
         });
 
-        onMessage(messaging, (payload) => {
+        const unsubscribe = onMessage(messaging, (payload) => {
           const notifTitle = payload.notification?.title || "SheetSync";
           const notifBody =
             payload.notification?.body || "You have a new notification.";
           const notifUrl = payload.data?.url || "/";
 
-          new Notification(notifTitle, {
+          const notification = new Notification(notifTitle, {
             body: notifBody,
             icon: "/icon.png",
             badge: "/icon.png",
             tag: "sheetsync-foreground",
             data: { url: notifUrl },
           });
+          notification.onclick = () => {
+            window.focus();
+            window.location.href = notifUrl;
+            notification.close();
+          };
         });
+
+        return unsubscribe;
       } catch (err) {
         console.error("Push notification init error:", err);
       }
     };
 
-    init();
+    let unsubscribe: (() => void) | undefined;
+    init().then((cleanup) => {
+      unsubscribe = cleanup;
+    });
+    return () => unsubscribe?.();
   }, [userId]);
 }

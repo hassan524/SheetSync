@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/querys/activity/activity";
 import { logCellEdit } from "@/lib/querys/sheet/firebase-realtime";
 import { maybeAutoSnapshot } from "@/lib/querys/sheet/snapshots";
 import { exportSheet, ExportFormat } from "@/lib/querys/export";
+import { getMemberColor } from "@/components/individual/sheet/sheet-ui-helpers";
 
 interface UsePersistenceProps {
   sheetId: string;
@@ -18,6 +19,7 @@ interface UsePersistenceProps {
   rows: SheetRow[];
   columns: ColumnDef[];
   currentUserId?: string;
+  currentUser?: { id: string; name: string } | null;
   setSaveStatus: (s: SaveStatus) => void;
   rowsHistoryCurrentState: SheetRow[];
 }
@@ -30,6 +32,7 @@ export function useSheetPersistence({
   rows,
   columns,
   currentUserId,
+  currentUser,
   setSaveStatus,
   rowsHistoryCurrentState,
 }: UsePersistenceProps) {
@@ -106,7 +109,17 @@ export function useSheetPersistence({
             hadChange = true;
             const cl = String.fromCharCode(65 + columns.findIndex((c) => c.key === col.key));
             firstChangedCell ??= `${cl}${rowIdx + 1}`;
-            logCellEdit(sheetId, `${cl}${rowIdx + 1}`, col.name, o ?? null, n ?? null);
+            logCellEdit(
+              sheetId,
+              `${cl}${rowIdx + 1}`,
+              col.name,
+              o ?? null,
+              n ?? null,
+              currentUser?.name ?? "You",
+              currentUser ? getMemberColor(currentUser.id) : "#0d7c5f",
+              currentUser?.id ?? "local",
+              row.id
+            );
           }
         });
       });
@@ -115,7 +128,7 @@ export function useSheetPersistence({
         maybeAutoSnapshot(sheetId, updatedRows, columns, currentUserId).catch(() => {});
       }
     },
-    [columns, sheetId, title, queueChangedRowsSave, logCellEditActivity, currentUserId],
+    [columns, sheetId, title, queueChangedRowsSave, logCellEditActivity, currentUserId, currentUser],
   );
 
   const handleExport = useCallback(

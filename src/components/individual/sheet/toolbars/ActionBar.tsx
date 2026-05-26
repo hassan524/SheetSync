@@ -4,14 +4,15 @@ import React from "react";
 import {
   Plus, Trash2, ArrowDownAZ, ArrowUpAZ, SlidersHorizontal, Eye, EyeOff,
   BarChart3, MessageSquare, Users, Clock, Columns3, Code2, Paintbrush,
-  Sun, Moon, Keyboard, ChevronDown, Rows3,
+  Sun, Moon, Keyboard, ChevronDown, Rows3, PanelRight, Lock, Zap, Sparkles, ListChecks,
+  Pin,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ColumnDef } from "@/types/index";
+import { ColumnDef, Role } from "@/types/index";
 import { IconBtn, ToolSep, ddStyle, ddItemStyle } from "@/components/individual/sheet/sheet-ui-helpers";
 import type { RightPanelType } from "@/components/individual/sheet/Right-panel";
 import { ConditionalFormatRule } from "@/types/index";
@@ -19,7 +20,7 @@ import { ConditionalFormatRule } from "@/types/index";
 interface ActionBarProps {
   isDark: boolean;
   isOrgSheet: boolean;
-  userRole?: "owner" | "editor" | "viewer";
+  userRole?: Role;
   ownerId: string | null;
   currentUserId?: string;
   selectedRows: Set<string>;
@@ -44,6 +45,10 @@ interface ActionBarProps {
   onHideColumn: () => void;
   onToggleChartPicker: () => void;
   onTogglePanel: (panel: RightPanelType) => void;
+  onToggleRowProtection?: () => void;
+  canProtectRows?: boolean;
+  onTogglePinRow?: () => void;
+  selectedRowPinned?: boolean;
   onToggleDark: () => void;
   onToggleFreezeRows?: () => void;
   chartBtnRef: React.RefObject<HTMLButtonElement>;
@@ -61,7 +66,8 @@ export function ActionBar({
   effectiveRightPanel, totalComments, frozenRowsCount = 0,
   onInsertRow, onInsertColumn, onDeleteRow, onSortAsc, onSortDesc,
   onToggleFilters, onHideColumn, onToggleChartPicker, onTogglePanel,
-  onToggleDark, onToggleFreezeRows, chartBtnRef,
+  onToggleRowProtection, onToggleDark, onToggleFreezeRows, chartBtnRef,
+  onTogglePinRow, selectedRowPinned, canProtectRows,
 }: ActionBarProps) {
   const selStyle = ddStyle(isDark);
   const isViewer = userRole === "viewer";
@@ -72,7 +78,7 @@ export function ActionBar({
 
   return (
     <div className="sheet-actionbar border-b shrink-0" style={{ height: "36px" }}>
-      <div className="h-full flex items-center px-2 gap-0.5 overflow-x-auto hide-scrollbar">
+      <div className="sheet-header-scrollbar h-full flex items-center px-2 gap-0.5 overflow-x-auto">
         {!isViewer && (
           <>
             <Tooltip>
@@ -147,11 +153,11 @@ export function ActionBar({
                     onClick={onToggleFreezeRows}
                   >
                     <Rows3 className="h-3.5 w-3.5" />
-                    {frozenRowsCount > 0 ? "Unfreeze row" : "Freeze row"}
+                    {frozenRowsCount > 0 ? "Unfreeze top row" : "Freeze top row"}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
-                  Keep the first row visible while scrolling
+                  Freeze keeps the top row visible while scrolling; it does not lock editing
                 </TooltipContent>
               </Tooltip>
             )}
@@ -252,26 +258,47 @@ export function ActionBar({
         )}
 
         {/* Panel toggles */}
+        <IconBtn
+          icon={MessageSquare}
+          tooltip="Comments"
+          onClick={() => onTogglePanel("comments")}
+          active={effectiveRightPanel === "comments"}
+          badge={totalComments}
+        />
+        <IconBtn
+          icon={PanelRight}
+          tooltip="Row details"
+          onClick={() => onTogglePanel("row-details")}
+          active={effectiveRightPanel === "row-details"}
+          disabled={!selectedCell}
+        />
+        <IconBtn
+          icon={Pin}
+          tooltip="Pin row"
+          onClick={onTogglePinRow}
+          active={!!selectedRowPinned}
+          disabled={!selectedCell || !onTogglePinRow}
+        />
+        <IconBtn
+          icon={Lock}
+          tooltip={canProtectRows ? "Lock/unlock editing for the selected row" : "Row protection is owner-only"}
+          onClick={onToggleRowProtection}
+          disabled={!selectedCell || !onToggleRowProtection || !canProtectRows}
+        />
         {isOrgSheet && (
-          <>
-            <IconBtn
-              icon={MessageSquare}
-              tooltip="Comments"
-              onClick={() => onTogglePanel("comments")}
-              active={effectiveRightPanel === "comments"}
-              badge={totalComments}
-            />
-            <IconBtn
-              icon={Users}
-              tooltip="Collaborators"
-              onClick={() => onTogglePanel("collaborators")}
-              active={effectiveRightPanel === "collaborators"}
-            />
-          </>
+          <IconBtn
+            icon={Users}
+            tooltip="Collaborators"
+            onClick={() => onTogglePanel("collaborators")}
+            active={effectiveRightPanel === "collaborators"}
+          />
         )}
         <IconBtn icon={Clock} tooltip="Time Travel — replay & branch" onClick={() => onTogglePanel("timetravel")} active={effectiveRightPanel === "timetravel"} />
         <IconBtn icon={Columns3} tooltip="Columns" onClick={() => onTogglePanel("columns")} active={effectiveRightPanel === "columns"} />
-        <IconBtn icon={Code2} tooltip="Developer tools" onClick={() => onTogglePanel("developer")} active={effectiveRightPanel === "developer"} />
+        <IconBtn icon={ListChecks} tooltip="Validation rules" onClick={() => onTogglePanel("validation")} active={effectiveRightPanel === "validation"} />
+        <IconBtn icon={Zap} tooltip="Automation rules (coming soon)" onClick={() => onTogglePanel("automation")} active={effectiveRightPanel === "automation"} />
+        <IconBtn icon={Sparkles} tooltip="AI assistant" onClick={() => onTogglePanel("aiassistant")} active={effectiveRightPanel === "aiassistant"} />
+        <IconBtn icon={Code2} tooltip="Developer tools (coming soon)" onClick={() => onTogglePanel("developer")} active={effectiveRightPanel === "developer"} />
         <IconBtn
           icon={BarChart3}
           tooltip="Charts panel"

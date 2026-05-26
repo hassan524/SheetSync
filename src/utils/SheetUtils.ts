@@ -1,4 +1,11 @@
-import { SheetRow, ColumnDef, SelectOption } from "@/types/index";
+import {
+  SheetRow,
+  ColumnDef,
+  SelectOption,
+  STATUS_VALUES,
+  PRIORITY_VALUES,
+} from "@/types/index";
+import { getStatusOptionStyle } from "@/lib/sheet-formatting-helpers";
 
 // Central shared sheet helper utilities.
 // This file contains helper functions used across the sheet editor,
@@ -23,6 +30,29 @@ export function getOptionBgStyle(option: string | SelectOption) {
     color: "#1f2937",
     backgroundColor: OPTION_PALETTE[hash % OPTION_PALETTE.length],
   };
+}
+
+export function getChoiceOptionsForColumn(
+  column: ColumnDef,
+  cellOptions: SelectOption[] = [],
+): SelectOption[] {
+  if (column.type === "status") return [...STATUS_VALUES];
+  if (column.type === "priority") return [...PRIORITY_VALUES];
+  if (cellOptions.length > 0) return cellOptions;
+  if (column.selectOptions?.length) return column.selectOptions;
+  if (column.validation_rules?.type === "dropdown") {
+    return ((column.validation_rules.options as string[] | undefined) ?? []);
+  }
+  return [];
+}
+
+export function getChoiceOptionStyle(
+  type: ColumnDef["type"],
+  option: string | SelectOption,
+) {
+  return type === "status" || type === "priority"
+    ? getStatusOptionStyle(getSelectOptionLabel(option))
+    : getOptionBgStyle(option);
 }
 
 export function columnIndexToName(index: number): string {

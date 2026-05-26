@@ -164,8 +164,11 @@ create index if not exists idx_organization_members_org on public.organization_m
 create index if not exists idx_organization_members_user on public.organization_members(user_id);
 create index if not exists idx_folders_organization on public.folders(organization_id);
 create index if not exists idx_folders_owner on public.folders(owner_id);
-create unique index if not exists idx_organization_email
-on public.organization_invites(organization_id, email);
+drop index if exists public.idx_organization_email;
+
+create unique index if not exists idx_organization_pending_email
+on public.organization_invites(organization_id, email)
+where status = 'pending';
 
 
 CREATE TABLE IF NOT EXISTS public.sheet_history (
@@ -313,6 +316,18 @@ ADD COLUMN IF NOT EXISTS forked_by_user_id uuid REFERENCES public.profiles(id) O
 -- ============================================================
 ALTER TABLE public.profiles
 ADD COLUMN IF NOT EXISTS push_enabled BOOLEAN DEFAULT true;
+
+CREATE TABLE IF NOT EXISTS public.push_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete cascade,
+  token text not null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(user_id, token)
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_tokens_user
+ON public.push_tokens(user_id);
 
 -- ============================================================
 -- Codex: Row Protection
