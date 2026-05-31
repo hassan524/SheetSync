@@ -7,7 +7,7 @@ import { RenderCellProps } from "react-data-grid";
 import { SheetRow, ColumnDef } from "@/types/index";
 import { getStatusOptionStyle } from "@/lib/sheet-formatting-helpers";
 import { getOptionBgStyle } from "@/utils/SheetUtils";
-import { CommentDot, CollabCursor } from "@/components/individual/sheet/sheet-ui-helpers";
+import { CommentDot } from "@/components/individual/sheet/sheet-ui-helpers";
 import type { SheetComment } from "@/lib/querys/sheet/firebase-realtime";
 
 interface CellRendererProps {
@@ -209,7 +209,7 @@ export function CellRenderer({
       onClick={onCellClick}
       onPointerDown={(e) => { if (onPointerDown) onPointerDown(rowIdx, colKey, e); }}
       onPointerEnter={(e) => { if (onPointerEnter) onPointerEnter(rowIdx, colKey, e); }}
-      title={validationWarning ?? undefined}
+      title={activeCollab ? `${activeCollab.name} selected this cell` : validationWarning ?? undefined}
     >
       {validationWarning && (
         <span className="sheet-validation-marker" aria-label={validationWarning}>
@@ -220,7 +220,6 @@ export function CellRenderer({
         <Lock className="absolute top-1 right-1 h-2 w-2 text-gray-300 opacity-0 group-hover/cell:opacity-60 transition-opacity" />
       )}
       {isOrgSheet && cellComments.length > 0 && <CommentDot count={cellComments.length} />}
-      {activeCollab && <CollabCursor name={activeCollab.name} color={activeCollab.color} />}
       {cellContent}
       {isSelected && onFillStart && (
         <button

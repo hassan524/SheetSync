@@ -46,7 +46,7 @@ export function useSheetStateVars(isOrganizationSheet: boolean, importedFrom: st
     avatar_url: string | null;
   } | null>(null);
   const [activeCursors, setActiveCursors] = useState<
-    Record<string, { name: string; color: string; row: number; col: string }>
+    Record<string, { name: string; color: string; row: number; col: string; x?: number; y?: number }>
   >({});
   const [comments, setComments] = useState<Record<string, SheetComment[]>>({});
   const [history, setHistory] = useState<HistoryEntry[]>([]);

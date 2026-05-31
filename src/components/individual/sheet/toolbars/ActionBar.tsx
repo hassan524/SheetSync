@@ -36,6 +36,7 @@ interface ActionBarProps {
   totalComments: number;
   historyLength: number;
   frozenRowsCount?: number;
+  canEditSheet?: boolean;
   onInsertRow: () => void;
   onInsertColumn: (type: ColumnDef["type"]) => void;
   onDeleteRow: () => void;
@@ -67,10 +68,10 @@ export function ActionBar({
   onInsertRow, onInsertColumn, onDeleteRow, onSortAsc, onSortDesc,
   onToggleFilters, onHideColumn, onToggleChartPicker, onTogglePanel,
   onToggleRowProtection, onToggleDark, onToggleFreezeRows, chartBtnRef,
-  onTogglePinRow, selectedRowPinned, canProtectRows,
+  onTogglePinRow, selectedRowPinned, canProtectRows, canEditSheet,
 }: ActionBarProps) {
   const selStyle = ddStyle(isDark);
-  const isViewer = userRole === "viewer";
+  const canEdit = canEditSheet ?? userRole !== "viewer";
   const isOwner = ownerId === currentUserId;
   const selectedColHidden = selectedCell
     ? columns.find((c) => c.key === selectedCell.col)?.hidden
@@ -79,13 +80,13 @@ export function ActionBar({
   return (
     <div className="sheet-actionbar border-b shrink-0" style={{ height: "36px" }}>
       <div className="sheet-header-scrollbar h-full flex items-center px-2 gap-0.5 overflow-x-auto">
-        {!isViewer && (
-          <>
+        <>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0"
                   onClick={onInsertRow}
+                  disabled={!canEdit}
                 >
                   <Plus className="h-3 w-3" />
                   Row
@@ -98,7 +99,7 @@ export function ActionBar({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0">
+                <button className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0" disabled={!canEdit}>
                   <Plus className="h-3 w-3" />
                   Column
                   <ChevronDown className="h-2.5 w-2.5 opacity-50 ml-0.5" />
@@ -122,6 +123,7 @@ export function ActionBar({
                     key={t}
                     className="text-xs capitalize"
                     onClick={() => onInsertColumn(t)}
+                    disabled={!canEdit}
                     style={ddItemStyle(isDark)}
                   >
                     {t === "select" ? "Dropdown" : t}
@@ -133,9 +135,9 @@ export function ActionBar({
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  disabled={selectedRows.size === 0}
+                  disabled={selectedRows.size === 0 || !canEdit}
                   onClick={onDeleteRow}
-                  className={`sheet-action-btn sheet-action-btn--danger flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0 ${selectedRows.size === 0 ? "opacity-35 cursor-not-allowed" : ""}`}
+                  className={`sheet-action-btn sheet-action-btn--danger flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0 ${selectedRows.size === 0 || !canEdit ? "opacity-35 cursor-not-allowed" : ""}`}
                 >
                   <Trash2 className="h-3 w-3" />
                   {selectedRows.size > 0 ? `Delete (${selectedRows.size})` : "Delete"}
@@ -151,6 +153,7 @@ export function ActionBar({
                   <button
                     className={`sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0 ${frozenRowsCount > 0 ? "sheet-action-btn--active" : ""}`}
                     onClick={onToggleFreezeRows}
+                    disabled={!canEdit}
                   >
                     <Rows3 className="h-3.5 w-3.5" />
                     {frozenRowsCount > 0 ? "Unfreeze top row" : "Freeze top row"}
@@ -168,6 +171,7 @@ export function ActionBar({
                 <button
                   className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0"
                   onClick={onSortAsc}
+                  disabled={!canEdit}
                 >
                   <ArrowDownAZ className="h-3.5 w-3.5" />
                   A→Z
@@ -182,6 +186,7 @@ export function ActionBar({
                 <button
                   className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0"
                   onClick={onSortDesc}
+                  disabled={!canEdit}
                 >
                   <ArrowUpAZ className="h-3.5 w-3.5" />
                   Z→A
@@ -197,6 +202,7 @@ export function ActionBar({
                 <button
                   className={`sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0 ${showFilters ? "sheet-action-btn--active" : ""}`}
                   onClick={onToggleFilters}
+                  disabled={!canEdit}
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                   Filter
@@ -216,7 +222,8 @@ export function ActionBar({
                 <TooltipTrigger asChild>
                   <button
                     className="sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0"
-                    onClick={onHideColumn}
+                  onClick={onHideColumn}
+                  disabled={!canEdit}
                   >
                     {selectedColHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     {selectedColHidden ? "Show" : "Hide"}
@@ -235,6 +242,7 @@ export function ActionBar({
                   ref={chartBtnRef}
                   className={`sheet-action-btn flex items-center gap-1 h-6 px-2.5 rounded text-[11px] font-medium shrink-0 ${showChartPicker ? "sheet-action-btn--active" : ""}`}
                   onClick={onToggleChartPicker}
+                  disabled={!canEdit}
                   style={chartCount > 0 ? { color: "#0ea5e9" } : undefined}
                 >
                   <BarChart3 className="h-3.5 w-3.5" />
@@ -254,8 +262,7 @@ export function ActionBar({
               </TooltipContent>
             </Tooltip>
             <ToolSep />
-          </>
-        )}
+        </>
 
         {/* Panel toggles */}
         <IconBtn
@@ -277,7 +284,7 @@ export function ActionBar({
           tooltip="Pin row"
           onClick={onTogglePinRow}
           active={!!selectedRowPinned}
-          disabled={!selectedCell || !onTogglePinRow}
+          disabled={!canEdit || !selectedCell || !onTogglePinRow}
         />
         <IconBtn
           icon={Lock}
@@ -294,9 +301,9 @@ export function ActionBar({
           />
         )}
         <IconBtn icon={Clock} tooltip="Time Travel — replay & branch" onClick={() => onTogglePanel("timetravel")} active={effectiveRightPanel === "timetravel"} />
-        <IconBtn icon={Columns3} tooltip="Columns" onClick={() => onTogglePanel("columns")} active={effectiveRightPanel === "columns"} />
-        <IconBtn icon={ListChecks} tooltip="Validation rules" onClick={() => onTogglePanel("validation")} active={effectiveRightPanel === "validation"} />
-        <IconBtn icon={Zap} tooltip="Automation rules (coming soon)" onClick={() => onTogglePanel("automation")} active={effectiveRightPanel === "automation"} />
+        <IconBtn icon={Columns3} tooltip="Columns" onClick={() => onTogglePanel("columns")} active={effectiveRightPanel === "columns"} disabled={!canEdit} />
+        <IconBtn icon={ListChecks} tooltip="Validation rules" onClick={() => onTogglePanel("validation")} active={effectiveRightPanel === "validation"} disabled={!canEdit} />
+        <IconBtn icon={Zap} tooltip="Automation rules (coming soon)" onClick={() => onTogglePanel("automation")} active={effectiveRightPanel === "automation"} disabled={!canEdit} />
         <IconBtn icon={Sparkles} tooltip="AI assistant" onClick={() => onTogglePanel("aiassistant")} active={effectiveRightPanel === "aiassistant"} />
         <IconBtn icon={Code2} tooltip="Developer tools (coming soon)" onClick={() => onTogglePanel("developer")} active={effectiveRightPanel === "developer"} />
         <IconBtn
@@ -304,6 +311,7 @@ export function ActionBar({
           tooltip="Charts panel"
           onClick={() => onTogglePanel("charts")}
           active={effectiveRightPanel === "charts"}
+          disabled={!canEdit}
           badge={chartCount > 0 ? chartCount : undefined}
         />
         <IconBtn
@@ -311,6 +319,7 @@ export function ActionBar({
           tooltip="Conditional formatting"
           onClick={() => onTogglePanel("conditional")}
           active={effectiveRightPanel === "conditional"}
+          disabled={!canEdit}
           badge={conditionalRulesCount > 0 ? conditionalRulesCount : undefined}
         />
         <IconBtn icon={isDark ? Sun : Moon} tooltip={isDark ? "Light mode" : "Dark mode"} onClick={onToggleDark} />

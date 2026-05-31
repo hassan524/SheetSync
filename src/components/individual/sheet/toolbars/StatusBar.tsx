@@ -17,6 +17,7 @@ interface StatusBarProps {
   isOrgSheet: boolean;
   liveTracking: boolean;
   chartCount: number;
+  canEditSheet?: boolean;
   onChartsClick: () => void;
   onShortcutsClick: () => void;
 }
@@ -25,6 +26,7 @@ export function StatusBar({
   rowCount, columnCount, selectedRowsCount, selectedCell, columns,
   filterValue, filteredRowsCount, totalRowsCount,
   isOrgSheet, liveTracking, chartCount,
+  canEditSheet = true,
   onChartsClick, onShortcutsClick,
 }: StatusBarProps) {
   const cellLabel = selectedCell
@@ -56,9 +58,9 @@ export function StatusBar({
       )}
       {chartCount > 0 && (
         <span
-          className="text-[10px] font-medium shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-80"
+          className={`text-[10px] font-medium shrink-0 flex items-center gap-1 ${canEditSheet ? "cursor-pointer hover:opacity-80" : "opacity-40 cursor-not-allowed"}`}
           style={{ color: "#0ea5e9" }}
-          onClick={onChartsClick}
+          onClick={canEditSheet ? onChartsClick : undefined}
         >
           <BarChart3 className="h-2.5 w-2.5" />
           {chartCount} chart{chartCount !== 1 ? "s" : ""}

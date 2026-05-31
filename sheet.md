@@ -2,6 +2,16 @@
 
 This document explains how the sheet editor works, where the main code lives, and how rows, columns, panels, hooks, persistence, and activity are connected.
 
+## Latest Realtime And Permission Work
+
+- Organization sheet sharing is owner-only in the sheet title bar, collaborators panel, organization header, organization table action menu, and invite/share-link API routes.
+- Editors can edit sheets; viewers can see the sheet and controls but edit actions are blocked with a clear viewer-access message.
+- Collaborators panel member management is owner-only. Owners can change a member between editor/viewer or remove them.
+- Live tracking now sends pointer coordinates through Supabase presence and renders collaborator mouse cursors over the sheet.
+- Collaborator selected cells are sent through presence too. Other users see the selected cell outlined and can hover it to see who selected it.
+- Sheet data now uses a `sheet-collab:{sheetId}` Supabase channel. Cell edits broadcast the latest rows immediately to other open clients, and database realtime changes on `rows`, `columns`, `formulas`, `cell_formats`, `protected_rows`, and `sheets` still trigger a full snapshot refresh when Supabase table realtime is enabled.
+- For realtime database updates to work in production, Supabase Realtime must be enabled for those tables and RLS policies must allow organization members to select the changed rows.
+
 ## Entry Points
 
 - `src/app/sheet/[id]/page.tsx` loads the route for a single sheet.

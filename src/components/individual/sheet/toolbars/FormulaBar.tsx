@@ -15,6 +15,7 @@ interface FormulaBarProps {
   };
   sheetId: string;
   isDark: boolean;
+  canEditSheet?: boolean;
   onRowsChange: (rows: SheetRow[]) => void;
   onSaveFormula: (sheetId: string, cellKey: string, formula: string) => Promise<void>;
   onDeleteFormula: (sheetId: string, cellKey: string) => Promise<void>;
@@ -28,6 +29,7 @@ export function FormulaBar({
   protection,
   sheetId,
   isDark,
+  canEditSheet = true,
   onRowsChange,
   onSaveFormula,
   onDeleteFormula,
@@ -75,6 +77,7 @@ export function FormulaBar({
         value={formulaValue}
         readOnly={
           !selectedCell ||
+          !canEditSheet ||
           !!(
             selectedCell &&
             rows[selectedCell.row]?.id &&
@@ -102,7 +105,7 @@ export function FormulaBar({
           }
         }}
         onBlur={async () => {
-          if (!selectedCell || !cellKey) return;
+          if (!selectedCell || !cellKey || !canEditSheet) return;
           const f = formulas.formulas[cellKey];
           if (f) await onSaveFormula(sheetId, cellKey, f);
           else await onDeleteFormula(sheetId, cellKey).catch(() => {});

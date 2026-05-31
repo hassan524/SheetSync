@@ -57,7 +57,7 @@ import ShareDialog from "./dialogs/Share-dialog";
 import RightPanel from "./Right-panel";
 import type { RightPanelType } from "./Right-panel";
 import FormulaDialog from "./dialogs/Formula-dialog";
-import { ddStyle, ddItemStyle, getMemberColor, CommentDot, CollabCursor, SheetAvatar } from "@/components/individual/sheet/sheet-ui-helpers";
+import { ddStyle, ddItemStyle, getMemberColor, CommentDot, SheetAvatar } from "@/components/individual/sheet/sheet-ui-helpers";
 
 // ── Lib ────────────────────────────────────────────────────────────────────
 import {
@@ -82,6 +82,8 @@ import { exportSheet } from "@/lib/querys/export";
 import { buildImportedSheetData, getImportedSheetTitle, MAX_IMPORT_BYTES } from "@/lib/import-sheet";
 import { getSheetOrgMembers } from "@/lib/querys/organization/get-sheet-members";
 import { supabase } from "@/lib/supabase/client";
+import { api } from "@/lib/api/api-client";
+import { useAuth } from "@/context/AuthContext";
 import { trackSheetOpen } from "@/lib/querys/sheet/track-open";
 import { subscribeToHistory, subscribeToComments, addComment, resolveComment, logCellEdit, logRowAdd, logFormulaSet, logColumnRename } from "@/lib/querys/sheet/firebase-realtime";
 import { maybeAutoSnapshot } from "@/lib/querys/sheet/snapshots";
@@ -408,7 +410,11 @@ export default function SheetClient() {
   const templateId = searchParams?.get("template") || "blank";
   const isOrganizationSheet = searchParams?.get("org") === "true";
   const importedFrom = searchParams?.get("imported");
+  const inviteToken = searchParams?.get("inviteToken") || "";
+  const invitedRole = searchParams?.get("role") || "";
   const sheetId = params?.id ?? "";
+  const { user: authUser, loading: authLoading, loginWithGoogle } = useAuth();
+  const [inviteReady, setInviteReady] = useState(!inviteToken);
 
   // states 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -454,9 +460,11 @@ export default function SheetClient() {
   } = sv;
 
   const { title, isOrgSheet, liveTracking, starred, rows, columns, organizationId } = sheetState;
+  const effectiveRole = sheetState.userRole ?? (sheetState.ownerId && currentUser?.id === sheetState.ownerId ? "owner" : undefined);
+  const isOwner = Boolean(currentUser && (sheetState.ownerId === currentUser.id || effectiveRole === "owner"));
+  const canEditSheet = !isOrgSheet || effectiveRole === "owner" || effectiveRole === "editor";
   const canProtectRows = Boolean(
-    currentUser &&
-      (sheetState.ownerId === currentUser.id || sheetState.userRole === "owner"),
+    currentUser && isOwner,
   );
 
   const [, setIsLoading] = useState(true);
@@ -471,9 +479,13 @@ export default function SheetClient() {
   const columnsHistory = useHistory<ColumnDef[]>([]);
   const titleSaveTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const presenceChannelRef = useRef<any>(null);
+  const lastViewerEditToastRef = useRef(0);
+  const localSaveRef = useRef(false);
+  const remoteRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const chartBtnRef = useRef<HTMLButtonElement | null>(null);
   const chartsHydratedRef = useRef(false);
+  const inviteAcceptStartedRef = useRef(false);
   const rowResizeRef = useRef<{ rowId: string; startY: number; startH: number; pointerId: number } | null>(null);
   const fillDragRef = useRef<{ row: number; colKey: string; pointerId: number } | null>(null);
   const fillTargetRowRef = useRef<number | null>(null);
@@ -518,8 +530,22 @@ export default function SheetClient() {
   const charts = useCharts({ storageKey: sheetId ? `sheetsync:${sheetId}:charts` : null });
 
   // These helpers mark the sheet as saving or saved.
-  const markSaving = useCallback(() => setSaveStatus("saving"), [setSaveStatus]);
-  const markSaved = useCallback(() => setSaveStatus("saved"), [setSaveStatus]);
+  const markSaving = useCallback(() => {
+    localSaveRef.current = true;
+    setSaveStatus("saving");
+  }, [setSaveStatus]);
+  const markSaved = useCallback(() => {
+    setSaveStatus("saved");
+    window.setTimeout(() => {
+      localSaveRef.current = false;
+    }, 1200);
+  }, [setSaveStatus]);
+  const showViewerEditMessage = useCallback(() => {
+    const now = Date.now();
+    if (now - lastViewerEditToastRef.current < 1600) return;
+    lastViewerEditToastRef.current = now;
+    toast.info("You are a viewer. Ask the owner for editor access to make changes.");
+  }, []);
 
   // Time travel hook tracks sheet snapshots and preview rows for older versions.
   const [timeTravelState, timeTravelActions] = useTimeTravel({
@@ -545,6 +571,92 @@ export default function SheetClient() {
       }
     };
   }, [isDark]);
+
+  useEffect(() => {
+    if (!inviteToken) {
+      setInviteReady(true);
+      return;
+    }
+    if (authLoading || typeof window === "undefined") return;
+
+    const currentPath = `${window.location.pathname}${window.location.search}`;
+
+    if (!authUser) {
+      loginWithGoogle(currentPath);
+      return;
+    }
+
+    // Check if this user already accepted this exact token before
+    // so re-opening the link never hits the API again
+    const userId = (authUser as any)?.id ?? (authUser as any)?.uid ?? "";
+    const alreadyAcceptedKey = `sheetsync:invite-accepted:${userId}:${inviteToken}`;
+    if (typeof window !== "undefined" && window.localStorage.getItem(alreadyAcceptedKey)) {
+      setInviteReady(true);
+      return;
+    }
+
+    if (inviteAcceptStartedRef.current) return;
+    inviteAcceptStartedRef.current = true;
+
+    let cancelled = false;
+
+    api
+      .post("/invites/accept", {
+        token: inviteToken,
+        inviteByLink: true,
+        sheetId: sheetId,
+        role: invitedRole || "viewer",
+        // invitedUserId: userId,
+      })
+      .then((res: any) => {
+        if (cancelled) return;
+
+        const data = res?.data ?? res;
+        const roleLabel = data?.role || invitedRole || "collaborator";
+        const roleCapped = roleLabel.charAt(0).toUpperCase() + roleLabel.slice(1);
+
+        if (data?.alreadyMember) {
+          toast.info("Welcome back! Opening your sheet…", { duration: 3000 });
+        } else {
+          toast.success(
+            `You've joined as ${roleCapped}${data?.inviterName ? ` — invited by ${data.inviterName}` : ""} 🎉`,
+            { duration: 5000 },
+          );
+        }
+
+        // Mark this token as accepted for this user so we never call API again
+        window.localStorage.setItem(alreadyAcceptedKey, "1");
+
+        // Clean all invite params from URL
+        const url = new URL(window.location.href);
+        ["invited", "inviteToken", "role", "by"].forEach((p) =>
+          url.searchParams.delete(p),
+        );
+        window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+
+        setInviteReady(true);
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+
+        if (err?.response?.status === 401) {
+          loginWithGoogle(currentPath);
+          return;
+        }
+
+        toast.error(
+          err?.response?.data?.error ||
+          err?.message ||
+          "Failed to accept invite",
+        );
+        inviteAcceptStartedRef.current = false;
+        setInviteReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, authUser, invitedRole, inviteToken, sheetId, loginWithGoogle]);
 
   useEffect(() => {
     if (!sheetId || typeof window === "undefined") return;
@@ -613,7 +725,7 @@ export default function SheetClient() {
   // ── Load sheet ─────────────────────────────────────────────────────────
   // Load the sheet from the backend and initialize state, formats, formulas, and charts.
   useEffect(() => {
-    if (!sheetId) return;
+    if (!sheetId || !inviteReady) return;
     chartsHydratedRef.current = false;
     queueMicrotask(() => setIsLoading(true));
     loadSheet(sheetId).then(async (data) => {
@@ -666,7 +778,7 @@ export default function SheetClient() {
           rows: bufferedRows, columns: data.columns,
           forkedFromSheetId: data.forked_from_sheet_id, forkedFromSnapshotLabel: data.forked_from_snapshot_label,
           forkedAt: data.forked_at, forkedByUserId: data.forked_by_user_id,
-          userRole: "owner",
+          userRole: sheetIsOrg ? "viewer" : "owner",
         });
         if (Array.isArray((data as any).charts)) { charts.replaceAll((data as any).charts); }
         chartsHydratedRef.current = true;
@@ -684,7 +796,7 @@ export default function SheetClient() {
       await trackSheetOpen(sheetId);
     }).catch((err) => { console.error(err); toast.error("Failed to load sheet. Please refresh."); })
       .finally(() => { setIsLoading(false); window.dispatchEvent(new Event("__sheet-ready")); });
-  }, [sheetId, charts.replaceAll]);
+  }, [sheetId, inviteReady, charts.replaceAll]);
 
   // Persist charts / row heights
   // Save chart settings and row heights after changes settle.
@@ -740,6 +852,92 @@ export default function SheetClient() {
     return subscribeToComments(sheetId, (grouped) => setComments(grouped));
   }, [sheetId]);
 
+  const applyRemoteSheetSnapshot = useCallback(async () => {
+    if (!sheetId || localSaveRef.current) return;
+    try {
+      const data = await loadSheet(sheetId);
+      const bufferedRows = ensureWorkingRowBuffer(data.rows, data.columns);
+      const nextColumns = data.columns;
+
+      const wrapSet = new Set<string>();
+      if (data.cellFormats) {
+        Object.entries(data.cellFormats).forEach(([key, fmt]) => {
+          if ((fmt as any).textWrap === true) wrapSet.add(key);
+        });
+        formatting.setCellFormats(data.cellFormats);
+      }
+      textWrap.setTextWrapColumns(wrapSet);
+      formulas.setFormulas(data.formulas ?? {});
+      formulas.setColumnFormulas(data.columnFormulas ?? {});
+      protection.setProtectedCells(data.protectedCells ?? new Set());
+      if (Array.isArray((data as any).charts)) charts.replaceAll((data as any).charts);
+      if ((data as any).rowHeights) setRowHeights((data as any).rowHeights);
+
+      if (JSON.stringify(bufferedRows) !== JSON.stringify(rowsHistory.currentState)) {
+        rowsHistory.pushState(bufferedRows);
+      }
+      if (JSON.stringify(nextColumns) !== JSON.stringify(columnsHistory.currentState)) {
+        columnsHistory.pushState(nextColumns);
+      }
+
+      setSheetState((prev) => ({
+        ...prev,
+        title: data.title,
+        starred: data.isStarred,
+        updatedAt: data.updated_at,
+        rows: bufferedRows,
+        columns: nextColumns,
+        ownerId: data.ownerId,
+        organizationId: data.organizationId ?? null,
+      }));
+      setSaveStatus("saved");
+    } catch (err) {
+      console.error("Realtime sheet refresh failed", err);
+    }
+  }, [
+    sheetId,
+    formatting,
+    textWrap,
+    formulas,
+    protection,
+    charts,
+    rowsHistory,
+    columnsHistory,
+    setSheetState,
+    setSaveStatus,
+    setRowHeights,
+  ]);
+
+  const scheduleRemoteSheetRefresh = useCallback(() => {
+    if (localSaveRef.current) return;
+    if (remoteRefreshTimeoutRef.current) clearTimeout(remoteRefreshTimeoutRef.current);
+    remoteRefreshTimeoutRef.current = setTimeout(() => {
+      remoteRefreshTimeoutRef.current = null;
+      applyRemoteSheetSnapshot();
+    }, 180);
+  }, [applyRemoteSheetSnapshot]);
+
+  useEffect(() => {
+    if (!sheetId || !inviteReady) return;
+    const channel = supabase
+      .channel(`sheet-data:${sheetId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "rows", filter: `sheet_id=eq.${sheetId}` }, scheduleRemoteSheetRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "columns", filter: `sheet_id=eq.${sheetId}` }, scheduleRemoteSheetRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "formulas", filter: `sheet_id=eq.${sheetId}` }, scheduleRemoteSheetRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cell_formats", filter: `sheet_id=eq.${sheetId}` }, scheduleRemoteSheetRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "protected_rows", filter: `sheet_id=eq.${sheetId}` }, scheduleRemoteSheetRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sheets", filter: `id=eq.${sheetId}` }, scheduleRemoteSheetRefresh)
+      .subscribe();
+
+    return () => {
+      if (remoteRefreshTimeoutRef.current) {
+        clearTimeout(remoteRefreshTimeoutRef.current);
+        remoteRefreshTimeoutRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [sheetId, inviteReady, scheduleRemoteSheetRefresh]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isMobile = window.matchMedia("(max-width: 768px)").matches;
@@ -762,24 +960,104 @@ export default function SheetClient() {
       window.localStorage.setItem(key, "1");
     }
   }, [sheetId]);
-  // Subscribe to collaborator cursor presence for organization sheets.
+
+  const applyBroadcastSnapshot = useCallback((payload: any) => {
+    if (!payload || payload.actorId === currentUser?.id) return;
+    if (payload.formulas) formulas.setFormulas(payload.formulas);
+    if (payload.columnFormulas) formulas.setColumnFormulas(payload.columnFormulas);
+    if (Array.isArray(payload.rows)) rowsHistory.pushState(payload.rows);
+    if (Array.isArray(payload.columns)) columnsHistory.pushState(payload.columns);
+    if (payload.cellFormats) formatting.setCellFormats(payload.cellFormats);
+    if (payload.textWrapColumns) textWrap.setTextWrapColumns(new Set(payload.textWrapColumns));
+    if (payload.cellTypeOverrides) cellTypes.setCellTypeOverrides(payload.cellTypeOverrides);
+    if (payload.cellSelectOptions) setCellSelectOptions(payload.cellSelectOptions);
+    if (Array.isArray(payload.charts)) charts.replaceAll(payload.charts);
+    if (payload.rowHeights) setRowHeights(payload.rowHeights);
+    setSheetState((prev) => ({
+      ...prev,
+      ...(typeof payload.title === "string" ? { title: payload.title } : {}),
+      ...(Array.isArray(payload.rows) ? { rows: payload.rows } : {}),
+      ...(Array.isArray(payload.columns) ? { columns: payload.columns } : {}),
+    }));
+    setSaveStatus("saved");
+  }, [currentUser?.id, formulas.setFormulas, formulas.setColumnFormulas, rowsHistory, columnsHistory, setSheetState, setSaveStatus, formatting.setCellFormats, textWrap.setTextWrapColumns, cellTypes.setCellTypeOverrides, setCellSelectOptions, charts.replaceAll, setRowHeights]);
+
+  const applyBroadcastSnapshotRef = useRef(applyBroadcastSnapshot);
   useEffect(() => {
-    if (!sheetId || !isOrgSheet || !currentUser || !liveTracking) return;
-    const ch = supabase.channel(`sheet-cursors:${sheetId}`, { config: { presence: { key: currentUser.id } } });
-    ch.on("presence", { event: "sync" }, () => {
-      const state = ch.presenceState<{ name: string; color: string; row: number; col: string }>();
-      const cursors: typeof activeCursors = {};
-      Object.entries(state).forEach(([uid, ps]) => { if (uid !== currentUser.id && ps[0]) cursors[uid] = ps[0]; });
-      setActiveCursors(cursors);
-    }).subscribe((status) => { if (status === "SUBSCRIBED") presenceChannelRef.current = ch; });
+    applyBroadcastSnapshotRef.current = applyBroadcastSnapshot;
+  }, [applyBroadcastSnapshot]);
+
+  const broadcastSheetSnapshot = useCallback((patch: Record<string, any>) => {
+    if (!presenceChannelRef.current || !currentUser || !isOrgSheet) return;
+    presenceChannelRef.current.send({
+      type: "broadcast",
+      event: "sheet_snapshot",
+      payload: {
+        actorId: currentUser.id,
+        title,
+        rows,
+        columns,
+        formulas: formulas.formulas,
+        columnFormulas: formulas.columnFormulas,
+        cellFormats: formatting.cellFormats,
+        textWrapColumns: [...textWrap.textWrapColumns],
+        cellTypeOverrides: cellTypes.cellTypeOverrides,
+        cellSelectOptions,
+        charts: charts.charts,
+        rowHeights,
+        ...patch,
+      },
+    });
+  }, [currentUser, isOrgSheet, title, rows, columns, formulas.formulas, formulas.columnFormulas, formatting.cellFormats, textWrap.textWrapColumns, cellTypes.cellTypeOverrides, cellSelectOptions, charts.charts, rowHeights]);
+
+  // Subscribe to collaborator cursor presence and immediate sheet broadcasts.
+  useEffect(() => {
+    if (!sheetId || !isOrgSheet || !currentUser) return;
+    if (presenceChannelRef.current) {
+      supabase.removeChannel(presenceChannelRef.current);
+      presenceChannelRef.current = null;
+    }
+    const ch = supabase.channel(`sheet-collab:${sheetId}`, {
+      config: {
+        presence: { key: currentUser.id },
+        broadcast: { self: false },
+      },
+    });
+    ch
+      .on("presence", { event: "sync" }, () => {
+        const state = ch.presenceState<{ name: string; color: string; row: number; col: string; x?: number; y?: number }>();
+        const cursors: typeof activeCursors = {};
+        Object.entries(state).forEach(([uid, ps]) => { if (uid !== currentUser.id && ps[0]) cursors[uid] = ps[0]; });
+        setActiveCursors(cursors);
+      })
+      .on("broadcast", { event: "sheet_snapshot" }, ({ payload }) => {
+        applyBroadcastSnapshotRef.current(payload);
+      })
+      .subscribe((status) => {
+        console.log("COLLAB CHANNEL STATUS:", status);
+        if (status === "SUBSCRIBED") {
+          presenceChannelRef.current = ch;
+          ch.track({
+            name: currentUser.name,
+            color: getMemberColor(currentUser.id),
+            row: -1,
+            col: "",
+          });
+        }
+      });
     return () => { supabase.removeChannel(ch); presenceChannelRef.current = null; };
-  }, [sheetId, isOrgSheet, currentUser, liveTracking]);
+  }, [sheetId, isOrgSheet, currentUser?.id]);
 
   // Track my current selected cell in the live cursor presence channel.
   useEffect(() => {
-    if (!presenceChannelRef.current || !currentUser || !selectedCell || !liveTracking) return;
-    presenceChannelRef.current.track({ name: currentUser.name, color: getMemberColor(currentUser.id), row: selectedCell.row, col: selectedCell.col });
-  }, [selectedCell, currentUser, liveTracking]);
+    if (!presenceChannelRef.current || !currentUser || !selectedCell || !isOrgSheet) return;
+    presenceChannelRef.current.track({
+      name: currentUser.name,
+      color: getMemberColor(currentUser.id),
+      row: selectedCell.row,
+      col: selectedCell.col,
+    });
+  }, [selectedCell, currentUser, isOrgSheet]);
 
   // ── Derived / computed ─────────────────────────────────────────────────
   const effectiveRightPanel = useMemo((): RightPanelType => {
@@ -993,11 +1271,19 @@ export default function SheetClient() {
   // Each handler updates local state, then triggers save behavior if needed.
   // Update the sheet title and save after the user stops typing.
   const handleTitleChange = useCallback((t: string) => {
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
     setSheetState((p) => ({ ...p, title: t }));
     markSaving();
     clearTimeout(titleSaveTimeout.current);
-    titleSaveTimeout.current = setTimeout(async () => { await updateSheetTitle(sheetId, t); markSaved(); }, 1000);
-  }, [sheetId, markSaving, markSaved]);
+    titleSaveTimeout.current = setTimeout(async () => {
+      await updateSheetTitle(sheetId, t);
+      markSaved();
+      broadcastSheetSnapshot({ title: t });
+    }, 1000);
+  }, [canEditSheet, showViewerEditMessage, sheetId, markSaving, markSaved]);
 
   // Toggle starred/unstarred state for this sheet.
   const handleStarredToggle = useCallback(async () => {
@@ -1010,10 +1296,15 @@ export default function SheetClient() {
       return { ...col, conditional_formatting: { ...(col.conditional_formatting ?? {}), columnFormat: { ...(col.conditional_formatting?.columnFormat ?? {}), ...formatUpdate } } };
     });
     await sheetColOps.persistColumns(nextColumns);
-  }, [columns, sheetColOps.persistColumns]);
+    broadcastSheetSnapshot({ columns: nextColumns });
+  }, [columns, sheetColOps.persistColumns, broadcastSheetSnapshot]);
 
   // Apply a formatting change to the selected cell and persist it.
   const handleFormatChange = useCallback(async (format: any) => {
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
     if (selectedColumnKey) {
       await handleApplyColumnFormat(selectedColumnKey, format);
       toast.success("Applied format to entire column");
@@ -1052,8 +1343,9 @@ export default function SheetClient() {
     const cellKey = `${selectedCell.row}-${selectedCell.col}`;
     markSaving();
     await saveCellFormat(sheetId, cellKey, merged);
+    broadcastSheetSnapshot({ cellFormats: formatting.cellFormats });
     markSaved();
-  }, [selectedCell, selectionRange, sheetId, markSaving, markSaved, formatting.applyFormat, formatting.getCurrentCellFormat, columns, selectedColumnKey, handleApplyColumnFormat]);
+  }, [canEditSheet, showViewerEditMessage, selectedCell, selectionRange, sheetId, markSaving, markSaved, formatting.applyFormat, formatting.getCurrentCellFormat, columns, selectedColumnKey, handleApplyColumnFormat]);
 
   // Paste the copied or cut cell range, then save the new row state.
   const handleSmartCopy = useCallback(() => {
@@ -1072,6 +1364,10 @@ export default function SheetClient() {
   }, [selectedCell, rows, formulas.formulas, formulas.columnFormulas, formatting.cellFormats, clipboard.copyCellOrRange]);
 
   const handlePaste = useCallback(async () => {
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
     if (selectedCell) {
       const rowId = rows[selectedCell.row]?.id;
       if (rowId && protection.isRowProtected(rowId)) {
@@ -1112,7 +1408,7 @@ export default function SheetClient() {
       try { markSaving(); await saveAllRows(sheetId, rowsHistory.currentState); markSaved(); }
       catch { toast.error("Paste saved locally but failed to persist."); setSaveStatus("saved"); }
     }, 50);
-  }, [clipboard.pasteCellOrRange, selectedCell, rows, protection.isRowProtected, sheetId, rowsHistory, markSaving, markSaved, setSaveStatus, formulas, formatting, setSheetState]);
+  }, [canEditSheet, showViewerEditMessage, clipboard.pasteCellOrRange, selectedCell, rows, protection.isRowProtected, sheetId, rowsHistory, markSaving, markSaved, setSaveStatus, formulas, formatting, setSheetState]);
 
   const onCellPointerDown = useCallback((rowIdx: number, colKey: string, e: React.PointerEvent) => {
     e.preventDefault();
@@ -1295,11 +1591,16 @@ export default function SheetClient() {
     setTimeout(async () => {
       try { markSaving(); await saveCellFormat(sheetId, cellKey, { ...formatting.getCurrentCellFormat(selectedCell), textWrap: newWrapSet.has(cellKey) }); markSaved(); }
       catch { toast.error("Text wrap failed to save."); setSaveStatus("saved"); }
+      broadcastSheetSnapshot({ textWrapColumns: [...newWrapSet] });
     }, 50);
   }, [selectedCell, textWrap, sheetId, formatting.getCurrentCellFormat, markSaving, markSaved]);
 
   // Insert a formula into the selected cell, save it, and close the dialog.
   const handleFormulaInsert = useCallback(async (example: string) => {
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
     if (!selectedCell) { toast.info("Select a cell first, then insert formula"); return; }
     const rowId = rows[selectedCell.row]?.id;
     if (rowId && protection.isRowProtected(rowId)) {
@@ -1316,8 +1617,9 @@ export default function SheetClient() {
     }
     markSaved();
     setShowFormulaDialog(false);
+    broadcastSheetSnapshot({ formulas: formulas.formulas });
     toast.success("Formula inserted — edit as needed");
-  }, [selectedCell, rows, protection.isRowProtected, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
+  }, [canEditSheet, showViewerEditMessage, selectedCell, rows, protection.isRowProtected, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
 
   const showAutomationNotification = useCallback((title: string, body: string) => {
     toast.info(body || title);
@@ -1488,6 +1790,7 @@ export default function SheetClient() {
     markSaving();
     try {
       await saveAllRows(sheetId, updatedRows);
+      broadcastSheetSnapshot({ rows: updatedRows });
       toast.success("Row updated");
       if (isOrgSheet && prevRow) {
         Object.entries(updates).forEach(([key, newVal]) => {
@@ -1554,18 +1857,18 @@ export default function SheetClient() {
     }
   }, [columns, handleUpdateRow, rows]);
 
-const handleRangeSelect = useCallback(
-  (startColKey: string, endColKey: string, startRow: number, endRow: number) => {
-    const startColIdx = columns.findIndex((c) => c.key === startColKey);
-    const endColIdx   = columns.findIndex((c) => c.key === endColKey);
-    if (startColIdx < 0 || endColIdx < 0) return;
-    setSelectionRange({
-      start: { row: startRow, colIndex: Math.min(startColIdx, endColIdx) },
-      end:   { row: endRow,   colIndex: Math.max(startColIdx, endColIdx) },
-    });
-  },
-  [columns],
-);
+  const handleRangeSelect = useCallback(
+    (startColKey: string, endColKey: string, startRow: number, endRow: number) => {
+      const startColIdx = columns.findIndex((c) => c.key === startColKey);
+      const endColIdx = columns.findIndex((c) => c.key === endColKey);
+      if (startColIdx < 0 || endColIdx < 0) return;
+      setSelectionRange({
+        start: { row: startRow, colIndex: Math.min(startColIdx, endColIdx) },
+        end: { row: endRow, colIndex: Math.max(startColIdx, endColIdx) },
+      });
+    },
+    [columns],
+  );
 
   const handleTogglePinRow = useCallback(async () => {
     if (!selectedCell) { toast.info("Select a row first"); return; }
@@ -1581,6 +1884,7 @@ const handleRangeSelect = useCallback(
     if (!formula.startsWith("=")) { toast.error("Formula must start with ="); return; }
     formulas.setColumnFormulas((p: any) => ({ ...p, [columnKey]: formula }));
     markSaving(); await saveColumnFormula(sheetId, columnKey, formula); markSaved();
+    broadcastSheetSnapshot({ columnFormulas: formulas.columnFormulas });
     toast.success(`Formula applied to entire "${columnKey}" column`);
   }, [formulas.setColumnFormulas, sheetId, markSaving, markSaved]);
 
@@ -1588,6 +1892,7 @@ const handleRangeSelect = useCallback(
   const handleRemoveColumnFormula = useCallback(async (columnKey: string) => {
     formulas.setColumnFormulas((p: any) => { const n = { ...p }; delete n[columnKey]; return n; });
     markSaving(); await deleteColumnFormula(sheetId, columnKey); markSaved();
+    broadcastSheetSnapshot({ columnFormulas: formulas.columnFormulas });
     toast.success("Column formula removed");
   }, [formulas.setColumnFormulas, sheetId, markSaving, markSaved]);
 
@@ -1693,6 +1998,7 @@ const handleRangeSelect = useCallback(
       return;
     }
     setRightPanel(null);
+    broadcastSheetSnapshot({ columns: nextColumns });
     toast.success(normalizedRules ? "Validation saved" : "Validation removed");
   }, [columns, markSaved, markSaving, rows, rowsHistory, sheetColOps.persistColumns, setRightPanel, setSheetState, sheetId]);
 
@@ -1714,6 +2020,7 @@ const handleRangeSelect = useCallback(
     );
     await sheetColOps.persistColumns(nextColumns);
     setRightPanel(null);
+    broadcastSheetSnapshot({ columns: nextColumns });
     toast.success("Select options inserted");
   }, [columns, sheetColOps.persistColumns, setRightPanel]);
 
@@ -1724,6 +2031,7 @@ const handleRangeSelect = useCallback(
     markSaving();
     try {
       await saveAllRows(sheetId, nextRows);
+      broadcastSheetSnapshot({ rows: nextRows });
       toast.success("Column filled with sequential row numbers");
     } catch (err) {
       toast.error("Failed to persist row numbers.");
@@ -1739,6 +2047,7 @@ const handleRangeSelect = useCallback(
     markSaving();
     try {
       await saveAllRows(sheetId, nextRows);
+      broadcastSheetSnapshot({ rows: nextRows });
       toast.success("Column filled with hashtag sequence");
     } catch (err) {
       toast.error("Failed to persist row numbers.");
@@ -1792,6 +2101,7 @@ const handleRangeSelect = useCallback(
       columnsHistory.pushState(normalizedColumns); rowsHistory.pushState(nextRows);
       setSheetState((prev) => ({ ...prev, columns: normalizedColumns, rows: nextRows }));
       markSaved(); toast.success("Columns updated");
+      broadcastSheetSnapshot({ columns: normalizedColumns, rows: nextRows });
     } catch (error: any) { setSaveStatus("saved"); toast.error(error?.message ?? "Failed to update columns."); }
   }, [columnsHistory, markSaved, markSaving, rows, rowsHistory, sheetId, setSaveStatus]);
 
@@ -1826,6 +2136,10 @@ const handleRangeSelect = useCallback(
   }, [columns, markSaved, markSaving, protection.isRowProtected, rows, rowsHistory, setSaveStatus, setSheetState, sheetId, validateRows]);
 
   const handleRowsChange = useCallback((updatedRows: SheetRow[]) => {
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
     const updatedById = new Map(updatedRows.map((row) => [row.id, row]));
     const mergedRows = updatedRows.length === rows.length
       ? updatedRows
@@ -1848,11 +2162,15 @@ const handleRangeSelect = useCallback(
       return;
     }
     persistence.handleRowsChange(guardedRows, rows, rowsHistory.pushState);
+    broadcastSheetSnapshot({
+      rows: guardedRows,
+      changedAt: Date.now(),
+    });
     const changedRows = guardedRows.filter((row, index) => JSON.stringify(row) !== JSON.stringify(rows[index]));
     if (changedRows.length > 0) {
       setTimeout(() => { runAutomationsForRows(changedRows, guardedRows).catch(() => { }); }, 80);
     }
-  }, [persistence.handleRowsChange, rows, rowsHistory.pushState, protection.isRowProtected, validateRows, runAutomationsForRows]);
+  }, [canEditSheet, showViewerEditMessage, persistence.handleRowsChange, broadcastSheetSnapshot, rows, rowsHistory.pushState, protection.isRowProtected, validateRows, runAutomationsForRows]);
 
   const handleImageChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1887,6 +2205,10 @@ const handleRangeSelect = useCallback(
   const handleSheetImport = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
     if (!file) return;
     try {
       if (file.size > MAX_IMPORT_BYTES) throw new Error("File is larger than the 50 MB import limit.");
@@ -1908,9 +2230,13 @@ const handleRangeSelect = useCallback(
       markSaved(); toast.success(`Imported ${parsed.source === "excel" ? "Excel" : "CSV"} file successfully.`);
     } catch (error: any) { setSaveStatus("saved"); toast.error(error?.message ?? "Import failed. Please try again."); }
     finally { setIsImportingSheet(false); }
-  }, [columnsHistory, markSaved, markSaving, rowsHistory, sheetId]);
+  }, [canEditSheet, showViewerEditMessage, columnsHistory, markSaved, markSaving, rowsHistory, sheetId]);
 
   const handleSelectedCellTypeChange = useCallback((type: ColumnDef["type"]) => {
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
     if (!selectedCell) return;
     const rowId = rows[selectedCell.row]?.id;
     if (rowId && protection.isRowProtected(rowId)) {
@@ -1943,8 +2269,9 @@ const handleRangeSelect = useCallback(
     rowsHistory.pushState(updatedRows);
     setSheetState((p) => ({ ...p, rows: updatedRows }));
     saveAllRows(sheetId, updatedRows).catch(() => { toast.error("Failed to save cell type"); });
+    broadcastSheetSnapshot({ rows: updatedRows, cellTypeOverrides: cellTypes.cellTypeOverrides });
     toast.success(`Cell changed to ${type}`);
-  }, [selectedCell, cellTypes, rows, rowsHistory, sheetId, columns, setCellSelectOptions, protection.isRowProtected]);
+  }, [canEditSheet, showViewerEditMessage, selectedCell, cellTypes, rows, rowsHistory, sheetId, columns, setCellSelectOptions, protection.isRowProtected]);
 
   const handleSelectSetupConfirm = useCallback(async (options: string[]) => {
     const { colKey, mode, row } = selectSetupDialog;
@@ -2089,7 +2416,7 @@ const handleRangeSelect = useCallback(
     };
 
     const dataCols = columns.filter((col) => !col.hidden).map((col): Column<SheetRow, SheetRow> => ({
-      key: col.key, name: col.name, width: col.width || 160, resizable: true, frozen: col.frozen,
+      key: col.key, name: col.name, width: col.width || 160, resizable: true, frozen: col.frozen, editable: canEditSheet,
       renderHeaderCell: () => (
         <div className={`h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer ${selectedColumnKey === col.key ? "bg-primary/15" : (selectedCell && selectedCell.col === col.key ? "bg-primary/10" : "")}`}
           onClick={(e) => {
@@ -2113,6 +2440,7 @@ const handleRangeSelect = useCallback(
           {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60" />}
           <ColumnHeaderMenu column={col}
             onChangeType={(t) => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
               sheetColOps.handleChangeColumnType(col.key, t);
               if (t === "select") {
                 setFocusedColumnKey(col.key);
@@ -2120,34 +2448,37 @@ const handleRangeSelect = useCallback(
               }
             }}
             onOpenColumnPanel={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
               setFocusedColumnKey(col.key);
               setRightPanel(col.type === "select" ? "select-options" : "columns");
             }}
-            onDelete={() => sheetColOps.handleDeleteColumn(col.key)}
-            onRename={(newName) => sheetColOps.handleRenameColumn(col.key, newName)}
-            onToggleTextWrap={handleTextWrapToggle}
+            onDelete={() => canEditSheet ? sheetColOps.handleDeleteColumn(col.key) : showViewerEditMessage()}
+            onRename={(newName) => canEditSheet ? sheetColOps.handleRenameColumn(col.key, newName) : showViewerEditMessage()}
+            onToggleTextWrap={() => canEditSheet ? handleTextWrapToggle() : showViewerEditMessage()}
             textWrapEnabled={textWrap.textWrapColumns.has(col.key)}
             columnFormula={formulas.columnFormulas[col.key]}
-            onApplyColumnFormula={(f) => handleApplyFormulaToColumn(col.key, f)}
-            onRemoveColumnFormula={() => handleRemoveColumnFormula(col.key)}
+            onApplyColumnFormula={(f) => canEditSheet ? handleApplyFormulaToColumn(col.key, f) : showViewerEditMessage()}
+            onRemoveColumnFormula={() => canEditSheet ? handleRemoveColumnFormula(col.key) : showViewerEditMessage()}
             selectOptions={col.selectOptions}
-            onUpdateSelectOptions={(opts) => sheetColOps.handleUpdateSelectOptions(col.key, opts)}
-            onFillColumnNumbers={() => handleFillColumnNumbers(col.key)}
-            onFillColumnHashNumbers={() => handleFillColumnHashNumbers(col.key)}
-            onInsertLeft={() => { const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx, null, "blank"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
-            onInsertRight={() => { const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, null, "blank"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
-            onDuplicate={() => { const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, col, "duplicate"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
-            onClearColumn={() => sheetColOps.clearColumnValues(col)}
-            onSortAsc={() => sheetRowOps.handleSortByColumn(col.key, "asc")}
-            onSortDesc={() => sheetRowOps.handleSortByColumn(col.key, "desc")}
+            onUpdateSelectOptions={(opts) => canEditSheet ? sheetColOps.handleUpdateSelectOptions(col.key, opts) : showViewerEditMessage()}
+            onFillColumnNumbers={() => canEditSheet ? handleFillColumnNumbers(col.key) : showViewerEditMessage()}
+            onFillColumnHashNumbers={() => canEditSheet ? handleFillColumnHashNumbers(col.key) : showViewerEditMessage()}
+            onInsertLeft={() => { if (!canEditSheet) { showViewerEditMessage(); return; } const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx, null, "blank"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
+            onInsertRight={() => { if (!canEditSheet) { showViewerEditMessage(); return; } const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, null, "blank"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
+            onDuplicate={() => { if (!canEditSheet) { showViewerEditMessage(); return; } const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, col, "duplicate"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
+            onClearColumn={() => canEditSheet ? sheetColOps.clearColumnValues(col) : showViewerEditMessage()}
+            onSortAsc={() => canEditSheet ? sheetRowOps.handleSortByColumn(col.key, "asc") : showViewerEditMessage()}
+            onSortDesc={() => canEditSheet ? sheetRowOps.handleSortByColumn(col.key, "desc") : showViewerEditMessage()}
             onSetCurrency={(currencyCode) => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
               const updated = columns.map((c) => c.key === col.key ? { ...c, currencyCode } : c);
               setSheetState((p) => ({ ...p, columns: updated })); columnsHistory.pushState(updated);
               setTimeout(async () => { markSaving(); await saveAllColumns(sheetId, columnsHistory.currentState); markSaved(); }, 50);
             }}
-            onApplyColumnFormat={(fmt) => handleApplyColumnFormat(col.key, fmt)}
-            onToggleFreeze={() => handleToggleFreezeColumn(col.key)}
+            onApplyColumnFormat={(fmt) => canEditSheet ? handleApplyColumnFormat(col.key, fmt) : showViewerEditMessage()}
+            onToggleFreeze={() => canEditSheet ? handleToggleFreezeColumn(col.key) : showViewerEditMessage()}
             onOpenValidationPanel={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
               setFocusedColumnKey(col.key);
               setRightPanel("validation");
             }}
@@ -2235,6 +2566,15 @@ const handleRangeSelect = useCallback(
         const cellKey = protection.getCellKey(rowIdx, col.key);
         const isProtected = protection.isRowProtected(row.id);
 
+        if (!canEditSheet) {
+          showViewerEditMessage();
+          return (
+            <div className="h-full w-full flex items-center px-2.5 text-xs bg-gray-50 text-gray-500">
+              Viewer access
+            </div>
+          );
+        }
+
         const editVal =
           formulas.formulas[cellKey] ??
           formulas.columnFormulas[col.key] ??
@@ -2255,30 +2595,45 @@ const handleRangeSelect = useCallback(
           );
         }
 
+        const publishLiveEdit = (
+          nextRow: SheetRow,
+          nextFormulas = formulas.formulas,
+        ) => {
+          broadcastSheetSnapshot({
+            rows: rows.map((item) => (item.id === row.id ? nextRow : item)),
+            formulas: nextFormulas,
+            changedAt: Date.now(),
+          });
+        };
+
         const onTextChange = (v: string) => {
           if (v.startsWith("=")) {
-            formulas.setFormulas((p: any) => ({ ...p, [cellKey]: v }));
+            const nextFormulas = { ...formulas.formulas, [cellKey]: v };
+            formulas.setFormulas(nextFormulas);
+            publishLiveEdit(row, nextFormulas);
           } else {
-            formulas.setFormulas((p: any) => {
-              const n = { ...p };
-              delete n[cellKey];
-              return n;
-            });
-            onRowChange({ ...row, [column.key]: v });
+            const nextFormulas = { ...formulas.formulas };
+            delete nextFormulas[cellKey];
+            const nextRow = { ...row, [column.key]: v };
+            formulas.setFormulas(nextFormulas);
+            onRowChange(nextRow);
+            publishLiveEdit(nextRow, nextFormulas);
           }
         };
 
         const onNumChange = (v: string) => {
           if (v.startsWith("=")) {
-            formulas.setFormulas((p: any) => ({ ...p, [cellKey]: v }));
+            const nextFormulas = { ...formulas.formulas, [cellKey]: v };
+            formulas.setFormulas(nextFormulas);
+            publishLiveEdit(row, nextFormulas);
           } else {
-            formulas.setFormulas((p: any) => {
-              const n = { ...p };
-              delete n[cellKey];
-              return n;
-            });
+            const nextFormulas = { ...formulas.formulas };
+            delete nextFormulas[cellKey];
             if (/^-?\d*\.?\d*$/.test(v)) {
-              onRowChange({ ...row, [column.key]: v });
+              const nextRow = { ...row, [column.key]: v };
+              formulas.setFormulas(nextFormulas);
+              onRowChange(nextRow);
+              publishLiveEdit(nextRow, nextFormulas);
             }
           }
         };
@@ -2290,11 +2645,17 @@ const handleRangeSelect = useCallback(
           }
           if (!/^\d*\.?\d*$/.test(v)) return;
           if (v === "" || v === "." || v.endsWith(".")) {
-            onRowChange({ ...row, [column.key]: v });
+            const nextRow = { ...row, [column.key]: v };
+            onRowChange(nextRow);
+            publishLiveEdit(nextRow);
             return;
           }
           const n = Math.min(100, Math.max(0, Number(v)));
-          if (!Number.isNaN(n)) onRowChange({ ...row, [column.key]: String(n) });
+          if (!Number.isNaN(n)) {
+            const nextRow = { ...row, [column.key]: String(n) };
+            onRowChange(nextRow);
+            publishLiveEdit(nextRow);
+          }
         };
 
         const onBlurSave = async () => {
@@ -2339,12 +2700,14 @@ const handleRangeSelect = useCallback(
           return (
             <div
               className="h-full flex items-center justify-center cursor-pointer"
-              onClick={() =>
-                onRowChange({
+              onClick={() => {
+                const nextRow = {
                   ...row,
                   [column.key]: !row[column.key],
-                })
-              }
+                };
+                onRowChange(nextRow);
+                publishLiveEdit(nextRow);
+              }}
             >
               {row[column.key] ? (
                 <span className="h-6 w-6 rounded-md bg-emerald-500/15 border border-emerald-600/60 flex items-center justify-center">
@@ -2363,9 +2726,11 @@ const handleRangeSelect = useCallback(
           return (
             <Select
               value={String(row[column.key] ?? "")}
-              onValueChange={(v) =>
-                onRowChange({ ...row, [column.key]: v })
-              }
+              onValueChange={(v) => {
+                const nextRow = { ...row, [column.key]: v };
+                onRowChange(nextRow);
+                publishLiveEdit(nextRow);
+              }}
             >
               <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0">
                 <SelectValue />
@@ -2407,9 +2772,11 @@ const handleRangeSelect = useCallback(
           return (
             <Select
               value={String(row[column.key] ?? "")}
-              onValueChange={(v) =>
-                onRowChange({ ...row, [column.key]: v })
-              }
+              onValueChange={(v) => {
+                const nextRow = { ...row, [column.key]: v };
+                onRowChange(nextRow);
+                publishLiveEdit(nextRow);
+              }}
             >
               <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0">
                 <SelectValue placeholder="Select…" />
@@ -2509,7 +2876,7 @@ const handleRangeSelect = useCallback(
     }));
 
     return [rowNumberCol, ...dataCols];
-  }, [columns, rows, selectedRows, selectedColumnKey, textWrap.textWrapColumns, cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas, formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey, protection.isCellProtected, protection.isRowProtected, sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, colOps, markSaving, markSaved, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat, handleToggleFreezeColumn, isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove, endRowResize, toggleRowProtectionById, onFillStart, rightPanel]);
+  }, [columns, rows, selectedRows, selectedColumnKey, textWrap.textWrapColumns, cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas, formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey, protection.isCellProtected, protection.isRowProtected, sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, colOps, markSaving, markSaved, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat, handleToggleFreezeColumn, isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove, endRowResize, toggleRowProtectionById, onFillStart, rightPanel, canEditSheet, showViewerEditMessage, broadcastSheetSnapshot]);
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -2520,6 +2887,7 @@ const handleRangeSelect = useCallback(
           title={title} starred={starred} saveStatus={saveStatus} isOrgSheet={isOrgSheet}
           isDark={isDark} importSource={importSource} forks={forks} orgMembers={orgMembers}
           currentUser={currentUser} isImportingSheet={isImportingSheet} totalComments={totalComments}
+          canEditSheet={canEditSheet} canShareSheet={isOwner}
           onTitleChange={handleTitleChange} onStarredToggle={handleStarredToggle}
           onImportClick={() => importInputRef.current?.click()}
           onExport={persistence.handleExport} onShareClick={() => setShowShareDialog(true)}
@@ -2612,12 +2980,14 @@ const handleRangeSelect = useCallback(
         <FormulaBar
           selectedCell={selectedCell} columns={columns} rows={rows} formulas={formulas}
           protection={protection} sheetId={sheetId} isDark={isDark}
+          canEditSheet={canEditSheet}
           onRowsChange={handleRowsChange} onSaveFormula={saveFormula} onDeleteFormula={deleteFormula}
         />
 
         <ActionBar
           isDark={isDark} isOrgSheet={isOrgSheet} userRole={sheetState.userRole}
           ownerId={sheetState.ownerId} currentUserId={currentUser?.id}
+          canEditSheet={canEditSheet}
           selectedRows={selectedRows} selectedCell={selectedCell} columns={columns}
           showFilters={showFilters} filterValue={filterValue}
           advancedFiltersCount={advancedFilters.length} chartCount={charts.charts.length}
@@ -2746,6 +3116,8 @@ const handleRangeSelect = useCallback(
                   setLiveTracking={(v) => setSheetState((p) => ({ ...p, liveTracking: v }))}
                   setShowShareDialog={setShowShareDialog} sheetId={sheetId} rows={rows} columns={columns}
                   totalComments={totalComments} historyCount={history.length} members={orgMembers}
+                  canManageMembers={isOwner} currentUserId={currentUser?.id}
+                  onMembersChange={setOrgMembers}
                   timeTravelState={timeTravelState} timeTravelActions={timeTravelActions}
                   activeChart={charts.activeChart} chartPanelTab={charts.panelTab}
                   setChartPanelTab={charts.setPanelTab}
@@ -2780,11 +3152,12 @@ const handleRangeSelect = useCallback(
           selectedCell={selectedCell} columns={columns} filterValue={filterValue}
           filteredRowsCount={filteredRows.length} totalRowsCount={rows.length}
           isOrgSheet={isOrgSheet} liveTracking={liveTracking} chartCount={charts.charts.length}
+          canEditSheet={canEditSheet}
           onChartsClick={() => setRightPanel("charts")} onShortcutsClick={() => toggleRightPanel("shortcuts")}
         />
 
         {/* Modals */}
-        {isOrgSheet && <ShareDialog showShareDialog={showShareDialog} setShowShareDialog={setShowShareDialog} sheetId={sheetId} isDark={isDark} />}
+        {isOrgSheet && isOwner && <ShareDialog showShareDialog={showShareDialog} setShowShareDialog={setShowShareDialog} sheetId={sheetId} isDark={isDark} />}
         <Dialog open={showDesktopTip} onOpenChange={setShowDesktopTip}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
@@ -2797,7 +3170,11 @@ const handleRangeSelect = useCallback(
         {showFormulaDialog && <FormulaDialog open={showFormulaDialog} onClose={() => setShowFormulaDialog(false)} onInsert={handleFormulaInsert} isDark={isDark} />}
         {charts.showPicker && (
           <ChartPicker isDark={isDark} anchorRef={chartBtnRef} rows={rows} columns={columns}
-            onSelect={(kind, preset) => { charts.insertChart(kind, rows, columns, { ...getSuggestedChartPreset(kind), ...preset }); toast.success(`${kind.charAt(0).toUpperCase() + kind.slice(1)} chart inserted — click to edit`); }}
+            onSelect={(kind, preset) => {
+              charts.insertChart(kind, rows, columns, { ...getSuggestedChartPreset(kind), ...preset });
+              setTimeout(() => broadcastSheetSnapshot({ charts: charts.charts }), 100);
+              toast.success(`${kind.charAt(0).toUpperCase() + kind.slice(1)} chart inserted — click to edit`);;
+            }}
             onClose={charts.closePicker}
           />
         )}
@@ -2805,9 +3182,8 @@ const handleRangeSelect = useCallback(
         {showSheetTour && (
           <div className="fixed inset-0 z-[80] bg-black/55 backdrop-blur-[1px] pointer-events-auto">
             <div
-              className={`absolute left-1/2 top-1/2 w-[min(92vw,380px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border p-4 shadow-2xl ${
-                isDark ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-200 bg-white text-gray-900"
-              }`}
+              className={`absolute left-1/2 top-1/2 w-[min(92vw,380px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border p-4 shadow-2xl ${isDark ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-200 bg-white text-gray-900"
+                }`}
             >
               <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">
                 Sheet guide {tourStep + 1} of {SHEET_TOUR_STEPS.length}
@@ -2819,9 +3195,8 @@ const handleRangeSelect = useCallback(
               <div className="mt-4 flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  className={`rounded-md px-3 py-1.5 text-xs ${
-                    isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-100"
-                  }`}
+                  className={`rounded-md px-3 py-1.5 text-xs ${isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-100"
+                    }`}
                   onClick={() => setShowSheetTour(false)}
                 >
                   Skip

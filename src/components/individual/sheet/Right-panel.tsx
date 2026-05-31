@@ -79,6 +79,9 @@ interface RightPanelProps {
   isOrganizationSheet: boolean;
   setLiveTracking: (value: boolean) => void;
   setShowShareDialog: (value: boolean) => void;
+  canManageMembers?: boolean;
+  currentUserId?: string;
+  onMembersChange?: (members: OrgMember[]) => void;
 
   // Developer
   sheetId: string;
@@ -219,6 +222,9 @@ export default function RightPanel({
   isOrganizationSheet,
   setLiveTracking,
   setShowShareDialog,
+  canManageMembers = false,
+  currentUserId,
+  onMembersChange,
   sheetId,
   rows,
   columns,
@@ -318,6 +324,10 @@ export default function RightPanel({
             setLiveTracking={setLiveTracking}
             setShowShareDialog={setShowShareDialog}
             members={members}
+            sheetId={sheetId}
+            canManageMembers={canManageMembers}
+            currentUserId={currentUserId}
+            onMembersChange={onMembersChange}
           />
         )}
 

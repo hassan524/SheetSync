@@ -150,18 +150,22 @@ export function OrganizationActionMenu({
       >
         <Users className="h-3.5 w-3.5" /> Manage Members
       </DropdownMenuItem>
-      {(org.role === "admin" || org.role === "owner") && (
+      {org.role === "owner" && (
         <DropdownMenuItem className="text-xs gap-2">
           <UserPlus className="h-3.5 w-3.5" /> Invite People
         </DropdownMenuItem>
       )}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        className="text-xs gap-2"
-        onClick={() => router.push(`/organizations/${org.id}?tab=settings`)}
-      >
-        <Settings className="h-3.5 w-3.5" /> Settings
-      </DropdownMenuItem>
+      {org.role === "owner" && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-xs gap-2"
+            onClick={() => router.push(`/organizations/${org.id}?tab=settings`)}
+          >
+            <Settings className="h-3.5 w-3.5" /> Settings
+          </DropdownMenuItem>
+        </>
+      )}
       {org.role !== "admin" && org.role !== "owner" && (
         <>
           <DropdownMenuSeparator />

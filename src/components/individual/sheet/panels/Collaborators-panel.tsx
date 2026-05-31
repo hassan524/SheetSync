@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +11,8 @@ import {
 import { Plus, MoreHorizontal, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
+import { api } from "@/lib/api/api-client";
+import type { Role } from "@/types/index";
 
 const MEMBER_COLORS = [
   "#0d7c5f",
@@ -46,32 +49,63 @@ interface CollaboratorsPanelProps {
   setLiveTracking: (value: boolean) => void;
   setShowShareDialog: (value: boolean) => void;
   members: OrgMember[];
+  sheetId: string;
+  canManageMembers: boolean;
+  currentUserId?: string;
+  onMembersChange?: (members: OrgMember[]) => void;
 }
 
 export default function CollaboratorsPanel({
   isDark,
   liveTracking,
   isOrganizationSheet,
-  setLiveTracking,
+  setLiveTracking: _setLiveTracking,
   setShowShareDialog,
   members,
+  sheetId,
+  canManageMembers,
+  currentUserId,
+  onMembersChange,
 }: CollaboratorsPanelProps) {
   const memberCount = members.length;
+  const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
 
-  // ── Toggle handler with feedback ─────────────────────────────────────────
   const handleToggleLiveTracking = () => {
-    // Guard: only org sheets support live tracking
     if (!isOrganizationSheet) {
-      toast.info(
-        "Live cursor tracking is only available on Organization sheets.",
-      );
+      toast.info("Live cursor tracking is only available on Organization sheets.");
       return;
     }
-    const next = !liveTracking;
-    setLiveTracking(next);
-    toast.success(
-      next ? "Live cursor tracking enabled" : "Live cursor tracking disabled",
-    );
+    _setLiveTracking(!liveTracking);
+  };
+
+  // ── Toggle handler with feedback ─────────────────────────────────────────
+  const handleChangeRole = async (member: OrgMember, role: Role) => {
+    if (!canManageMembers || role === "owner" || member.role === role) return;
+    try {
+      setBusyMemberId(member.id);
+      await api.put("/organization/members", { sheetId, userId: member.id, role });
+      const next = members.map((item) => item.id === member.id ? { ...item, role } : item);
+      onMembersChange?.(next);
+      toast.success(`${member.name}'s role changed to ${role}`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || "Failed to change role");
+    } finally {
+      setBusyMemberId(null);
+    }
+  };
+
+  const handleRemoveMember = async (member: OrgMember) => {
+    if (!canManageMembers || member.id === currentUserId || member.role === "owner") return;
+    try {
+      setBusyMemberId(member.id);
+      await api.delete(`/organization/members?sheetId=${encodeURIComponent(sheetId)}&userId=${encodeURIComponent(member.id)}`);
+      onMembersChange?.(members.filter((item) => item.id !== member.id));
+      toast.success(`${member.name} removed`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || "Failed to remove member");
+    } finally {
+      setBusyMemberId(null);
+    }
   };
 
   return (
@@ -102,6 +136,7 @@ export default function CollaboratorsPanel({
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-3 space-y-3">
           {/* Live tracking toggle card */}
+          {false && (
           <div
             className={`rounded-xl border p-3 ${isDark ? "border-gray-700/60 bg-gray-900/60" : "border-gray-200 bg-white shadow-sm"}`}
           >
@@ -191,6 +226,7 @@ export default function CollaboratorsPanel({
               </p>
             )}
           </div>
+          )}
 
           {/* Section label */}
           <div
@@ -280,25 +316,31 @@ export default function CollaboratorsPanel({
                     </div>
 
                     {/* Actions */}
+                    {canManageMembers && c.role !== "owner" && c.id !== currentUserId && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
+                          disabled={busyMemberId === c.id}
                           className={`h-6 w-6 rounded-md opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-36">
-                        <DropdownMenuItem className="text-xs">
-                          Change role
+                        <DropdownMenuItem className="text-xs" onClick={() => handleChangeRole(c, "editor")}>
+                          Make editor
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs text-red-500">
+                        <DropdownMenuItem className="text-xs" onClick={() => handleChangeRole(c, "viewer")}>
+                          Make viewer
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-xs text-red-500" onClick={() => handleRemoveMember(c)}>
                           Remove
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                   </div>
                 );
               })
@@ -306,12 +348,14 @@ export default function CollaboratorsPanel({
           </div>
 
           {/* Invite button */}
+          {canManageMembers && (
           <Button
             className="w-full h-8 text-xs rounded-xl gap-1.5 font-medium"
             onClick={() => setShowShareDialog(true)}
           >
             <Plus className="h-3.5 w-3.5" /> Invite people
           </Button>
+          )}
 
           <div className="h-2" />
         </div>

@@ -50,6 +50,8 @@ interface TitleBarProps {
   currentUser: { id: string; name: string; email: string; avatar_url: string | null } | null;
   isImportingSheet: boolean;
   totalComments: number;
+  canEditSheet?: boolean;
+  canShareSheet?: boolean;
   onTitleChange: (t: string) => void;
   onStarredToggle: () => void;
   onImportClick: () => void;
@@ -72,6 +74,8 @@ export function TitleBar({
   currentUser,
   isImportingSheet,
   totalComments,
+  canEditSheet = true,
+  canShareSheet = true,
   onTitleChange,
   onStarredToggle,
   onImportClick,
@@ -110,6 +114,7 @@ export function TitleBar({
           <Input
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
+            disabled={!canEditSheet}
             className="sheet-title-input h-7 border-0 bg-transparent font-semibold not-italic text-[13px] tracking-tight focus-visible:ring-1 px-1.5 rounded-md w-24 sm:w-44 md:w-56 min-w-0"
           />
           <button
@@ -287,7 +292,7 @@ export function TitleBar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {isOrgSheet && (
+        {isOrgSheet && canShareSheet && (
           <button
             className="sheet-btn-primary flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-3 rounded-md text-[11.5px] font-semibold transition-all shrink-0"
             onClick={onShareClick}

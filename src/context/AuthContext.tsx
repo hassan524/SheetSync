@@ -10,6 +10,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { AuthError, Session } from "@supabase/supabase-js";
 import { usePush } from "@/hooks/notfication/use-push";
+import { getCurrentAppOrigin } from "@/lib/app-url";
 
 // -----------------------
 // User type
@@ -26,7 +27,7 @@ interface AuthContextType {
   user: UserProfile | null;
   accessToken: string | null;
   loading: boolean;
-  loginWithGoogle: () => Promise<AuthError | null>;
+  loginWithGoogle: (redirectPath?: string) => Promise<AuthError | null>;
   logout: () => Promise<void>;
 }
 
@@ -92,8 +93,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // -----------------------
   // Google login
   // -----------------------
-  const loginWithGoogle = async (): Promise<AuthError | null> => {
-    const redirectUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`;
+  const loginWithGoogle = async (
+    redirectPath = "/dashboard",
+  ): Promise<AuthError | null> => {
+    const appUrl = getCurrentAppOrigin();
+    const safeRedirectPath = redirectPath.startsWith("/")
+      ? redirectPath
+      : "/dashboard";
+    const redirectUrl = `${appUrl}${safeRedirectPath}`;
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -135,4 +142,3 @@ export const useAuth = () => {
   if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 };
-
