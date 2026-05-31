@@ -7,11 +7,11 @@ import { getConfiguredAppOrigin } from "@/lib/app-url";
 
 export async function POST(req: NextRequest) {
   try {
-    const { sheetId, role } = await req.json();
+    const { sheetId, orgId, role } = await req.json();
 
-    if (!sheetId) {
+    if (!sheetId && !orgId) {
       return NextResponse.json(
-        { error: "Sheet ID is required" },
+        { error: "Sheet ID or organization ID is required" },
         { status: 400 },
       );
     }
@@ -36,23 +36,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: sheet, error: sheetError } = await supabase
-      .from("sheets")
-      .select("id, title, organization_id")
-      .eq("id", sheetId)
-      .maybeSingle();
+    const { data: sheet, error: sheetError } = sheetId
+      ? await supabase
+          .from("sheets")
+          .select("id, title, organization_id")
+          .eq("id", sheetId)
+          .maybeSingle()
+      : { data: null, error: null };
 
-    if (sheetError || !sheet?.organization_id) {
+    if (sheetId && (sheetError || !sheet?.organization_id)) {
       return NextResponse.json(
         { error: "Organization sheet not found" },
         { status: 404 },
       );
     }
 
+    const organizationId = sheet?.organization_id ?? orgId;
+    if (!organizationId) {
+      return NextResponse.json(
+        { error: "Organization ID is required" },
+        { status: 400 },
+      );
+    }
+
     const { data: inviterMember, error: memberError } = await supabase
       .from("organization_members")
       .select("role, organizations(name)")
-      .eq("organization_id", sheet.organization_id)
+      .eq("organization_id", organizationId)
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -74,7 +84,7 @@ export async function POST(req: NextRequest) {
     const { error: insertError } = await supabase
       .from("organization_invites")
       .insert({
-        organization_id: sheet.organization_id,
+        organization_id: organizationId,
         email: `link-${token}@sheetsync.local`,
         role,
         token,
@@ -97,21 +107,25 @@ export async function POST(req: NextRequest) {
     await supabase.from("sheet_history").insert({
       actor_id: user.id,
       user_id: user.id,
-      sheet_id: sheetId,
-      organization_id: sheet.organization_id,
+      sheet_id: sheetId ?? null,
+      organization_id: organizationId,
       action: "created share link",
-      target: sheet.title ?? "Sheet",
+      target: sheet?.title ?? (inviterMember as any).organizations?.name ?? "Organization",
     });
 
     const origin =
       process.env.NODE_ENV === "production"
         ? getConfiguredAppOrigin() || req.nextUrl.origin
         : req.nextUrl.origin;
-    const inviteUrl = new URL(`/sheet/${sheetId}`, origin);
-    inviteUrl.searchParams.set("invited", "true");
-    inviteUrl.searchParams.set("inviteToken", token);
-    inviteUrl.searchParams.set("role", role);
-    inviteUrl.searchParams.set("by", user.id);
+    const inviteUrl = sheetId
+      ? new URL(`/sheet/${sheetId}`, origin)
+      : new URL(`/invite/${token}`, origin);
+    if (sheetId) {
+      inviteUrl.searchParams.set("invited", "true");
+      inviteUrl.searchParams.set("inviteToken", token);
+      inviteUrl.searchParams.set("role", role);
+      inviteUrl.searchParams.set("by", user.id);
+    }
 
     return NextResponse.json({ success: true, inviteUrl: inviteUrl.toString() });
   } catch (err: any) {

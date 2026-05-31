@@ -46,7 +46,7 @@ interface TitleBarProps {
   isDark: boolean;
   importSource: "csv" | "excel" | null;
   forks: { id: string; title: string; forked_at: string | null }[];
-  orgMembers: OrgMember[];
+  activeMembers?: OrgMember[];
   currentUser: { id: string; name: string; email: string; avatar_url: string | null } | null;
   isImportingSheet: boolean;
   totalComments: number;
@@ -70,7 +70,7 @@ export function TitleBar({
   isDark,
   importSource,
   forks,
-  orgMembers,
+  activeMembers = [],
   currentUser,
   isImportingSheet,
   totalComments,
@@ -85,6 +85,8 @@ export function TitleBar({
 }: TitleBarProps) {
   const router = useRouter();
   const selStyle = ddStyle(isDark);
+  const visibleActiveMembers = activeMembers.slice(0, 3);
+  const hiddenActiveCount = Math.max(0, activeMembers.length - visibleActiveMembers.length);
 
   return (
     <header
@@ -204,7 +206,7 @@ export function TitleBar({
         {isOrgSheet && (
           <>
             <div className="hidden sm:flex -space-x-2 shrink-0">
-              {orgMembers.slice(0, 3).map((c) => (
+              {visibleActiveMembers.map((c) => (
                 <Tooltip key={c.id}>
                   <TooltipTrigger>
                     <Avatar member={c} showOnline />
@@ -217,12 +219,12 @@ export function TitleBar({
                   </TooltipContent>
                 </Tooltip>
               ))}
-              {orgMembers.length > 3 && (
+              {hiddenActiveCount > 0 && (
                 <div
                   className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold cursor-pointer border-2 bg-gray-200 text-gray-600 shrink-0"
                   style={{ borderColor: "var(--sheet-titlebar-bg)" }}
                 >
-                  +{orgMembers.length - 3}
+                  +{hiddenActiveCount}
                 </div>
               )}
             </div>

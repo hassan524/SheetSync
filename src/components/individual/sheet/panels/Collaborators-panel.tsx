@@ -52,6 +52,7 @@ interface CollaboratorsPanelProps {
   sheetId: string;
   canManageMembers: boolean;
   currentUserId?: string;
+  activeMemberIds?: Set<string>;
   onMembersChange?: (members: OrgMember[]) => void;
 }
 
@@ -65,9 +66,11 @@ export default function CollaboratorsPanel({
   sheetId,
   canManageMembers,
   currentUserId,
+  activeMemberIds = new Set(),
   onMembersChange,
 }: CollaboratorsPanelProps) {
   const memberCount = members.length;
+  const onlineCount = members.filter((member) => activeMemberIds.has(member.id) || member.id === currentUserId).length;
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
 
   const handleToggleLiveTracking = () => {
@@ -122,7 +125,7 @@ export default function CollaboratorsPanel({
             <span
               className={`h-1.5 w-1.5 rounded-full ${liveTracking && isOrganizationSheet ? "bg-emerald-400 animate-pulse" : isDark ? "bg-gray-600" : "bg-gray-300"}`}
             />
-            {memberCount} member{memberCount !== 1 ? "s" : ""}
+            {onlineCount} online
           </span>
         </div>
         <span
@@ -246,6 +249,16 @@ export default function CollaboratorsPanel({
             ) : (
               members.map((c) => {
                 const color = getMemberColor(c.id);
+                const isOnline = activeMemberIds.has(c.id) || c.id === currentUserId;
+                const status = isOnline ? "online" : c.status ?? "offline";
+                const statusClass =
+                  status === "online"
+                    ? "bg-emerald-400"
+                    : status === "away"
+                      ? "bg-amber-400"
+                      : isDark
+                        ? "bg-gray-700"
+                        : "bg-gray-300";
                 return (
                   <div
                     key={c.id}
@@ -274,12 +287,10 @@ export default function CollaboratorsPanel({
                           {getInitials(c.name)}
                         </div>
                       )}
-                      {/* Online dot — only show when live tracking is active */}
-                      {liveTracking && isOrganizationSheet && (
-                        <div
-                          className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 ${isDark ? "border-gray-950" : "border-white"} bg-emerald-400`}
-                        />
-                      )}
+                      <div
+                        className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 ${isDark ? "border-gray-950" : "border-white"} ${statusClass}`}
+                        title={status}
+                      />
                     </div>
 
                     {/* Info */}
@@ -311,7 +322,7 @@ export default function CollaboratorsPanel({
                       <p
                         className={`text-[10px] mt-0.5 truncate ${isDark ? "text-gray-600" : "text-gray-400"}`}
                       >
-                        {c.email}
+                        {c.email} · {status}
                       </p>
                     </div>
 

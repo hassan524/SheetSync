@@ -8,6 +8,8 @@ export interface OrgMember {
   email: string;
   avatar_url: string | null;
   role: string;
+  status?: "online" | "away" | "offline";
+  last_active_at?: string | null;
 }
 
 export interface SheetOrgData {
@@ -58,6 +60,8 @@ export async function getSheetOrgMembers(
     .from("organization_members")
     .select(`
       role,
+      status,
+      last_active_at,
       profiles (
         id,
         name,
@@ -75,6 +79,8 @@ export async function getSheetOrgMembers(
     email: m.profiles.email ?? "",
     avatar_url: m.profiles.avatar_url ?? null,
     role: m.role ?? "viewer",
+    status: m.status ?? "offline",
+    last_active_at: m.last_active_at ?? null,
   }));
 
   return {

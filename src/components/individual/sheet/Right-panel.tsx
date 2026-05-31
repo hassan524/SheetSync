@@ -81,6 +81,7 @@ interface RightPanelProps {
   setShowShareDialog: (value: boolean) => void;
   canManageMembers?: boolean;
   currentUserId?: string;
+  activeMemberIds?: Set<string>;
   onMembersChange?: (members: OrgMember[]) => void;
 
   // Developer
@@ -224,6 +225,7 @@ export default function RightPanel({
   setShowShareDialog,
   canManageMembers = false,
   currentUserId,
+  activeMemberIds = new Set(),
   onMembersChange,
   sheetId,
   rows,
@@ -327,6 +329,7 @@ export default function RightPanel({
             sheetId={sheetId}
             canManageMembers={canManageMembers}
             currentUserId={currentUserId}
+            activeMemberIds={activeMemberIds}
             onMembersChange={onMembersChange}
           />
         )}

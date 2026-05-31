@@ -80,7 +80,7 @@ import { protectRow, unprotectRow } from "@/lib/querys/sheet/protection";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { exportSheet } from "@/lib/querys/export";
 import { buildImportedSheetData, getImportedSheetTitle, MAX_IMPORT_BYTES } from "@/lib/import-sheet";
-import { getSheetOrgMembers } from "@/lib/querys/organization/get-sheet-members";
+import { getSheetOrgMembers, type OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import { supabase } from "@/lib/supabase/client";
 import { api } from "@/lib/api/api-client";
 import { useAuth } from "@/context/AuthContext";
@@ -131,6 +131,23 @@ type ValidationApplyRange = {
   startRow: number;
   endRow: number;
 };
+
+type SheetPresence = {
+  name: string;
+  color: string;
+  row: number;
+  col: string;
+  selectedAt?: number;
+  email?: string;
+  avatar_url?: string | null;
+  role?: string;
+};
+
+function getLatestPresence(presences: SheetPresence[] | undefined) {
+  if (!presences?.length) return null;
+  return [...presences]
+    .sort((a, b) => (b.selectedAt ?? 0) - (a.selectedAt ?? 0))[0] ?? null;
+}
 
 const SHEET_TOUR_STEPS = [
   {
@@ -1010,6 +1027,28 @@ export default function SheetClient() {
     });
   }, [currentUser, isOrgSheet, title, rows, columns, formulas.formulas, formulas.columnFormulas, formatting.cellFormats, textWrap.textWrapColumns, cellTypes.cellTypeOverrides, cellSelectOptions, charts.charts, rowHeights]);
 
+  const applyRemoteCellSelection = useCallback((payload: SheetPresence & { userId?: string }) => {
+    if (!payload?.userId || payload.userId === currentUser?.id) return;
+    setActiveCursors((prev) => ({
+      ...prev,
+      [payload.userId as string]: {
+        name: payload.name,
+        color: payload.color,
+        row: payload.row,
+        col: payload.col,
+        selectedAt: payload.selectedAt,
+        email: payload.email,
+        avatar_url: payload.avatar_url,
+        role: payload.role,
+      },
+    }));
+  }, [currentUser?.id, setActiveCursors]);
+
+  const applyRemoteCellSelectionRef = useRef(applyRemoteCellSelection);
+  useEffect(() => {
+    applyRemoteCellSelectionRef.current = applyRemoteCellSelection;
+  }, [applyRemoteCellSelection]);
+
   // Subscribe to collaborator cursor presence and immediate sheet broadcasts.
   useEffect(() => {
     if (!sheetId || !isOrgSheet || !currentUser) return;
@@ -1025,16 +1064,33 @@ export default function SheetClient() {
     });
     ch
       .on("presence", { event: "sync" }, () => {
-        const state = ch.presenceState<{ name: string; color: string; row: number; col: string; x?: number; y?: number }>();
+        const state = ch.presenceState<SheetPresence>();
         const cursors: typeof activeCursors = {};
-        Object.entries(state).forEach(([uid, ps]) => { if (uid !== currentUser.id && ps[0]) cursors[uid] = ps[0]; });
+        Object.entries(state).forEach(([uid, ps]) => {
+          const presence = getLatestPresence(ps);
+          if (uid !== currentUser.id && presence) cursors[uid] = presence;
+        });
         setActiveCursors(cursors);
+      })
+      .on("presence", { event: "join" }, ({ key, newPresences }: any) => {
+        if (key === currentUser.id) return;
+        const presence = getLatestPresence(newPresences);
+        if (presence) setActiveCursors((prev) => ({ ...prev, [key]: presence }));
+      })
+      .on("presence", { event: "leave" }, ({ key }: any) => {
+        setActiveCursors((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
       })
       .on("broadcast", { event: "sheet_snapshot" }, ({ payload }) => {
         applyBroadcastSnapshotRef.current(payload);
       })
+      .on("broadcast", { event: "cell_selection" }, ({ payload }) => {
+        applyRemoteCellSelectionRef.current(payload);
+      })
       .subscribe((status) => {
-        console.log("COLLAB CHANNEL STATUS:", status);
         if (status === "SUBSCRIBED") {
           presenceChannelRef.current = ch;
           ch.track({
@@ -1042,6 +1098,10 @@ export default function SheetClient() {
             color: getMemberColor(currentUser.id),
             row: -1,
             col: "",
+            selectedAt: Date.now(),
+            email: currentUser.email,
+            avatar_url: currentUser.avatar_url,
+            role: sheetState.userRole ?? "viewer",
           });
         }
       });
@@ -1056,14 +1116,75 @@ export default function SheetClient() {
       color: getMemberColor(currentUser.id),
       row: selectedCell.row,
       col: selectedCell.col,
+      selectedAt: Date.now(),
+      email: currentUser.email,
+      avatar_url: currentUser.avatar_url,
+      role: sheetState.userRole ?? "viewer",
     });
-  }, [selectedCell, currentUser, isOrgSheet]);
+    presenceChannelRef.current.send({
+      type: "broadcast",
+      event: "cell_selection",
+      payload: {
+        userId: currentUser.id,
+        name: currentUser.name,
+        color: getMemberColor(currentUser.id),
+        row: selectedCell.row,
+        col: selectedCell.col,
+        selectedAt: Date.now(),
+        email: currentUser.email,
+        avatar_url: currentUser.avatar_url,
+        role: sheetState.userRole ?? "viewer",
+      },
+    });
+  }, [selectedCell?.row, selectedCell?.col, currentUser?.id, currentUser?.name, currentUser?.email, currentUser?.avatar_url, isOrgSheet, sheetState.userRole]);
 
   // ── Derived / computed ─────────────────────────────────────────────────
   const effectiveRightPanel = useMemo((): RightPanelType => {
     if (!isOrgSheet && rightPanel === "collaborators") return null;
     return rightPanel;
   }, [isOrgSheet, rightPanel]);
+
+  const activeSheetMembers = useMemo(() => {
+    if (!isOrgSheet) return [];
+    const byId = new Map(orgMembers.map((member) => [member.id, member]));
+    const members: OrgMember[] = [];
+    const addMember = (id: string, fallback: Partial<OrgMember>) => {
+      if (members.some((member) => member.id === id)) return;
+      const orgMember = byId.get(id);
+      members.push({
+        id,
+        name: orgMember?.name ?? fallback.name ?? "Member",
+        email: orgMember?.email ?? fallback.email ?? "",
+        avatar_url: orgMember?.avatar_url ?? fallback.avatar_url ?? null,
+        role: orgMember?.role ?? fallback.role ?? "viewer",
+        status: "online",
+        last_active_at: orgMember?.last_active_at ?? null,
+      });
+    };
+
+    if (currentUser) {
+      addMember(currentUser.id, {
+        name: currentUser.name,
+        email: currentUser.email,
+        avatar_url: currentUser.avatar_url,
+        role: sheetState.userRole ?? "viewer",
+      });
+    }
+    Object.entries(activeCursors).forEach(([id, presence]) => {
+      addMember(id, {
+        name: presence.name,
+        email: presence.email,
+        avatar_url: presence.avatar_url,
+        role: presence.role,
+      });
+    });
+    return members;
+  }, [activeCursors, currentUser, isOrgSheet, orgMembers, sheetState.userRole]);
+
+  const activeSheetMemberIds = useMemo(
+    () => new Set(activeSheetMembers.map((member) => member.id)),
+    [activeSheetMembers],
+  );
 
   const conditionalRules = useMemo<ConditionalFormatRule[]>(() => {
     const rules = columns.flatMap((col) => {
@@ -2312,16 +2433,32 @@ export default function SheetClient() {
 
   const handleAddComment = useCallback(async (cellKey: string) => {
     if (!newCommentText.trim()) return;
-    await addComment({ sheetId, cellKey, userId: "local", author: "You", authorColor: "#0d7c5f", text: newCommentText.trim(), parentId: null });
+    await addComment({
+      sheetId,
+      cellKey,
+      userId: currentUser?.id ?? "local",
+      author: currentUser?.name ?? "You",
+      authorColor: currentUser ? getMemberColor(currentUser.id) : "#0d7c5f",
+      text: newCommentText.trim(),
+      parentId: null,
+    });
     setNewCommentText(""); toast.success("Comment added");
-  }, [newCommentText, sheetId]);
+  }, [currentUser, newCommentText, sheetId]);
 
   const handleReply = useCallback(async (cellKey: string, commentId: string) => {
     const text = replyText[commentId];
     if (!text?.trim()) return;
-    await addComment({ sheetId, cellKey, userId: "local", author: "You", authorColor: "#0d7c5f", text: text.trim(), parentId: commentId });
+    await addComment({
+      sheetId,
+      cellKey,
+      userId: currentUser?.id ?? "local",
+      author: currentUser?.name ?? "You",
+      authorColor: currentUser ? getMemberColor(currentUser.id) : "#0d7c5f",
+      text: text.trim(),
+      parentId: commentId,
+    });
     setReplyText((p) => ({ ...p, [commentId]: "" }));
-  }, [replyText, sheetId]);
+  }, [currentUser, replyText, sheetId]);
 
   const handleResolveComment = useCallback(async (_cellKey: string, commentId: string) => {
     await resolveComment(commentId); toast.success("Comment resolved");
@@ -2527,9 +2664,9 @@ export default function SheetClient() {
               setSelectedColumnKey(null);
               setSelectedCell({ row: rowIdx, col: col.key });
               if (rightPanel === "validation") setFocusedColumnKey(col.key);
-              setActiveCommentCell(`row:${rows[rowIdx]?.id}`);
+              setActiveCommentCell(`${rowIdx}-${col.key}`);
             }}
-            onCommentClick={(e) => { e.stopPropagation(); setActiveCommentCell(`row:${rows[rowIdx]?.id}`); setRightPanel("comments"); }}
+            onCommentClick={(e) => { e.stopPropagation(); setActiveCommentCell(`${rowIdx}-${col.key}`); setRightPanel("comments"); }}
             onPointerDown={onCellPointerDown}
             onPointerEnter={onCellPointerEnter}
             onFillStart={onFillStart}
@@ -2735,7 +2872,12 @@ export default function SheetClient() {
               <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent style={selStyle}>
+              <SelectContent
+                side="bottom"
+                align="start"
+                avoidCollisions={false}
+                style={selStyle}
+              >
                 {opts.map((option) => {
                   const value = getSelectOptionLabel(option);
                   const style = getStatusOptionStyle(value);
@@ -2781,7 +2923,12 @@ export default function SheetClient() {
               <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0">
                 <SelectValue placeholder="Select…" />
               </SelectTrigger>
-              <SelectContent style={selStyle}>
+              <SelectContent
+                side="bottom"
+                align="start"
+                avoidCollisions={false}
+                style={selStyle}
+              >
                 {selectOpts.map((opt) => {
                   const optionLabel = getSelectOptionLabel(opt);
                   return (
@@ -2885,7 +3032,7 @@ export default function SheetClient() {
 
         <TitleBar
           title={title} starred={starred} saveStatus={saveStatus} isOrgSheet={isOrgSheet}
-          isDark={isDark} importSource={importSource} forks={forks} orgMembers={orgMembers}
+          isDark={isDark} importSource={importSource} forks={forks} activeMembers={activeSheetMembers}
           currentUser={currentUser} isImportingSheet={isImportingSheet} totalComments={totalComments}
           canEditSheet={canEditSheet} canShareSheet={isOwner}
           onTitleChange={handleTitleChange} onStarredToggle={handleStarredToggle}
@@ -3116,6 +3263,7 @@ export default function SheetClient() {
                   setLiveTracking={(v) => setSheetState((p) => ({ ...p, liveTracking: v }))}
                   setShowShareDialog={setShowShareDialog} sheetId={sheetId} rows={rows} columns={columns}
                   totalComments={totalComments} historyCount={history.length} members={orgMembers}
+                  activeMemberIds={activeSheetMemberIds}
                   canManageMembers={isOwner} currentUserId={currentUser?.id}
                   onMembersChange={setOrgMembers}
                   timeTravelState={timeTravelState} timeTravelActions={timeTravelActions}

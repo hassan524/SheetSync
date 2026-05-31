@@ -162,7 +162,8 @@ export function SheetAvatar({
   return (
     <div
       className="sheet-avatar h-6 w-6 rounded-full relative border-2 flex-shrink-0 overflow-hidden"
-      style={{ borderColor: "var(--sheet-titlebar-bg)" }}
+      style={{ borderColor: color }}
+      title={member.name}
     >
       {member.avatar_url ? (
         <Image

@@ -56,6 +56,16 @@ export default function ShareDialog({
   const [shareUrl, setShareUrl] = useState("");
   const [creatingLink, setCreatingLink] = useState(false);
 
+  const parseEmails = (value: string) =>
+    Array.from(
+      new Set(
+        value
+          .split(/[\s,;]+/)
+          .map((item) => item.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+
   // Show org selector when we're NOT inside a specific org/sheet
   const showOrgSelector =
     !currentOrg && !sheetId && organizations && organizations.length > 0;
@@ -70,15 +80,19 @@ export default function ShareDialog({
   }, [organizations, currentOrg, showShareDialog]);
 
   const handleInvite = async () => {
-    const trimmed = email.trim();
-    if (!trimmed) return;
+    const emails = parseEmails(email);
+    if (emails.length === 0) return;
+    if (!effectiveOrg && !sheetId) {
+      toast.error("Select an organization first");
+      return;
+    }
 
     // If we have an org context, use the real invite API
     if (effectiveOrg) {
       try {
         setSending(true);
         const response = await api.post("/invites/send", {
-          emails: [trimmed],
+          emails,
           orgId: effectiveOrg.id,
           role,
           sheetId,
@@ -107,7 +121,7 @@ export default function ShareDialog({
       try {
         setSending(true);
         const response = await api.post("/invites/send", {
-          emails: [trimmed],
+          emails,
           role,
           sheetId,
         });
@@ -134,11 +148,15 @@ export default function ShareDialog({
   };
 
   const createShareLink = async () => {
-    if (!sheetId) return "";
+    if (!sheetId && !effectiveOrg) return "";
 
     try {
       setCreatingLink(true);
-      const response = await api.post("/invites/link", { sheetId, role });
+      const response = await api.post("/invites/link", {
+        sheetId,
+        orgId: sheetId ? undefined : effectiveOrg?.id,
+        role,
+      });
       const data = response?.data ?? response;
       const inviteUrl = data?.inviteUrl ?? "";
       setShareUrl(inviteUrl);
@@ -167,12 +185,14 @@ export default function ShareDialog({
   const dialogDesc = sheetId
     ? "Invite collaborators or share a link"
     : currentOrg
-      ? `Invite collaborators to ${currentOrg.name}`
+      ? `Invite collaborators to ${currentOrg.name} or share an invite link`
       : "Select an organization and invite collaborators";
   const displayShareUrl =
     shareUrl ||
     (sheetId
       ? `${getCurrentAppOrigin()}/sheet/${sheetId}?invited=true...`
+      : effectiveOrg
+        ? `${getCurrentAppOrigin()}/invite/...`
       : getCurrentAppOrigin());
 
   return (
@@ -185,7 +205,7 @@ export default function ShareDialog({
         <div className="space-y-4">
           <div className="flex gap-2">
             <Input
-              placeholder="Enter email address"
+              placeholder="Emails separated by comma or space"
               className="text-sm"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -207,13 +227,13 @@ export default function ShareDialog({
             <Button
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 text-sm"
               onClick={handleInvite}
-              disabled={sending || !email.trim()}
+              disabled={sending || !email.trim() || (!effectiveOrg && !sheetId)}
             >
               {sending ? "Sending…" : "Invite"}
             </Button>
           </div>
 
-          {showOrgSelector ? (
+          {showOrgSelector && (
             /* ── Organization selector (when NOT inside a specific org) ── */
             <div
               className={`rounded-xl border p-3 ${isDark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-gray-50"}`}
@@ -226,11 +246,12 @@ export default function ShareDialog({
               </div>
               <Select
                 value={selectedOrg?.id || ""}
-                onValueChange={(id) =>
+                onValueChange={(id) => {
                   setSelectedOrg(
                     (organizations ?? []).find((o) => o.id === id) || null,
-                  )
-                }
+                  );
+                  setShareUrl("");
+                }}
                 disabled={sending}
               >
                 <SelectTrigger className="h-8 text-sm w-full">
@@ -245,7 +266,9 @@ export default function ShareDialog({
                 </SelectContent>
               </Select>
             </div>
-          ) : (
+          )}
+
+          {(sheetId || effectiveOrg) && (
             /* ── "Anyone with the link" section (when inside org/sheet) ── */
             <div
               className={`rounded-xl border p-3 ${isDark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-gray-50"}`}
