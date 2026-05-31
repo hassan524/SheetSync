@@ -21,20 +21,26 @@ const LandingClient = () => {
   const router = useRouter();
   const { user, loading, loginWithGoogle } = useAuth();
   const [demoOpen, setDemoOpen] = useState(false);
+  const [nextPath, setNextPath] = useState("/dashboard");
   useScrollReveal(!loading && !user);
 
   useEffect(() => {
+    const next = new URLSearchParams(window.location.search).get("next");
+    setNextPath(next?.startsWith("/") ? next : "/dashboard");
+  }, []);
+
+  useEffect(() => {
     if (!loading && user) {
-      router.replace("/dashboard");
+      router.replace(nextPath.startsWith("/") ? nextPath : "/dashboard");
     }
-  }, [loading, router, user]);
+  }, [loading, nextPath, router, user]);
 
   const handleGetStarted = async () => {
     if (user) {
       router.push("/dashboard");
       return;
     }
-    const error = await loginWithGoogle();
+    const error = await loginWithGoogle(nextPath);
     if (error) return;
     const session = await supabase.auth.getSession();
     if (session.data.session?.user) router.push("/dashboard");
@@ -66,4 +72,3 @@ const LandingClient = () => {
 };
 
 export default LandingClient;
-

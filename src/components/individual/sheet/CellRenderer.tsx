@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React from "react";
 import Image from "next/image";
 import { AlertTriangle, Check, Calendar, Lock, MessageSquare } from "lucide-react";
 import { RenderCellProps } from "react-data-grid";
 import { SheetRow, ColumnDef } from "@/types/index";
 import { getStatusOptionStyle } from "@/lib/sheet-formatting-helpers";
 import { getOptionBgStyle } from "@/utils/SheetUtils";
-import { CommentDot, CollabCursor } from "@/components/individual/sheet/sheet-ui-helpers";
+import { CommentDot } from "@/components/individual/sheet/sheet-ui-helpers";
 import type { SheetComment } from "@/lib/querys/sheet/firebase-realtime";
 
 interface CellRendererProps {
@@ -51,11 +51,15 @@ export function CellRenderer({
   horizontalAlign,
   onCellClick,
   onCommentClick,
-  onPointerDown, onPointerEnter, onFillStart,
+  onPointerDown,
+  onPointerEnter,
+  onFillStart,
   isSelected,
   isActiveSelected,
-  validationWarning
+  validationWarning,
 }: CellRendererProps) {
+
+  // ── Cell content by type ───────────────────────────────────────────────
   const cellContent = (() => {
     switch (type) {
       case "status":
@@ -71,6 +75,7 @@ export function CellRenderer({
           </span>
         );
       }
+
       case "checkbox":
         return displayValue ? (
           <span className="h-6 w-6 rounded-md bg-emerald-500/15 border border-emerald-600/60 flex items-center justify-center">
@@ -79,6 +84,7 @@ export function CellRenderer({
         ) : (
           <span className="h-5 w-5 rounded border border-gray-400/80 bg-white" />
         );
+
       case "date":
         return displayValue ? (
           <div className="flex items-center gap-1.5">
@@ -86,6 +92,7 @@ export function CellRenderer({
             <span className="sheet-cell-text">{String(displayValue)}</span>
           </div>
         ) : null;
+
       case "currency":
         return displayValue ? (
           <span className="tabular-nums sheet-cell-mono">
@@ -95,9 +102,8 @@ export function CellRenderer({
               minimumFractionDigits: 2,
             }).format(Number(displayValue))}
           </span>
-        ) : (
-          ""
-        );
+        ) : "";
+
       case "image":
         return displayValue ? (
           <Image
@@ -111,6 +117,7 @@ export function CellRenderer({
         ) : (
           <span className="text-gray-300 text-[10px] italic">Image URL…</span>
         );
+
       case "url": {
         if (!displayValue) return null;
         const raw = String(displayValue).trim();
@@ -127,6 +134,7 @@ export function CellRenderer({
           </a>
         );
       }
+
       case "progress": {
         const pct = Math.min(100, Math.max(0, Number(displayValue ?? 0)));
         const color =
@@ -150,6 +158,7 @@ export function CellRenderer({
           </div>
         );
       }
+
       case "select": {
         const val = String(displayValue ?? "");
         const optionStyle = getOptionBgStyle(val);
@@ -161,12 +170,12 @@ export function CellRenderer({
           </span>
         );
       }
+
       case "number":
         return displayValue !== undefined ? (
           <span className="truncate sheet-cell-text tabular-nums">{String(displayValue)}</span>
-        ) : (
-          ""
-        );
+        ) : "";
+
       default:
         return displayValue !== undefined ? (
           <span
@@ -178,12 +187,11 @@ export function CellRenderer({
           >
             {String(displayValue)}
           </span>
-        ) : (
-          ""
-        );
+        ) : "";
     }
   })();
 
+  // ── Alignment ─────────────────────────────────────────────────────────
   const justifyClass =
     horizontalAlign === "center"
       ? "justify-center"
@@ -195,33 +203,109 @@ export function CellRenderer({
             ? "justify-end"
             : "";
 
+  // First two initials of collaborator name for the avatar bubble
+  const collabInitials = activeCollab
+    ? activeCollab.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
+    : "";
+
+  // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div
       data-fill-row={rowIdx}
-      className={`h-full w-full flex relative group/cell ${isWrapped ? "items-start pt-1.5" : "items-center"} ${justifyClass} ${type === "checkbox" ? "justify-center" : ""} px-2.5 py-1 gap-1.5 ${isSelected ? "bg-primary/10" : ""} ${isActiveSelected ? "sheet-cell-active-selected" : ""} ${validationWarning ? "sheet-cell-validation-warning" : ""}`}
+      className={[
+        "h-full w-full flex relative group/cell",
+        // must be overflow-visible so the label above the cell is visible
+        activeCollab ? "overflow-visible" : "overflow-hidden",
+        isWrapped ? "items-start pt-1.5" : "items-center",
+        justifyClass,
+        type === "checkbox" ? "justify-center" : "",
+        "px-2.5 py-1 gap-1.5",
+        isSelected ? "bg-primary/10" : "",
+        isActiveSelected ? "sheet-cell-active-selected" : "",
+        validationWarning ? "sheet-cell-validation-warning" : "",
+      ].join(" ")}
       style={{
         color: "inherit",
         ...cellStyle,
+        // strong colored border + very subtle background tint
         ...(activeCollab
-          ? { outline: `2px solid ${activeCollab.color}`, outlineOffset: "-2px" }
+          ? {
+              outline: `2px solid ${activeCollab.color}`,
+              outlineOffset: "-2px",
+              backgroundColor: `${activeCollab.color}18`,
+            }
           : {}),
       }}
       onClick={onCellClick}
       onPointerDown={(e) => { if (onPointerDown) onPointerDown(rowIdx, colKey, e); }}
       onPointerEnter={(e) => { if (onPointerEnter) onPointerEnter(rowIdx, colKey, e); }}
-      title={validationWarning ?? undefined}
+      title={activeCollab ? `${activeCollab.name} is editing this cell` : validationWarning ?? undefined}
     >
+      {/* ── Collaborator name tag floating above cell ─────────────────── */}
+      {activeCollab && (
+        <div
+          className="absolute left-0 z-50 pointer-events-none select-none"
+          style={{ top: "-24px" }}
+        >
+          {/* pill with avatar initials + name */}
+          <div
+            className="flex items-center gap-1 pl-1 pr-2 py-[3px] rounded-sm shadow-lg whitespace-nowrap"
+            style={{
+              backgroundColor: activeCollab.color,
+              boxShadow: `0 2px 10px ${activeCollab.color}66`,
+            }}
+          >
+            {/* initials circle */}
+            <div
+              className="h-4 w-4 rounded-full flex items-center justify-center shrink-0"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.3)",
+                fontSize: "8px",
+                fontWeight: 800,
+                color: "#fff",
+                lineHeight: 1,
+              }}
+            >
+              {collabInitials}
+            </div>
+            {/* full name */}
+            <span style={{ fontSize: "10px", fontWeight: 600, color: "#fff", lineHeight: 1 }}>
+              {activeCollab.name}
+            </span>
+          </div>
+          {/* tiny downward triangle pointing at cell */}
+          <div
+            style={{
+              width: 0,
+              height: 0,
+              borderLeft: "4px solid transparent",
+              borderRight: "4px solid transparent",
+              borderTop: `4px solid ${activeCollab.color}`,
+              marginLeft: "8px",
+            }}
+          />
+        </div>
+      )}
+
+      {/* ── Validation warning icon ───────────────────────────────────── */}
       {validationWarning && (
         <span className="sheet-validation-marker" aria-label={validationWarning}>
           <AlertTriangle className="h-3 w-3" />
         </span>
       )}
+
+      {/* ── Row lock icon ─────────────────────────────────────────────── */}
       {isProtected && (
         <Lock className="absolute top-1 right-1 h-2 w-2 text-gray-300 opacity-0 group-hover/cell:opacity-60 transition-opacity" />
       )}
+
+      {/* ── Comment dot ───────────────────────────────────────────────── */}
       {isOrgSheet && cellComments.length > 0 && <CommentDot count={cellComments.length} />}
-      {activeCollab && <CollabCursor name={activeCollab.name} color={activeCollab.color} />}
+
+      {/* ── Main cell content ─────────────────────────────────────────── */}
       {cellContent}
+
+      {/* ── Fill handle drag button ───────────────────────────────────── */}
       {isSelected && onFillStart && (
         <button
           type="button"
@@ -234,6 +318,8 @@ export function CellRenderer({
           aria-label="Fill handle"
         />
       )}
+
+      {/* ── Comment button (org sheets) ───────────────────────────────── */}
       {isOrgSheet && (
         <button
           className="absolute bottom-0.5 right-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity duration-100"

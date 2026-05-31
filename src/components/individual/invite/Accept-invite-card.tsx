@@ -1,90 +1,82 @@
 "use client";
 
 import { api } from "@/lib/api/api-client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { CheckCircle2, Users, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+const withInviteAcceptedFlag = (path: string) => {
+  const [pathname, query = ""] = path.split("?");
+  const params = new URLSearchParams(query);
+  params.set("invite", "accepted");
+  const nextQuery = params.toString();
+
+  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
+};
 
 export default function AcceptInviteCard({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [orgId, setOrgId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const hasStarted = useRef(false);
+  const nextPath = searchParams?.get("next");
+  const safeNextPath = nextPath?.startsWith("/") ? nextPath : null;
 
-  const acceptInvite = async () => {
+  const acceptInvite = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       const response = await api.post("/invites/accept", { token });
       const data = response?.data ?? response;
+      const baseDestination =
+        safeNextPath ||
+        (data?.organizationId
+          ? `/organizations/${data.organizationId}`
+          : "/dashboard");
+      const destination = safeNextPath
+        ? withInviteAcceptedFlag(baseDestination)
+        : baseDestination;
 
-      setOrgId(data?.organizationId ?? null);
       setSuccess(true);
+      router.replace(destination);
     } catch (err: any) {
       console.error(err);
+      const status = err?.response?.status;
+      if (status === 401 && typeof window !== "undefined") {
+        const next = `${window.location.pathname}${window.location.search}`;
+        router.replace(`/?next=${encodeURIComponent(next)}`);
+        return;
+      }
+
       setError(
-        err?.response?.data?.error || err?.message || "Failed to accept invite"
+        err?.response?.data?.error || err?.message || "Failed to accept invite",
       );
     } finally {
       setLoading(false);
     }
-  };
+  }, [router, safeNextPath, token]);
+
+  useEffect(() => {
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+    acceptInvite();
+  }, [acceptInvite]);
+
+  if (!error || loading || success) return null;
 
   return (
-    <div className="bg-white shadow-xl rounded-2xl p-10 w-[440px] text-center border border-gray-100">
-      <div className="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center mx-auto mb-5">
-        <Users className="h-6 w-6 text-emerald-600" />
-      </div>
-
-      <h2 className="text-xl font-semibold mb-2">Organization Invite</h2>
-
-      <p className="text-gray-500 text-sm mb-8">
-        You have been invited to join an organization on SheetSync.
-      </p>
-
-      {success ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-center gap-2 text-emerald-600">
-            <CheckCircle2 className="h-5 w-5" />
-            <span className="font-medium">Invite accepted successfully!</span>
-          </div>
-          {orgId && (
-            <button
-              onClick={() => router.push(`/organizations/${orgId}`)}
-              className="w-full bg-black text-white py-3 rounded-xl hover:opacity-90 transition font-medium text-sm"
-            >
-              Go to Organization →
-            </button>
-          )}
-        </div>
-      ) : error ? (
-        <div className="space-y-4">
-          <p className="text-red-500 text-sm">{error}</p>
-          <button
-            onClick={acceptInvite}
-            className="w-full bg-black text-white py-3 rounded-xl hover:opacity-90 transition font-medium text-sm"
-          >
-            Try Again
-          </button>
-        </div>
-      ) : (
+    <div className="bg-white shadow-xl rounded-2xl p-8 w-[360px] text-center border border-gray-100">
+      <div className="space-y-4">
+        <p className="text-red-500 text-sm">{error}</p>
         <button
           onClick={acceptInvite}
-          disabled={loading}
-          className="w-full bg-black text-white py-3 rounded-xl hover:opacity-90 transition font-medium text-sm flex items-center justify-center gap-2"
+          className="w-full bg-black text-white py-3 rounded-xl hover:opacity-90 transition font-medium text-sm"
         >
-          {loading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Accepting…
-            </>
-          ) : (
-            "Accept Invite"
-          )}
+          Try Again
         </button>
-      )}
+      </div>
     </div>
   );
 }

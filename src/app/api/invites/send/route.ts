@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { randomUUID } from "crypto";
 import { sendInviteEmail } from "@/lib/email/send-invite-email";
+import { getConfiguredAppOrigin } from "@/lib/app-url";
 
 // Email validation
 function isValidEmail(email: string) {
@@ -13,14 +14,14 @@ function isValidEmail(email: string) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { orgId, emails, role } = body;
+    const { orgId: requestedOrgId, emails, role, sheetId } = body;
 
     // -----------------------------
     // Basic validation
     // -----------------------------
-    if (!orgId)
+    if (!requestedOrgId && !sheetId)
       return NextResponse.json(
-        { error: "Organization ID is required" },
+        { error: "Organization ID or sheet ID is required" },
         { status: 400 },
       );
 
@@ -55,6 +56,27 @@ export async function POST(req: NextRequest) {
         { status: 401 },
       );
 
+    let orgId = requestedOrgId;
+    let sheetTitle = "";
+
+    if (!orgId && sheetId) {
+      const { data: sheet, error: sheetError } = await supabase
+        .from("sheets")
+        .select("title, organization_id")
+        .eq("id", sheetId)
+        .maybeSingle();
+
+      if (sheetError || !sheet?.organization_id) {
+        return NextResponse.json(
+          { error: "Organization sheet not found" },
+          { status: 404 },
+        );
+      }
+
+      orgId = sheet.organization_id;
+      sheetTitle = sheet.title ?? "";
+    }
+
     const { data: inviterMember, error: inviterMemberError } = await supabase
       .from("organization_members")
       .select("role, organizations(name)")
@@ -69,9 +91,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!["owner", "admin"].includes(inviterMember.role)) {
+    if (inviterMember.role !== "owner") {
       return NextResponse.json(
-        { error: "Only organization owners and admins can invite members" },
+        { error: "Only the organization owner can invite members" },
         { status: 403 },
       );
     }
@@ -174,17 +196,17 @@ export async function POST(req: NextRequest) {
       // Store invite
       // -----------------------------
       const invitePayload = {
-          organization_id: orgId,
-          email: cleanEmail,
-          role,
-          token,
-          invited_by: user.id,
-          status: "pending",
-          created_at: new Date().toISOString(),
-          expires_at: new Date(
-            Date.now() + 7 * 24 * 60 * 60 * 1000,
-          ).toISOString(),
-        };
+        organization_id: orgId,
+        email: cleanEmail,
+        role,
+        token,
+        invited_by: user.id,
+        status: "pending",
+        created_at: new Date().toISOString(),
+        expires_at: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+      };
 
       const inviteWrite = existingInvite
         ? await supabase
@@ -211,12 +233,29 @@ export async function POST(req: NextRequest) {
       // Send invite email
       // -----------------------------
       try {
+        const origin =
+          process.env.NODE_ENV === "production"
+            ? getConfiguredAppOrigin() || req.nextUrl.origin
+            : req.nextUrl.origin;
+        const sheetInviteUrl = sheetId
+          ? new URL(`/sheet/${sheetId}`, origin)
+          : null;
+
+        if (sheetInviteUrl) {
+          sheetInviteUrl.searchParams.set("invited", "true");
+          sheetInviteUrl.searchParams.set("inviteToken", token);
+          sheetInviteUrl.searchParams.set("role", role);
+          sheetInviteUrl.searchParams.set("by", user.id);
+        }
+
         await sendInviteEmail({
           email: cleanEmail,
           organizationName: orgName,
           token,
           inviterName: user.user_metadata?.full_name || "Someone",
           role,
+          redirectPath: sheetId ? `/sheet/${sheetId}` : undefined,
+          inviteUrl: sheetInviteUrl?.toString(),
         });
 
         results.push({
@@ -229,8 +268,8 @@ export async function POST(req: NextRequest) {
           user_id: user.id,
           sheet_id: null,
           organization_id: orgId,
-          action: "invited user",
-          target: orgName,
+          action: sheetId ? "invited user to sheet" : "invited user",
+          target: sheetTitle || orgName,
         });
       } catch (emailError: any) {
         console.error("Email send error:", emailError);
@@ -266,4 +305,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

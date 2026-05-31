@@ -42,6 +42,7 @@ export function OrgHeader({ org }: OrgHeaderProps) {
   >([]);
   const [selectedSheetId, setSelectedSheetId] = useState("");
   const [importing, setImporting] = useState(false);
+  const canInviteMembers = org.role === "owner";
 
   useEffect(() => {
     if (!importOpen) return;
@@ -124,15 +125,17 @@ export function OrgHeader({ org }: OrgHeaderProps) {
 
         {/* ─── Right: Actions ─── */}
         <div className="flex items-center gap-2 shrink-0 overflow-x-auto styled-scrollbar pb-1 sm:pb-0">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5"
-            onClick={() => setInviteOpen(true)}
-          >
-            <UserPlus className="h-4 w-4" />
-            <span className="hidden sm:inline text-xs">Invite</span>
-          </Button>
+          {canInviteMembers && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={() => setInviteOpen(true)}
+            >
+              <UserPlus className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs">Invite</span>
+            </Button>
+          )}
 
           <Button
             variant="outline"
@@ -164,14 +167,16 @@ export function OrgHeader({ org }: OrgHeaderProps) {
         onSheetCreated={() => {}}
       />
 
-      <ShareDialog
-        showShareDialog={inviteOpen}
-        setShowShareDialog={setInviteOpen}
-        currentOrg={{ id: org.id, name: org.name }}
-        onInvited={() => {
-          /* refresh members if needed */
-        }}
-      />
+      {canInviteMembers && (
+        <ShareDialog
+          showShareDialog={inviteOpen}
+          setShowShareDialog={setInviteOpen}
+          currentOrg={{ id: org.id, name: org.name }}
+          onInvited={() => {
+            /* refresh members if needed */
+          }}
+        />
+      )}
 
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="sm:max-w-md">

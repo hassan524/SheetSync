@@ -30,7 +30,9 @@ export function middleware(req: NextRequest) {
 
   // If NOT logged in, don't allow access to dashboard or other pages
   if (pathname !== "/" && !isLoggedIn) {
-    return NextResponse.redirect(new URL("/", req.url));
+    const loginUrl = new URL("/", req.url);
+    loginUrl.searchParams.set("next", `${pathname}${req.nextUrl.search}`);
+    return NextResponse.redirect(loginUrl);
   }
 
   // Otherwise allow request

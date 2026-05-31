@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Building2,
   User,
+  Folder,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -344,6 +345,24 @@ const ImportDropzone = ({
   const [selectedFolderId, setSelectedFolderId] = useState("");
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
 
+  const handleDestinationTypeChange = (
+    type: "skip" | "personal" | "organization",
+  ) => {
+    setDestinationType(type);
+    if (type === "skip") {
+      setSelectedFolderId("");
+      setSelectedOrganizationId("");
+      return;
+    }
+    if (type === "personal") {
+      setSelectedOrganizationId("");
+      setSelectedFolderId((prev) => prev || folders[0]?.id || "");
+      return;
+    }
+    setSelectedFolderId("");
+    setSelectedOrganizationId((prev) => prev || organizations[0]?.id || "");
+  };
+
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -534,7 +553,7 @@ const ImportDropzone = ({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <button
             type="button"
-            onClick={() => setDestinationType("skip")}
+            onClick={() => handleDestinationTypeChange("skip")}
             disabled={busy}
             className={`h-12 rounded-lg border px-3 text-left flex items-center gap-2 transition-colors ${
               destinationType === "skip"
@@ -544,15 +563,15 @@ const ImportDropzone = ({
           >
             <FileSpreadsheet className="h-4 w-4 text-primary" />
             <span>
-              <span className="block text-sm font-medium">No folder</span>
+              <span className="block text-sm font-medium">Recent only</span>
               <span className="block text-[11px] text-muted-foreground">
-                Import without saving to a folder
+                Open now without a folder
               </span>
             </span>
           </button>
           <button
             type="button"
-            onClick={() => setDestinationType("personal")}
+            onClick={() => handleDestinationTypeChange("personal")}
             disabled={busy}
             className={`h-12 rounded-lg border px-3 text-left flex items-center gap-2 transition-colors ${
               destinationType === "personal"
@@ -571,10 +590,7 @@ const ImportDropzone = ({
           <button
             type="button"
             onClick={() => {
-              setDestinationType("organization");
-              setSelectedOrganizationId(
-                (prev) => prev || organizations[0]?.id || "",
-              );
+              handleDestinationTypeChange("organization");
             }}
             disabled={busy || organizations.length === 0}
             className={`h-12 rounded-lg border px-3 text-left flex items-center gap-2 transition-colors disabled:opacity-50 ${
@@ -593,22 +609,28 @@ const ImportDropzone = ({
           </button>
         </div>
         {destinationType === "personal" && (
-          <label className="block">
-            <span className="text-xs font-medium">Folder</span>
-            <select
-              className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/25"
-              value={selectedFolderId}
-              onChange={(e) => setSelectedFolderId(e.target.value)}
-              disabled={busy}
-            >
-              <option value="">No folder</option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          folders.length > 0 ? (
+            <label className="block">
+              <span className="text-xs font-medium">Personal folder</span>
+              <select
+                className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/25"
+                value={selectedFolderId}
+                onChange={(e) => setSelectedFolderId(e.target.value)}
+                disabled={busy}
+              >
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <Folder className="h-4 w-4" />
+              Create a personal folder first, or use No folder.
+            </div>
+          )
         )}
         {destinationType === "organization" && (
           <label className="block">
@@ -619,7 +641,6 @@ const ImportDropzone = ({
               onChange={(e) => setSelectedOrganizationId(e.target.value)}
               disabled={busy}
             >
-              <option value="">No organization</option>
               {organizations.map((org) => (
                 <option key={org.id} value={org.id}>
                   {org.name}

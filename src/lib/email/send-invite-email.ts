@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { buildAppUrl } from "@/lib/app-url";
 
 export async function sendInviteEmail({
   email,
@@ -6,12 +7,16 @@ export async function sendInviteEmail({
   token,
   inviterName,
   role = "editor",
+  redirectPath,
+  inviteUrl,
 }: {
   email: string;
   organizationName: string;
   token: string;
   inviterName?: string;
   role?: string;
+  redirectPath?: string;
+  inviteUrl?: string;
 }) {
   if (!process.env.RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY is not set in environment variables.");
@@ -19,14 +24,17 @@ export async function sendInviteEmail({
 
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${token}`;
+  const safeRedirectPath = redirectPath?.startsWith("/") ? redirectPath : "";
+  const inviteLink =
+    inviteUrl ||
+    `${buildAppUrl(`/invite/${token}`)}${
+      safeRedirectPath ? `?next=${encodeURIComponent(safeRedirectPath)}` : ""
+    }`;
   const isDev = process.env.NODE_ENV === "development";
 
   // In dev, Resend only delivers to your verified email account.
   // Set RESEND_DEV_TO_EMAIL=you@gmail.com in .env.local
-  const toAddress = isDev
-    ? (process.env.RESEND_DEV_TO_EMAIL ?? email)
-    : email;
+  const toAddress = isDev ? (process.env.RESEND_DEV_TO_EMAIL ?? email) : email;
 
   const fromAddress = isDev
     ? "SheetSync <onboarding@resend.dev>"
@@ -37,7 +45,13 @@ export async function sendInviteEmail({
     ? `<b>${inviterName}</b> has invited you`
     : "You've been invited";
 
-  const html = buildEmailHtml({ organizationName, inviteLink, inviterLine, roleLabel, email });
+  const html = buildEmailHtml({
+    organizationName,
+    inviteLink,
+    inviterLine,
+    roleLabel,
+    email,
+  });
 
   try {
     const result = await resend.emails.send({
@@ -70,8 +84,7 @@ function buildEmailHtml({
   roleLabel: string;
   email: string;
 }) {
-  const firstLetter =
-    organizationName?.charAt(0)?.toUpperCase() || "O";
+  const firstLetter = organizationName?.charAt(0)?.toUpperCase() || "O";
 
   return /* html */ `
 <!DOCTYPE html>

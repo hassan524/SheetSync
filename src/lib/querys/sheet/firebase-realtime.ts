@@ -163,9 +163,7 @@ export async function addComment(comment: {
   try {
     const ref = await addDoc(collection(db, "sheet_comments"), {
       ...comment,
-      cellKey: comment.cellKey.startsWith("row:")
-        ? comment.cellKey
-        : `row:${comment.cellKey}`,
+      cellKey: comment.cellKey,
       parentId: comment.parentId ?? null,
       resolved: false,
       createdAt: serverTimestamp(),
@@ -207,7 +205,6 @@ export function subscribeToComments(
     snapshot.docs.forEach((d) => {
       const data = d.data();
       const cellKey = String(data.cellKey ?? "");
-      if (!cellKey.startsWith("row:")) return;
       const comment: SheetComment = {
         id: d.id,
         sheetId: data.sheetId,

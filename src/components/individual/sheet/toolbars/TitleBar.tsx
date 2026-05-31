@@ -46,10 +46,12 @@ interface TitleBarProps {
   isDark: boolean;
   importSource: "csv" | "excel" | null;
   forks: { id: string; title: string; forked_at: string | null }[];
-  orgMembers: OrgMember[];
+  activeMembers?: OrgMember[];
   currentUser: { id: string; name: string; email: string; avatar_url: string | null } | null;
   isImportingSheet: boolean;
   totalComments: number;
+  canEditSheet?: boolean;
+  canShareSheet?: boolean;
   onTitleChange: (t: string) => void;
   onStarredToggle: () => void;
   onImportClick: () => void;
@@ -68,10 +70,12 @@ export function TitleBar({
   isDark,
   importSource,
   forks,
-  orgMembers,
+  activeMembers = [],
   currentUser,
   isImportingSheet,
   totalComments,
+  canEditSheet = true,
+  canShareSheet = true,
   onTitleChange,
   onStarredToggle,
   onImportClick,
@@ -81,6 +85,8 @@ export function TitleBar({
 }: TitleBarProps) {
   const router = useRouter();
   const selStyle = ddStyle(isDark);
+  const visibleActiveMembers = activeMembers.slice(0, 3);
+  const hiddenActiveCount = Math.max(0, activeMembers.length - visibleActiveMembers.length);
 
   return (
     <header
@@ -110,6 +116,7 @@ export function TitleBar({
           <Input
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
+            disabled={!canEditSheet}
             className="sheet-title-input h-7 border-0 bg-transparent font-semibold not-italic text-[13px] tracking-tight focus-visible:ring-1 px-1.5 rounded-md w-24 sm:w-44 md:w-56 min-w-0"
           />
           <button
@@ -199,7 +206,7 @@ export function TitleBar({
         {isOrgSheet && (
           <>
             <div className="hidden sm:flex -space-x-2 shrink-0">
-              {orgMembers.slice(0, 3).map((c) => (
+              {visibleActiveMembers.map((c) => (
                 <Tooltip key={c.id}>
                   <TooltipTrigger>
                     <Avatar member={c} showOnline />
@@ -212,12 +219,12 @@ export function TitleBar({
                   </TooltipContent>
                 </Tooltip>
               ))}
-              {orgMembers.length > 3 && (
+              {hiddenActiveCount > 0 && (
                 <div
                   className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold cursor-pointer border-2 bg-gray-200 text-gray-600 shrink-0"
                   style={{ borderColor: "var(--sheet-titlebar-bg)" }}
                 >
-                  +{orgMembers.length - 3}
+                  +{hiddenActiveCount}
                 </div>
               )}
             </div>
@@ -287,7 +294,7 @@ export function TitleBar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {isOrgSheet && (
+        {isOrgSheet && canShareSheet && (
           <button
             className="sheet-btn-primary flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-3 rounded-md text-[11.5px] font-semibold transition-all shrink-0"
             onClick={onShareClick}

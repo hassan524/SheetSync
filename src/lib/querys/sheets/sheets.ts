@@ -425,6 +425,14 @@ export async function getRecentSheets(limit?: number) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
+  const { data: memberships } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", user.id);
+  const orgIds = (memberships ?? [])
+    .map((membership: any) => membership.organization_id)
+    .filter(Boolean);
+
   let query = supabase
     .from("sheets")
     .select(
@@ -451,9 +459,14 @@ export async function getRecentSheets(limit?: number) {
     `,
     )
     .is("forked_from_sheet_id", null)
-    .eq("owner_id", user.id)
     .not("last_opened_at", "is", null)
     .order("last_opened_at", { ascending: false });
+
+  const ownershipFilters = [`owner_id.eq.${user.id}`];
+  if (orgIds.length > 0) {
+    ownershipFilters.push(`organization_id.in.(${orgIds.join(",")})`);
+  }
+  query = query.or(ownershipFilters.join(","));
 
   if (limit !== undefined) {
     query = query.limit(limit);
@@ -568,4 +581,3 @@ export async function getStarredSheets() {
     };
   });
 }
-
