@@ -94,8 +94,8 @@ export const OPTION_PALETTE = [
 
 export function getDefaultValueForType(type: ColumnDef["type"]) {
   if (type === "checkbox") return false;
-  if (type === "priority") return "Low";
-  if (type === "status") return "To Do";
+  if (type === "priority") return "Medium";
+  if (type === "status") return "Not Started";
   if (type === "date") return new Date().toISOString().split("T")[0];
   if (type === "number" || type === "currency" || type === "progress") return 0;
   return "";

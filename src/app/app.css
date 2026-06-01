@@ -450,6 +450,11 @@
       transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  .sheet-mobile-submenu {
+    position: relative !important;
+    transform: none !important;
+  }
+
   .scroll-reveal.revealed {
     opacity: 1;
     transform: translateY(0);

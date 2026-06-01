@@ -20,7 +20,11 @@ import {
   Settings2,
 } from "lucide-react";
 import type { SheetChart } from "@/hooks/sheets/use-charts";
-import { SCHEME_COLORS, CATEGORICAL_KINDS } from "@/hooks/sheets/use-charts";
+import {
+  SCHEME_COLORS,
+  CATEGORICAL_KINDS,
+  getLabelCols,
+} from "@/hooks/sheets/use-charts";
 import type { SheetRow, ColumnDef } from "@/types/index";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });

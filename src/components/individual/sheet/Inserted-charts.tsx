@@ -140,100 +140,183 @@ export default function InsertedChartWidget({
 }: InsertedChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
-    startX: number;
-    startY: number;
-    origX: number;
-    origY: number;
+    sx: number;
+    sy: number;
+    ox: number;
+    oy: number;
   } | null>(null);
+  const pointerIdRef = useRef<number | null>(null);
   const [pos, setPos] = useState({ x: chart.x, y: chart.y });
   const [size, setSize] = useState({ w: chart.width, h: chart.height });
   const [minimized, setMinimized] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [viewport, setViewport] = useState({ w: 1200, h: 800 });
 
-  // ── Drag ──────────────────────────────────
-  const onDragStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      dragRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        origX: pos.x,
-        origY: pos.y,
+  // Keep viewport for mobile clamping
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () =>
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  const clamp = useCallback(
+    (x: number, y: number, w: number, h: number) => {
+      const pad = 8;
+      const maxX = Math.max(pad, viewport.w - w - pad);
+      const maxY = Math.max(pad, viewport.h - h - pad);
+      return {
+        x: Math.min(maxX, Math.max(pad, x)),
+        y: Math.min(maxY, Math.max(pad, y)),
       };
+    },
+    [viewport],
+  );
+
+  // ── Drag (Pointer events: works on mouse + touch) ──
+  const onDragPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      pointerIdRef.current = e.pointerId;
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      dragRef.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y };
       setDragging(true);
     },
     [pos],
   );
 
-  useEffect(() => {
-    if (!dragging) return;
-    const onMove = (e: MouseEvent) => {
+  const onDragPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragging) return;
+      if (pointerIdRef.current !== e.pointerId) return;
       if (!dragRef.current) return;
-      const dx = e.clientX - dragRef.current.startX;
-      const dy = e.clientY - dragRef.current.startY;
-      setPos({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy });
-    };
-    const onUp = () => {
-      setDragging(false);
-      onPositionChange(chart.id, pos.x, pos.y);
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [dragging, pos, chart.id, onPositionChange]);
+      const next = {
+        x: dragRef.current.ox + (e.clientX - dragRef.current.sx),
+        y: dragRef.current.oy + (e.clientY - dragRef.current.sy),
+      };
+      const clamped = clamp(
+        next.x,
+        next.y,
+        size.w,
+        minimized ? 54 : size.h,
+      );
+      setPos(clamped);
+    },
+    [dragging, clamp, size.w, size.h, minimized],
+  );
 
-  // ── Resize ─────────────────────────────────
+  const onDragPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (pointerIdRef.current !== e.pointerId) return;
+      let finalPos = pos;
+      if (dragRef.current) {
+        finalPos = clamp(
+          dragRef.current.ox + (e.clientX - dragRef.current.sx),
+          dragRef.current.oy + (e.clientY - dragRef.current.sy),
+          size.w,
+          minimized ? 54 : size.h,
+        );
+        setPos(finalPos);
+      }
+      pointerIdRef.current = null;
+      dragRef.current = null;
+      setDragging(false);
+      onPositionChange(chart.id, finalPos.x, finalPos.y);
+    },
+    [chart.id, onPositionChange, pos, clamp, size.w, size.h, minimized],
+  );
+
+  // ── Resize (Pointer events) ──
   const resizeRef = useRef<{
-    startX: number;
-    startY: number;
-    origW: number;
-    origH: number;
+    sx: number;
+    sy: number;
+    ow: number;
+    oh: number;
   } | null>(null);
   const [resizing, setResizing] = useState(false);
 
-  const onResizeStart = useCallback(
-    (e: React.MouseEvent) => {
+  const onResizePointerDown = useCallback(
+    (e: React.PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      pointerIdRef.current = e.pointerId;
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       resizeRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        origW: size.w,
-        origH: size.h,
+        sx: e.clientX,
+        sy: e.clientY,
+        ow: size.w,
+        oh: size.h,
       };
       setResizing(true);
     },
     [size],
   );
 
-  useEffect(() => {
-    if (!resizing) return;
-    const onMove = (e: MouseEvent) => {
+  const onResizePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!resizing) return;
+      if (pointerIdRef.current !== e.pointerId) return;
       if (!resizeRef.current) return;
       const w = Math.max(
         320,
-        resizeRef.current.origW + e.clientX - resizeRef.current.startX,
+        resizeRef.current.ow + e.clientX - resizeRef.current.sx,
       );
       const h = Math.max(
         220,
-        resizeRef.current.origH + e.clientY - resizeRef.current.startY,
+        resizeRef.current.oh + e.clientY - resizeRef.current.sy,
       );
-      setSize({ w, h });
-    };
-    const onUp = () => {
+      const maxW = Math.max(320, viewport.w - 16);
+      const maxH = Math.max(220, viewport.h - 80);
+      setSize({ w: Math.min(maxW, w), h: Math.min(maxH, h) });
+    },
+    [resizing, viewport.w, viewport.h],
+  );
+
+  const onResizePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (pointerIdRef.current !== e.pointerId) return;
+      let finalSize = size;
+      if (resizeRef.current) {
+        const w = Math.max(
+          320,
+          resizeRef.current.ow + e.clientX - resizeRef.current.sx,
+        );
+        const h = Math.max(
+          220,
+          resizeRef.current.oh + e.clientY - resizeRef.current.sy,
+        );
+        const maxW = Math.max(320, viewport.w - 16);
+        const maxH = Math.max(220, viewport.h - 80);
+        finalSize = { w: Math.min(maxW, w), h: Math.min(maxH, h) };
+        setSize(finalSize);
+      }
+      pointerIdRef.current = null;
+      resizeRef.current = null;
       setResizing(false);
-      onSizeChange(chart.id, size.w, size.h);
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [resizing, size, chart.id, onSizeChange]);
+      onSizeChange(chart.id, finalSize.w, finalSize.h);
+      const clamped = clamp(
+        pos.x,
+        pos.y,
+        finalSize.w,
+        minimized ? 54 : finalSize.h,
+      );
+      setPos(clamped);
+    },
+    [
+      chart.id,
+      onSizeChange,
+      size,
+      viewport.w,
+      viewport.h,
+      clamp,
+      pos.x,
+      pos.y,
+      minimized,
+    ],
+  );
 
   const border = isDark ? "#1e2330" : "#e2e8f0";
   const bg = isDark ? "#0f1117" : "#ffffff";
@@ -260,6 +343,8 @@ export default function InsertedChartWidget({
         boxShadow: dragging
           ? "0 24px 48px rgba(0,0,0,0.28)"
           : "0 8px 32px rgba(0,0,0,0.12)",
+        touchAction: "none",
+        userSelect: "none",
       }}
     >
       {/* ── Header ── */}
@@ -268,10 +353,14 @@ export default function InsertedChartWidget({
         style={{
           background: headerBg,
           borderColor: border,
-          cursor: "grab",
+          cursor: dragging ? "grabbing" : "grab",
           userSelect: "none",
+          touchAction: "none",
         }}
-        onMouseDown={onDragStart}
+        onPointerDown={onDragPointerDown}
+        onPointerMove={onDragPointerMove}
+        onPointerUp={onDragPointerUp}
+        onPointerCancel={onDragPointerUp}
       >
         <GripHorizontal
           className="h-3.5 w-3.5 shrink-0"
@@ -288,6 +377,8 @@ export default function InsertedChartWidget({
           {chart.title}
         </span>
         <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={() => setMinimized((p) => !p)}
           className="h-5 w-5 flex items-center justify-center rounded-md transition-colors hover:bg-gray-100"
@@ -300,6 +391,8 @@ export default function InsertedChartWidget({
           )}
         </button>
         <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={() => onRemove(chart.id)}
           className="h-5 w-5 flex items-center justify-center rounded-md transition-colors hover:bg-red-50"
@@ -343,9 +436,12 @@ export default function InsertedChartWidget({
       {/* ── Resize handle ── */}
       {!minimized && (
         <div
-          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize"
-          onMouseDown={onResizeStart}
-          style={{ zIndex: 20 }}
+          className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize z-20"
+          style={{ touchAction: "none" }}
+          onPointerDown={onResizePointerDown}
+          onPointerMove={onResizePointerMove}
+          onPointerUp={onResizePointerUp}
+          onPointerCancel={onResizePointerUp}
         >
           <svg
             width="12"
