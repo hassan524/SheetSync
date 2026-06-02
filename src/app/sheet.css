@@ -251,14 +251,15 @@
 }
 
 .sheet-action-btn {
+  cursor: pointer;
   color: var(--sh-text2);
   border-radius: 5px;
   font-size: 11px;
 }
 
 .sheet-action-btn:hover:not(:disabled) {
-  /* background: var(--sh-hover);
-  color: var(--sh-text); */
+  background: var(--sh-hover);
+  color: var(--sh-text);
   background-color: transparent;
 }
 
@@ -474,13 +475,31 @@
 
 .rdg-cell {
   border-right: 1px solid var(--rdg-border-color);
-  border-bottom: 1px solid var(--rdg-border-color);
+  border-bottom: 1px solid var(--rdg-border-color) !important;
+  border-top: none !important;
   padding: 0 !important;
   background-color: var(--rdg-background-color);
   cursor: cell;
-  overflow: hidden;
-  contain: layout style;
+  overflow: visible;
+  contain: style;
   transition: background-color 0.06s ease;
+}
+
+.rdg-sheet .rdg-row .rdg-cell {
+  border-bottom: 1px solid var(--rdg-border-color) !important;
+  border-top: none !important;
+}
+
+.rdg-dark .rdg-sheet .rdg-row .rdg-cell {
+  border-bottom-color: #1e2330 !important;
+}
+
+/* mention chip display in cells */
+.sheet-mention {
+  color: #c2185b;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .rdg-cell:hover {

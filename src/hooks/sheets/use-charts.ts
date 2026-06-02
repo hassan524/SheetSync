@@ -180,9 +180,19 @@ export function requiresNumericY(kind: ChartKind): boolean {
   return !CATEGORICAL_KINDS.has(kind);
 }
 
-/** All columns usable as X-axis (label) — everything except row-number pseudo-columns */
+/** Column types/names that should never be used as chart labels/categories */
+const NON_CHARTABLE_TYPES = new Set(["image", "checkbox", "url"]);
+const NON_CHARTABLE_LABEL_RE =
+  /(^|[\s_-])(id|ids|uuid|guid|description|desc|details?|notes?|comment|comments)([\s_-]|$)/i;
+
+/** All columns usable as X-axis (label) — excludes row-number pseudo-columns and non-chartable types */
 export function getLabelCols(columns: ColumnDef[]): ColumnDef[] {
-  return columns.filter((c) => !EXTRA_COL_RE.test(c.key));
+  return columns.filter(
+    (c) =>
+      !EXTRA_COL_RE.test(c.key) &&
+      !NON_CHARTABLE_TYPES.has(c.type ?? "text") &&
+      !NON_CHARTABLE_LABEL_RE.test(`${c.name ?? ""} ${c.key ?? ""}`),
+  );
 }
 
 /** Columns that carry numeric data (valid Y-axis choices) */

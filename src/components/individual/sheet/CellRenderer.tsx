@@ -104,19 +104,36 @@ export function CellRenderer({
           </span>
         ) : "";
 
-      case "image":
-        return displayValue ? (
-          <Image
-            src={String(displayValue)}
+      case "image": {
+        const imgSrc = String(displayValue ?? "").trim();
+        const isValidImg =
+          imgSrc.startsWith("data:image") ||
+          /^https?:\/\/.+\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?.*)?$/i.test(imgSrc) ||
+          /^https?:\/\//i.test(imgSrc);
+        if (!imgSrc || !isValidImg) {
+          return <span className="text-gray-300 text-[10px] italic">No image</span>;
+        }
+        return (
+          <img
+            src={imgSrc}
             alt="Cell"
-            width={32}
-            height={32}
-            unoptimized
-            className="h-8 w-8 rounded object-cover border border-gray-200"
+            className="h-8 w-8 rounded object-cover border border-gray-200 cursor-zoom-in"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            onClick={(e) => {
+              e.stopPropagation();
+              const overlay = document.createElement("div");
+              overlay.style.cssText =
+                "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:zoom-out";
+              const img = document.createElement("img");
+              img.src = imgSrc;
+              img.style.cssText = "max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6)";
+              overlay.appendChild(img);
+              overlay.onclick = () => document.body.removeChild(overlay);
+              document.body.appendChild(overlay);
+            }}
           />
-        ) : (
-          <span className="text-gray-300 text-[10px] italic">Image URL…</span>
         );
+      }
 
       case "url": {
         if (!displayValue) return null;
@@ -176,8 +193,26 @@ export function CellRenderer({
           <span className="truncate sheet-cell-text tabular-nums">{String(displayValue)}</span>
         ) : "";
 
-      default:
-        return displayValue !== undefined ? (
+      default: {
+        if (displayValue === undefined) return "";
+        const text = String(displayValue);
+        const hasMention = text.includes("@");
+        if (!hasMention) {
+          return (
+            <span
+              className={
+                isWrapped
+                  ? "sheet-cell-text break-words whitespace-pre-wrap w-full"
+                  : "truncate sheet-cell-text"
+              }
+            >
+              {text}
+            </span>
+          );
+        }
+        // Split on @Word sequences and render mentions styled
+        const parts = text.split(/(@[\w][\w\s]*?)(?=\s@|\s[^@\w]|$)/g).filter(p => p !== "");
+        return (
           <span
             className={
               isWrapped
@@ -185,9 +220,16 @@ export function CellRenderer({
                 : "truncate sheet-cell-text"
             }
           >
-            {String(displayValue)}
+            {parts.map((part, i) =>
+              part.startsWith("@") ? (
+                <span key={`mention-${i}-${part}`} className="sheet-mention">{part}</span>
+              ) : (
+                <span key={`text-${i}`}>{part}</span>
+              )
+            )}
           </span>
-        ) : "";
+        );
+      }
     }
   })();
 
@@ -230,10 +272,10 @@ export function CellRenderer({
         // strong colored border + very subtle background tint
         ...(activeCollab
           ? {
-              outline: `2px solid ${activeCollab.color}`,
-              outlineOffset: "-2px",
-              backgroundColor: `${activeCollab.color}18`,
-            }
+            outline: `2px solid ${activeCollab.color}`,
+            outlineOffset: "-2px",
+            backgroundColor: `${activeCollab.color}18`,
+          }
           : {}),
       }}
       onClick={onCellClick}

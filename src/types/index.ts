@@ -169,13 +169,14 @@ export interface ColumnDef {
     | "select"
     | "image"; // supports image URL rendering in-cell
 
-  selectOptions?: SelectOption[]; // ✅ ADDED (dropdown values)
+  selectOptions?: SelectOption[]; // ADDED (dropdown values)
   currencyCode?: string; // used when type === "currency"
   frozen?: boolean; // Freeze column in place
   hidden?: boolean; // Hide column from view
   conditional_formatting?: any; // Conditional formatting rules
   group_id?: string; // Group ID for column grouping
   validation_rules?: any; // Validation rules for column
+  position?: number; // Column order position
 }
 
 export interface SavedFilterView {

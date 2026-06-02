@@ -438,9 +438,16 @@ export default function SheetClient() {
   const [activeCell, setActiveCell] = useState<{ rowId: string; colKey: string } | null>(null);
   const [focusedColumnKey, setFocusedColumnKey] = useState<string | null>(null);
   const [selectedColumnKey, setSelectedColumnKey] = useState<string | null>(null);
-
+  const [mentionState, setMentionState] = useState<{
+    active: boolean;
+    query: string;
+    anchor: { top: number; left: number } | null;
+    cellKey: string;
+    inputRef: HTMLInputElement | null;
+  }>({ active: false, query: "", anchor: null, cellKey: "", inputRef: null });
   // This hook gives us the main sheet editor state.
   // It stores the rows, columns, selected cell, panel state, and many UI flags.
+
   const sv = useSheetStateVars(isOrganizationSheet, importedFrom);
   const {
     sheetState, setSheetState,
@@ -1357,6 +1364,16 @@ export default function SheetClient() {
     return Object.values(comments).reduce((a, b) => a + b.filter((c) => !c.resolved).length, 0);
   }, [comments]);
 
+  const mentionableMembers = useMemo(() => {
+    if (!mentionState.active) return [];
+    const q = mentionState.query.toLowerCase();
+    return orgMembers
+      .filter((m) =>
+        m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+      )
+      .slice(0, 8);
+  }, [mentionState.active, mentionState.query, orgMembers]);
+
   // Derived values used by the sheet UI.
   // These values are memoized to keep grid and toolbar performance fast.
   const selectedCellType = useMemo(() => {
@@ -1470,10 +1487,7 @@ export default function SheetClient() {
 
   // Paste the copied or cut cell range, then save the new row state.
   const handleSmartCopy = useCallback(() => {
-    if (!selectedCell) {
-      toast.error("Select a cell to copy");
-      return;
-    }
+    if (!selectedCell) return;
     const cellKey = `${selectedCell.row}-${selectedCell.col}`;
     smartClipboardRef.current = {
       value: rows[selectedCell.row]?.[selectedCell.col],
@@ -1496,6 +1510,32 @@ export default function SheetClient() {
         return;
       }
     }
+
+    // Try reading from system clipboard first (paste from outside the app)
+    if (selectedCell && navigator.clipboard?.readText) {
+      try {
+        const externalText = await navigator.clipboard.readText();
+        const internalPayload = smartClipboardRef.current;
+        // Only use external clipboard if it differs from the internal copy
+        const internalVal = String(internalPayload?.value ?? "");
+        if (externalText && externalText !== internalVal) {
+          const nextRows = rows.map((row, idx) =>
+            idx === selectedCell.row
+              ? { ...row, [selectedCell.col]: externalText }
+              : row,
+          );
+          rowsHistory.pushState(nextRows);
+          setSheetState((prev) => ({ ...prev, rows: nextRows }));
+          markSaving();
+          await saveAllRows(sheetId, nextRows);
+          markSaved();
+          return;
+        }
+      } catch {
+        // Clipboard permission denied — fall through to internal paste
+      }
+    }
+
     const payload = smartClipboardRef.current;
     if (selectedCell && payload) {
       const cellKey = `${selectedCell.row}-${selectedCell.col}`;
@@ -2555,7 +2595,8 @@ export default function SheetClient() {
     const dataCols = columns.filter((col) => !col.hidden).map((col): Column<SheetRow, SheetRow> => ({
       key: col.key, name: col.name, width: col.width || 160, resizable: true, frozen: col.frozen, editable: canEditSheet,
       renderHeaderCell: () => (
-        <div className={`h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer ${selectedColumnKey === col.key ? "bg-primary/15" : (selectedCell && selectedCell.col === col.key ? "bg-primary/10" : "")}`}
+        <div
+          className={`h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer ${selectedColumnKey === col.key ? "bg-primary/15" : (selectedCell && selectedCell.col === col.key ? "bg-primary/10" : "")}`}
           onClick={(e) => {
             if ((e.target as HTMLElement).closest("button")) return;
             setSelectedColumnKey(col.key);
@@ -2564,21 +2605,51 @@ export default function SheetClient() {
             if (colIdx >= 0) {
               setSelectionRange({
                 start: { row: 0, colIndex: colIdx },
-                end: { row: rows.length - 1, colIndex: colIdx }
+                end: { row: rows.length - 1, colIndex: colIdx },
               });
             }
           }}
           draggable
           onDragStart={() => colOps.handleColumnDragStart(col.key)}
           onDragOver={(e) => colOps.handleColumnDragOver(e, col.key, (u: any) => setSheetState((p) => ({ ...p, columns: typeof u === "function" ? u(p.columns) : u })))}
-          onDragEnd={sheetColOps.handleColumnDragEnd}>
+          onDragEnd={sheetColOps.handleColumnDragEnd}
+        >
           <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-move opacity-0 group-hover/header:opacity-100 transition-opacity" />
           <span className="flex-1 sheet-col-label truncate">{col.name}</span>
-          {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60" />}
-          <ColumnHeaderMenu column={col}
+          {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && (
+            <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60" />
+          )}
+          <ColumnHeaderMenu
+            column={col}
             onChangeType={(t) => {
               if (!canEditSheet) { showViewerEditMessage(); return; }
+              // 1. Change column-level type + apply defaults (handled inside handleChangeColumnType)
               sheetColOps.handleChangeColumnType(col.key, t);
+              // 2. Clear per-row cell-type overrides BUT preserve the default values just set
+              setTimeout(() => {
+                const clearedRows = rowsHistory.currentState.map((row) => {
+                  const rowTypes = { ...(row[ROW_CELL_TYPES_KEY] ?? {}) };
+                  delete rowTypes[col.key];
+                  const rowSelects = { ...(row[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}) };
+                  delete rowSelects[col.key];
+                  // Re-apply default for this type so clearing overrides doesn't blank the value
+                  const defaultVal = getDefaultValueForType(t);
+                  const currentVal = row[col.key];
+                  const shouldApplyDefault =
+                    currentVal === "" || currentVal === null || currentVal === undefined;
+                  return {
+                    ...row,
+                    ...(shouldApplyDefault ? { [col.key]: defaultVal } : {}),
+                    [ROW_CELL_TYPES_KEY]: rowTypes,
+                    [ROW_CELL_SELECT_OPTIONS_KEY]: rowSelects,
+                  };
+                });
+                rowsHistory.pushState(clearedRows);
+                setSheetState((p) => ({ ...p, rows: clearedRows }));
+                saveAllRows(sheetId, clearedRows).catch(console.error);
+                broadcastSheetSnapshot({ rows: clearedRows });
+              }, 60);
+              // 3. Open select-options panel for select type
               if (t === "select") {
                 setFocusedColumnKey(col.key);
                 setRightPanel("select-options");
@@ -2600,16 +2671,44 @@ export default function SheetClient() {
             onUpdateSelectOptions={(opts) => canEditSheet ? sheetColOps.handleUpdateSelectOptions(col.key, opts) : showViewerEditMessage()}
             onFillColumnNumbers={() => canEditSheet ? handleFillColumnNumbers(col.key) : showViewerEditMessage()}
             onFillColumnHashNumbers={() => canEditSheet ? handleFillColumnHashNumbers(col.key) : showViewerEditMessage()}
-            onInsertLeft={() => { if (!canEditSheet) { showViewerEditMessage(); return; } const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx, null, "blank"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
-            onInsertRight={() => { if (!canEditSheet) { showViewerEditMessage(); return; } const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, null, "blank"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
-            onDuplicate={() => { if (!canEditSheet) { showViewerEditMessage(); return; } const idx = columns.findIndex((c) => c.key === col.key); sheetColOps.insertColumnAt(idx + 1, col, "duplicate"); setTimeout(async () => { markSaving(); await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]); markSaved(); }, 50); }}
+            onInsertLeft={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
+              const idx = columns.findIndex((c) => c.key === col.key);
+              sheetColOps.insertColumnAt(idx, null, "blank");
+              setTimeout(async () => {
+                markSaving();
+                await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]);
+                markSaved();
+              }, 50);
+            }}
+            onInsertRight={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
+              const idx = columns.findIndex((c) => c.key === col.key);
+              sheetColOps.insertColumnAt(idx + 1, null, "blank");
+              setTimeout(async () => {
+                markSaving();
+                await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]);
+                markSaved();
+              }, 50);
+            }}
+            onDuplicate={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
+              const idx = columns.findIndex((c) => c.key === col.key);
+              sheetColOps.insertColumnAt(idx + 1, col, "duplicate");
+              setTimeout(async () => {
+                markSaving();
+                await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]);
+                markSaved();
+              }, 50);
+            }}
             onClearColumn={() => canEditSheet ? sheetColOps.clearColumnValues(col) : showViewerEditMessage()}
             onSortAsc={() => canEditSheet ? sheetRowOps.handleSortByColumn(col.key, "asc") : showViewerEditMessage()}
             onSortDesc={() => canEditSheet ? sheetRowOps.handleSortByColumn(col.key, "desc") : showViewerEditMessage()}
             onSetCurrency={(currencyCode) => {
               if (!canEditSheet) { showViewerEditMessage(); return; }
               const updated = columns.map((c) => c.key === col.key ? { ...c, currencyCode } : c);
-              setSheetState((p) => ({ ...p, columns: updated })); columnsHistory.pushState(updated);
+              setSheetState((p) => ({ ...p, columns: updated }));
+              columnsHistory.pushState(updated);
               setTimeout(async () => { markSaving(); await saveAllColumns(sheetId, columnsHistory.currentState); markSaved(); }, 50);
             }}
             onApplyColumnFormat={(fmt) => canEditSheet ? handleApplyColumnFormat(col.key, fmt) : showViewerEditMessage()}
@@ -2639,15 +2738,15 @@ export default function SheetClient() {
         )?.message ?? null;
         const activeCollabEntry = Object.values(activeCursors).find((c) => c.row === rowIdx && c.col === col.key);
         const colIndex = columns.findIndex((c) => c.key === col.key);
-        const inSelection = selectionRange ? (
-          (() => {
+        const inSelection = selectionRange
+          ? (() => {
             const sr = Math.min(selectionRange.start.row, selectionRange.end.row);
             const er = Math.max(selectionRange.start.row, selectionRange.end.row);
             const sc = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
             const ec = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
             return rowIdx >= sr && rowIdx <= er && colIndex >= sc && colIndex <= ec;
           })()
-        ) : false;
+          : false;
 
         return (
           <CellRenderer
@@ -2695,10 +2794,8 @@ export default function SheetClient() {
       },
       renderEditCell(props: RenderEditCellProps<SheetRow, SheetRow>) {
         const { row, column, onRowChange } = props;
-
         const rowIdx = rows.findIndex((r) => r.id === row.id);
         const cellType = cellTypes.getCellType(rowIdx, col.key, col.type || "text");
-
         const cellStyle = getEffectiveCellStyle(rowIdx, column.key, row);
         const cellKey = protection.getCellKey(rowIdx, col.key);
         const isProtected = protection.isRowProtected(row.id);
@@ -2708,6 +2805,15 @@ export default function SheetClient() {
           return (
             <div className="h-full w-full flex items-center px-2.5 text-xs bg-gray-50 text-gray-500">
               Viewer access
+            </div>
+          );
+        }
+
+        if (isProtected) {
+          toast.error("This cell is protected");
+          return (
+            <div className="h-full w-full flex items-center px-2.5 text-xs bg-gray-50 text-gray-400 gap-1.5">
+              <Lock className="h-3 w-3" /> Protected
             </div>
           );
         }
@@ -2723,19 +2829,7 @@ export default function SheetClient() {
           color: isDark ? "#e2e8f0" : "#1a1d23",
         };
 
-        if (isProtected) {
-          toast.error("This cell is protected");
-          return (
-            <div className="h-full w-full flex items-center px-2.5 text-xs bg-gray-50 text-gray-400 gap-1.5">
-              <Lock className="h-3 w-3" /> Protected
-            </div>
-          );
-        }
-
-        const publishLiveEdit = (
-          nextRow: SheetRow,
-          nextFormulas = formulas.formulas,
-        ) => {
+        const publishLiveEdit = (nextRow: SheetRow, nextFormulas = formulas.formulas) => {
           broadcastSheetSnapshot({
             rows: rows.map((item) => (item.id === row.id ? nextRow : item)),
             formulas: nextFormulas,
@@ -2776,10 +2870,7 @@ export default function SheetClient() {
         };
 
         const onProgressChange = (v: string) => {
-          if (v.startsWith("=")) {
-            onNumChange(v);
-            return;
-          }
+          if (v.startsWith("=")) { onNumChange(v); return; }
           if (!/^\d*\.?\d*$/.test(v)) return;
           if (v === "" || v === "." || v.endsWith(".")) {
             const nextRow = { ...row, [column.key]: v };
@@ -2801,32 +2892,18 @@ export default function SheetClient() {
           else await deleteFormula(sheetId, cellKey).catch(() => { });
         };
 
-        // ---------------- IMAGE TYPE ----------------
+        // ---------------- IMAGE ----------------
         if (cellType === "image") {
-          const handleClick = () => {
-            setActiveCell({
-              rowId: row.id,
-              colKey: column.key,
-            });
-            fileInputRef.current?.click();
-          };
-
           return (
             <div
               className="w-full h-full flex items-center justify-center cursor-pointer"
-              onClick={handleClick}
+              onClick={() => { setActiveCell({ rowId: row.id, colKey: column.key }); fileInputRef.current?.click(); }}
               style={inputStyle}
             >
               {row[column.key] ? (
-                <img
-                  src={row[column.key]}
-                  alt="cell"
-                  className="max-h-12 max-w-full object-cover rounded"
-                />
+                <img src={row[column.key]} alt="cell" className="max-h-12 max-w-full object-cover rounded" />
               ) : (
-                <span className="text-xs text-gray-400">
-                  Upload Image
-                </span>
+                <span className="text-xs text-gray-400">Upload Image</span>
               )}
             </div>
           );
@@ -2838,10 +2915,7 @@ export default function SheetClient() {
             <div
               className="h-full flex items-center justify-center cursor-pointer"
               onClick={() => {
-                const nextRow = {
-                  ...row,
-                  [column.key]: !row[column.key],
-                };
+                const nextRow = { ...row, [column.key]: !row[column.key] };
                 onRowChange(nextRow);
                 publishLiveEdit(nextRow);
               }}
@@ -2859,7 +2933,6 @@ export default function SheetClient() {
         // ---------------- PRIORITY / STATUS ----------------
         if (cellType === "priority" || cellType === "status") {
           const opts = getChoiceOptionsForColumn({ ...col, type: cellType });
-
           return (
             <Select
               value={String(row[column.key] ?? "")}
@@ -2872,28 +2945,13 @@ export default function SheetClient() {
               <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent
-                side="bottom"
-                align="start"
-                avoidCollisions={false}
-                style={selStyle}
-              >
+              <SelectContent side="bottom" align="start" avoidCollisions={false} style={selStyle}>
                 {opts.map((option) => {
                   const value = getSelectOptionLabel(option);
                   const style = getStatusOptionStyle(value);
                   return (
-                    <SelectItem
-                      key={value}
-                      value={value}
-                      style={ddItemStyle(isDark)}
-                    >
-                      <span
-                        className="sheet-badge-pill"
-                        style={{
-                          color: style?.color,
-                          backgroundColor: style?.bgColor,
-                        }}
-                      >
+                    <SelectItem key={value} value={value} style={ddItemStyle(isDark)}>
+                      <span className="sheet-badge-pill" style={{ color: style?.color, backgroundColor: style?.bgColor }}>
                         {style?.label ?? value}
                       </span>
                     </SelectItem>
@@ -2906,11 +2964,7 @@ export default function SheetClient() {
 
         // ---------------- SELECT ----------------
         if (cellType === "select") {
-          const selectOpts = getChoiceOptionsForColumn(
-            col,
-            cellSelectOptions[cellKey] ?? [],
-          );
-
+          const selectOpts = getChoiceOptionsForColumn(col, cellSelectOptions[cellKey] ?? []);
           return (
             <Select
               value={String(row[column.key] ?? "")}
@@ -2923,26 +2977,12 @@ export default function SheetClient() {
               <SelectTrigger className="h-full border-0 text-xs rounded-none focus:ring-0">
                 <SelectValue placeholder="Select…" />
               </SelectTrigger>
-              <SelectContent
-                side="bottom"
-                align="start"
-                avoidCollisions={false}
-                style={selStyle}
-              >
+              <SelectContent side="bottom" align="start" avoidCollisions={false} style={selStyle}>
                 {selectOpts.map((opt) => {
                   const optionLabel = getSelectOptionLabel(opt);
                   return (
-                    <SelectItem
-                      key={optionLabel}
-                      value={optionLabel}
-                      style={ddItemStyle(isDark)}
-                    >
-                      <span
-                        className="sheet-badge-pill"
-                        style={getOptionBgStyle(opt)}
-                      >
-                        {optionLabel}
-                      </span>
+                    <SelectItem key={optionLabel} value={optionLabel} style={ddItemStyle(isDark)}>
+                      <span className="sheet-badge-pill" style={getOptionBgStyle(opt)}>{optionLabel}</span>
                     </SelectItem>
                   );
                 })}
@@ -2957,23 +2997,12 @@ export default function SheetClient() {
         }
 
         // ---------------- NUMBER / CURRENCY / PROGRESS ----------------
-        if (
-          cellType === "number" ||
-          cellType === "currency" ||
-          cellType === "progress"
-        )
+        if (cellType === "number" || cellType === "currency" || cellType === "progress")
           return (
             <input
               className="w-full h-full px-2.5 text-xs outline-none border-0 text-right tabular-nums font-mono"
-              style={inputStyle}
-              type="text"
-              autoFocus
-              value={editVal}
-              onChange={(e) =>
-                cellType === "progress"
-                  ? onProgressChange(e.target.value)
-                  : onNumChange(e.target.value)
-              }
+              style={inputStyle} type="text" autoFocus value={editVal}
+              onChange={(e) => cellType === "progress" ? onProgressChange(e.target.value) : onNumChange(e.target.value)}
               onBlur={onBlurSave}
             />
           );
@@ -2983,10 +3012,8 @@ export default function SheetClient() {
           return (
             <input
               className="w-full h-full px-2.5 text-xs outline-none border-0"
-              style={inputStyle}
-              type={formulas.formulas[cellKey] ? "text" : "date"}
-              autoFocus
-              value={editVal}
+              style={inputStyle} type={formulas.formulas[cellKey] ? "text" : "date"}
+              autoFocus value={editVal}
               onChange={(e) => onTextChange(e.target.value)}
               onBlur={onBlurSave}
             />
@@ -2997,33 +3024,199 @@ export default function SheetClient() {
           return (
             <textarea
               className="w-full h-full px-2.5 py-2 text-xs outline-none border-0 resize-none"
-              style={inputStyle}
-              autoFocus
-              value={editVal}
+              style={inputStyle} autoFocus value={editVal}
               onChange={(e) => onTextChange(e.target.value)}
               onBlur={onBlurSave}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) e.stopPropagation(); }}
             />
           );
 
         // ---------------- DEFAULT ----------------
+        // ---------------- DEFAULT ----------------
+        const mentionCellKey = `${rowIdx}-${col.key}`;
+        const isMentionActive = mentionState.active && mentionState.cellKey === mentionCellKey;
         return (
-          <input
-            className="w-full h-full px-2.5 text-xs outline-none border-0"
-            style={inputStyle}
-            autoFocus
-            value={editVal}
-            onChange={(e) => onTextChange(e.target.value)}
-            onBlur={onBlurSave}
-          />
+          <div style={{ position: "relative", width: "100%", height: "100%" }}>
+            <input
+              className="w-full h-full px-2.5 text-xs outline-none border-0"
+              style={inputStyle}
+              autoFocus
+              value={editVal}
+              onChange={(e) => {
+                const val = e.target.value;
+                const cursor = e.target.selectionStart ?? val.length;
+                const textBeforeCursor = val.slice(0, cursor);
+                const atMatch = textBeforeCursor.match(/@([\w][\w\s]*)$/);
+                const justAt = textBeforeCursor.match(/@$/);
+                if ((atMatch || justAt) && isOrgSheet && orgMembers.length > 0) {
+                  setMentionState({
+                    active: true,
+                    query: atMatch ? atMatch[1] : "",
+                    anchor: null,
+                    cellKey: mentionCellKey,
+                    inputRef: e.target,
+                  });
+                } else {
+                  if (mentionState.active) setMentionState((s) => ({ ...s, active: false }));
+                }
+                onTextChange(val);
+              }}
+              onKeyDown={(e) => {
+                if (isMentionActive) {
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    setMentionState((s) => ({ ...s, active: false }));
+                  }
+                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }
+                }
+              }}
+              onBlur={() => {
+                setTimeout(() => {
+                  setMentionState((s) => ({ ...s, active: false }));
+                  onBlurSave();
+                }, 160);
+              }}
+            />
+            {isMentionActive && mentionableMembers.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  zIndex: 9999,
+                  background: isDark ? "#1a1f2e" : "#ffffff",
+                  border: `1px solid ${isDark ? "#2a3045" : "#e2e8f0"}`,
+                  borderRadius: 8,
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+                  minWidth: 220,
+                  maxWidth: 300,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "6px 10px 4px",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: isDark ? "#4a5568" : "#9ca3af",
+                    borderBottom: `1px solid ${isDark ? "#2a3045" : "#f1f5f9"}`,
+                  }}
+                >
+                  Members
+                </div>
+                {mentionableMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "7px 10px",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: isDark ? "#e2e8f0" : "#1a1d23",
+                      background: "transparent",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.background = isDark ? "#2d3244" : "#f8fafc";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const currentVal = String(row[column.key] ?? "");
+                      const cursor = mentionState.inputRef?.selectionStart ?? currentVal.length;
+                      const before = currentVal.slice(0, cursor);
+                      const after = currentVal.slice(cursor);
+                      const replaced = before.replace(/@([\w][\w\s]*)?$/, `@${member.name} `) + after;
+                      onTextChange(replaced);
+                      setMentionState((s) => ({ ...s, active: false }));
+                      setTimeout(() => mentionState.inputRef?.focus(), 10);
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: "50%",
+                        background: getMemberColor(member.id),
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#fff",
+                        flexShrink: 0,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {member.avatar_url ? (
+                        <img
+                          src={member.avatar_url}
+                          alt=""
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        member.name.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontWeight: 500,
+                          color: "#c2185b",
+                          textDecoration: "underline",
+                          textUnderlineOffset: 2,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        @{member.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: isDark ? "#4a5568" : "#9ca3af",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {member.role ?? member.email}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         );
-      }
+      },
     }));
 
     return [rowNumberCol, ...dataCols];
-  }, [columns, rows, selectedRows, selectedColumnKey, textWrap.textWrapColumns, cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas, formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey, protection.isCellProtected, protection.isRowProtected, sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, colOps, markSaving, markSaved, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat, handleToggleFreezeColumn, isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove, endRowResize, toggleRowProtectionById, onFillStart, rightPanel, canEditSheet, showViewerEditMessage, broadcastSheetSnapshot]);
+  }, [
+    columns, rows, selectedRows, selectedColumnKey, textWrap.textWrapColumns,
+    cellTypes.getCellType, getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas,
+    formulas.setFormulas, formulas.getFormula, cellSelectOptions, protection.getCellKey,
+    protection.isCellProtected, protection.isRowProtected, sheetColOps, handleTextWrapToggle,
+    sheetId, columnsHistory, rowsHistory, colOps, markSaving, markSaved,
+    handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat,
+    handleToggleFreezeColumn, isOrgSheet, comments, activeCursors, isDark,
+    beginRowResize, onRowResizeMove, endRowResize, toggleRowProtectionById, onFillStart,
+    rightPanel, canEditSheet, showViewerEditMessage, broadcastSheetSnapshot,
+    selectionRange, selectedCell, setSheetState, setSelectedColumnKey, setSelectedCell,
+    setSelectionRange, setFocusedColumnKey, setRightPanel, setActiveCell,
+    saveAllRows, saveAllRows, saveAllColumns, saveFormula, deleteFormula,
+    mentionState, mentionableMembers, setMentionState,
+  ]);
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -3141,8 +3334,55 @@ export default function SheetClient() {
           showChartPicker={charts.showPicker} conditionalRulesCount={conditionalRules.length}
           effectiveRightPanel={effectiveRightPanel} totalComments={totalComments}
           historyLength={history.length} frozenRowsCount={frozenRowsCount}
-          onInsertRow={sheetRowOps.handleInsertRow}
-          onInsertColumn={sheetColOps.handleInsertColumn}
+          onInsertRow={() => {
+            if (!canEditSheet) { showViewerEditMessage(); return; }
+            const currentRows = rowsHistory.currentState;
+            const currentCols = columnsHistory.currentState;
+            const newRow: SheetRow = {
+              id: `row_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            };
+            currentCols.forEach((col) => { newRow[col.key] = ""; });
+            const nextRows = [...currentRows, newRow];
+            rowsHistory.pushState(nextRows);
+            setSheetState((p) => ({ ...p, rows: nextRows }));
+            markSaving();
+            saveAllRows(sheetId, nextRows)
+              .then(() => { markSaved(); broadcastSheetSnapshot({ rows: nextRows }); })
+              .catch((error) => { toast.error("Failed to save new row error:", error); console.log("error to save new col", error); setSaveStatus("saved"); });
+          }}
+
+          onInsertColumn={(type) => {
+            if (!canEditSheet) { showViewerEditMessage(); return; }
+            const currentCols = columnsHistory.currentState;
+            const currentRows = rowsHistory.currentState;
+            const newKey = `col_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+            const newCol: ColumnDef = {
+              key: newKey,
+              name: `Column ${currentCols.length + 1}`,
+              type: type ?? "text",
+              width: 160,
+              editable: true,
+              position: currentCols.length,
+            };
+            const nextCols = [...currentCols, newCol];
+            const nextRows = currentRows.map((row) => ({ ...row, [newKey]: "" }));
+            columnsHistory.pushState(nextCols);
+            rowsHistory.pushState(nextRows);
+            setSheetState((p) => ({ ...p, columns: nextCols, rows: nextRows }));
+            markSaving();
+            Promise.all([saveAllColumns(sheetId, nextCols), saveAllRows(sheetId, nextRows)])
+              .then(() => {
+                markSaved();
+                broadcastSheetSnapshot({ columns: nextCols, rows: nextRows });
+                toast.success(`${type ?? "text"} column added`);
+                // Open select-options panel immediately after adding a select column
+                if (type === "select") {
+                  setFocusedColumnKey(newKey);
+                  setRightPanel("select-options");
+                }
+              })
+              .catch((error) => { toast.error("Failed to save new column error:", error); console.log('failed to save new col error:', error); setSaveStatus("saved"); });
+          }}
           onDeleteRow={sheetRowOps.handleDeleteRow}
           onSortAsc={() => { if (!selectedCell) { toast.info("Select a column first to sort"); return; } sheetRowOps.handleSortByColumn(selectedCell.col, "asc"); }}
           onSortDesc={() => { if (!selectedCell) { toast.info("Select a column first to sort"); return; } sheetRowOps.handleSortByColumn(selectedCell.col, "desc"); }}
@@ -3251,7 +3491,14 @@ export default function SheetClient() {
 
           {effectiveRightPanel && (rightPanel === "comments" || rightPanel === "developer" || rightPanel === "timetravel" || rightPanel === "charts" || rightPanel === "conditional" || rightPanel === "columns" || rightPanel === "select-options" || rightPanel === "row-details" || rightPanel === "validation" || rightPanel === "shortcuts" || rightPanel === "formulas" || rightPanel === "automation" || rightPanel === "aiassistant" || isOrgSheet) && (
             <>
-              <div className="fixed inset-0 bg-black/40 z-20 sm:hidden backdrop-blur-[1px]" onClick={() => setRightPanel(null)} />
+              {/* Only show mobile backdrop for slide-in panels, NOT for charts (charts has its own picker UI) */}
+              {effectiveRightPanel !== "charts" && (
+                <div
+                  className="fixed inset-0 bg-black/40 z-20 sm:hidden backdrop-blur-[1px]"
+                  onClick={() => setRightPanel(null)}
+                />
+              )}
+
               <div className="fixed right-0 top-0 bottom-0 z-30 sm:static sm:z-auto w-80 max-w-[88vw] shadow-2xl sm:shadow-none transition-transform duration-200 ease-out">
                 <RightPanel
                   rightPanel={effectiveRightPanel} isDark={isDark} setRightPanel={setRightPanel}
@@ -3284,10 +3531,8 @@ export default function SheetClient() {
                   onApplyValidation={handleApplyValidation}
                   onUpdateRow={handleUpdateRow}
                   onInsertFormula={handleFormulaInsert}
-                  // automationRules={automationRules}
-                  // onChangeAutomationRules={persistAutomationRules}
                   onRunAutomation={() => { if (selectedCell && rows[selectedCell.row]) runAutomationsForRows([rows[selectedCell.row]]); }}
-                  allColumns={columns}                  // ← ADD
+                  allColumns={columns}
                   onRangeSelect={handleRangeSelect}
                 />
               </div>
@@ -3317,7 +3562,7 @@ export default function SheetClient() {
         </Dialog>
         {showFormulaDialog && <FormulaDialog open={showFormulaDialog} onClose={() => setShowFormulaDialog(false)} onInsert={handleFormulaInsert} isDark={isDark} />}
         {charts.showPicker && (
-          <ChartPicker isDark={isDark} anchorRef={chartBtnRef} rows={rows} columns={columns}
+          <ChartPicker isDark={isDark} anchorRef={chartBtnRef}
             onSelect={(kind, preset) => {
               charts.insertChart(kind, rows, columns, { ...getSuggestedChartPreset(kind), ...preset });
               setTimeout(() => broadcastSheetSnapshot({ charts: charts.charts }), 100);

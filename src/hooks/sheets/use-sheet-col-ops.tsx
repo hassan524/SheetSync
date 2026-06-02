@@ -5,7 +5,7 @@ import { saveAllRows } from "@/lib/querys/sheet/rows";
 import { saveAllColumns, deleteColumn } from "@/lib/querys/sheet/columns";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { logColAdd, logColDelete, logColumnRename } from "@/lib/querys/sheet/firebase-realtime";
-import { normalizeGeneratedColumnNames, columnIndexToName } from "@/utils/SheetUtils";
+import { normalizeGeneratedColumnNames, columnIndexToName, getDefaultValueForType } from "@/utils/SheetUtils";
 import { SelectSetupDialogState } from "@/types/index";
 
 interface UseColOpsProps {
@@ -73,9 +73,22 @@ export function useSheetColOps({
         const normalizedCols = normalizeGeneratedColumnNames(columnsHistory.currentState);
         columnsHistory.pushState(normalizedCols);
         setSheetState((p: any) => ({ ...p, columns: normalizedCols }));
+
+        // Find the newly added column key and apply default values
+        const newCol = normalizedCols[normalizedCols.length - 1];
+        const defaultVal = getDefaultValueForType(type);
+        const rowsWithDefaults = rowsHistory.currentState.map((row) => {
+          if (!newCol) return row;
+          const current = row[newCol.key];
+          const isEmpty = current === "" || current === null || current === undefined;
+          return isEmpty ? { ...row, [newCol.key]: defaultVal } : row;
+        });
+        rowsHistory.pushState(rowsWithDefaults);
+        setSheetState((p: any) => ({ ...p, rows: rowsWithDefaults }));
+
         await Promise.all([
           saveAllColumns(sheetId, normalizedCols),
-          saveAllRows(sheetId, rowsHistory.currentState),
+          saveAllRows(sheetId, rowsWithDefaults),
         ]);
         markSaved();
         if (isOrgSheet) {
@@ -129,9 +142,25 @@ export function useSheetColOps({
           newType,
         );
 
+        // Apply default values for the new type to every row that is empty
+        const defaultVal = getDefaultValueForType(newType);
+        const rowsWithDefaults = updatedRows.map((row) => {
+          const current = row[colKey];
+          const isEmpty = current === "" || current === null || current === undefined;
+          return isEmpty ? { ...row, [colKey]: defaultVal } : row;
+        });
+
+        columnsHistory.pushState(updatedColumns);
+        rowsHistory.pushState(rowsWithDefaults);
+        setSheetState((p: any) => ({
+          ...p,
+          columns: updatedColumns,
+          rows: rowsWithDefaults,
+        }));
+
         await Promise.all([
           saveAllColumns(sheetId, updatedColumns),
-          saveAllRows(sheetId, updatedRows),
+          saveAllRows(sheetId, rowsWithDefaults),
         ]);
 
         markSaved();
@@ -139,7 +168,7 @@ export function useSheetColOps({
         console.error(err);
       }
     },
-    [colOps, sheetId]
+    [colOps, sheetId, columnsHistory, rowsHistory, setSheetState, markSaving, markSaved]
   );
   const handleColumnDragEnd = useCallback(async () => {
     colOps.handleColumnDragEnd();
