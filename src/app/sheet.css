@@ -338,14 +338,25 @@
 }
 
 /* Row resize affordance */
+.sheet-row-num::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(13, 124, 95, 0.18);
+}
+
 .sheet-row-num:hover::after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 2px;
+  right: 2px;
   bottom: 0;
-  height: 2px;
-  background: rgba(13, 124, 95, 0.35);
+  height: 4px;
+  background: rgba(13, 124, 95, 0.55);
 }
 
 .sheet-row-num-text {

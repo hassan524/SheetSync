@@ -20,7 +20,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Share2,
   Download,
   Trash2,
   FileSpreadsheet,
@@ -200,13 +199,13 @@ export const colPeople = colMembers;
 
 export const colPersonal = {
   key: "personal",
-  header: "Personal",
-  width: "90px",
+  header: "Workspace",
+  width: "120px",
   render: (s: UniversalSheetRow) => {
     const isPersonal = s.source !== "organization";
     return (
-      <span className="text-xs font-bold text-primary">
-        {isPersonal ? "Yes" : "No"}
+      <span className="inline-flex rounded-md bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        {isPersonal ? "My workspace" : s.organizationName ?? "Team workspace"}
       </span>
     );
   },
@@ -369,18 +368,6 @@ function SheetActionMenu({
 
   return (
     <>
-      <DropdownMenuItem
-        className="text-xs gap-2"
-        onClick={() => {
-          const url = `${window.location.origin}/sheet/${sheet.id}`;
-          navigator.clipboard
-            .writeText(url)
-            .then(() => toast.success("Link copied to clipboard"));
-        }}
-      >
-        <Share2 className="h-3.5 w-3.5" /> Copy Link
-      </DropdownMenuItem>
-
       <DropdownMenuSub>
         <DropdownMenuSubTrigger
           className="text-xs gap-2"

@@ -9,7 +9,6 @@ import {
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
-  Share2,
   Download,
   Trash2,
   FileSpreadsheet,
@@ -80,18 +79,6 @@ function StarredActionMenu({
 
   return (
     <>
-      <DropdownMenuItem
-        className="text-xs gap-2"
-        onClick={() => {
-          const url = `${window.location.origin}/sheet/${sheet.id}`;
-          navigator.clipboard
-            .writeText(url)
-            .then(() => toast.success("Link copied to clipboard"));
-        }}
-      >
-        <Share2 className="h-3.5 w-3.5" /> Copy Link
-      </DropdownMenuItem>
-
       <DropdownMenuSub>
         <DropdownMenuSubTrigger
           className="text-xs gap-2"

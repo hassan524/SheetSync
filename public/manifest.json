@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "SheetSync Collaborative Spreadsheets",
+  "name": "SheetSync",
   "short_name": "SheetSync",
-  "description": "Realtime collaborative spreadsheets with 100+ formulas, templates, and team workspaces.",
+  "description": "SheetSync",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

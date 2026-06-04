@@ -24,6 +24,8 @@ import {
   SCHEME_COLORS,
   CATEGORICAL_KINDS,
   getLabelCols,
+  isChartableLabelColumn,
+  coerceChartNumber,
 } from "@/hooks/sheets/use-charts";
 import type { SheetRow, ColumnDef } from "@/types/index";
 
@@ -48,6 +50,8 @@ function resolveChartData(
 
   // ── SHEET MODE ──
   if (!chart.labelColumnKey) return { categories: [], series: [] };
+  const labelColumn = columns.find((c) => c.key === chart.labelColumnKey);
+  if (!isChartableLabelColumn(labelColumn)) return { categories: [], series: [] };
 
   const start = Math.max(0, chart.startRow ?? 0);
   const end =
@@ -101,10 +105,7 @@ function resolveChartData(
       return {
         name: col?.name ?? key,
         data: displayRows.map((r) => {
-          const v = r[key];
-          return v === undefined || v === null || v === ""
-            ? 0
-            : parseFloat(String(v)) || 0;
+          return coerceChartNumber(r[key]) ?? 0;
         }),
       };
     });
@@ -123,8 +124,8 @@ function resolveChartData(
       });
     const entry = labelMap.get(label)!;
     chart.seriesKeys.forEach((key, si) => {
-      const v = parseFloat(String(r[key] ?? ""));
-      if (!isNaN(v)) {
+      const v = coerceChartNumber(r[key]);
+      if (v !== null) {
         entry.sums[si] += v;
         entry.counts[si]++;
       }
@@ -487,16 +488,18 @@ export default function ChartWidget({
       if (!resizing) return;
       if (pointerIdRef.current !== e.pointerId) return;
       if (!resizeRef.current) return;
+      const minW = viewport.w < 640 ? 220 : 280;
+      const minH = viewport.w < 640 ? 160 : 180;
       const w = Math.max(
-        280,
+        minW,
         resizeRef.current.ow + e.clientX - resizeRef.current.sx,
       );
       const h = Math.max(
-        180,
+        minH,
         resizeRef.current.oh + e.clientY - resizeRef.current.sy,
       );
-      const maxW = Math.max(280, viewport.w - 16);
-      const maxH = Math.max(180, viewport.h - 80);
+      const maxW = Math.max(minW, viewport.w - 16);
+      const maxH = Math.max(minH, viewport.h - 80);
       setSize({ w: Math.min(maxW, w), h: Math.min(maxH, h) });
     },
     [resizing, viewport.w, viewport.h],
@@ -507,16 +510,18 @@ export default function ChartWidget({
       if (pointerIdRef.current !== e.pointerId) return;
       let finalSize = size;
       if (resizeRef.current) {
+        const minW = viewport.w < 640 ? 220 : 280;
+        const minH = viewport.w < 640 ? 160 : 180;
         const w = Math.max(
-          280,
+          minW,
           resizeRef.current.ow + e.clientX - resizeRef.current.sx,
         );
         const h = Math.max(
-          180,
+          minH,
           resizeRef.current.oh + e.clientY - resizeRef.current.sy,
         );
-        const maxW = Math.max(280, viewport.w - 16);
-        const maxH = Math.max(180, viewport.h - 80);
+        const maxW = Math.max(minW, viewport.w - 16);
+        const maxH = Math.max(minH, viewport.h - 80);
         finalSize = { w: Math.min(maxW, w), h: Math.min(maxH, h) };
         setSize(finalSize);
       }
@@ -571,10 +576,17 @@ export default function ChartWidget({
   // Categorical charts (pie/donut/radar) only need labelColumnKey
   // Other charts need labelColumnKey + at least one seriesKey
   const isCat = CATEGORICAL_KINDS.has(chart.kind);
+  const labelColumn = columns.find((c) => c.key === chart.labelColumnKey);
+  const invalidLabelColumn =
+    chart.dataMode === "sheet" &&
+    !!chart.labelColumnKey &&
+    !isChartableLabelColumn(labelColumn);
 
   const isUnconfigured =
     chart.dataMode === "sheet"
-      ? !chart.labelColumnKey || (!isCat && chart.seriesKeys.length === 0)
+      ? !chart.labelColumnKey ||
+        invalidLabelColumn ||
+        (!isCat && chart.seriesKeys.length === 0)
       : chart.manualCategories.length === 0 ||
         chart.manualSeries.every((s) => s.values.length === 0);
 

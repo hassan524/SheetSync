@@ -14,7 +14,6 @@ import {
   ChevronDown,
   Download,
   Share2,
-  Bell,
   Layers,
   Printer,
   Code2,
@@ -228,8 +227,6 @@ export function TitleBar({
                 </div>
               )}
             </div>
-            <div className="sheet-vdiv h-5 w-px mx-0.5 hidden sm:block shrink-0" />
-            <IconBtn icon={Bell} tooltip="Notifications" badge={totalComments} onClick={onNotificationsClick} />
           </>
         )}
         {!isOrgSheet && currentUser && (

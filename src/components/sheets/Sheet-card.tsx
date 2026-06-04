@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { useSheetTransition } from "@/hooks/sheets/use-sheet-transition";
+import { updateSheetStarred } from "@/lib/querys/sheet/sheet";
 import { deleteSheet } from "@/lib/querys/sheets/sheets";
 import { toast } from "sonner";
 
@@ -99,6 +100,8 @@ const SheetCard = ({
 
   const [showDelete, setShowDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [starred, setStarred] = useState(Boolean(isStarred));
+  const [isStarring, setIsStarring] = useState(false);
   const [prefetched, setPrefetched] = useState(false);
 
   const prefetchSheet = useCallback(() => {
@@ -125,6 +128,10 @@ const SheetCard = ({
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    setStarred(Boolean(isStarred));
+  }, [isStarred]);
+
   const handleDelete = async () => {
     setIsDeleting(true);
 
@@ -140,6 +147,22 @@ const SheetCard = ({
       toast.error("Failed to delete sheet");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleStar = async () => {
+    setIsStarring(true);
+    const next = !starred;
+    setStarred(next);
+    try {
+      await updateSheetStarred(id, next);
+      router.refresh();
+      toast.success(next ? "Added to starred" : "Removed from starred");
+    } catch {
+      setStarred(!next);
+      toast.error("Failed to update star");
+    } finally {
+      setIsStarring(false);
     }
   };
 
@@ -176,11 +199,13 @@ const SheetCard = ({
               size="icon"
               variant="ghost"
               className="h-6 w-6 bg-transparent hover:bg-muted/60"
-              aria-label={isStarred ? "Starred sheet" : "Star sheet"}
+              onClick={handleStar}
+              disabled={isStarring}
+              aria-label={starred ? "Unstar sheet" : "Star sheet"}
             >
               <Star
                 className={`h-3 w-3 ${
-                  isStarred
+                  starred
                     ? "fill-amber-400 text-amber-400"
                     : "text-muted-foreground"
                 }`}

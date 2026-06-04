@@ -43,6 +43,7 @@ const nextConfig: NextConfig = {
 
 export default (withPWA({
   dest: "public",
+  importScripts: ["/firebase-messaging-sw.js"],
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",

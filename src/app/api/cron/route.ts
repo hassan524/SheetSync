@@ -17,7 +17,17 @@ const DEADLINE_TEMPLATE_IDS = [
   "c9fb4014-cccf-4394-9c3f-5eb16c00cc47", // Project Tracker
 ];
 
-export async function GET() {
+export async function GET(req: Request) {
+  const configuredSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get("authorization");
+  const requestSecret = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length)
+    : null;
+
+  if (!configuredSecret || requestSecret !== configuredSecret) {
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   const results = {
     inactiveChecked: 0,
     inactiveNotified: 0,

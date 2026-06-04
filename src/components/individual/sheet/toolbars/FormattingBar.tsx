@@ -335,7 +335,7 @@ export function FormattingBar({
               <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider select-none">Col Width</span>
               <input
                 type="text"
-                className="h-7 w-12 rounded-md border border-border bg-background px-1 text-xs text-center outline-none focus:ring-2 focus:ring-primary/30 font-mono font-medium"
+                className="sheet-search-input h-7 w-12 rounded-md px-1 text-xs text-center outline-none focus:ring-2 focus:ring-primary/30 font-mono font-medium"
                 value={widthVal}
                 onChange={(e) => setWidthVal(e.target.value)}
                 onBlur={() => {

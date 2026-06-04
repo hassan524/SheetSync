@@ -31,9 +31,7 @@ const SettingsDialog = () => {
   const fetchPushPref = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const res = await fetch(
-        `/api/push-preference?userId=${encodeURIComponent(user.id)}`,
-      );
+      const res = await fetch("/api/push-preference");
       const json = await res.json();
       if (json.ok) setPushEnabled(json.push_enabled);
     } catch {
@@ -54,7 +52,7 @@ const SettingsDialog = () => {
       const res = await fetch("/api/push-preference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, enabled }),
+        body: JSON.stringify({ enabled }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error);

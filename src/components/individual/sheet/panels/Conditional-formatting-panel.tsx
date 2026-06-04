@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type {
   ConditionalFormatOperator,
@@ -103,6 +103,11 @@ export default function ConditionalFormattingPanel({
   const [bold, setBold] = useState(true);
   const [italic, setItalic] = useState(false);
   const parsedRange = useMemo(() => parseRange(range), [range]);
+  const selectedRangeLabel = defaultRange;
+
+  useEffect(() => {
+    setRange(defaultRange);
+  }, [defaultRange]);
 
   const needsValue = !["not_empty", "empty"].includes(operator);
   const rootStyle = isDark
@@ -126,6 +131,23 @@ export default function ConditionalFormattingPanel({
             className="w-full h-8 rounded-md border border-border bg-background px-2.5 text-xs outline-none"
             placeholder="A1:C20"
           />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] text-muted-foreground">
+              Current selection: {selectedRangeLabel}
+            </p>
+            <button
+              type="button"
+              className="text-[10px] font-semibold text-primary hover:underline"
+              onClick={() => setRange(selectedRangeLabel)}
+            >
+              Use selection
+            </button>
+          </div>
+          {range.trim() && !parsedRange && (
+            <p className="text-[10px] text-red-500">
+              Use A1 notation like A1:C20.
+            </p>
+          )}
 
           <label className="block text-[11px] font-medium text-muted-foreground">
             Format cells if
@@ -211,30 +233,6 @@ export default function ConditionalFormattingPanel({
               }}
             >
               Preview
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-background p-3 space-y-3">
-          <div className="text-[11px] font-semibold">Suggested rule examples</div>
-          <div className="rounded-md border border-dashed border-border p-3 bg-slate-50 text-sm text-slate-700">
-            <div className="font-semibold">Overdue status red highlight</div>
-            <div className="text-[11px] text-muted-foreground">If the status column equals <span className="font-semibold">overdue</span>, color the row red.</div>
-            <div className="mt-2 flex gap-2">
-              <Button size="sm" onClick={() => {
-                const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
-                onSaveRule({ id, range: "A1:Z9999", startRow: 0, endRow: 9998, startCol: 0, endCol: 25, operator: "equals", value: "overdue", value2: "", format: { bgColor: "#fee2e2", textColor: "#7f1d1d", bold: true, italic: false } });
-              }}>Apply</Button>
-            </div>
-          </div>
-          <div className="rounded-md border border-dashed border-border p-3 bg-slate-50 text-sm text-slate-700">
-            <div className="font-semibold">Completed rows dim</div>
-            <div className="text-[11px] text-muted-foreground">If status equals <span className="font-semibold">completed</span>, apply a softer style.</div>
-            <div className="mt-2 flex gap-2">
-              <Button size="sm" onClick={() => {
-                const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
-                onSaveRule({ id, range: "A1:Z9999", startRow: 0, endRow: 9998, startCol: 0, endCol: 25, operator: "equals", value: "completed", value2: "", format: { bgColor: "#f8fafc", textColor: "#475569", bold: false, italic: false } });
-              }}>Apply</Button>
             </div>
           </div>
         </div>
