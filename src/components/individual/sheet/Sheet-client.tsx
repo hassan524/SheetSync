@@ -987,52 +987,25 @@ export default function SheetClient() {
 
   const applyBroadcastSnapshot = useCallback((payload: any) => {
     if (!payload || payload.actorId === currentUser?.id) return;
-    if (payload.formulas) formulas.setFormulas(payload.formulas);
-    if (payload.columnFormulas) formulas.setColumnFormulas(payload.columnFormulas);
-    if (Array.isArray(payload.rows)) rowsHistory.pushState(payload.rows);
-    if (Array.isArray(payload.columns)) columnsHistory.pushState(payload.columns);
-    if (payload.cellFormats) formatting.setCellFormats(payload.cellFormats);
-    if (payload.textWrapColumns) textWrap.setTextWrapColumns(new Set(payload.textWrapColumns));
-    if (payload.cellTypeOverrides) cellTypes.setCellTypeOverrides(payload.cellTypeOverrides);
-    if (payload.cellSelectOptions) setCellSelectOptions(payload.cellSelectOptions);
-    if (Array.isArray(payload.charts)) charts.replaceAll(payload.charts);
-    if (payload.rowHeights) setRowHeights(payload.rowHeights);
-    setSheetState((prev) => ({
-      ...prev,
-      ...(typeof payload.title === "string" ? { title: payload.title } : {}),
-      ...(Array.isArray(payload.rows) ? { rows: payload.rows } : {}),
-      ...(Array.isArray(payload.columns) ? { columns: payload.columns } : {}),
-    }));
-    setSaveStatus("saved");
-  }, [currentUser?.id, formulas.setFormulas, formulas.setColumnFormulas, rowsHistory, columnsHistory, setSheetState, setSaveStatus, formatting.setCellFormats, textWrap.setTextWrapColumns, cellTypes.setCellTypeOverrides, setCellSelectOptions, charts.replaceAll, setRowHeights]);
+    scheduleRemoteSheetRefresh();
+  }, [currentUser?.id, scheduleRemoteSheetRefresh]);
 
   const applyBroadcastSnapshotRef = useRef(applyBroadcastSnapshot);
   useEffect(() => {
     applyBroadcastSnapshotRef.current = applyBroadcastSnapshot;
   }, [applyBroadcastSnapshot]);
 
-  const broadcastSheetSnapshot = useCallback((patch: Record<string, any>) => {
+  const broadcastSheetSnapshot = useCallback((_patch: Record<string, any>) => {
     if (!presenceChannelRef.current || !currentUser || !isOrgSheet) return;
     presenceChannelRef.current.send({
       type: "broadcast",
       event: "sheet_snapshot",
       payload: {
         actorId: currentUser.id,
-        title,
-        rows,
-        columns,
-        formulas: formulas.formulas,
-        columnFormulas: formulas.columnFormulas,
-        cellFormats: formatting.cellFormats,
-        textWrapColumns: [...textWrap.textWrapColumns],
-        cellTypeOverrides: cellTypes.cellTypeOverrides,
-        cellSelectOptions,
-        charts: charts.charts,
-        rowHeights,
-        ...patch,
+        updatedAt: Date.now(),
       },
     });
-  }, [currentUser, isOrgSheet, title, rows, columns, formulas.formulas, formulas.columnFormulas, formatting.cellFormats, textWrap.textWrapColumns, cellTypes.cellTypeOverrides, cellSelectOptions, charts.charts, rowHeights]);
+  }, [currentUser, isOrgSheet]);
 
   const applyRemoteCellSelection = useCallback((payload: SheetPresence & { userId?: string }) => {
     if (!payload?.userId || payload.userId === currentUser?.id) return;
@@ -1392,17 +1365,6 @@ export default function SheetClient() {
     const rowId = rows[selectedCell.row]?.id;
     return rowId ? protection.isRowProtected(rowId) : false;
   }, [selectedCell, rows, protection.isRowProtected]);
-
-  const getSuggestedChartPreset = useCallback((kind: any) => {
-    const usableCols = columns.filter((c) => !c.hidden);
-    const labelCol = usableCols.find((c) => ["text", "status", "priority", "select", "date"].includes(c.type ?? ""));
-    const numericCols = usableCols.filter((c) => ["number", "currency", "progress", "percent"].includes(c.type ?? ""));
-    const preset: any = {};
-    if (labelCol) preset.labelColumnKey = labelCol.key;
-    if (kind === "pie" || kind === "donut" || kind === "radar") { preset.aggregateMode = "count"; preset.seriesKeys = []; }
-    else if (numericCols.length > 0) { preset.seriesKeys = [numericCols[0].key]; preset.aggregateMode = "none"; }
-    return preset;
-  }, [columns]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
   // These functions are called by UI controls when the user edits the sheet.
@@ -2376,7 +2338,7 @@ export default function SheetClient() {
       if (!/\.(csv|xlsx|xls)$/i.test(file.name)) throw new Error("Unsupported file type. Upload a CSV, XLSX, or XLS file.");
       setIsImportingSheet(true); markSaving();
       const buffer = await file.arrayBuffer();
-      const parsed = buildImportedSheetData(file, buffer);
+      const parsed = await buildImportedSheetData(file, buffer);
       const importedRows = ensureWorkingRowBuffer(parsed.rows, parsed.columns);
       const nextTitle = getImportedSheetTitle(file.name);
       const [formulasDelete, formatsDelete] = await Promise.all([
@@ -2721,9 +2683,13 @@ export default function SheetClient() {
           />
         </div>
       ),
-      renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
-        const rowIdx = rows.findIndex((r) => r.id === props.row.id);
-        const type = cellTypes.getCellType(rowIdx, col.key, col.type || "text");
+    renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
+    const rowIdx = rows.findIndex((r) => r.id === props.row.id);
+//     Imported header/title/metadata rows always render as plain text
+//     regardless of the column's inferred type.
+    const type = props.row._isHeaderRow
+      ? "text"
+      : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
         const cellKey = protection.getCellKey(rowIdx, col.key);
         const formula = formulas.getFormula(rowIdx, col.key);
         let displayValue = props.row[col.key];
@@ -2792,10 +2758,13 @@ export default function SheetClient() {
           </div>
         );
       },
-      renderEditCell(props: RenderEditCellProps<SheetRow, SheetRow>) {
-        const { row, column, onRowChange } = props;
-        const rowIdx = rows.findIndex((r) => r.id === row.id);
-        const cellType = cellTypes.getCellType(rowIdx, col.key, col.type || "text");
+    renderEditCell(props: RenderEditCellProps<SheetRow, SheetRow>) {
+    const { row, column, onRowChange } = props;
+    const rowIdx = rows.findIndex((r) => r.id === row.id);
+    // Imported header/title/metadata rows always edit as plain text
+    const cellType = row._isHeaderRow
+      ? "text"
+      : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
         const cellStyle = getEffectiveCellStyle(rowIdx, column.key, row);
         const cellKey = protection.getCellKey(rowIdx, col.key);
         const isProtected = protection.isRowProtected(row.id);
@@ -3564,7 +3533,7 @@ export default function SheetClient() {
         {charts.showPicker && (
           <ChartPicker isDark={isDark} anchorRef={chartBtnRef}
             onSelect={(kind, preset) => {
-              charts.insertChart(kind, rows, columns, { ...getSuggestedChartPreset(kind), ...preset });
+              charts.insertChart(kind, rows, columns, preset);
               setTimeout(() => broadcastSheetSnapshot({ charts: charts.charts }), 100);
               toast.success(`${kind.charAt(0).toUpperCase() + kind.slice(1)} chart inserted — click to edit`);;
             }}

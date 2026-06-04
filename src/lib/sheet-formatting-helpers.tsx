@@ -26,9 +26,14 @@ export function conditionalRuleMatches(rule: ConditionalFormatRule, raw: unknown
   if (rule.operator === "equals") return lowerText === lowerTarget;
   if (rule.operator === "not_equals") return lowerText !== lowerTarget;
 
-  const value = Number(raw);
-  const target1 = Number(rule.value);
-  const target2 = Number(rule.value2);
+  const parseNumber = (value: unknown) => {
+    const normalized = String(value ?? "").trim().replace(/[$,%\s,]/g, "");
+    if (!/^[-+]?\d*\.?\d+$/.test(normalized)) return Number.NaN;
+    return Number(normalized);
+  };
+  const value = parseNumber(raw);
+  const target1 = parseNumber(rule.value);
+  const target2 = parseNumber(rule.value2);
   if (Number.isNaN(value) || Number.isNaN(target1)) return false;
   if (rule.operator === "gt") return value > target1;
   if (rule.operator === "gte") return value >= target1;

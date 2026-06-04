@@ -25,7 +25,7 @@ export function usePush(userId?: string) {
         if (!messaging) return;
 
         const registration = await navigator.serviceWorker.register(
-          "/firebase-messaging-sw.js",
+          "/sw.js",
         );
 
         const token = await getToken(messaging, {
@@ -38,7 +38,7 @@ export function usePush(userId?: string) {
         await fetch("/api/save-token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, token }),
+          body: JSON.stringify({ token }),
         });
 
         const unsubscribe = onMessage(messaging, (payload) => {

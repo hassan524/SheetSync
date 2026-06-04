@@ -183,23 +183,40 @@ export function requiresNumericY(kind: ChartKind): boolean {
 /** Column types/names that should never be used as chart labels/categories */
 const NON_CHARTABLE_TYPES = new Set(["image", "checkbox", "url"]);
 const NON_CHARTABLE_LABEL_RE =
-  /(^|[\s_-])(id|ids|uuid|guid|description|desc|details?|notes?|comment|comments)([\s_-]|$)/i;
+  /(^|[\s_-])(id|ids|uuid|guid|description|desc|details?|notes?|comment|comments|bug\s*id|ticket\s*id|issue\s*id)([\s_-]|$)/i;
 
 /** All columns usable as X-axis (label) — excludes row-number pseudo-columns and non-chartable types */
 export function getLabelCols(columns: ColumnDef[]): ColumnDef[] {
   return columns.filter(
     (c) =>
       !EXTRA_COL_RE.test(c.key) &&
+      !c.hidden &&
       !NON_CHARTABLE_TYPES.has(c.type ?? "text") &&
       !NON_CHARTABLE_LABEL_RE.test(`${c.name ?? ""} ${c.key ?? ""}`),
   );
 }
 
+export function isChartableLabelColumn(column: ColumnDef | undefined): boolean {
+  if (!column) return false;
+  return getLabelCols([column]).length === 1;
+}
+
 /** Columns that carry numeric data (valid Y-axis choices) */
 export function getNumericCols(columns: ColumnDef[]): ColumnDef[] {
   return columns.filter(
-    (c) => !EXTRA_COL_RE.test(c.key) && NUMERIC_TYPES.has(c.type ?? "text"),
+    (c) => !EXTRA_COL_RE.test(c.key) && !c.hidden && NUMERIC_TYPES.has(c.type ?? "text"),
   );
+}
+
+export function coerceChartNumber(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/[$,%\s,]/g, "");
+  if (!/^[-+]?\d*\.?\d+$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function uid() {
@@ -245,6 +262,8 @@ export function resolveChartData(
 
   // ── SHEET MODE ────────────────────────────────────────────
   if (!chart.labelColumnKey) return { categories: [], series: [] };
+  const labelColumn = columns.find((c) => c.key === chart.labelColumnKey);
+  if (!isChartableLabelColumn(labelColumn)) return { categories: [], series: [] };
 
   // Apply row range
   const start = Math.max(0, chart.startRow ?? 0);
@@ -302,9 +321,7 @@ export function resolveChartData(
       return {
         name: col?.name ?? key,
         data: displayRows.map((r) => {
-          const v = r[key];
-          if (v === undefined || v === null || v === "") return 0;
-          return parseFloat(String(v)) || 0;
+          return coerceChartNumber(r[key]) ?? 0;
         }),
       };
     });
@@ -326,8 +343,8 @@ export function resolveChartData(
     }
     const entry = labelMap.get(label)!;
     chart.seriesKeys.forEach((key, si) => {
-      const v = parseFloat(String(r[key] ?? ""));
-      if (!isNaN(v)) {
+      const v = coerceChartNumber(r[key]);
+      if (v !== null) {
         entry.sums[si] += v;
         entry.counts[si] += 1;
       }

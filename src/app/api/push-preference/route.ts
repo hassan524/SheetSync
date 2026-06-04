@@ -1,14 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId");
+async function getAuthenticatedUserId() {
+  const authClient = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error,
+  } = await authClient.auth.getUser();
+
+  if (error || !user) return null;
+  return user.id;
+}
+
+export async function GET() {
+  const userId = await getAuthenticatedUserId();
 
   if (!userId) {
-    return Response.json(
-      { ok: false, error: "Missing userId" },
-      { status: 400 },
-    );
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = createClient(
@@ -30,11 +38,16 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { userId, enabled } = await req.json();
+  const { enabled } = await req.json();
+  const userId = await getAuthenticatedUserId();
 
-  if (!userId || typeof enabled !== "boolean") {
+  if (!userId) {
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (typeof enabled !== "boolean") {
     return Response.json(
-      { ok: false, error: "Missing userId or enabled" },
+      { ok: false, error: "Missing enabled" },
       { status: 400 },
     );
   }

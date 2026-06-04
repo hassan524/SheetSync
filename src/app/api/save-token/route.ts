@@ -1,13 +1,24 @@
 import { createClient } from "@supabase/supabase-js";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
-  const { userId, token } = await req.json();
+  const { token } = await req.json();
 
-  if (!userId || !token) {
+  if (!token) {
     return Response.json(
-      { ok: false, error: "Missing userId or token" },
+      { ok: false, error: "Missing token" },
       { status: 400 },
     );
+  }
+
+  const authClient = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await authClient.auth.getUser();
+
+  if (authError || !user) {
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = createClient(
@@ -17,7 +28,7 @@ export async function POST(req: Request) {
 
   const { error } = await supabase.from("push_tokens").upsert(
     {
-      user_id: userId,
+      user_id: user.id,
       token,
       updated_at: new Date().toISOString(),
     },

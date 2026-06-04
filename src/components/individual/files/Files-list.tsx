@@ -12,7 +12,6 @@ import {
   type UniversalSheetRow,
 } from "@/data/tables/universalSheetColumns";
 import { Search, Grid3X3, List, Building2, FolderOpen } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { getInitials } from "@/lib/utils";
 
 interface FilesListProps {
@@ -168,18 +167,6 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
                   style={{ animationDelay: `${index * 30}ms` }}
                 >
                   <div className="relative">
-                    {sheet.source === "organization" &&
-                      sheet.organizationName && (
-                        <div className="absolute -top-2 left-3 z-10">
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] gap-1 py-0 px-1.5 h-4 bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
-                          >
-                            <Building2 className="h-2.5 w-2.5" />
-                            {sheet.organizationName}
-                          </Badge>
-                        </div>
-                      )}
                     <SheetCard
                       id={sheet.id}
                       title={sheet.title}

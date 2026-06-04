@@ -20,10 +20,7 @@ export async function POST(req: NextRequest) {
 
     if (inviteByLink) {
       console.log("🔗 [INVITE] Link invite flow started", {
-        token,
         sheetId,
-        role,
-        // invitedUserId,
         userId: user.id,
         userEmail: user.email,
       });
@@ -110,6 +107,37 @@ export async function POST(req: NextRequest) {
       }
 
       // ── Step 3: Check if already a member ───────────────────────────────
+      const { data: linkInvite, error: linkInviteError } = await admin
+        .from("organization_invites")
+        .select("id, organization_id, role, status, expires_at")
+        .eq("token", token)
+        .eq("organization_id", orgId)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (linkInviteError || !linkInvite) {
+        return NextResponse.json(
+          { error: "Invite link is invalid or expired" },
+          { status: 404 },
+        );
+      }
+
+      if (
+        linkInvite.expires_at &&
+        new Date(linkInvite.expires_at) < new Date()
+      ) {
+        await admin
+          .from("organization_invites")
+          .update({ status: "expired" })
+          .eq("id", linkInvite.id);
+        return NextResponse.json(
+          { error: "Invite link has expired" },
+          { status: 410 },
+        );
+      }
+
+      const effectiveRole = linkInvite.role || "viewer";
+
       const { data: existing, error: existingError } = await admin
         .from("organization_members")
         .select("id, role")
@@ -145,7 +173,6 @@ export async function POST(req: NextRequest) {
       }
 
       // ── Step 4: Insert new member ────────────────────────────────────────
-      const effectiveRole = role || "viewer";
 
       console.log("➕ [INVITE] Inserting new member:", {
         organization_id: orgId,

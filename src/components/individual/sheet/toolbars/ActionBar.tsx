@@ -271,7 +271,9 @@ export function ActionBar({
         <IconBtn icon={BarChart3} tooltip="Charts panel" onClick={() => onTogglePanel("charts")} active={effectiveRightPanel === "charts"} disabled={!canEdit} badge={chartCount > 0 ? chartCount : undefined} />
         <IconBtn icon={Paintbrush} tooltip="Conditional formatting" onClick={() => onTogglePanel("conditional")} active={effectiveRightPanel === "conditional"} disabled={!canEdit} badge={conditionalRulesCount > 0 ? conditionalRulesCount : undefined} />
         <IconBtn icon={isDark ? Sun : Moon} tooltip={isDark ? "Light mode" : "Dark mode"} onClick={onToggleDark} />
-        <IconBtn icon={Keyboard} tooltip="Keyboard shortcuts" onClick={() => onTogglePanel("shortcuts")} active={effectiveRightPanel === "shortcuts"} />
+        <span className="hidden sm:inline-flex">
+          <IconBtn icon={Keyboard} tooltip="Keyboard shortcuts" onClick={() => onTogglePanel("shortcuts")} active={effectiveRightPanel === "shortcuts"} />
+        </span>
       </div>
     </div>
   );
