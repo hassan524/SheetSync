@@ -48,18 +48,18 @@ const CreateFolderDialog = ({ open, onOpenChange, onConfirm }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[400px] p-0 overflow-hidden rounded-xl">
-        <div className="p-5 sm:p-6">
-          <DialogHeader className="mb-5">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-[380px] p-0 overflow-hidden rounded-xl">
+        <div className="p-4 sm:p-6">
+          <DialogHeader className="mb-4">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <FolderPlus className="h-4.5 w-4.5 text-primary" />
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <FolderPlus className="h-4 w-4 text-primary" />
               </div>
-              <div>
-                <DialogTitle className="text-base font-semibold">
+              <div className="min-w-0 text-left">
+                <DialogTitle className="text-sm sm:text-base font-semibold">
                   New Folder
                 </DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
                   Organize your sheets into folders
                 </p>
               </div>
@@ -84,19 +84,19 @@ const CreateFolderDialog = ({ open, onOpenChange, onConfirm }: Props) => {
             />
           </div>
 
-          <DialogFooter className="mt-6 gap-2">
+          <DialogFooter className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={loading}
-              className="flex-1 sm:flex-none"
+              className="h-10 w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreate}
               disabled={!name.trim() || loading}
-              className="flex-1 sm:flex-none"
+              className="h-10 w-full sm:w-auto"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

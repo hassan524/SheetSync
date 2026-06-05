@@ -6,6 +6,20 @@ import { getInitials, timeAgo } from "@/lib/utils";
 import type { Organization, Sheet, Member } from "@/types";
 import { logActivity } from "@/lib/querys/activity/activity";
 
+function inferPresenceStatus(
+  userId: string,
+  currentUserId: string,
+  lastActiveAt?: string | null,
+): "online" | "away" | "offline" {
+  if (userId === currentUserId) return "online";
+  if (!lastActiveAt) return "offline";
+
+  const diff = Date.now() - new Date(lastActiveAt).getTime();
+  if (diff <= 5 * 60 * 1000) return "online";
+  if (diff <= 30 * 60 * 1000) return "away";
+  return "offline";
+}
+
 /**
  * Get all organizations the current user belongs to.
  *
@@ -46,6 +60,7 @@ export async function getAllOrganizations() {
         organization_members!inner (
           id,
           status,
+          last_active_at,
           profiles (
             id,
             email,
@@ -94,8 +109,13 @@ export async function getAllOrganizations() {
       members: org?.organization_members ?? [],
       membersCount: org?.organization_members?.length ?? 0,
       activeNow:
-        org?.organization_members?.filter((m: any) => m.status === "online")
-          .length ?? 0,
+        org?.organization_members?.filter((m: any) =>
+          inferPresenceStatus(
+            m.profiles?.id,
+            user.id,
+            m.last_active_at,
+          ) === "online"
+        ).length ?? 0,
     };
   });
 
@@ -122,6 +142,15 @@ export async function getOrganizationById(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
+
+  await supabase
+    .from("organization_members")
+    .update({
+      status: "online",
+      last_active_at: new Date().toISOString(),
+    })
+    .eq("organization_id", id)
+    .eq("user_id", user.id);
 
   const { data, error } = await supabase
     .from("organization_members")
@@ -230,7 +259,11 @@ export async function getOrganizationById(
         avatar_url: member.profiles.avatar_url,
       },
       role: member.role,
-      status: member.status || "offline",
+      status: inferPresenceStatus(
+        member.profiles.id,
+        user.id,
+        member.last_active_at,
+      ),
       lastActive: member.last_active_at
         ? timeAgo(member.last_active_at)
         : "Never",

@@ -46,6 +46,7 @@ export const peopleColumns = [
   {
     key: "user",
     header: "Member",
+    width: "280px",
     render: (person: PersonData) => (
       <div className="flex items-center gap-3">
         <div className="relative">
@@ -68,10 +69,10 @@ export const peopleColumns = [
         </div>
 
         <div className="min-w-0">
-          <span className="text-sm font-medium truncate max-w-[200px] block">
+          <span className="text-sm font-semibold truncate max-w-[190px] block">
             {person.name}
           </span>
-          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+          <span className="text-[11px] text-muted-foreground flex items-center gap-1 max-w-[210px]">
             <Mail className="h-3 w-3 shrink-0" />
             <span className="truncate">{person.email}</span>
           </span>
@@ -82,8 +83,8 @@ export const peopleColumns = [
 
   {
     key: "organizations",
-    header: "Organization & Role",
-    width: "280px",
+    header: "Organizations",
+    width: "260px",
     render: (person: PersonData) => {
       const orgs = person.organizations ?? [];
 
@@ -96,26 +97,18 @@ export const peopleColumns = [
       }
 
       return (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {orgs.slice(0, 2).map((org, idx) => (
-            <div key={idx} className="flex items-center gap-1.5">
-              <div className="flex items-center gap-1 text-[11px] bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-2 py-0.5">
+            <div key={idx} className="flex min-w-0 items-center gap-1.5">
+              <div className="flex min-w-0 items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] text-foreground">
                 <Building2 className="h-3 w-3 shrink-0" />
                 <span className="truncate max-w-[120px]">{org}</span>
               </div>
-
-              <span
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                  ROLE_STYLE[person.role as Role] ?? ROLE_STYLE.Viewer
-                }`}
-              >
-                {person.role}
-              </span>
             </div>
           ))}
 
           {orgs.length > 2 && (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
               +{orgs.length - 2} more
             </span>
           )}
@@ -125,13 +118,28 @@ export const peopleColumns = [
   },
 
   {
+    key: "role",
+    header: "Role",
+    width: "110px",
+    render: (person: PersonData) => (
+      <span
+        className={`inline-flex rounded-md px-2 py-1 text-[11px] font-medium ${
+          ROLE_STYLE[person.role as Role] ?? ROLE_STYLE.Viewer
+        }`}
+      >
+        {person.role}
+      </span>
+    ),
+  },
+
+  {
     key: "status",
     header: "Status",
     width: "100px",
     render: (person: PersonData) => (
-      <div className="flex items-center gap-1.5">
+      <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1">
         <Circle className={`h-2 w-2 ${statusColors[person.status]}`} />
-        <span className="text-xs capitalize">{person.status}</span>
+        <span className="text-[11px] font-medium capitalize">{person.status}</span>
       </div>
     ),
   },
@@ -139,7 +147,7 @@ export const peopleColumns = [
   {
     key: "lastActive",
     header: "Last Active",
-    width: "130px",
+    width: "120px",
     render: (person: PersonData) => (
       <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <Clock className="h-3 w-3 shrink-0" />
@@ -151,7 +159,7 @@ export const peopleColumns = [
   {
     key: "sheetsAccess",
     header: "Sheets",
-    width: "90px",
+    width: "80px",
     render: (person: PersonData) => (
       <div className="flex items-center gap-1.5">
         <FileSpreadsheet className="h-3 w-3 text-muted-foreground" />
