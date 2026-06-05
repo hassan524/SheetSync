@@ -65,22 +65,22 @@ const PeopleList: React.FC<PeopleListProps> = ({
   return (
     <>
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6 animate-slide-up overflow-hidden">
-        <div className="relative flex-1 w-full max-w-md">
+      <div className="mb-5 grid gap-3 animate-slide-up lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-center">
+        <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Search people..."
-            className="pl-9"
+            className="h-10 pl-9"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 max-[420px]:grid-cols-2">
           {/* Organization Filter */}
           <Select value={orgFilter} onValueChange={setOrgFilter}>
-            <SelectTrigger className="w-36 sm:w-40">
+            <SelectTrigger className="h-10 min-w-0">
               <SelectValue placeholder="All Organizations" />
             </SelectTrigger>
             <SelectContent>
@@ -95,7 +95,7 @@ const PeopleList: React.FC<PeopleListProps> = ({
 
           {/* Status Filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-28 sm:w-32">
+            <SelectTrigger className="h-10 min-w-0">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
@@ -116,7 +116,7 @@ const PeopleList: React.FC<PeopleListProps> = ({
               setSearchQuery("");
             }}
             title="Reset filters"
-            className="shrink-0"
+            className="h-10 w-10 shrink-0"
           >
             <Filter className="h-4 w-4" />
           </Button>
@@ -126,11 +126,11 @@ const PeopleList: React.FC<PeopleListProps> = ({
             value={viewMode}
             onValueChange={(v) => setViewMode(v as "cards" | "table")}
           >
-            <TabsList className="h-9">
-              <TabsTrigger value="table" className="px-3">
+            <TabsList className="h-10">
+              <TabsTrigger value="table" className="h-8 px-3">
                 <List className="h-4 w-4" />
               </TabsTrigger>
-              <TabsTrigger value="cards" className="px-3">
+              <TabsTrigger value="cards" className="h-8 px-3">
                 <Grid3X3 className="h-4 w-4" />
               </TabsTrigger>
             </TabsList>

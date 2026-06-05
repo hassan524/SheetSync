@@ -612,15 +612,11 @@ function exportPDF(data: SheetExportData) {
       const cellKey = `${hook.row.index}-${col.key}`;
       const isWrap  = wrapCellKeys.has(cellKey);
 
-      if (isWrap) {
-        hook.cell.styles.overflow    = "linebreak";
-        hook.cell.styles.cellPadding = { top: 3, right: 3, bottom: 3, left: 3 };
-        return;
-      }
-
-      // No-wrap: enforce single line with trailing ellipsis
-      hook.cell.styles.overflow      = "ellipsize";
-      hook.cell.styles.minCellHeight = 10;
+      hook.cell.styles.overflow = "linebreak";
+      hook.cell.styles.cellPadding = isWrap
+        ? { top: 3, right: 3, bottom: 3, left: 3 }
+        : { top: 2.5, right: 3, bottom: 2.5, left: 3 };
+      return;
 
       // hook.cell.text is string[] (one entry per line). Join to get the full string,
       // then measure and trim to fit inside the column.

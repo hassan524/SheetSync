@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Allow static files and assets
   if (
     pathname === "/manifest.json" ||
     pathname === "/sw.js" ||
@@ -18,24 +19,23 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Read your custom session cookie
-  const token = req.cookies.get("my-supabase-session")?.value;
-
-  const isLoggedIn = Boolean(token);
-
-  // If logged in, don't allow access to "/" (login page)
-  if (pathname === "/" && isLoggedIn) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+  // Always allow the landing page (/)
+  if (pathname === "/") {
+    return NextResponse.next();
   }
 
-  // If NOT logged in, don't allow access to dashboard or other pages
-  if (pathname !== "/" && !isLoggedIn) {
+  // Read your custom session cookie
+  const token = req.cookies.get("my-supabase-session")?.value;
+  const isLoggedIn = Boolean(token);
+
+  // If NOT logged in, don't allow access to dashboard or other protected pages
+  if (!isLoggedIn) {
     const loginUrl = new URL("/", req.url);
     loginUrl.searchParams.set("next", `${pathname}${req.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Otherwise allow request
+  // If logged in, allow access
   return NextResponse.next();
 }
 

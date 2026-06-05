@@ -578,12 +578,16 @@ export default function SheetClient() {
     onBranch: (newSheetId: string, label: string) => { toast.success(`Branched! Opening "${label}"…`, { duration: 3000 }); router.push(`/sheet/${newSheetId}`); },
   });
 
-  // Sync history states
-  // Keep the central sheet state in sync with undo/redo history.
-  // The history hooks may update outside the normal sheet state object,
-  // so we mirror the current history snapshot back to the sheet state here.
-  useEffect(() => { startTransition(() => setSheetState((p) => ({ ...p, rows: rowsHistory.currentState }))); }, [rowsHistory.currentState]);
-  useEffect(() => { startTransition(() => setSheetState((p) => ({ ...p, columns: columnsHistory.currentState }))); }, [columnsHistory.currentState]);
+ // Sync history states
+  const skipHistorySyncRef = useRef(false);
+  useEffect(() => {
+    if (skipHistorySyncRef.current) return;
+    startTransition(() => setSheetState((p) => ({ ...p, rows: rowsHistory.currentState })));
+  }, [rowsHistory.currentState]);
+  useEffect(() => {
+    if (skipHistorySyncRef.current) return;
+    startTransition(() => setSheetState((p) => ({ ...p, columns: columnsHistory.currentState })));
+  }, [columnsHistory.currentState]);
 
   // Dark mode body attribute
   useEffect(() => {
@@ -987,25 +991,52 @@ export default function SheetClient() {
 
   const applyBroadcastSnapshot = useCallback((payload: any) => {
     if (!payload || payload.actorId === currentUser?.id) return;
-    scheduleRemoteSheetRefresh();
-  }, [currentUser?.id, scheduleRemoteSheetRefresh]);
+    if (payload.formulas) formulas.setFormulas(payload.formulas);
+    if (payload.columnFormulas) formulas.setColumnFormulas(payload.columnFormulas);
+    if (Array.isArray(payload.rows)) rowsHistory.pushState(payload.rows);
+    if (Array.isArray(payload.columns)) columnsHistory.pushState(payload.columns);
+    if (payload.cellFormats) formatting.setCellFormats(payload.cellFormats);
+    if (payload.textWrapColumns) textWrap.setTextWrapColumns(new Set(payload.textWrapColumns));
+    if (payload.cellTypeOverrides) cellTypes.setCellTypeOverrides(payload.cellTypeOverrides);
+    if (payload.cellSelectOptions) setCellSelectOptions(payload.cellSelectOptions);
+    if (Array.isArray(payload.charts)) charts.replaceAll(payload.charts);
+    if (payload.rowHeights) setRowHeights(payload.rowHeights);
+    setSheetState((prev) => ({
+      ...prev,
+      ...(typeof payload.title === "string" ? { title: payload.title } : {}),
+      ...(Array.isArray(payload.rows) ? { rows: payload.rows } : {}),
+      ...(Array.isArray(payload.columns) ? { columns: payload.columns } : {}),
+    }));
+    setSaveStatus("saved");
+  }, [currentUser?.id, formulas.setFormulas, formulas.setColumnFormulas, rowsHistory, columnsHistory, setSheetState, setSaveStatus, formatting.setCellFormats, textWrap.setTextWrapColumns, cellTypes.setCellTypeOverrides, setCellSelectOptions, charts.replaceAll, setRowHeights]);
 
   const applyBroadcastSnapshotRef = useRef(applyBroadcastSnapshot);
   useEffect(() => {
     applyBroadcastSnapshotRef.current = applyBroadcastSnapshot;
   }, [applyBroadcastSnapshot]);
 
-  const broadcastSheetSnapshot = useCallback((_patch: Record<string, any>) => {
+  const broadcastSheetSnapshot = useCallback((patch: Record<string, any>) => {
     if (!presenceChannelRef.current || !currentUser || !isOrgSheet) return;
     presenceChannelRef.current.send({
       type: "broadcast",
       event: "sheet_snapshot",
       payload: {
         actorId: currentUser.id,
-        updatedAt: Date.now(),
+        title,
+        rows,
+        columns,
+        formulas: formulas.formulas,
+        columnFormulas: formulas.columnFormulas,
+        cellFormats: formatting.cellFormats,
+        textWrapColumns: [...textWrap.textWrapColumns],
+        cellTypeOverrides: cellTypes.cellTypeOverrides,
+        cellSelectOptions,
+        charts: charts.charts,
+        rowHeights,
+        ...patch,
       },
     });
-  }, [currentUser, isOrgSheet]);
+  }, [currentUser, isOrgSheet, title, rows, columns, formulas.formulas, formulas.columnFormulas, formatting.cellFormats, textWrap.textWrapColumns, cellTypes.cellTypeOverrides, cellSelectOptions, charts.charts, rowHeights]);
 
   const applyRemoteCellSelection = useCallback((payload: SheetPresence & { userId?: string }) => {
     if (!payload?.userId || payload.userId === currentUser?.id) return;
@@ -1365,6 +1396,17 @@ export default function SheetClient() {
     const rowId = rows[selectedCell.row]?.id;
     return rowId ? protection.isRowProtected(rowId) : false;
   }, [selectedCell, rows, protection.isRowProtected]);
+
+  const getSuggestedChartPreset = useCallback((kind: any) => {
+    const usableCols = columns.filter((c) => !c.hidden);
+    const labelCol = usableCols.find((c) => ["text", "status", "priority", "select", "date"].includes(c.type ?? ""));
+    const numericCols = usableCols.filter((c) => ["number", "currency", "progress", "percent"].includes(c.type ?? ""));
+    const preset: any = {};
+    if (labelCol) preset.labelColumnKey = labelCol.key;
+    if (kind === "pie" || kind === "donut" || kind === "radar") { preset.aggregateMode = "count"; preset.seriesKeys = []; }
+    else if (numericCols.length > 0) { preset.seriesKeys = [numericCols[0].key]; preset.aggregateMode = "none"; }
+    return preset;
+  }, [columns]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
   // These functions are called by UI controls when the user edits the sheet.
@@ -2214,30 +2256,34 @@ export default function SheetClient() {
       name: column.name.trim() || columnIndexToName(index), type: column.type ?? "text", width: column.width ?? 160, editable: true, position: index,
     }));
     const nextRows = rows.map((row) => {
-      const mapped: SheetRow = { id: row.id };
-      normalizedColumns.forEach((column) => { mapped[column.key] = row[column.key] ?? ""; });
+      const mapped: SheetRow = { ...row };
+      normalizedColumns.forEach((column) => {
+        if (!(column.key in mapped)) mapped[column.key] = "";
+      });
       return mapped;
     });
+    columnsHistory.pushState(normalizedColumns);
+    rowsHistory.pushState(nextRows);
+    setSheetState((prev) => ({ ...prev, columns: normalizedColumns, rows: nextRows }));
     try {
       markSaving();
       await Promise.all([saveAllColumns(sheetId, normalizedColumns), saveAllRows(sheetId, nextRows)]);
-      columnsHistory.pushState(normalizedColumns); rowsHistory.pushState(nextRows);
-      setSheetState((prev) => ({ ...prev, columns: normalizedColumns, rows: nextRows }));
       markSaved(); toast.success("Columns updated");
       broadcastSheetSnapshot({ columns: normalizedColumns, rows: nextRows });
     } catch (error: any) { setSaveStatus("saved"); toast.error(error?.message ?? "Failed to update columns."); }
-  }, [columnsHistory, markSaved, markSaving, rows, rowsHistory, sheetId, setSaveStatus]);
-
-  const handleBulkUpdateColumn = useCallback(async (columnKey: string, limit: number | "all", value: string) => {
+  }, [columnsHistory, markSaved, markSaving, rows, rowsHistory, sheetId, setSaveStatus, setSheetState, broadcastSheetSnapshot]);
+  const handleBulkUpdateColumn = useCallback(async (columnKey: string, range: { start: number; end: number } | "all", value: string) => {
     const column = columns.find((item) => item.key === columnKey);
     if (!column) return;
-    const maxRows = limit === "all" ? rows.length : Math.min(limit, rows.length);
-    if (maxRows <= 0) return;
+    const startIdx = range === "all" ? 0 : range.start;
+    const endIdx = range === "all" ? rows.length - 1 : range.end;
+    if (endIdx < startIdx) return;
 
     const updatedRows = rows.map((row, index) => {
-      if (index >= maxRows || protection.isRowProtected(row.id)) return row;
+      if (index < startIdx || index > endIdx || protection.isRowProtected(row.id)) return row;
       return { ...row, [columnKey]: value };
     });
+
     const validation = validateRows(updatedRows, rows);
     if (!validation.ok) {
       toast.error(validation.message);
@@ -2249,7 +2295,8 @@ export default function SheetClient() {
     markSaving();
     try {
       await saveAllRows(sheetId, updatedRows);
-      toast.success(`Updated ${maxRows} ${maxRows === 1 ? "cell" : "cells"} in ${column.name}`);
+      const count = endIdx - startIdx + 1;
+      toast.success(`Updated ${count} ${count === 1 ? "cell" : "cells"} in ${column.name}`);
     } catch {
       toast.error("Column update saved locally but failed to persist.");
       setSaveStatus("saved");
@@ -2683,13 +2730,13 @@ export default function SheetClient() {
           />
         </div>
       ),
-    renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
-    const rowIdx = rows.findIndex((r) => r.id === props.row.id);
-//     Imported header/title/metadata rows always render as plain text
-//     regardless of the column's inferred type.
-    const type = props.row._isHeaderRow
-      ? "text"
-      : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
+      renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
+        const rowIdx = rows.findIndex((r) => r.id === props.row.id);
+        //     Imported header/title/metadata rows always render as plain text
+        //     regardless of the column's inferred type.
+        const type = props.row._isHeaderRow
+          ? "text"
+          : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
         const cellKey = protection.getCellKey(rowIdx, col.key);
         const formula = formulas.getFormula(rowIdx, col.key);
         let displayValue = props.row[col.key];
@@ -2743,7 +2790,9 @@ export default function SheetClient() {
       },
       renderSummaryCell(props: any) {
         const rowIdx = rows.findIndex((r) => r.id === props.row.id);
-        const type = cellTypes.getCellType(rowIdx, col.key, col.type || "text");
+        const type = props.row._isHeaderRow
+          ? "text"
+          : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
         const formula = formulas.getFormula(rowIdx, col.key);
         let displayValue = props.row[col.key];
         if (formula?.startsWith("=")) displayValue = formulas.evaluateFormula(formula, rowIdx);
@@ -2758,13 +2807,13 @@ export default function SheetClient() {
           </div>
         );
       },
-    renderEditCell(props: RenderEditCellProps<SheetRow, SheetRow>) {
-    const { row, column, onRowChange } = props;
-    const rowIdx = rows.findIndex((r) => r.id === row.id);
-    // Imported header/title/metadata rows always edit as plain text
-    const cellType = row._isHeaderRow
-      ? "text"
-      : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
+      renderEditCell(props: RenderEditCellProps<SheetRow, SheetRow>) {
+        const { row, column, onRowChange } = props;
+        const rowIdx = rows.findIndex((r) => r.id === row.id);
+        // Imported header/title/metadata rows always edit as plain text
+        const cellType = row._isHeaderRow
+          ? "text"
+          : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
         const cellStyle = getEffectiveCellStyle(rowIdx, column.key, row);
         const cellKey = protection.getCellKey(rowIdx, col.key);
         const isProtected = protection.isRowProtected(row.id);
@@ -3533,7 +3582,7 @@ export default function SheetClient() {
         {charts.showPicker && (
           <ChartPicker isDark={isDark} anchorRef={chartBtnRef}
             onSelect={(kind, preset) => {
-              charts.insertChart(kind, rows, columns, preset);
+              charts.insertChart(kind, rows, columns, { ...getSuggestedChartPreset(kind), ...preset });
               setTimeout(() => broadcastSheetSnapshot({ charts: charts.charts }), 100);
               toast.success(`${kind.charAt(0).toUpperCase() + kind.slice(1)} chart inserted — click to edit`);;
             }}

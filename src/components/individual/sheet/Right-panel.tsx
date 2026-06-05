@@ -112,7 +112,7 @@ interface RightPanelProps {
   onSaveConditionalRule?: (rule: ConditionalFormatRule) => void;
   onDeleteConditionalRule?: (ruleId: string) => void;
   onApplyColumns?: (columns: ColumnDef[]) => void;
-  onBulkUpdateColumn?: (columnKey: string, limit: number | "all", value: string) => void;
+  onBulkUpdateColumn?: (columnKey: string, range: { start: number; end: number } | "all", value: string) => void;
   focusedColumnKey?: string | null;
   onApplySelectOptions?: (columnKey: string, options: SelectOption[]) => void;
   selectedRowIndex?: number | null;
