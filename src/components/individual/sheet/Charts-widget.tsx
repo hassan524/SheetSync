@@ -28,6 +28,7 @@ import {
   coerceChartNumber,
 } from "@/hooks/sheets/use-charts";
 import type { SheetRow, ColumnDef } from "@/types/index";
+import { formatSheetDate } from "@/utils/SheetUtils";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -52,6 +53,7 @@ function resolveChartData(
   if (!chart.labelColumnKey) return { categories: [], series: [] };
   const labelColumn = columns.find((c) => c.key === chart.labelColumnKey);
   if (!isChartableLabelColumn(labelColumn)) return { categories: [], series: [] };
+  const isDateLabel = labelColumn?.type === "date";
 
   const start = Math.max(0, chart.startRow ?? 0);
   const end =
@@ -77,7 +79,8 @@ function resolveChartData(
   if ((isCat && noSeries) || chart.aggregateMode === "count") {
     const countMap = new Map<string, number>();
     sliced.forEach((r) => {
-      const label = String(r[chart.labelColumnKey!]).trim();
+      const rawLabel = String(r[chart.labelColumnKey!]).trim();
+      const label = isDateLabel ? formatSheetDate(rawLabel) : rawLabel;
       if (label) countMap.set(label, (countMap.get(label) ?? 0) + 1);
     });
     const categories = Array.from(countMap.keys());
@@ -97,9 +100,10 @@ function resolveChartData(
       const step = Math.ceil(sliced.length / max);
       displayRows = sliced.filter((_, i) => i % step === 0);
     }
-    const categories = displayRows.map((r) =>
-      String(r[chart.labelColumnKey!]).trim(),
-    );
+    const categories = displayRows.map((r) => {
+      const raw = String(r[chart.labelColumnKey!]).trim();
+      return isDateLabel ? formatSheetDate(raw) : raw;
+    });
     const series = chart.seriesKeys.map((key) => {
       const col = columns.find((c) => c.key === key);
       return {
@@ -116,7 +120,8 @@ function resolveChartData(
   const labelMap = new Map<string, { sums: number[]; counts: number[] }>();
   const sc = chart.seriesKeys.length;
   sliced.forEach((r) => {
-    const label = String(r[chart.labelColumnKey!]).trim();
+    const rawLabel = String(r[chart.labelColumnKey!]).trim();
+    const label = isDateLabel ? formatSheetDate(rawLabel) : rawLabel;
     if (!labelMap.has(label))
       labelMap.set(label, {
         sums: new Array(sc).fill(0),
@@ -396,6 +401,20 @@ export default function ChartWidget({
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
+
+  useEffect(() => {
+    setSize((prev) => {
+      const maxW = viewport.w - 16;
+      const maxH = viewport.h - 80;
+      const nextW = Math.min(prev.w, maxW);
+      const nextH = Math.min(prev.h, maxH);
+      if (nextW === prev.w && nextH === prev.h) return prev;
+      return {
+        w: nextW,
+        h: nextH,
+      };
+    });
+  }, [viewport.w, viewport.h]);
 
   const clamp = useCallback(
     (x: number, y: number, w: number, h: number) => {
@@ -801,26 +820,28 @@ export default function ChartWidget({
       {/* Resize handle */}
       {!chart.minimized && (
         <div
-          className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize z-20"
+          className="absolute bottom-0 right-0 w-10 h-10 cursor-se-resize z-20"
           style={{ touchAction: "none" }}
           onPointerDown={onResizePointerDown}
           onPointerMove={onResizePointerMove}
           onPointerUp={onResizePointerUp}
           onPointerCancel={onResizePointerUp}
         >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            className="absolute bottom-1.5 right-1.5"
-          >
-            <path
-              d="M10 2L2 10M10 6L6 10M10 10"
-              stroke={mutedC}
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
+          <div className="absolute inset-0 flex items-end justify-end pr-1.5 pb-1.5">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              className=""
+            >
+              <path
+                d="M10 2L2 10M10 6L6 10M10 10"
+                stroke={mutedC}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
         </div>
       )}
     </div>

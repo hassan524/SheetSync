@@ -25,7 +25,7 @@ export interface PersonData {
   email: string;
   initials: string;
   avatar?: string;
-  role: "Admin" | "Editor" | "Viewer";
+  role: "Owner" | "Admin" | "Editor" | "Viewer";
   status: "online" | "away" | "offline";
   lastActive: string;
   sheetsAccess: number;

@@ -21,6 +21,7 @@
  *      other                         → "none"
  */
 
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   Plus,
@@ -1494,6 +1495,12 @@ function FormatTab({
   inputBg: string;
   inputBorder: string;
 }) {
+  const [title, setTitle] = useState(chart.title ?? "");
+
+  useEffect(() => {
+    setTitle(chart.title ?? "");
+  }, [chart.title]);
+
   const inputStyle: React.CSSProperties = {
     background: inputBg,
     border: `1px solid ${inputBorder}`,
@@ -1512,8 +1519,9 @@ function FormatTab({
         <input
           style={inputStyle}
           placeholder="Enter chart title…"
-          defaultValue={chart.title}
-          onBlur={(e) => onUpdate({ title: e.target.value })}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => onUpdate({ title: title.trim() })}
         />
       </div>
 

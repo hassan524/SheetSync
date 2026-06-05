@@ -551,12 +551,13 @@ export async function buildImportedSheetData(
         const hasDarkBg = isDarkColor(existing.bgColor);
 
         cellFormats[cellKey] = {
+          bold: true,
           // If Excel gave a dark background, force white text so it's readable
           ...(hasDarkBg ? { textColor: "#ffffff" } : {}),
           // Excel's own format wins for everything else
           ...existing,
           // Always bold for header rows
-          bold: true,
+          // bold: true,
         };
       });
     }

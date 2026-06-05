@@ -7,7 +7,6 @@ import OrganizationCard from "@/components/organizations/Organization-card";
 import { DataTable } from "@/components/common/Data-table";
 import {
   organizationColumns,
-  organizationAction,
   NoOrganizationsIcon,
 } from "@/data/tables/columns/organizationTableColumns";
 import { Search, Grid3X3, List, X } from "lucide-react";
@@ -117,7 +116,6 @@ const OrganizationList: React.FC<OrganizationListProps> = ({
           columns={organizationColumns}
           rows={filteredTableData}
           getKey={(org) => org.id}
-          action={organizationAction}
           emptyText="No organizations found"
           emptyDescription="Try a different search term or create a new organization."
           emptyIcon={<NoOrganizationsIcon />}

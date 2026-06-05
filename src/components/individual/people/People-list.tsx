@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +15,7 @@ import PersonCard from "@/components/people/Person-card";
 import { DataTable } from "@/components/common/Data-table";
 import {
   peopleColumns,
-  peopleAction,
+  createPeopleAction,
 } from "@/data/tables/columns/peopleTableColumns";
 import { Search, Filter, Grid3X3, List, UserX } from "lucide-react";
 import type { PersonData } from "@/lib/querys/people/people";
@@ -34,8 +34,14 @@ const PeopleList: React.FC<PeopleListProps> = ({
   const [orgFilter, setOrgFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all-status");
 
+  const [peopleState, setPeopleState] = useState<PersonData[]>(people);
+
+  useEffect(() => {
+    setPeopleState(people);
+  }, [people]);
+
   const filteredPeople = useMemo(() => {
-    return people.filter((person) => {
+    return peopleState.filter((person) => {
       const matchesSearch =
         person.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         person.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -51,7 +57,7 @@ const PeopleList: React.FC<PeopleListProps> = ({
 
       return matchesSearch && matchesOrg && matchesStatus;
     });
-  }, [people, searchQuery, orgFilter, statusFilter]);
+  }, [peopleState, searchQuery, orgFilter, statusFilter]);
 
   const uniqueOrgs = useMemo(() => {
     const seen = new Set<string>();
@@ -61,6 +67,19 @@ const PeopleList: React.FC<PeopleListProps> = ({
       return true;
     });
   }, [organizations]);
+
+  const handleRoleChange = (personId: string, newRole: PersonData["role"]) => {
+    setPeopleState((prev) =>
+      prev.map((person) =>
+        person.id === personId ? { ...person, role: newRole } : person,
+      ),
+    );
+  };
+
+  const peopleAction = useMemo(
+    () => createPeopleAction(handleRoleChange),
+    [handleRoleChange],
+  );
 
   return (
     <>
