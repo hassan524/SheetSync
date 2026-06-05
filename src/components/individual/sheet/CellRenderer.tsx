@@ -6,7 +6,7 @@ import { AlertTriangle, Check, Calendar, Lock, MessageSquare } from "lucide-reac
 import { RenderCellProps } from "react-data-grid";
 import { SheetRow, ColumnDef } from "@/types/index";
 import { getStatusOptionStyle } from "@/lib/sheet-formatting-helpers";
-import { getOptionBgStyle } from "@/utils/SheetUtils";
+import { getOptionBgStyle, formatSheetDate } from "@/utils/SheetUtils";
 import { CommentDot } from "@/components/individual/sheet/sheet-ui-helpers";
 import type { SheetComment } from "@/lib/querys/sheet/firebase-realtime";
 
@@ -87,9 +87,9 @@ export function CellRenderer({
 
       case "date":
         return displayValue ? (
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-3 w-3 text-gray-400" />
-            <span className="sheet-cell-text">{String(displayValue)}</span>
+          <div className="flex items-center gap-1.5" style={{ color: "inherit" }}>
+            <Calendar className="h-3 w-3 shrink-0" style={{ color: "inherit", opacity: 0.5 }} />
+            <span className="sheet-cell-text">{formatSheetDate(displayValue)}</span>
           </div>
         ) : null;
 

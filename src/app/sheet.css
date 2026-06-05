@@ -587,7 +587,7 @@
 /* stylesheet cannot bleed through the custom dark theme.                     */
 .rdg-dark .rdg-cell {
   background-color: #0f1117 !important;
-  color: #e2e8f0 !important;
+  color: #e2e8f0;
   border-right-color: #1e2330 !important;
   border-bottom-color: #1e2330 !important;
 }
@@ -624,7 +624,6 @@
 .rdg-dark .rdg-cell[role="gridcell"],
 .rdg-dark .rdg-cell[role="columnheader"] {
   background-color: #0f1117 !important;
-  color: #e2e8f0 !important;
 }
 
 .rdg-dark .rdg-cell input,

@@ -1,23 +1,8 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import {
-  Building2,
-  Users,
-  FileSpreadsheet,
-  Clock,
-  Circle,
-  LogOut,
-  Settings,
-  ExternalLink,
-  UserPlus,
-} from "lucide-react";
+import { Building2, Users, FileSpreadsheet, Clock, Circle } from "lucide-react";
 import { OrganizationTableData, Role } from "@/types";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 const roleVariants: Record<Role, "default" | "secondary" | "outline"> = {
@@ -122,65 +107,6 @@ export const organizationColumns = [
     ),
   },
 ];
-
-export function OrganizationActionMenu({
-  org,
-}: {
-  org: OrganizationTableData;
-}) {
-  const router = useRouter();
-
-  return (
-    <>
-      <DropdownMenuItem
-        className="text-xs gap-2"
-        onClick={() => router.push(`/organizations/${org.id}`)}
-      >
-        <ExternalLink className="h-3.5 w-3.5" /> Open Dashboard
-      </DropdownMenuItem>
-      <DropdownMenuItem
-        className="text-xs gap-2"
-        onClick={() => router.push(`/organizations/${org.id}?tab=sheets`)}
-      >
-        <FileSpreadsheet className="h-3.5 w-3.5" /> View Sheets
-      </DropdownMenuItem>
-      <DropdownMenuItem
-        className="text-xs gap-2"
-        onClick={() => router.push(`/organizations/${org.id}?tab=members`)}
-      >
-        <Users className="h-3.5 w-3.5" /> Manage Members
-      </DropdownMenuItem>
-      {org.role === "owner" && (
-        <DropdownMenuItem className="text-xs gap-2">
-          <UserPlus className="h-3.5 w-3.5" /> Invite People
-        </DropdownMenuItem>
-      )}
-      {org.role === "owner" && (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-xs gap-2"
-            onClick={() => router.push(`/organizations/${org.id}?tab=settings`)}
-          >
-            <Settings className="h-3.5 w-3.5" /> Settings
-          </DropdownMenuItem>
-        </>
-      )}
-      {org.role !== "admin" && org.role !== "owner" && (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-xs gap-2 text-red-600 focus:text-red-600">
-            <LogOut className="h-3.5 w-3.5" /> Leave Organization
-          </DropdownMenuItem>
-        </>
-      )}
-    </>
-  );
-}
-
-export const organizationAction = {
-  render: (org: OrganizationTableData) => <OrganizationActionMenu org={org} />,
-};
 
 export function NoOrganizationsIcon() {
   return (

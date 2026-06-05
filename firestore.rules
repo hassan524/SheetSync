@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Sheet history — any authenticated user can read/write
+    match /sheet_history/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Comments — any authenticated user can read/write
+    match /sheet_comments/{docId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

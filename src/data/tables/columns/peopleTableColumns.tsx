@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenuItem,
@@ -19,7 +18,6 @@ import {
   Shield,
 } from "lucide-react";
 import type { PersonData } from "@/lib/querys/people/people";
-import { toast } from "sonner";
 
 /* ---------------- TYPES ---------------- */
 
@@ -173,28 +171,26 @@ export const peopleColumns = [
 
 /* ---------------- ACTION MENU ---------------- */
 
-function PeopleActionMenu({ person }: { person: PersonData }) {
-  const [currentRole, setCurrentRole] = useState<Role>(person.role as Role);
-
-  const handleRoleChange = (newRole: Role) => {
-    setCurrentRole(newRole);
-    toast.success(`${person.name}'s role changed to ${newRole}`);
-  };
-
+function PeopleActionMenu({
+  person,
+  onRoleChange,
+}: {
+  person: PersonData;
+  onRoleChange: (personId: string, newRole: Role) => void;
+}) {
   return (
     <>
       <DropdownMenuItem
-        className="text-xs gap-2"
+        className="text-xs gap-2 cursor-pointer"
         onClick={() => {
           navigator.clipboard.writeText(person.email);
-          toast.success("Email copied to clipboard");
         }}
       >
         <Mail className="h-3.5 w-3.5" /> Copy Email
       </DropdownMenuItem>
 
       <DropdownMenuItem
-        className="text-xs gap-2"
+        className="text-xs gap-2 cursor-pointer"
         onClick={() => {
           window.location.href = `mailto:${person.email}`;
         }}
@@ -203,7 +199,7 @@ function PeopleActionMenu({ person }: { person: PersonData }) {
       </DropdownMenuItem>
 
       <DropdownMenuSub>
-        <DropdownMenuSubTrigger className="text-xs gap-2">
+        <DropdownMenuSubTrigger className="text-xs gap-2 cursor-pointer">
           <ShieldCheck className="h-3.5 w-3.5" />
           Change Role
           <ChevronRight className="h-3 w-3 ml-auto" />
@@ -213,14 +209,14 @@ function PeopleActionMenu({ person }: { person: PersonData }) {
           {(["Owner", "Admin", "Editor", "Viewer"] as Role[]).map((role) => (
             <DropdownMenuItem
               key={role}
-              className={`text-xs gap-2 ${
-                currentRole === role ? "font-semibold" : ""
+              className={`text-xs gap-2 cursor-pointer ${
+                person.role === role ? "font-semibold" : ""
               }`}
-              onClick={() => handleRoleChange(role)}
+              onClick={() => onRoleChange(person.id, role)}
             >
               <Shield className="h-3 w-3" />
               {role}
-              {currentRole === role && (
+              {person.role === role && (
                 <span className="ml-auto text-[10px] text-muted-foreground">
                   current
                 </span>
@@ -235,7 +231,13 @@ function PeopleActionMenu({ person }: { person: PersonData }) {
 
 /* ---------------- EXPORTS ---------------- */
 
-export const peopleAction = {
-  render: (person: PersonData) => <PeopleActionMenu person={person} />,
-};
+export function createPeopleAction(
+  onRoleChange: (personId: string, newRole: Role) => void,
+) {
+  return {
+    render: (person: PersonData) => (
+      <PeopleActionMenu person={person} onRoleChange={onRoleChange} />
+    ),
+  };
+}
 

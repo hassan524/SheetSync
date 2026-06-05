@@ -97,6 +97,7 @@ import {
   getOptionBgStyle,
   getSelectOptionLabel,
   getChoiceOptionsForColumn,
+  formatSheetDate,
 } from "@/utils/SheetUtils";
 import { getStatusOptionStyle, isCellInConditionalRange, conditionalRuleMatches } from "@/lib/sheet-formatting-helpers";
 // @ts-ignore
@@ -578,7 +579,7 @@ export default function SheetClient() {
     onBranch: (newSheetId: string, label: string) => { toast.success(`Branched! Opening "${label}"…`, { duration: 3000 }); router.push(`/sheet/${newSheetId}`); },
   });
 
- // Sync history states
+  // Sync history states
   const skipHistorySyncRef = useRef(false);
   useEffect(() => {
     if (skipHistorySyncRef.current) return;
@@ -2255,23 +2256,30 @@ export default function SheetClient() {
       ...column, key: column.key || `col_custom_${Date.now()}_${index}`,
       name: column.name.trim() || columnIndexToName(index), type: column.type ?? "text", width: column.width ?? 160, editable: true, position: index,
     }));
-    const nextRows = rows.map((row) => {
+    // Use the history's current state to avoid stale closure over `rows`
+    const currentRows = rowsHistory.currentState;
+    const nextRows = currentRows.map((row) => {
       const mapped: SheetRow = { ...row };
       normalizedColumns.forEach((column) => {
         if (!(column.key in mapped)) mapped[column.key] = "";
       });
       return mapped;
     });
+    // Block the history-sync useEffects from overwriting what we're about to set
+    skipHistorySyncRef.current = true;
     columnsHistory.pushState(normalizedColumns);
     rowsHistory.pushState(nextRows);
     setSheetState((prev) => ({ ...prev, columns: normalizedColumns, rows: nextRows }));
+    // Re-enable sync on next tick after React has flushed the state updates
+    setTimeout(() => { skipHistorySyncRef.current = false; }, 0);
     try {
       markSaving();
       await Promise.all([saveAllColumns(sheetId, normalizedColumns), saveAllRows(sheetId, nextRows)]);
       markSaved(); toast.success("Columns updated");
       broadcastSheetSnapshot({ columns: normalizedColumns, rows: nextRows });
     } catch (error: any) { setSaveStatus("saved"); toast.error(error?.message ?? "Failed to update columns."); }
-  }, [columnsHistory, markSaved, markSaving, rows, rowsHistory, sheetId, setSaveStatus, setSheetState, broadcastSheetSnapshot]);
+  }, [columnsHistory, markSaved, markSaving, rowsHistory, sheetId, setSaveStatus, setSheetState, broadcastSheetSnapshot]);
+
   const handleBulkUpdateColumn = useCallback(async (columnKey: string, range: { start: number; end: number } | "all", value: string) => {
     const column = columns.find((item) => item.key === columnKey);
     if (!column) return;
@@ -2739,8 +2747,9 @@ export default function SheetClient() {
           : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
         const cellKey = protection.getCellKey(rowIdx, col.key);
         const formula = formulas.getFormula(rowIdx, col.key);
-        let displayValue = props.row[col.key];
-        if (formula?.startsWith("=")) displayValue = formulas.evaluateFormula(formula, rowIdx);
+        let rawValue = props.row[col.key];
+        if (formula?.startsWith("=")) rawValue = formulas.evaluateFormula(formula, rowIdx);
+        const displayValue = type === "date" ? formatSheetDate(rawValue) : rawValue;
         const validationWarning = getCellValidationFailure(
           col.validation_rules,
           props.row[col.key],
@@ -2802,7 +2811,7 @@ export default function SheetClient() {
             style={getEffectiveCellStyle(rowIdx, col.key, props.row)}
           >
             <span className={`truncate sheet-cell-text ${type === "number" || type === "currency" ? "ml-auto tabular-nums" : ""}`}>
-              {String(displayValue ?? "")}
+              {type === "date" ? formatSheetDate(displayValue) : String(displayValue ?? "")}
             </span>
           </div>
         );

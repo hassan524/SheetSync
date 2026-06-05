@@ -10,6 +10,47 @@ import { getStatusOptionStyle } from "@/lib/sheet-formatting-helpers";
 // Central shared sheet helper utilities.
 // This file contains helper functions used across the sheet editor,
 // including column naming, formatting helpers, row buffering, and select option styling.
+
+/**
+ * Format a date value to D/M/YYYY (e.g. "26/3/2026").
+ * Accepts ISO strings ("2026-02-03"), Date objects, or any parseable date string.
+ * Returns the original string if it can't be parsed as a valid date.
+ */
+export function formatSheetDate(value: any): string {
+  if (value === null || value === undefined || value === "") return "";
+
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return "";
+    return `${value.getDate()}/${value.getMonth() + 1}/${value.getFullYear()}`;
+  }
+
+  try {
+    const str = String(value).trim();
+    // For ISO date strings like "2026-02-03", parse parts directly to avoid timezone issues
+    const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      const month = parseInt(isoMatch[2], 10);
+      const day = parseInt(isoMatch[3], 10);
+      const year = parseInt(isoMatch[1], 10);
+      return `${day}/${month}/${year}`;
+    }
+    // If the value is already in D/M/YYYY or M/D/YYYY slash format, keep D/M/YYYY form.
+    const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+      const day = parseInt(slashMatch[1], 10);
+      const month = parseInt(slashMatch[2], 10);
+      const year = parseInt(slashMatch[3], 10);
+      if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return str;
+    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+  } catch {
+    return String(value);
+  }
+}
 export function getSelectOptionLabel(option: string | SelectOption) {
   return typeof option === "object" ? option.label : option;
 }
