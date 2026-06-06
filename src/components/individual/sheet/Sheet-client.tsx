@@ -1774,7 +1774,8 @@ export default function SheetClient() {
       return;
     }
     const cellKey = `${selectedCell.row}-${selectedCell.col}`;
-    formulas.setFormulas((p: any) => ({ ...p, [cellKey]: example }));
+    const nextFormulas = { ...formulas.formulas, [cellKey]: example };
+    formulas.setFormulas(nextFormulas);
     markSaving();
     await saveFormula(sheetId, cellKey, example);
     if (isOrgSheet) {
@@ -1783,9 +1784,9 @@ export default function SheetClient() {
     }
     markSaved();
     setShowFormulaDialog(false);
-    broadcastSheetSnapshot({ formulas: formulas.formulas });
+    broadcastSheetSnapshot({ formulas: nextFormulas });
     toast.success("Formula inserted — edit as needed");
-  }, [canEditSheet, showViewerEditMessage, selectedCell, rows, protection.isRowProtected, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
+  }, [canEditSheet, showViewerEditMessage, selectedCell, rows, protection.isRowProtected, formulas.formulas, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
 
   const showAutomationNotification = useCallback((title: string, body: string) => {
     toast.info(body || title);
@@ -2773,7 +2774,7 @@ export default function SheetClient() {
         return (
           <CellRenderer
             type={type} props={props} colKey={col.key} rowIdx={rowIdx} row={props.row}
-            displayValue={displayValue} colDef={col}
+            displayValue={displayValue} rawFormula={formula?.startsWith("=") ? formula : undefined} colDef={col}
             isWrapped={textWrap.textWrapColumns.has(`${rowIdx}-${col.key}`)}
             isProtected={protection.isRowProtected(props.row.id)}
             isOrgSheet={isOrgSheet}

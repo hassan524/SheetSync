@@ -41,7 +41,6 @@ import Image from "next/image";
 
 const mainNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Personal Sheets", url: "/sheets", icon: FileSpreadsheet },
   { title: "Organizations", url: "/organizations", icon: Building2 },
   { title: "People", url: "/people", icon: Users },
 ];

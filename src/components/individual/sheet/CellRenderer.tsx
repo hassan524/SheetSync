@@ -17,6 +17,7 @@ interface CellRendererProps {
   rowIdx: number;
   row: SheetRow;
   displayValue: any;
+  rawFormula?: string;
   colDef?: ColumnDef;
   isWrapped: boolean;
   isProtected: boolean;
@@ -41,6 +42,7 @@ export function CellRenderer({
   rowIdx,
   row,
   displayValue,
+  rawFormula,
   colDef,
   isWrapped,
   isProtected,
@@ -61,6 +63,13 @@ export function CellRenderer({
 
   // ── Cell content by type ───────────────────────────────────────────────
   const cellContent = (() => {
+    if (isActiveSelected && rawFormula) {
+      return (
+        <span className="sheet-cell-text break-words whitespace-pre-wrap w-full font-mono">
+          {rawFormula}
+        </span>
+      );
+    }
     switch (type) {
       case "status":
       case "priority": {

@@ -22,7 +22,7 @@ const renameSheetSchema = z.object({
   newName: z.string().min(1).max(100),
 });
 
-// ── Get all sheets, optionally by folder
+// ── Get all sheets
 export async function getAllSheets(folderId?: string) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -31,7 +31,7 @@ export async function getAllSheets(folderId?: string) {
 
   if (!user) throw new Error("Unauthorized");
 
-  let query = supabase
+  const query = supabase
     .from("sheets")
     .select(
       `
@@ -42,7 +42,6 @@ export async function getAllSheets(folderId?: string) {
         email,
         avatar_url
       ),
-      folders ( id, name ),
       organizations (
         id,
         name,
@@ -65,10 +64,6 @@ export async function getAllSheets(folderId?: string) {
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false });
 
-  if (folderId) {
-    query = query.eq("folder_id", folderId);
-  }
-
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
@@ -77,14 +72,11 @@ export async function getAllSheets(folderId?: string) {
     const org = Array.isArray(sheet.organizations)
       ? sheet.organizations[0]
       : sheet.organizations;
-    const folder = Array.isArray(sheet.folders)
-      ? sheet.folders[0]
-      : sheet.folders;
     const ownerName = sheet.owner?.name ?? "Unknown";
 
     return {
       ...sheet,
-      folder: folder ? { id: folder.id, name: folder.name } : null,
+      folder: null,
       organization: org
         ? {
             id: org.id,
@@ -106,8 +98,8 @@ export async function getAllSheets(folderId?: string) {
       },
       rows: Array.isArray(sheet.rows) ? sheet.rows.length : sheet.rows,
       columns: Array.isArray(sheet.columns)
-        ? sheet.columns.length
-        : sheet.columns,
+          ? sheet.columns.length
+          : sheet.columns,
     };
   });
 }
@@ -126,7 +118,7 @@ export async function getPersonalSheetOptions() {
     .select("id, title, updated_at")
     .is("forked_from_sheet_id", null)
     .eq("owner_id", user.id)
-    .eq("is_personal", true)
+    .is("organization_id", null)
     .order("updated_at", { ascending: false });
 
   if (error) throw new Error(error.message);
@@ -163,7 +155,7 @@ export async function importPersonalSheetToOrganization({
     .select("*")
     .eq("id", sourceSheetId)
     .eq("owner_id", user.id)
-    .eq("is_personal", true)
+    .is("organization_id", null)
     .single();
 
   if (sourceError || !source) throw new Error("Personal sheet not found.");
@@ -202,11 +194,9 @@ export async function importPersonalSheetToOrganization({
     .from("sheets")
     .insert({
       title: source.title,
-      folder_id: null,
       owner_id: user.id,
       organization_id: organizationId,
       template_id: source.template_id,
-      is_personal: false,
       last_opened_at: new Date().toISOString(),
       charts: source.charts ?? null,
       row_heights: source.row_heights ?? null,
@@ -347,11 +337,9 @@ export async function createSheet({
     .insert([
       {
         title: parsed.data.name,
-        folder_id: folder_id ?? null,
         owner_id: user.id,
         organization_id: organizationId ?? null,
         template_id: templateId,
-        is_personal: !organizationId,
         last_opened_at: markRecent ? new Date().toISOString() : null,
       },
     ])
@@ -439,8 +427,7 @@ export async function getRecentSheets(limit?: number) {
       `
       id, title, template_id, is_starred,
       created_at, updated_at, last_opened_at,
-      organization_id, folder_id, size_mb,
-      folders ( id, name ),
+      organization_id, size_mb,
       organizations (
         id,
         name,
@@ -478,7 +465,6 @@ export async function getRecentSheets(limit?: number) {
 
   return (data || []).map((sheet: any) => {
     const org = sheet.organizations?.[0] ?? null;
-    const folder = sheet.folders?.[0] ?? null;
 
     return {
       id: sheet.id,
@@ -501,7 +487,7 @@ export async function getRecentSheets(limit?: number) {
             })),
           }
         : null,
-      folder: folder ? { id: folder.id, name: folder.name } : null,
+      folder: null,
       rowsCount: sheet.rows?.length ?? 0,
       colsCount: sheet.columns?.length ?? 0,
       isStarred: !!sheet.is_starred,
@@ -522,8 +508,7 @@ export async function getStarredSheets() {
       `
       id, title, template_id, is_starred,
       created_at, updated_at, last_opened_at,
-      organization_id, folder_id, size_mb,
-      folders ( id, name ),
+      organization_id, size_mb,
       organizations (
         id,
         name,
@@ -551,7 +536,6 @@ export async function getStarredSheets() {
 
   return (data || []).map((sheet: any) => {
     const org = sheet.organizations?.[0] ?? null;
-    const folder = sheet.folders?.[0] ?? null;
 
     return {
       id: sheet.id,
@@ -574,7 +558,7 @@ export async function getStarredSheets() {
             })),
           }
         : null,
-      folder: folder ? { id: folder.id, name: folder.name } : null,
+      folder: null,
       rowsCount: sheet.rows?.length ?? 0,
       colsCount: sheet.columns?.length ?? 0,
       isStarred: true,

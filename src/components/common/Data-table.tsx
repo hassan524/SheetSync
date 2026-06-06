@@ -224,7 +224,7 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        "border rounded-lg overflow-hidden flex flex-col shadow-sm bg-card",
+        "overflow-hidden flex flex-col bg-transparent",
         "h-[400px] md:h-[65vh]",
         className,
       )}

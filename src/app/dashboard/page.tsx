@@ -77,7 +77,7 @@ const Index = async () => {
         {/* Recent Sheets + Activity — same max height, scroll inside (matches Recent page rhythm) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch min-h-0">
           <div className="lg:col-span-2 flex flex-col min-h-0 max-h-[min(70vh,640px)]">
-            <div className="rounded-xl border border-border bg-card flex flex-col min-h-0 h-full overflow-hidden p-4 sm:p-5">
+            <div className="rounded-xl bg-card flex flex-col min-h-0 h-full overflow-hidden">
               <RecentSheets />
             </div>
           </div>

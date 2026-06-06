@@ -2,16 +2,29 @@
 
 import { useState } from "react";
 import TemplateCard from "@/components/sheets/Template-card";
-import UseTemplateModal from "@/components/sheets/Use-template-modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { createSheet } from "@/lib/querys/sheets/sheets";
+import { logActivity } from "@/lib/querys/activity/activity";
+import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
+import { toast } from "sonner";
 
 const ACTIVE_TEMPLATE_TITLES = new Set([
   "Blank Sheet",
   "Finance Tracker",
   "QA Tracker",
   "Project Tracker",
+  "Client CRM",
+  "Employee Directory",
+  "Inventory Manager",
+  "Marketing Calendar",
+  "Meeting Notes",
+  "Sprint Planner",
+  "Expense Report",
+  "Content Pipeline",
+  "Event Planner",
+  "Student Gradebook",
 ]);
 
 interface Template {
@@ -19,10 +32,7 @@ interface Template {
   title: string;
   description: string;
   category: string;
-
-  // ✅ FIXED: use string instead of LucideIcon
   iconName: string;
-
   bgColor: string;
   color: string;
   features: string[];
@@ -34,12 +44,10 @@ interface TemplatesListProps {
 }
 
 const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [templateModalOpen, setTemplateModalOpen] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
-    null,
-  );
+  const [loading, setLoading] = useState(false);
 
   const filtered = templates.filter((t) => {
     const matchesSearch =
@@ -52,12 +60,35 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
     return matchesSearch && matchesCategory;
   });
 
-  const handleTemplateClick = (id: string) => {
+  const handleTemplateClick = async (id: string, title: string) => {
     const template = templates.find((t) => t.id === id);
     if (!template || !ACTIVE_TEMPLATE_TITLES.has(template.title)) return;
+    if (loading) return;
 
-    setSelectedTemplateId(id);
-    setTemplateModalOpen(true);
+    const toastId = toast.loading("Creating sheet from template...");
+    try {
+      setLoading(true);
+      const createdSheet = await createSheet({
+        name: "Untitled Sheet",
+        templateId: id,
+        markRecent: true,
+      });
+
+      await logActivity({
+        sheetId: createdSheet.id,
+        organizationId: null,
+        action: "created sheet",
+        target: `Untitled Sheet (${title})`,
+      });
+
+      toast.success("Sheet created successfully", { id: toastId });
+      router.refresh();
+      router.push(`/sheet/${createdSheet.id}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create sheet", { id: toastId });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -95,14 +126,13 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
           {filtered.map((template) => (
             <div
               key={template.id}
-              onClick={() => handleTemplateClick(template.id)}
+              onClick={() => handleTemplateClick(template.id, template.title)}
               className={
                 ACTIVE_TEMPLATE_TITLES.has(template.title)
-                  ? "cursor-pointer"
-                  : "cursor-not-allowed"
+                  ? "cursor-pointer h-full"
+                  : "cursor-not-allowed h-full"
               }
             >
-              {/* 🔥 FIX: convert iconName → icon */}
               <TemplateCard
                 id={template.id}
                 title={template.title}
@@ -136,20 +166,8 @@ const TemplatesList = ({ templates, categories }: TemplatesListProps) => {
           </Button>
         </div>
       )}
-
-      {selectedTemplateId && (
-        <UseTemplateModal
-          open={templateModalOpen}
-          onOpenChange={(open) => {
-            setTemplateModalOpen(open);
-            if (!open) setSelectedTemplateId(null);
-          }}
-          templateId={selectedTemplateId}
-        />
-      )}
     </>
   );
 };
 
 export default TemplatesList;
-

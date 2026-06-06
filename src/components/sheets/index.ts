@@ -7,3 +7,5 @@ export { default as NewSheetModal } from './New-sheet-modal'
 export { default as SheetCard } from './Sheet-card'
 export { default as TemplateCard } from './Template-card'
 export { default as UseTemplateModal } from './Use-template-modal'
+export { default as SheetsTable } from './SheetsTable'
+

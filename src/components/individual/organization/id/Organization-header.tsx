@@ -162,8 +162,6 @@ export function OrgHeader({ org }: OrgHeaderProps) {
       <NewSheetModal
         open={newSheetOpen}
         onOpenChange={setNewSheetOpen}
-        ShowSaveTo={false}
-        folders={[]}
         onSheetCreated={() => {}}
       />
 

@@ -1,78 +1,59 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import SheetCard from "@/components/sheets/Sheet-card";
-import { DataTable } from "@/components/common/Data-table";
-import {
-  sheetsWithSourceColumns,
-  universalSheetAction,
-  UniversalEmptyIcon,
-  type UniversalSheetRow,
-} from "@/data/tables/universalSheetColumns";
-import { Search, Grid3X3, List, Building2, FolderOpen } from "lucide-react";
-import { getInitials } from "@/lib/utils";
+import { SheetsTable } from "@/components/sheets";
+import { Search, Building2, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface FilesListProps {
   sheets: any[];
 }
 
-const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
-  const [viewMode, setViewMode] = useState<"cards" | "table">("table");
+const FilesList: React.FC<FilesListProps> = ({ sheets: initialSheets }) => {
+  const router = useRouter();
+  const [sheets, setSheets] = useState(initialSheets);
   const [searchQuery, setSearchQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<
     "all" | "personal" | "organization"
   >("all");
 
-  const tableRows: UniversalSheetRow[] = useMemo(
-    () =>
-      sheets.map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        is_starred: s.is_starred,
-        source: s.organization_id ? "organization" : "personal",
-        organizationName: s.organization?.name ?? s.organizationName ?? null,
-        organizationId: s.organization_id,
-        folderName: s.folder?.name ?? s.folderName ?? null,
-        owner: s.owner ?? { name: "You", initials: "ME" },
-        members: (s.organization?.members ?? s.organizationMembers ?? []).map(
-          (member: any) => ({
-            id: member.id,
-            name: member.name,
-            email: member.email,
-            avatar: member.avatar,
-            initials: getInitials(member.name ?? member.email ?? "Member"),
-            status: member.status,
-          }),
-        ),
-        lastModified: s.updated_at,
-        createdAt: s.created_at,
-        collaborators: s.collaborators ?? 0,
-        rows: Array.isArray(s.rows) ? s.rows.length : (s.rows ?? undefined),
-        columns: Array.isArray(s.columns)
-          ? s.columns.length
-          : (s.columns ?? undefined),
-        visibility: s.visibility,
-        activeEditors: s.activeEditors,
-      })),
-    [sheets],
-  );
+  useEffect(() => {
+    setSheets(initialSheets);
+  }, [initialSheets]);
 
   const filtered = useMemo(
     () =>
-      tableRows.filter((s) => {
+      (sheets ?? []).filter((s) => {
         const matchSearch = s.title
           .toLowerCase()
           .includes(searchQuery.toLowerCase());
-        const matchSource = sourceFilter === "all" || s.source === sourceFilter;
+        const isOrg = s.isOrganization || s.organization_id;
+        const source = isOrg ? "organization" : "personal";
+        const matchSource = sourceFilter === "all" || source === sourceFilter;
         return matchSearch && matchSource;
       }),
-    [tableRows, searchQuery, sourceFilter],
+    [sheets, searchQuery, sourceFilter],
   );
 
-  const personalCount = tableRows.filter((s) => s.source === "personal").length;
-  const orgCount = tableRows.filter((s) => s.source === "organization").length;
+  const personalCount = useMemo(
+    () => (sheets ?? []).filter((s) => !(s.isOrganization || s.organization_id)).length,
+    [sheets]
+  );
+  const orgCount = useMemo(
+    () => (sheets ?? []).filter((s) => s.isOrganization || s.organization_id).length,
+    [sheets]
+  );
+
+  const handleDeleted = (id: string) => {
+    setSheets((prev) => prev.filter((s) => s.id !== id));
+    router.refresh();
+  };
+
+  const handleRenamed = (id: string, title: string) => {
+    setSheets((prev) => prev.map((s) => s.id === id ? { ...s, title } : s));
+    router.refresh();
+  };
 
   return (
     <>
@@ -95,14 +76,14 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
               {
                 key: "all",
                 label: "All files",
-                count: tableRows.length,
+                count: sheets.length,
                 icon: undefined,
               },
               {
                 key: "personal",
-                label: "Personal",
+                label: "Private",
                 count: personalCount,
-                icon: FolderOpen,
+                icon: User,
               },
               {
                 key: "organization",
@@ -130,69 +111,18 @@ const FilesList: React.FC<FilesListProps> = ({ sheets }) => {
               </span>
             </button>
           ))}
-
-          <Tabs
-            value={viewMode}
-            onValueChange={(v) => setViewMode(v as "cards" | "table")}
-          >
-            <TabsList className="h-9">
-              <TabsTrigger value="table" className="px-3">
-                <List className="h-4 w-4" />
-              </TabsTrigger>
-              <TabsTrigger value="cards" className="px-3">
-                <Grid3X3 className="h-4 w-4" />
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
         </div>
       </div>
 
-      {viewMode === "table" ? (
-        <DataTable
-          columns={sheetsWithSourceColumns}
-          rows={filtered}
-          getKey={(s) => s.id}
-          action={universalSheetAction}
-          emptyText="No files found"
-          emptyDescription="Your personal and organization sheets will appear here."
-          emptyIcon={<UniversalEmptyIcon />}
-        />
-      ) : (
-        <>
-          {filtered.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-              {filtered.map((sheet, index) => (
-                <div
-                  key={sheet.id}
-                  style={{ animationDelay: `${index * 30}ms` }}
-                >
-                  <div className="relative">
-                    <SheetCard
-                      id={sheet.id}
-                      title={sheet.title}
-                      lastEdited={sheet.lastModified || ""}
-                      isStarred={sheet.is_starred}
-                      templateId="default"
-                      isOrganization={sheet.source === "organization"}
-                      organizationName={sheet.organizationName}
-                      folderName={sheet.folderName}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-14 animate-fade-in">
-              <p className="text-muted-foreground text-sm">
-                No files found matching your search.
-              </p>
-            </div>
-          )}
-        </>
-      )}
+      <SheetsTable
+        sheets={filtered}
+        onDeleted={handleDeleted}
+        onRenamed={handleRenamed}
+        emptyText="No files found"
+        emptyDescription="Your personal and organization sheets will appear here."
+      />
     </>
   );
 };
 
 export default FilesList;
-

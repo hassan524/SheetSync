@@ -1,75 +1,43 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import SheetCard from "@/components/sheets/Sheet-card";
-import { DataTable } from "@/components/common/Data-table";
-import {
-  starredColumns,
-  StarredAction,
-  NoStarredSheetsIcon,
-} from "@/data/tables/columns/starredTableColumns";
-import type { UniversalSheetRow } from "@/data/tables/universalSheetColumns";
-import { Search, Grid3X3, List } from "lucide-react";
-import { getInitials } from "@/lib/utils";
+import { SheetsTable } from "@/components/sheets";
+import { Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface StarredListProps {
   starredSheets: any[];
 }
 
 const StarredList: React.FC<StarredListProps> = ({
-  starredSheets: initial,
+  starredSheets: initialSheets,
 }) => {
-  const [viewMode, setViewMode] = useState<"cards" | "table">("table");
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [sheets, setSheets] = useState(initial);
+  const [sheets, setSheets] = useState(initialSheets);
 
-  const tableRows: UniversalSheetRow[] = useMemo(
-    () =>
-      sheets.map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        is_starred: true,
-        source:
-          s.isOrganization || s.organization_id
-            ? ("organization" as const)
-            : ("personal" as const),
-        organizationName: s.organization?.name ?? null,
-        owner: s.owner ?? { name: "You", initials: "ME" },
-        members: (s.organization?.members ?? s.organizationMembers ?? []).map(
-          (member: any) => ({
-            id: member.id,
-            name: member.name,
-            email: member.email,
-            avatar: member.avatar,
-            initials: getInitials(member.name ?? member.email ?? "Member"),
-            status: member.status,
-          }),
-        ),
-        lastModified: s.lastEdited ?? s.updated_at,
-        createdAt: s.createdAt ?? s.created_at,
-        rows: s.rowsCount ?? s.rows,
-        columns: s.colsCount ?? s.columns,
-        folderName: s.folder?.name ?? null,
-        templateId: s.templateId,
-      })),
-    [sheets],
-  );
+  useEffect(() => {
+    setSheets(initialSheets);
+  }, [initialSheets]);
 
   const filtered = useMemo(
     () =>
-      tableRows.filter((s) =>
+      (sheets ?? []).filter((s) =>
         s.title.toLowerCase().includes(searchQuery.toLowerCase()),
       ),
-    [tableRows, searchQuery],
+    [sheets, searchQuery],
   );
 
-  const handleUnstar = (id: string) => {
+  const handleDeleted = (id: string) => {
     setSheets((prev) => prev.filter((s) => s.id !== id));
+    router.refresh();
   };
 
-  const action = StarredAction({ onUnstar: handleUnstar });
+  const handleRenamed = (id: string, title: string) => {
+    setSheets((prev) => prev.map((s) => s.id === id ? { ...s, title } : s));
+    router.refresh();
+  };
 
   return (
     <>
@@ -84,67 +52,17 @@ const StarredList: React.FC<StarredListProps> = ({
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Tabs
-          value={viewMode}
-          onValueChange={(v) => setViewMode(v as "cards" | "table")}
-        >
-          <TabsList className="h-9">
-            <TabsTrigger value="table" className="px-3">
-              <List className="h-4 w-4" />
-            </TabsTrigger>
-            <TabsTrigger value="cards" className="px-3">
-              <Grid3X3 className="h-4 w-4" />
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
       </div>
 
-      {viewMode === "table" ? (
-        <DataTable
-          columns={starredColumns}
-          rows={filtered}
-          getKey={(s) => s.id}
-          action={action}
-          emptyText="No starred sheets"
-          emptyDescription="Star a sheet from the editor or context menu to pin it here."
-          emptyIcon={<NoStarredSheetsIcon />}
-        />
-      ) : (
-        <>
-          {filtered.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-              {filtered.map((sheet, index) => (
-                <div
-                  key={sheet.id}
-                  style={{ animationDelay: `${index * 30}ms` }}
-                >
-                  <SheetCard
-                    id={sheet.id}
-                    title={sheet.title}
-                    lastEdited={sheet.lastModified ?? ""}
-                    isStarred={true}
-                    rows={sheet.rows}
-                    cols={sheet.columns}
-                    templateId={sheet.templateId || "default"}
-                    isOrganization={sheet.source === "organization"}
-                    organizationName={sheet.organizationName}
-                    folderName={sheet.folderName}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 animate-fade-in">
-              <p className="text-muted-foreground">
-                No starred sheets found matching your search.
-              </p>
-            </div>
-          )}
-        </>
-      )}
+      <SheetsTable
+        sheets={filtered}
+        onDeleted={handleDeleted}
+        onRenamed={handleRenamed}
+        emptyText="No starred sheets"
+        emptyDescription="Star a sheet from the editor or context menu to pin it here."
+      />
     </>
   );
 };
 
 export default StarredList;
-
