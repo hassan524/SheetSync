@@ -34,6 +34,12 @@ interface CellRendererProps {
   isSelected?: boolean;
   isActiveSelected?: boolean;
   validationWarning?: string | null;
+  mergeStyle?: React.CSSProperties;
+  isMergeMaster?: boolean;
+  autoOverflowWidth?: number;
+  isAutoOverflowMaster?: boolean;
+  isAutoOverflowCovered?: boolean;
+  mergedHeight?: number;
 }
 
 export function CellRenderer({
@@ -59,7 +65,16 @@ export function CellRenderer({
   isSelected,
   isActiveSelected,
   validationWarning,
+  mergeStyle,
+  isMergeMaster,
+  autoOverflowWidth,
+  isAutoOverflowMaster,
+  isAutoOverflowCovered,
+  mergedHeight,
 }: CellRendererProps) {
+
+  // ── Resolve mergeMode once so both cellContent and outer div can use it ──
+  const mergeMode = (mergeStyle as any)?.__mergeMode as string | undefined;
 
   // ── Cell content by type ───────────────────────────────────────────────
   const cellContent = (() => {
@@ -70,6 +85,7 @@ export function CellRenderer({
         </span>
       );
     }
+
     switch (type) {
       case "status":
       case "priority": {
@@ -127,7 +143,9 @@ export function CellRenderer({
             src={imgSrc}
             alt="Cell"
             className="h-8 w-8 rounded object-cover border border-gray-200 cursor-zoom-in"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
             onClick={(e) => {
               e.stopPropagation();
               const overlay = document.createElement("div");
@@ -135,7 +153,8 @@ export function CellRenderer({
                 "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:zoom-out";
               const img = document.createElement("img");
               img.src = imgSrc;
-              img.style.cssText = "max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6)";
+              img.style.cssText =
+                "max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6)";
               overlay.appendChild(img);
               overlay.onclick = () => document.body.removeChild(overlay);
               document.body.appendChild(overlay);
@@ -200,38 +219,77 @@ export function CellRenderer({
       case "number":
         return displayValue !== undefined ? (
           <span className="truncate sheet-cell-text tabular-nums">{String(displayValue)}</span>
-        ) : "";
+        ) : (
+          ""
+        );
 
       default: {
         if (displayValue === undefined) return "";
         const text = String(displayValue);
-        const hasMention = text.includes("@");
-        if (!hasMention) {
+
+        // ── Merge master: respect isWrapped + mergeMode for text behaviour ──
+        if (isMergeMaster) {
+          const hasMention = text.includes("@");
+          const content = hasMention
+            ? text
+              .split(/(@[\w][\w\s]*?)(?=\s@|\s[^@\w]|$)/g)
+              .filter(Boolean)
+              .map((part, i) =>
+                part.startsWith("@") ? (
+                  <span key={`mention-${i}`} className="sheet-mention">
+                    {part}
+                  </span>
+                ) : (
+                  <span key={`text-${i}`}>{part}</span>
+                )
+              )
+            : text;
+
           return (
             <span
-              className={
-                isWrapped
-                  ? "sheet-cell-text break-words whitespace-pre-wrap w-full"
-                  : "truncate sheet-cell-text"
-              }
+              className="sheet-cell-text"
+              style={{
+                display: "block",
+                width: "100%",
+                // If text wrap enabled → wrap regardless of merge mode.
+                // merge-across without wrap → truncate like a normal cell.
+                // merge-down / merge-all without wrap → still wrap (multi-row).
+                whiteSpace: isWrapped ? "pre-wrap" : mergeMode === "across" ? "nowrap" : "pre-wrap",
+                overflowWrap: isWrapped ? "break-word" : mergeMode === "across" ? "normal" : "break-word",
+                wordBreak: isWrapped ? "break-word" : mergeMode === "across" ? "normal" : "break-word",
+                overflow: "hidden",
+                textOverflow: isWrapped ? "clip" : mergeMode === "across" ? "ellipsis" : "clip",
+                textAlign: mergeMode === "center" ? "center" : "left",
+                lineHeight: 1.5,
+              }}
             >
-              {text}
+              {content}
             </span>
           );
         }
-        // Split on @Word sequences and render mentions styled
-        const parts = text.split(/(@[\w][\w\s]*?)(?=\s@|\s[^@\w]|$)/g).filter(p => p !== "");
+
+        // ── Normal (non-merge) text cell ──────────────────────────────────
+        const hasMention = text.includes("@");
+        const spanClass = isWrapped
+          ? "sheet-cell-text break-words whitespace-pre-wrap w-full"
+          : isAutoOverflowMaster
+            ? "sheet-cell-text whitespace-pre"
+            : "truncate sheet-cell-text";
+
+        if (!hasMention) {
+          return <span className={spanClass}>{text}</span>;
+        }
+
+        const parts = text
+          .split(/(@[\w][\w\s]*?)(?=\s@|\s[^@\w]|$)/g)
+          .filter((p) => p !== "");
         return (
-          <span
-            className={
-              isWrapped
-                ? "sheet-cell-text break-words whitespace-pre-wrap w-full"
-                : "truncate sheet-cell-text"
-            }
-          >
+          <span className={spanClass}>
             {parts.map((part, i) =>
               part.startsWith("@") ? (
-                <span key={`mention-${i}-${part}`} className="sheet-mention">{part}</span>
+                <span key={`mention-${i}-${part}`} className="sheet-mention">
+                  {part}
+                </span>
               ) : (
                 <span key={`text-${i}`}>{part}</span>
               )
@@ -242,7 +300,7 @@ export function CellRenderer({
     }
   })();
 
-  // ── Alignment ─────────────────────────────────────────────────────────
+  // ── Alignment (non-merge cells only) ──────────────────────────────────
   const justifyClass =
     horizontalAlign === "center"
       ? "justify-center"
@@ -254,31 +312,113 @@ export function CellRenderer({
             ? "justify-end"
             : "";
 
-  // First two initials of collaborator name for the avatar bubble
+  const shouldAutoOverflow = Boolean(
+    isAutoOverflowMaster && autoOverflowWidth && !isWrapped && !isMergeMaster
+  );
+
+  const contentStyle: React.CSSProperties | undefined = shouldAutoOverflow
+    ? {
+      width: autoOverflowWidth,
+      maxWidth: "none",
+      pointerEvents: "none",
+      whiteSpace: "pre",
+    }
+    : undefined;
+
   const collabInitials = activeCollab
-    ? activeCollab.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
+    ? activeCollab.name
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
     : "";
 
-  // ── Render ─────────────────────────────────────────────────────────────
+  // ── Merge master background (paints over covered cells) ───────────────
+  const mergeBg =
+    cellStyle.backgroundColor && cellStyle.backgroundColor !== "transparent"
+      ? cellStyle.backgroundColor
+      : typeof document !== "undefined" && document.body.dataset.sheetDark === "true"
+        ? "#131620"
+        : "#ffffff";
+
+  // ── Merge master absolute-positioning override ────────────────────────
+  // react-data-grid has no native colspan/rowspan; we fake it by making the
+  // master cell position:absolute and sizing it to cover all sibling cells.
+  // The bottom border is drawn explicitly so merge-across rows always show
+  // the horizontal grid line regardless of the cell's own border being stripped.
+  // Always apply absolute overlay for merge masters so the div can
+  // visually span beyond the single rdg-cell boundary into sibling cells.
+  // The parent rdg-cell must have overflow:visible (handled in sheet.css).
+  // ── Merge master absolute-positioning override ────────────────────────
+  // Always applied for merge masters. The absolute div escapes the rdg-cell
+  // boundary (which must have overflow:visible in CSS) to visually span
+  // all merged rows/columns.
+  const mergeOverrideStyle: React.CSSProperties = isMergeMaster
+    ? {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      width: autoOverflowWidth ?? "100%",
+      height: mergedHeight ?? "100%",
+      zIndex: 8,
+      backgroundColor: mergeBg,
+      borderTop: "none",
+      borderLeft: "none",
+      borderRight: "none",
+      // Draw bottom border at the bottom of the full merged block
+      borderBottom: `1px solid var(--rdg-border-color, #e8eaed)`,
+      // Selection ring drawn here spans the full merged dimensions
+      boxShadow: isSelected
+        ? "inset 0 0 0 2px var(--primary, #0d7c5f)"
+        : "none",
+      boxSizing: "border-box",
+      overflow: "hidden",
+      transition: "background-color 0.1s ease",
+      outline: "none",
+    }
+    : {};
+
+  // ── Class list ────────────────────────────────────────────────────────
+  const rootClass = [
+    "h-full w-full flex relative group/cell",
+    // Overflow — merge masters need visible so the absolute overlay can bleed out
+    isMergeMaster ? "overflow-visible" : (activeCollab || shouldAutoOverflow ? "overflow-visible" : "overflow-hidden"),
+    shouldAutoOverflow ? "sheet-cell-auto-overflow-master" : "",
+    isAutoOverflowCovered ? "sheet-cell-auto-overflow-covered" : "",
+    // Vertical + horizontal alignment
+    isMergeMaster
+      ? [
+        "items-start pt-1.5 pb-1.5 sheet-cell-merge-master",
+        mergeMode === "center" ? "justify-center" : "justify-start",
+      ].join(" ")
+      : [
+        isWrapped ? "items-start pt-1.5" : "items-center",
+        justifyClass,
+      ].join(" "),
+    type === "checkbox" ? "justify-center" : "",
+    "px-2.5 gap-1.5",
+    // Selection highlight — skip on merge master to avoid fighting mergeOverrideStyle's bg
+    !isMergeMaster && isSelected ? "bg-primary/10" : "",
+    !isMergeMaster && isActiveSelected ? "sheet-cell-active-selected" : "",
+    validationWarning ? "sheet-cell-validation-warning" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  // ── Render ────────────────────────────────────────────────────────────
   return (
     <div
       data-fill-row={rowIdx}
-      className={[
-        "h-full w-full flex relative group/cell",
-        // must be overflow-visible so the label above the cell is visible
-        activeCollab ? "overflow-visible" : "overflow-hidden",
-        isWrapped ? "items-start pt-1.5" : "items-center",
-        justifyClass,
-        type === "checkbox" ? "justify-center" : "",
-        "px-2.5 py-1 gap-1.5",
-        isSelected ? "bg-primary/10" : "",
-        isActiveSelected ? "sheet-cell-active-selected" : "",
-        validationWarning ? "sheet-cell-validation-warning" : "",
-      ].join(" ")}
+      className={rootClass}
       style={{
         color: "inherit",
         ...cellStyle,
-        // strong colored border + very subtle background tint
+        ...mergeStyle,
+        ...mergeOverrideStyle,
+        // Merge master: clip content within the overlay bounds
+        ...(isMergeMaster ? { overflow: "hidden" } : {}),
+        // Collaborator presence highlight (overrides merge bg for collab)
         ...(activeCollab
           ? {
             outline: `2px solid ${activeCollab.color}`,
@@ -287,18 +427,29 @@ export function CellRenderer({
           }
           : {}),
       }}
-      onClick={onCellClick}
-      onPointerDown={(e) => { if (onPointerDown) onPointerDown(rowIdx, colKey, e); }}
-      onPointerEnter={(e) => { if (onPointerEnter) onPointerEnter(rowIdx, colKey, e); }}
-      title={activeCollab ? `${activeCollab.name} is editing this cell` : validationWarning ?? undefined}
+      onClick={(e) => {
+        if (isMergeMaster) e.stopPropagation();
+        onCellClick();
+      }}
+      onPointerDown={(e) => {
+        if (isMergeMaster) e.stopPropagation();
+        if (onPointerDown) onPointerDown(rowIdx, colKey, e);
+      }}
+      onPointerEnter={(e) => {
+        if (onPointerEnter) onPointerEnter(rowIdx, colKey, e);
+      }}
+      title={
+        activeCollab
+          ? `${activeCollab.name} is editing this cell`
+          : validationWarning ?? undefined
+      }
     >
-      {/* ── Collaborator name tag floating above cell ─────────────────── */}
+      {/* ── Collaborator name tag floating above cell ──────────────────── */}
       {activeCollab && (
         <div
           className="absolute left-0 z-50 pointer-events-none select-none"
           style={{ top: "-24px" }}
         >
-          {/* pill with avatar initials + name */}
           <div
             className="flex items-center gap-1 pl-1 pr-2 py-[3px] rounded-sm shadow-lg whitespace-nowrap"
             style={{
@@ -306,7 +457,6 @@ export function CellRenderer({
               boxShadow: `0 2px 10px ${activeCollab.color}66`,
             }}
           >
-            {/* initials circle */}
             <div
               className="h-4 w-4 rounded-full flex items-center justify-center shrink-0"
               style={{
@@ -319,12 +469,12 @@ export function CellRenderer({
             >
               {collabInitials}
             </div>
-            {/* full name */}
-            <span style={{ fontSize: "10px", fontWeight: 600, color: "#fff", lineHeight: 1 }}>
+            <span
+              style={{ fontSize: "10px", fontWeight: 600, color: "#fff", lineHeight: 1 }}
+            >
               {activeCollab.name}
             </span>
           </div>
-          {/* tiny downward triangle pointing at cell */}
           <div
             style={{
               width: 0,
@@ -338,25 +488,34 @@ export function CellRenderer({
         </div>
       )}
 
-      {/* ── Validation warning icon ───────────────────────────────────── */}
+      {/* ── Validation warning icon ────────────────────────────────────── */}
       {validationWarning && (
         <span className="sheet-validation-marker" aria-label={validationWarning}>
           <AlertTriangle className="h-3 w-3" />
         </span>
       )}
 
-      {/* ── Row lock icon ─────────────────────────────────────────────── */}
+      {/* ── Row lock icon ──────────────────────────────────────────────── */}
       {isProtected && (
         <Lock className="absolute top-1 right-1 h-2 w-2 text-gray-300 opacity-0 group-hover/cell:opacity-60 transition-opacity" />
       )}
 
       {/* ── Comment dot ───────────────────────────────────────────────── */}
-      {isOrgSheet && cellComments.length > 0 && <CommentDot count={cellComments.length} />}
+      {isOrgSheet && cellComments.length > 0 && (
+        <CommentDot count={cellComments.length} />
+      )}
 
-      {/* ── Main cell content ─────────────────────────────────────────── */}
-      {cellContent}
+      {/* ── Main cell content ──────────────────────────────────────────── */}
+      <span
+        className={
+          shouldAutoOverflow ? "sheet-cell-auto-overflow-content" : "contents"
+        }
+        style={contentStyle}
+      >
+        {cellContent}
+      </span>
 
-      {/* ── Fill handle drag button ───────────────────────────────────── */}
+      {/* ── Fill handle drag button ────────────────────────────────────── */}
       {isSelected && onFillStart && (
         <button
           type="button"

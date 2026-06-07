@@ -4,6 +4,7 @@ import React from "react";
 import {
   Undo2, Redo2, Copy, Scissors, Clipboard, WrapText, Lock, Unlock,
   Sigma, SlidersHorizontal, Search, X, ChevronsLeftRight, ChevronsRightLeft, Maximize2,
+  Merge, Split,
 } from "lucide-react";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -61,6 +62,10 @@ interface FormattingBarProps {
   onDragResizeAllColumns?: (delta: number) => void;
   onEndResizeAllColumns?: () => void;
   onOpenValidation?: () => void;
+  canMergeSelection?: boolean;
+  isMergedSelection?: boolean;
+  onMergeSelection?: (mode: "all" | "across" | "down" | "center") => void;
+  onUnmergeSelection?: () => void;
 }
 
 const FONT_FAMILIES = [
@@ -80,6 +85,7 @@ export function FormattingBar({
   onSearchToggle, onSearchChange, onSearchClose, onSort, onHideColumn,
   selectedColumnKey, selectedColumnWidth, onSetColumnWidth, onExpandAllColumns,
   onDragResizeAllColumns, onEndResizeAllColumns, onOpenValidation,
+  canMergeSelection = false, isMergedSelection = false, onMergeSelection, onUnmergeSelection,
 }: FormattingBarProps) {
   const selStyle = ddStyle(isDark);
 
@@ -189,6 +195,47 @@ export function FormattingBar({
         <IconBtn icon={Copy} tooltip="Copy" shortcut="Ctrl+C" onClick={onCopy} />
         <IconBtn icon={Scissors} tooltip="Cut" shortcut="Ctrl+X" onClick={onCut} />
         <IconBtn icon={Clipboard} tooltip="Paste" shortcut="Ctrl+V" onClick={onPaste} />
+        <ToolSep />
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0 ${canMergeSelection && !isMergedSelection ? "sheet-icon-btn--active" : ""}`}
+                  disabled={!canMergeSelection}
+                  aria-label="Merge cells"
+                >
+                  <Merge className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
+              Merge cells
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="start" style={selStyle} className="w-44">
+            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("all")} style={ddItemStyle(isDark)}>
+              Merge all
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("across")} style={ddItemStyle(isDark)}>
+              Merge across
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("down")} style={ddItemStyle(isDark)}>
+              Merge down
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("center")} style={ddItemStyle(isDark)}>
+              Merge & center
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <IconBtn
+          icon={Split}
+          tooltip="Unmerge cells"
+          onClick={onUnmergeSelection ?? (() => {})}
+          disabled={!isMergedSelection}
+          active={isMergedSelection}
+        />
         <ToolSep />
         <Select value={fontFamily} onValueChange={onFontFamilyChange}>
           <SelectTrigger

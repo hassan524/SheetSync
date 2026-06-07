@@ -208,6 +208,14 @@ export interface CellFormat {
   borderStyle?: "none" | "solid" | "dashed" | "dotted";
   borderColor?: string;
   borderWidth?: number;
+  merge?: {
+    masterRow: number;
+    masterCol: string;
+    rowSpan: number;
+    colSpan: number;
+    hidden?: boolean;
+    mode?: "all" | "across" | "down" | "center";
+  };
 }
 
 export type ConditionalFormatOperator =

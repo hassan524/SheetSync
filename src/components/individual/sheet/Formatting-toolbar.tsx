@@ -69,6 +69,9 @@ const PRESET_COLORS = [
   "#ead1dc",
 ];
 
+const TOOL_GROUP_CLASS =
+  "flex items-center border border-gray-200 dark:border-slate-800 rounded-lg p-0.5 bg-transparent gap-0.5 shrink-0";
+
 export default function FormattingToolbar({
   currentFormat = {}, // ← add default empty object here
   onFormatChange,
@@ -77,7 +80,7 @@ export default function FormattingToolbar({
   return (
     <div className="flex items-center gap-1.5">
       {/* Group 1: Text Styling (Bold, Italic, Underline, Strikethrough) */}
-      <div className="flex items-center border border-gray-200 dark:border-slate-800 rounded-lg p-0.5 bg-gray-50/50 dark:bg-slate-900/20 gap-0.5 shrink-0">
+      <div className={TOOL_GROUP_CLASS}>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -144,7 +147,7 @@ export default function FormattingToolbar({
       </div>
 
       {/* Group 2: Quick text utilities (Size Adjustments & Clear Formatting) */}
-      <div className="flex items-center border border-gray-200 dark:border-slate-800 rounded-lg p-0.5 bg-gray-50/50 dark:bg-slate-900/20 gap-0.5 shrink-0">
+      <div className={TOOL_GROUP_CLASS}>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -209,7 +212,7 @@ export default function FormattingToolbar({
       </div>
 
       {/* Group 3: Colors & Borders (Borders, Text Color, Background Color) */}
-      <div className="flex items-center border border-gray-200 dark:border-slate-800 rounded-lg p-0.5 bg-gray-50/50 dark:bg-slate-900/20 gap-0.5 shrink-0">
+      <div className={TOOL_GROUP_CLASS}>
         {/* Borders */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -399,7 +402,7 @@ export default function FormattingToolbar({
       </div>
 
       {/* Group 4: Alignment (Left, Center, Right) */}
-      <div className="flex items-center border border-gray-200 dark:border-slate-800 rounded-lg p-0.5 bg-gray-50/50 dark:bg-slate-900/20 gap-0.5 shrink-0">
+      <div className={TOOL_GROUP_CLASS}>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
