@@ -359,16 +359,18 @@ export function CellRenderer({
       position: "absolute",
       top: 0,
       left: 0,
-      width: autoOverflowWidth ?? "100%",
-      height: mergedHeight ?? "100%",
+      width: mergeMode === "across" || mergeMode === "all" || mergeMode === "center"
+        ? (autoOverflowWidth ? `${autoOverflowWidth - 1}px` : "calc(100% - 1px)")
+        : "calc(100% - 1px)",
+      height: mergeMode === "down" || mergeMode === "all" || mergeMode === "center"
+        ? (mergedHeight ? `${mergedHeight - 1}px` : "calc(100% - 1px)")
+        : "calc(100% - 1px)",
       zIndex: 8,
       backgroundColor: mergeBg,
       borderTop: "none",
       borderLeft: "none",
-      borderRight: "none",
-      // Draw bottom border at the bottom of the full merged block
+      borderRight: `1px solid var(--rdg-border-color, #e8eaed)`,
       borderBottom: `1px solid var(--rdg-border-color, #e8eaed)`,
-      // Selection ring drawn here spans the full merged dimensions
       boxShadow: isSelected
         ? "inset 0 0 0 2px var(--primary, #0d7c5f)"
         : "none",

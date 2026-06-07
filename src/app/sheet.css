@@ -221,9 +221,19 @@
 }
 
 /* The inner overlay div — position/size/boxShadow all set inline */
+/* Draw the regular grid line around merged areas */
 .sheet-cell-merge-master {
-  border: none !important;
+  /* use your theme border token */
+  border: 1px solid var(--sh-border) !important;
   outline: none !important;
+}
+
+/* When that merged cell is selected, highlight it */
+.sheet-cell-merge-master.sheet-cell-active-selected,
+.sheet-cell-merge-master:has(input:focus),
+.sheet-cell-merge-master:has(textarea:focus) {
+  outline: 2px solid var(--primary, #0d7c5f) !important;
+  outline-offset: -2px !important;
 }
 
 /* ─── Merge: covered cells ───────────────────────────────────────────────── */
@@ -234,7 +244,8 @@
   redirects selection to the master.
 */
 .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
-  border: none !important;
+  border-top: none !important;
+  border-left: none !important;
   outline: none !important;
   background: transparent !important;
   box-shadow: none !important;
