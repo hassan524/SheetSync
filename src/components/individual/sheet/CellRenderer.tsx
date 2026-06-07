@@ -251,9 +251,6 @@ export function CellRenderer({
               style={{
                 display: "block",
                 width: "100%",
-                // If text wrap enabled → wrap regardless of merge mode.
-                // merge-across without wrap → truncate like a normal cell.
-                // merge-down / merge-all without wrap → still wrap (multi-row).
                 whiteSpace: isWrapped ? "pre-wrap" : mergeMode === "across" ? "nowrap" : "pre-wrap",
                 overflowWrap: isWrapped ? "break-word" : mergeMode === "across" ? "normal" : "break-word",
                 wordBreak: isWrapped ? "break-word" : mergeMode === "across" ? "normal" : "break-word",
@@ -334,7 +331,7 @@ export function CellRenderer({
       .slice(0, 2)
     : "";
 
-  // ── Merge master background (paints over covered cells) ───────────────
+  // ── Merge master background ────────────────────────────────────────────
   const mergeBg =
     cellStyle.backgroundColor && cellStyle.backgroundColor !== "transparent"
       ? cellStyle.backgroundColor
@@ -343,34 +340,58 @@ export function CellRenderer({
         : "#ffffff";
 
   // ── Merge master absolute-positioning override ────────────────────────
-  // react-data-grid has no native colspan/rowspan; we fake it by making the
-  // master cell position:absolute and sizing it to cover all sibling cells.
-  // The bottom border is drawn explicitly so merge-across rows always show
-  // the horizontal grid line regardless of the cell's own border being stripped.
-  // Always apply absolute overlay for merge masters so the div can
-  // visually span beyond the single rdg-cell boundary into sibling cells.
-  // The parent rdg-cell must have overflow:visible (handled in sheet.css).
-  // ── Merge master absolute-positioning override ────────────────────────
-  // Always applied for merge masters. The absolute div escapes the rdg-cell
-  // boundary (which must have overflow:visible in CSS) to visually span
-  // all merged rows/columns.
+  //
+  // BORDER RULES (matching Zoho Sheets behaviour):
+  //
+  //  merge-all / merge-center:
+  //    The master covers a rectangular block. We draw the bottom border only.
+  //    The right border is suppressed because the block expands to fill the
+  //    space — showing a right border here would double-draw over the next
+  //    real column's left edge.
+  //
+  //  merge-across (single row, multiple columns):
+  //    Each row is its own independent merge strip. We MUST draw the right
+  //    border so the end of the merged strip is visually closed.
+  //    Bottom border is also drawn.
+  //
+  //  merge-down (multiple rows, single column):
+  //    Two side-by-side merge-down blocks must have the vertical column
+  //    separator between them. We draw the right border on each master so
+  //    that separator is visible.
+  //    Bottom border is also drawn.
+  //
+  // NOTE: "none" for borderRight on merge-all is intentional — the rdg-cell
+  //       to the right will draw its own left border (via border-right on the
+  //       preceding cell in rdg's model), so we don't need to draw it here.
+
+  const shouldShowRightBorder =
+    mergeMode === "across" || mergeMode === "down";
+
   const mergeOverrideStyle: React.CSSProperties = isMergeMaster
     ? {
       position: "absolute",
       top: 0,
       left: 0,
+      // Width: span all merged columns for across/all/center;
+      // for down it's a single column so "100%" is correct.
       width: autoOverflowWidth ?? "100%",
+      // Height: span all merged rows; single-row merges default to "100%".
       height: mergedHeight ?? "100%",
       zIndex: 8,
       backgroundColor: mergeBg,
       borderTop: "none",
       borderLeft: "none",
-      borderRight: "none",
-      // Draw bottom border at the bottom of the full merged block
+      // Conditionally show right border (see comment block above)
+      borderRight: shouldShowRightBorder
+        ? `1px solid var(--rdg-border-color, #e8eaed)`
+        : "none",
+      // Always draw the bottom border so the horizontal grid line is visible
       borderBottom: `1px solid var(--rdg-border-color, #e8eaed)`,
-      // Selection ring drawn here spans the full merged dimensions
+      // Selection ring — inset so it sits inside the merged block boundaries.
+      // The double-inset trick (2px primary + 3px white) gives the classic
+      // spreadsheet selection look without clipping.
       boxShadow: isSelected
-        ? "inset 0 0 0 2px var(--primary, #0d7c5f)"
+        ? "inset 0 0 0 2px var(--primary, #0d7c5f), inset 0 0 0 3px rgba(255,255,255,0.85)"
         : "none",
       boxSizing: "border-box",
       overflow: "hidden",
@@ -382,11 +403,9 @@ export function CellRenderer({
   // ── Class list ────────────────────────────────────────────────────────
   const rootClass = [
     "h-full w-full flex relative group/cell",
-    // Overflow — merge masters need visible so the absolute overlay can bleed out
     isMergeMaster ? "overflow-visible" : (activeCollab || shouldAutoOverflow ? "overflow-visible" : "overflow-hidden"),
     shouldAutoOverflow ? "sheet-cell-auto-overflow-master" : "",
     isAutoOverflowCovered ? "sheet-cell-auto-overflow-covered" : "",
-    // Vertical + horizontal alignment
     isMergeMaster
       ? [
         "items-start pt-1.5 pb-1.5 sheet-cell-merge-master",
@@ -398,7 +417,8 @@ export function CellRenderer({
       ].join(" "),
     type === "checkbox" ? "justify-center" : "",
     "px-2.5 gap-1.5",
-    // Selection highlight — skip on merge master to avoid fighting mergeOverrideStyle's bg
+    // Skip selection highlight on merge masters — the boxShadow on
+    // mergeOverrideStyle handles the visual selection ring instead.
     !isMergeMaster && isSelected ? "bg-primary/10" : "",
     !isMergeMaster && isActiveSelected ? "sheet-cell-active-selected" : "",
     validationWarning ? "sheet-cell-validation-warning" : "",
@@ -416,9 +436,7 @@ export function CellRenderer({
         ...cellStyle,
         ...mergeStyle,
         ...mergeOverrideStyle,
-        // Merge master: clip content within the overlay bounds
         ...(isMergeMaster ? { overflow: "hidden" } : {}),
-        // Collaborator presence highlight (overrides merge bg for collab)
         ...(activeCollab
           ? {
             outline: `2px solid ${activeCollab.color}`,
@@ -444,7 +462,7 @@ export function CellRenderer({
           : validationWarning ?? undefined
       }
     >
-      {/* ── Collaborator name tag floating above cell ──────────────────── */}
+      {/* ── Collaborator name tag ──────────────────────────────────────── */}
       {activeCollab && (
         <div
           className="absolute left-0 z-50 pointer-events-none select-none"

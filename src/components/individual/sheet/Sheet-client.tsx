@@ -1530,6 +1530,12 @@ export default function SheetClient() {
     if (masterColIndex === undefined) return;
     setSelectedColumnKey(null);
     setSelectedCell({ row: merge.masterRow, col: merge.masterCol });
+
+    // For merge-across: rowSpan is 1, so end.row === start.row (correct — one row)
+    // For merge-down:   colSpan is 1, so end.colIndex === start.colIndex (correct — one col)
+    // For merge-all:    both rowSpan and colSpan > 1 (correct — full block)
+    // The selectionRange drives the blue highlight on covered cells AND the
+    // inSelection check that marks isSelected=true on the master for the boxShadow ring.
     setSelectionRange({
       start: { row: merge.masterRow, colIndex: masterColIndex },
       end: {
@@ -1865,19 +1871,38 @@ export default function SheetClient() {
     setSelectedColumnKey(null);
     const colIndex = columns.findIndex((c) => c.key === colKey);
     if (colIndex === -1) return;
+
+    // If this cell is part of a merge block, let onCellClick → selectMergeBlock
+    // handle the selection. Starting a drag anchor here would reset selectionRange
+    // to a single cell and override the full-block selection.
+    const cellKey = `${rowIdx}-${colKey}`;
+    const mergeInfo = mergeByCell.get(cellKey);
+    if (mergeInfo) {
+      isDraggingRef.current = false;
+      selectionAnchorRef.current = null;
+      return;
+    }
+
     selectionAnchorRef.current = { row: rowIdx, colIndex };
     setSelectionRange({ start: { row: rowIdx, colIndex }, end: { row: rowIdx, colIndex } });
     isDraggingRef.current = true;
     const onUp = () => { isDraggingRef.current = false; selectionAnchorRef.current = null; window.removeEventListener("pointerup", onUp); };
     window.addEventListener("pointerup", onUp);
-  }, [columns]);
+  }, [columns, mergeByCell]);
 
   const onCellPointerEnter = useCallback((rowIdx: number, colKey: string) => {
     if (!isDraggingRef.current || !selectionAnchorRef.current) return;
     const colIndex = columns.findIndex((c) => c.key === colKey);
     if (colIndex === -1) return;
+
+    // Don't extend a drag selection into a merge block — it would create a
+    // partial selection that doesn't align with the merged boundaries.
+    const cellKey = `${rowIdx}-${colKey}`;
+    const mergeInfo = mergeByCell.get(cellKey);
+    if (mergeInfo) return;
+
     setSelectionRange({ start: selectionAnchorRef.current, end: { row: rowIdx, colIndex } });
-  }, [columns]);
+  }, [columns, mergeByCell]);
 
   const buildFillValue = useCallback((base: any, offset: number, step = 1) => {
     const raw = String(base ?? "");
@@ -3040,6 +3065,11 @@ export default function SheetClient() {
         // In gridColumns → renderCell (covered cell branch)
         // In renderCell — covered cell branch (full replacement)
         if (mergeInfo?.hidden) {
+          // Look up the master's canonical merge info (it has hidden: undefined).
+          // The covered cell's copy is correct but using the master entry is safer
+          // and ensures selectMergeBlock always receives the non-hidden version.
+          const masterKey = `${mergeInfo.masterRow}-${mergeInfo.masterCol}`;
+          const masterMergeInfo = mergeByCell.get(masterKey) ?? mergeInfo;
           return (
             <div
               className="sheet-merge-covered-cell"
@@ -3056,7 +3086,7 @@ export default function SheetClient() {
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                selectMergeBlock(mergeInfo);
+                selectMergeBlock(masterMergeInfo);  // ← FIXED: always uses master's info
               }}
             />
           );
@@ -3518,6 +3548,7 @@ export default function SheetClient() {
           const mergeMode = mergeInfo?.mode;
           return (
             <div
+              data-merge-edit="true"
               style={{
                 position: "absolute",
                 top: 0,
@@ -3578,13 +3609,18 @@ export default function SheetClient() {
 
 
         // Standard single-row input (non-merged or single-row merged)
+        // Standard single-row input (non-merged or single-row merged)
         return (
           <div
+            data-merge-edit={isMergeMaster ? "true" : undefined}
             style={{
-              position: "relative",
-              width: "100%",
+              position: isMergeMaster ? "absolute" : "relative",
+              top: isMergeMaster ? 0 : undefined,
+              left: isMergeMaster ? 0 : undefined,
+              width: isMergeMaster ? (editWidth ?? "100%") : "100%",
               height: "100%",
-              ...editMergeStyle,
+              zIndex: isMergeMaster ? 9 : undefined,
+              boxSizing: "border-box",
             }}
           >
             <input
@@ -3594,6 +3630,9 @@ export default function SheetClient() {
                 width: "100%",
                 height: "100%",
                 textAlign: mergeInfo?.mode === "center" ? "center" : undefined,
+                boxShadow: isMergeMaster
+                  ? "inset 0 0 0 2px var(--primary, #0d7c5f), inset 0 0 0 3px rgba(255,255,255,0.85)"
+                  : undefined,
               }}
               autoFocus
               value={editVal}
@@ -4217,7 +4256,7 @@ export default function SheetClient() {
             </div>
           </div>
         )}
-        
+
         <style jsx global>{`
   .sheet-root * { scrollbar-width: thin; scrollbar-color: #c7cdd8 transparent; }
   .sheet-root *::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -4225,7 +4264,7 @@ export default function SheetClient() {
   .sheet-root *::-webkit-scrollbar-track { background: transparent; }
   .no-scrollbar { -ms-overflow-style: auto; scrollbar-width: thin; }
 
-  /* ── Merge: master ───────────────────────────────────────────── */
+/* ── Merge: master ───────────────────────────────────────────── */
   .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
     overflow: visible !important;
     contain: none !important;
@@ -4238,12 +4277,23 @@ export default function SheetClient() {
     outline: none !important;
     background: transparent !important;
   }
+  /* Suppress rdg's single-cell outline on merge masters — full-block ring
+     is handled by mergeOverrideStyle boxShadow in CellRenderer */
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"]:focus-within,
+  .rdg-sheet .rdg-cell:has([data-merge-edit="true"]) {
+    outline: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    contain: none !important;
+    z-index: 10 !important;
+  }
   .sheet-cell-merge-master {
     border: none !important;
     outline: none !important;
   }
 
-  /* ── Merge: covered ──────────────────────────────────────────── */
+/* ── Merge: covered ──────────────────────────────────────────── */
   .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
     border: none !important;
     outline: none !important;
@@ -4259,6 +4309,13 @@ export default function SheetClient() {
     background: transparent !important;
     box-shadow: none !important;
   }
+  /* Restore bottom border so horizontal row separator shows below merge strip */
+  .rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+    border-bottom: 1px solid var(--rdg-border-color, #e8eaed) !important;
+  }
+  .sheet-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+    border-bottom: 1px solid #1e2330 !important;
+  }
   .sheet-merge-covered-cell {
     background: transparent !important;
     pointer-events: auto;
@@ -4266,10 +4323,24 @@ export default function SheetClient() {
   }
 
   /* ── Border fix at zoom levels < 100% ───────────────────────── */
-  .rdg-sheet .rdg-cell[aria-selected="true"] {
-    outline: 2px solid var(--primary, #0d7c5f) !important;
-    outline-offset: -2px !important;
-  }
+/* ── Border fix at zoom levels < 100% ───────────────────────── */
+/* Normal cells get the selection outline */
+.rdg-sheet .rdg-cell[aria-selected="true"] {
+  outline: 2px solid var(--primary, #0d7c5f) !important;
+  outline-offset: -2px !important;
+}
+/* Merge master: suppress rdg's single-cell outline — the boxShadow on
+   the absolute overlay (mergeOverrideStyle) handles the full-block ring */
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+/* Also suppress when rdg puts the cell into edit mode */
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"]:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
   .rdg-sheet .rdg-header-row .rdg-cell {
     outline: 1px solid var(--rdg-border-color, #e2e8f0) !important;
     outline-offset: -1px !important;
