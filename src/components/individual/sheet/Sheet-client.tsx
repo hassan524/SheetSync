@@ -4196,6 +4196,8 @@ export default function SheetClient() {
           const mergeInfo = mergeByCell.get(`${rowIdx}-${column.key}`);
           const colIndex = columns.findIndex((c) => c.key === column.key);
 
+          const colDef = columns.find((c) => c.key === column.key)!;
+
           // ── Covered cell: safety net (editable() already blocks this path) ──
           if (mergeInfo?.hidden) {
             queueMicrotask(() => {
@@ -4233,7 +4235,7 @@ export default function SheetClient() {
 
           const cellType = row._isHeaderRow
             ? "text"
-            : cellTypes.getCellType(rowIdx, column.key, column.type || "text");
+            : cellTypes.getCellType(rowIdx, column.key, colDef.type || "text");
           const cellStyle = getEffectiveCellStyle(rowIdx, column.key, row);
           const cellKey = `${rowIdx}-${column.key}`;
           const isProtected = protection.isRowProtected(row.id);
@@ -4417,7 +4419,7 @@ export default function SheetClient() {
 
           // ── PRIORITY / STATUS ─────────────────────────────────────────
           if (cellType === "priority" || cellType === "status") {
-            const opts = getChoiceOptionsForColumn({ ...column, type: cellType });
+          const opts = getChoiceOptionsForColumn({ ...colDef, type: cellType });
             return (
               <EditorWrapper>
                 <Select
@@ -4467,7 +4469,7 @@ export default function SheetClient() {
           // ── SELECT ────────────────────────────────────────────────────
           if (cellType === "select") {
             const selectOpts = getChoiceOptionsForColumn(
-              column,
+              colDef,
               cellSelectOptions[cellKey] ?? [],
             );
             return (
