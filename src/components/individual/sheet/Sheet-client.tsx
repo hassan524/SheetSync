@@ -144,6 +144,30 @@ type SheetPresence = {
   role?: string;
 };
 
+type MergeInfo = NonNullable<CellFormat["merge"]>;
+type MergeMode = NonNullable<MergeInfo["mode"]>;
+type AutoOverflowInfo = {
+  masterRow: number;
+  masterCol: string;
+  colSpan: number;
+  width: number;
+  covered?: boolean;
+};
+
+function isMergeInfo(value: any): value is MergeInfo {
+  return Boolean(
+    value &&
+    typeof value.masterRow === "number" &&
+    typeof value.masterCol === "string" &&
+    typeof value.rowSpan === "number" &&
+    typeof value.colSpan === "number",
+  );
+}
+
+function shouldAutoOverflowValue(value: any) {
+  return typeof value === "string" && value.trim().length > 0 && !value.includes("\n");
+}
+
 function getLatestPresence(presences: SheetPresence[] | undefined) {
   if (!presences?.length) return null;
   return [...presences]
@@ -1409,6 +1433,272 @@ export default function SheetClient() {
     return preset;
   }, [columns]);
 
+  const columnIndexByKey = useMemo(
+    () => new Map(columns.map((column, index) => [column.key, index])),
+    [columns],
+  );
+
+  const mergeByCell = useMemo(() => {
+    const map = new Map<string, MergeInfo>();
+    Object.entries(formatting.cellFormats).forEach(([cellKey, format]) => {
+      if (isMergeInfo(format?.merge)) map.set(cellKey, format.merge);
+    });
+    return map;
+  }, [formatting.cellFormats]);
+
+  const autoOverflowByCell = useMemo(() => {
+    const map = new Map<string, AutoOverflowInfo>();
+    const visibleColumns = columns.filter((column) => !column.hidden);
+
+    rows.forEach((row, rowIdx) => {
+      visibleColumns.forEach((column, visibleColIdx) => {
+        const cellKey = `${rowIdx}-${column.key}`;
+        if (textWrap.textWrapColumns.has(cellKey) || mergeByCell.has(cellKey)) return;
+        const value = row[column.key];
+        if (!shouldAutoOverflowValue(value)) return;
+
+        const ownWidth = column.width ?? 160;
+        const estimatedTextWidth = Math.ceil(String(value).length * 7.2) + 24;
+        if (estimatedTextWidth <= ownWidth) return;
+
+        let width = ownWidth;
+        let colSpan = 1;
+        const coveredKeys: string[] = [];
+
+        for (let nextIdx = visibleColIdx + 1; nextIdx < visibleColumns.length && width < estimatedTextWidth; nextIdx += 1) {
+          const nextColumn = visibleColumns[nextIdx];
+          const nextKey = `${rowIdx}-${nextColumn.key}`;
+          if (textWrap.textWrapColumns.has(nextKey) || mergeByCell.has(nextKey)) break;
+          const nextValue = row[nextColumn.key];
+          if (nextValue !== undefined && nextValue !== null && String(nextValue) !== "") break;
+          width += nextColumn.width ?? 160;
+          colSpan += 1;
+          coveredKeys.push(nextKey);
+        }
+
+        if (colSpan <= 1) return;
+        map.set(cellKey, {
+          masterRow: rowIdx,
+          masterCol: column.key,
+          colSpan,
+          width,
+        });
+        coveredKeys.forEach((coveredKey) => {
+          map.set(coveredKey, {
+            masterRow: rowIdx,
+            masterCol: column.key,
+            colSpan,
+            width,
+            covered: true,
+          });
+        });
+      });
+    });
+
+    return map;
+  }, [columns, mergeByCell, rows, textWrap.textWrapColumns]);
+
+  const selectedMergeInfo = useMemo(() => {
+    if (!selectedCell) return null;
+    const direct = mergeByCell.get(`${selectedCell.row}-${selectedCell.col}`);
+    if (direct) return direct;
+    if (!selectionRange) return null;
+    const startRow = Math.min(selectionRange.start.row, selectionRange.end.row);
+    const endRow = Math.max(selectionRange.start.row, selectionRange.end.row);
+    const startCol = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
+    const endCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+    for (let rowIdx = startRow; rowIdx <= endRow; rowIdx += 1) {
+      for (let colIdx = startCol; colIdx <= endCol; colIdx += 1) {
+        const colKey = columns[colIdx]?.key;
+        if (!colKey) continue;
+        const merge = mergeByCell.get(`${rowIdx}-${colKey}`);
+        if (merge) return merge;
+      }
+    }
+    return null;
+  }, [columns, mergeByCell, selectedCell, selectionRange]);
+
+  const canMergeSelection = useMemo(() => {
+    if (!selectionRange) return false;
+    const rowSpan = Math.abs(selectionRange.end.row - selectionRange.start.row) + 1;
+    const colSpan = Math.abs(selectionRange.end.colIndex - selectionRange.start.colIndex) + 1;
+    return rowSpan > 1 || colSpan > 1;
+  }, [selectionRange]);
+
+  const selectMergeBlock = useCallback((merge: MergeInfo) => {
+    const masterColIndex = columnIndexByKey.get(merge.masterCol);
+    if (masterColIndex === undefined) return;
+    setSelectedColumnKey(null);
+    setSelectedCell({ row: merge.masterRow, col: merge.masterCol });
+
+    // For merge-across: rowSpan is 1, so end.row === start.row (correct — one row)
+    // For merge-down:   colSpan is 1, so end.colIndex === start.colIndex (correct — one col)
+    // For merge-all:    both rowSpan and colSpan > 1 (correct — full block)
+    // The selectionRange drives the blue highlight on covered cells AND the
+    // inSelection check that marks isSelected=true on the master for the boxShadow ring.
+    setSelectionRange({
+      start: { row: merge.masterRow, colIndex: masterColIndex },
+      end: {
+        row: merge.masterRow + merge.rowSpan - 1,
+        colIndex: masterColIndex + merge.colSpan - 1,
+      },
+    });
+    setActiveCommentCell(`${merge.masterRow}-${merge.masterCol}`);
+  }, [columnIndexByKey, setSelectedColumnKey, setSelectedCell, setSelectionRange, setActiveCommentCell]);
+
+  const clearMergeFormatsInRange = useCallback((
+    nextFormats: Record<string, CellFormat>,
+    startRow: number,
+    endRow: number,
+    startCol: number,
+    endCol: number,
+  ) => {
+    const mergeKeys = new Set<string>();
+    for (let rowIdx = startRow; rowIdx <= endRow; rowIdx += 1) {
+      for (let colIdx = startCol; colIdx <= endCol; colIdx += 1) {
+        const colKey = columns[colIdx]?.key;
+        if (!colKey) continue;
+        const merge = mergeByCell.get(`${rowIdx}-${colKey}`);
+        if (!merge) continue;
+        const masterColIndex = columnIndexByKey.get(merge.masterCol);
+        if (masterColIndex === undefined) continue;
+        for (let mr = merge.masterRow; mr < merge.masterRow + merge.rowSpan; mr += 1) {
+          for (let mc = masterColIndex; mc < masterColIndex + merge.colSpan; mc += 1) {
+            const mergedColKey = columns[mc]?.key;
+            if (mergedColKey) mergeKeys.add(`${mr}-${mergedColKey}`);
+          }
+        }
+      }
+    }
+    mergeKeys.forEach((cellKey) => {
+      const { merge: _merge, ...rest } = nextFormats[cellKey] ?? {};
+      if (Object.keys(rest).length > 0) nextFormats[cellKey] = rest;
+      else delete nextFormats[cellKey];
+    });
+  }, [columnIndexByKey, columns, mergeByCell]);
+
+  const persistCellFormatMap = useCallback(async (nextFormats: Record<string, CellFormat>) => {
+    formatting.setCellFormats(nextFormats);
+    markSaving();
+    try {
+      await saveAllCellFormats(sheetId, nextFormats);
+      broadcastSheetSnapshot({ cellFormats: nextFormats });
+      markSaved();
+    } catch {
+      setSaveStatus("saved");
+      toast.error("Failed to save cell formatting.");
+    }
+  }, [broadcastSheetSnapshot, formatting.setCellFormats, markSaved, markSaving, setSaveStatus, sheetId]);
+
+  const handleMergeSelection = useCallback(async (mode: MergeMode = "all") => {
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
+    if (!selectionRange || !canMergeSelection) {
+      toast.info("Select two or more cells to merge.");
+      return;
+    }
+    const startRow = Math.min(selectionRange.start.row, selectionRange.end.row);
+    const endRow = Math.max(selectionRange.start.row, selectionRange.end.row);
+    const startCol = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
+    const endCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+    const selectedRowSpan = endRow - startRow + 1;
+    const selectedColSpan = endCol - startCol + 1;
+    if (mode === "across" && selectedColSpan < 2) {
+      toast.info("Select two or more columns to merge across.");
+      return;
+    }
+    if (mode === "down" && selectedRowSpan < 2) {
+      toast.info("Select two or more rows to merge down.");
+      return;
+    }
+    const nextFormats: Record<string, CellFormat> = { ...formatting.cellFormats };
+    clearMergeFormatsInRange(nextFormats, startRow, endRow, startCol, endCol);
+
+    const applyMergeBlock = (masterRow: number, masterColIndex: number, rowSpan: number, colSpan: number) => {
+      const masterCol = columns[masterColIndex]?.key;
+      if (!masterCol || rowSpan < 1 || colSpan < 1 || (rowSpan === 1 && colSpan === 1)) return;
+      const merge: MergeInfo = { masterRow, masterCol, rowSpan, colSpan, mode };
+      for (let rowIdx = masterRow; rowIdx < masterRow + rowSpan; rowIdx += 1) {
+        for (let colIdx = masterColIndex; colIdx < masterColIndex + colSpan; colIdx += 1) {
+          const colKey = columns[colIdx]?.key;
+          if (!colKey) continue;
+          const cellKey = `${rowIdx}-${colKey}`;
+          const isMaster = rowIdx === masterRow && colIdx === masterColIndex;
+          if (isMaster) {
+            // Only apply center alignment when mode is explicitly "center",
+            // and preserve existing alignment otherwise
+            const existingFormat = nextFormats[cellKey] ?? {};
+            nextFormats[cellKey] = {
+              ...existingFormat,
+              ...(mode === "center" ? { align: "center" } : {}),
+              merge,
+            };
+          } else {
+            // Covered cells: strip everything except the hidden merge marker
+            nextFormats[cellKey] = {
+              merge: { ...merge, hidden: true },
+            };
+          }
+        }
+      }
+    };
+
+    if (mode === "across") {
+      for (let rowIdx = startRow; rowIdx <= endRow; rowIdx += 1) {
+        applyMergeBlock(rowIdx, startCol, 1, selectedColSpan);
+      }
+    } else if (mode === "down") {
+      for (let colIdx = startCol; colIdx <= endCol; colIdx += 1) {
+        applyMergeBlock(startRow, colIdx, selectedRowSpan, 1);
+      }
+    } else {
+      applyMergeBlock(startRow, startCol, selectedRowSpan, selectedColSpan);
+    }
+
+    await persistCellFormatMap(nextFormats);
+    const masterCol = columns[startCol]?.key;
+    if (masterCol) {
+      setSelectedCell({ row: startRow, col: masterCol });
+      setSelectionRange({
+        start: { row: startRow, colIndex: startCol },
+        end: {
+          row: mode === "across" ? startRow : endRow,
+          colIndex: mode === "down" ? startCol : endCol,
+        },
+      });
+    }
+    toast.success(mode === "center" ? "Cells merged and centered" : "Cells merged");
+  }, [canEditSheet, showViewerEditMessage, selectionRange, canMergeSelection, columns, formatting.cellFormats, clearMergeFormatsInRange, persistCellFormatMap, setSelectedCell, setSelectionRange]);
+
+  const handleUnmergeSelection = useCallback(async () => {
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
+    const merge = selectedMergeInfo;
+    if (!merge) {
+      toast.info("Select a merged cell first.");
+      return;
+    }
+    const masterColIndex = columnIndexByKey.get(merge.masterCol);
+    if (masterColIndex === undefined) return;
+    const nextFormats: Record<string, CellFormat> = { ...formatting.cellFormats };
+    for (let rowIdx = merge.masterRow; rowIdx < merge.masterRow + merge.rowSpan; rowIdx += 1) {
+      for (let colIdx = masterColIndex; colIdx < masterColIndex + merge.colSpan; colIdx += 1) {
+        const colKey = columns[colIdx]?.key;
+        if (!colKey) continue;
+        const cellKey = `${rowIdx}-${colKey}`;
+        const { merge: _merge, ...rest } = nextFormats[cellKey] ?? {};
+        if (Object.keys(rest).length > 0) nextFormats[cellKey] = rest;
+        else delete nextFormats[cellKey];
+      }
+    }
+    await persistCellFormatMap(nextFormats);
+    toast.success("Cells unmerged");
+  }, [canEditSheet, showViewerEditMessage, selectedMergeInfo, columnIndexByKey, formatting.cellFormats, columns, persistCellFormatMap]);
+
   // ── Handlers ───────────────────────────────────────────────────────────
   // These functions are called by UI controls when the user edits the sheet.
   // Each handler updates local state, then triggers save behavior if needed.
@@ -1581,19 +1871,38 @@ export default function SheetClient() {
     setSelectedColumnKey(null);
     const colIndex = columns.findIndex((c) => c.key === colKey);
     if (colIndex === -1) return;
+
+    // If this cell is part of a merge block, let onCellClick → selectMergeBlock
+    // handle the selection. Starting a drag anchor here would reset selectionRange
+    // to a single cell and override the full-block selection.
+    const cellKey = `${rowIdx}-${colKey}`;
+    const mergeInfo = mergeByCell.get(cellKey);
+    if (mergeInfo) {
+      isDraggingRef.current = false;
+      selectionAnchorRef.current = null;
+      return;
+    }
+
     selectionAnchorRef.current = { row: rowIdx, colIndex };
     setSelectionRange({ start: { row: rowIdx, colIndex }, end: { row: rowIdx, colIndex } });
     isDraggingRef.current = true;
     const onUp = () => { isDraggingRef.current = false; selectionAnchorRef.current = null; window.removeEventListener("pointerup", onUp); };
     window.addEventListener("pointerup", onUp);
-  }, [columns]);
+  }, [columns, mergeByCell]);
 
   const onCellPointerEnter = useCallback((rowIdx: number, colKey: string) => {
     if (!isDraggingRef.current || !selectionAnchorRef.current) return;
     const colIndex = columns.findIndex((c) => c.key === colKey);
     if (colIndex === -1) return;
+
+    // Don't extend a drag selection into a merge block — it would create a
+    // partial selection that doesn't align with the merged boundaries.
+    const cellKey = `${rowIdx}-${colKey}`;
+    const mergeInfo = mergeByCell.get(cellKey);
+    if (mergeInfo) return;
+
     setSelectionRange({ start: selectionAnchorRef.current, end: { row: rowIdx, colIndex } });
-  }, [columns]);
+  }, [columns, mergeByCell]);
 
   const buildFillValue = useCallback((base: any, offset: number, step = 1) => {
     const raw = String(base ?? "");
@@ -1774,7 +2083,8 @@ export default function SheetClient() {
       return;
     }
     const cellKey = `${selectedCell.row}-${selectedCell.col}`;
-    formulas.setFormulas((p: any) => ({ ...p, [cellKey]: example }));
+    const nextFormulas = { ...formulas.formulas, [cellKey]: example };
+    formulas.setFormulas(nextFormulas);
     markSaving();
     await saveFormula(sheetId, cellKey, example);
     if (isOrgSheet) {
@@ -1783,9 +2093,9 @@ export default function SheetClient() {
     }
     markSaved();
     setShowFormulaDialog(false);
-    broadcastSheetSnapshot({ formulas: formulas.formulas });
+    broadcastSheetSnapshot({ formulas: nextFormulas });
     toast.success("Formula inserted — edit as needed");
-  }, [canEditSheet, showViewerEditMessage, selectedCell, rows, protection.isRowProtected, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
+  }, [canEditSheet, showViewerEditMessage, selectedCell, rows, protection.isRowProtected, formulas.formulas, formulas.setFormulas, sheetId, markSaving, markSaved, isOrgSheet, columns]);
 
   const showAutomationNotification = useCallback((title: string, body: string) => {
     toast.info(body || title);
@@ -2610,10 +2920,17 @@ export default function SheetClient() {
     };
 
     const dataCols = columns.filter((col) => !col.hidden).map((col): Column<SheetRow, SheetRow> => ({
-      key: col.key, name: col.name, width: col.width || 160, resizable: true, frozen: col.frozen, editable: canEditSheet,
+      key: col.key, name: col.name, width: col.width || 160, resizable: true, frozen: col.frozen,
+      editable: (row: SheetRow) => {
+        if (!canEditSheet) return false;
+        const rowIdx = rows.findIndex((r) => r.id === row.id);
+        const mi = mergeByCell.get(`${rowIdx}-${col.key}`);
+        if (mi?.hidden) return false;
+        return true;
+      },
       renderHeaderCell: () => (
         <div
-          className={`h-full w-full flex items-center gap-1.5 px-2.5 group/header sheet-header-cell border-r cursor-pointer ${selectedColumnKey === col.key ? "bg-primary/15" : (selectedCell && selectedCell.col === col.key ? "bg-primary/10" : "")}`}
+          className={`h-full w-full flex items-center gap-1.5 px-2 group/header sheet-header-cell sheet-header-cell--excel border-r cursor-pointer ${selectedColumnKey === col.key ? "bg-primary/15" : (selectedCell && selectedCell.col === col.key ? "bg-primary/10" : "")}`}
           onClick={(e) => {
             if ((e.target as HTMLElement).closest("button")) return;
             setSelectedColumnKey(col.key);
@@ -2632,7 +2949,10 @@ export default function SheetClient() {
           onDragEnd={sheetColOps.handleColumnDragEnd}
         >
           <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-move opacity-0 group-hover/header:opacity-100 transition-opacity" />
-          <span className="flex-1 sheet-col-label truncate">{col.name}</span>
+          <div className="min-w-0 flex-1">
+            <div className="sheet-col-letter truncate">{columnIndexToName(columns.findIndex((c) => c.key === col.key))}</div>
+            <div className="sheet-col-label truncate">{col.name || columnIndexToName(columns.findIndex((c) => c.key === col.key))}</div>
+          </div>
           {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && (
             <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60" />
           )}
@@ -2740,12 +3060,61 @@ export default function SheetClient() {
       ),
       renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
         const rowIdx = rows.findIndex((r) => r.id === props.row.id);
+        const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
+        const autoOverflowInfo = autoOverflowByCell.get(`${rowIdx}-${col.key}`);
+        // In gridColumns → renderCell (covered cell branch)
+        // In renderCell — covered cell branch (full replacement)
+        if (mergeInfo?.hidden) {
+          // Look up the master's canonical merge info (it has hidden: undefined).
+          // The covered cell's copy is correct but using the master entry is safer
+          // and ensures selectMergeBlock always receives the non-hidden version.
+          const masterKey = `${mergeInfo.masterRow}-${mergeInfo.masterCol}`;
+          const masterMergeInfo = mergeByCell.get(masterKey) ?? mergeInfo;
+          return (
+            <div
+              className="sheet-merge-covered-cell"
+              data-merge-covered="true"
+              style={{
+                position: "absolute",
+                inset: 0,
+                pointerEvents: "auto",
+                userSelect: "none",
+                cursor: "cell",
+                background: "transparent",
+                zIndex: 5,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                selectMergeBlock(masterMergeInfo);  // ← FIXED: always uses master's info
+              }}
+            />
+          );
+        }
+
+        const isMergeMaster = Boolean(mergeInfo && !mergeInfo.hidden && mergeInfo.rowSpan * mergeInfo.colSpan > 1);
+        const colIndex = columns.findIndex((c) => c.key === col.key);
+        const mergedWidth = isMergeMaster
+          ? columns
+            .slice(colIndex, colIndex + mergeInfo!.colSpan)
+            .filter((item) => !item.hidden)
+            .reduce((sum, item) => sum + (item.width ?? 160), 0)
+          : undefined;
+        // Calculate pixel height spanning all merged rows so the master cell
+        // can paint over them with position:absolute in CellRenderer.
+        // Uses rowHeights for manually resized rows, falls back to header row height (33px).
+        const mergedHeight = isMergeMaster && mergeInfo!.rowSpan > 1
+          ? Array.from({ length: mergeInfo!.rowSpan }, (_, i) => {
+            const targetRow = rows[mergeInfo!.masterRow + i];
+            return targetRow ? (rowHeights[targetRow.id] ?? 33) : 33;
+          }).reduce((sum, h) => sum + h, 0)
+          : undefined;
         //     Imported header/title/metadata rows always render as plain text
         //     regardless of the column's inferred type.
         const type = props.row._isHeaderRow
           ? "text"
           : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
-        const cellKey = protection.getCellKey(rowIdx, col.key);
+        const effectiveAutoOverflowInfo = type === "text" ? autoOverflowInfo : undefined;
         const formula = formulas.getFormula(rowIdx, col.key);
         let rawValue = props.row[col.key];
         if (formula?.startsWith("=")) rawValue = formulas.evaluateFormula(formula, rowIdx);
@@ -2759,8 +3128,16 @@ export default function SheetClient() {
           columns,
         )?.message ?? null;
         const activeCollabEntry = Object.values(activeCursors).find((c) => c.row === rowIdx && c.col === col.key);
-        const colIndex = columns.findIndex((c) => c.key === col.key);
-        const inSelection = selectionRange
+        const effectiveCellStyle = getEffectiveCellStyle(rowIdx, col.key, props.row);
+        const mergedCellStyle = isMergeMaster
+          ? {
+            ...effectiveCellStyle,
+            borderStyle: "none",
+            borderColor: "transparent",
+            borderWidth: 0,
+          }
+          : effectiveCellStyle;
+        const inSelection = selectionRange && !mergeInfo?.hidden
           ? (() => {
             const sr = Math.min(selectionRange.start.row, selectionRange.end.row);
             const er = Math.max(selectionRange.start.row, selectionRange.end.row);
@@ -2773,15 +3150,32 @@ export default function SheetClient() {
         return (
           <CellRenderer
             type={type} props={props} colKey={col.key} rowIdx={rowIdx} row={props.row}
-            displayValue={displayValue} colDef={col}
+            displayValue={displayValue} rawFormula={formula?.startsWith("=") ? formula : undefined} colDef={col}
             isWrapped={textWrap.textWrapColumns.has(`${rowIdx}-${col.key}`)}
             isProtected={protection.isRowProtected(props.row.id)}
             isOrgSheet={isOrgSheet}
-            cellStyle={getEffectiveCellStyle(rowIdx, col.key, props.row)}
+            cellStyle={mergedCellStyle}
             cellComments={[...(comments[`${rowIdx}-${col.key}`] || []), ...(comments[`row:${props.row.id}`] || [])]}
             activeCollab={activeCollabEntry ? { name: activeCollabEntry.name, color: activeCollabEntry.color } : null}
-            horizontalAlign={(getEffectiveCellStyle(rowIdx, col.key, props.row).textAlign as any) ?? undefined}
+            horizontalAlign={(effectiveCellStyle.textAlign as any) ?? undefined}
+            mergeStyle={
+              isMergeMaster
+                ? {
+                  zIndex: 7,
+                  ...({ __mergeMode: mergeInfo?.mode } as any),
+                }
+                : undefined
+            }
+            isMergeMaster={isMergeMaster}
+            mergedHeight={mergedHeight}
+            autoOverflowWidth={isMergeMaster ? mergedWidth : effectiveAutoOverflowInfo?.width}
+            isAutoOverflowMaster={isMergeMaster || Boolean(effectiveAutoOverflowInfo && !effectiveAutoOverflowInfo.covered)}
+            isAutoOverflowCovered={Boolean(effectiveAutoOverflowInfo?.covered)}
             onCellClick={() => {
+              if (mergeInfo && isMergeMaster) {
+                selectMergeBlock(mergeInfo);
+                return;
+              }
               setSelectedColumnKey(null);
               setSelectedCell({ row: rowIdx, col: col.key });
               if (rightPanel === "validation") setFocusedColumnKey(col.key);
@@ -2791,14 +3185,16 @@ export default function SheetClient() {
             onPointerDown={onCellPointerDown}
             onPointerEnter={onCellPointerEnter}
             onFillStart={onFillStart}
-            isSelected={inSelection || (selectedCell?.row === rowIdx && selectedCell.col === col.key)}
-            isActiveSelected={selectedCell?.row === rowIdx && selectedCell.col === col.key}
+            isSelected={!mergeInfo?.hidden && (inSelection || (selectedCell?.row === rowIdx && selectedCell.col === col.key))}
+            isActiveSelected={!mergeInfo?.hidden && selectedCell?.row === rowIdx && selectedCell.col === col.key}
             validationWarning={validationWarning}
           />
         );
       },
       renderSummaryCell(props: any) {
         const rowIdx = rows.findIndex((r) => r.id === props.row.id);
+        const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
+        if (mergeInfo?.hidden) return <div className="h-full w-full sheet-cell-merge-covered" />;
         const type = props.row._isHeaderRow
           ? "text"
           : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
@@ -2819,10 +3215,62 @@ export default function SheetClient() {
       renderEditCell(props: RenderEditCellProps<SheetRow, SheetRow>) {
         const { row, column, onRowChange } = props;
         const rowIdx = rows.findIndex((r) => r.id === row.id);
+        const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
+
+        const colIndex = columns.findIndex((c) => c.key === col.key);
+
+        if (mergeInfo?.hidden) {
+          queueMicrotask(() => {
+            selectMergeBlock(mergeInfo);
+            if (typeof document !== "undefined") {
+              (document.activeElement as HTMLElement)?.blur();
+            }
+          });
+          return (
+            <div
+              className="h-full w-full sheet-cell-merge-covered"
+              style={{ pointerEvents: "none", userSelect: "none", visibility: "hidden" }}
+            />
+          );
+        }
+
+        const isMergeMaster = Boolean(
+          mergeInfo && !mergeInfo.hidden && mergeInfo.rowSpan * mergeInfo.colSpan > 1
+        );
+
+        // ─── Compute merged edit dimensions for master cells ────────────────
+        const editWidth = isMergeMaster
+          ? columns
+            .slice(colIndex, colIndex + mergeInfo!.colSpan)
+            .filter((item) => !item.hidden)
+            .reduce((sum, item) => sum + (item.width ?? 160), 0)
+          : undefined;
+
+        const editHeight =
+          isMergeMaster && mergeInfo!.rowSpan > 1
+            ? Array.from({ length: mergeInfo!.rowSpan }, (_, i) => {
+              const tr = rows[mergeInfo!.masterRow + i];
+              return tr ? (rowHeights[tr.id] ?? 33) : 33;
+            }).reduce((sum, h) => sum + h, 0)
+            : undefined;
+
+        const editMergeStyle: React.CSSProperties | undefined = isMergeMaster
+          ? {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: editWidth ?? "100%",
+            height: editHeight ?? "100%",
+            zIndex: 9,
+            boxSizing: "border-box",
+          }
+          : undefined;
+
         // Imported header/title/metadata rows always edit as plain text
         const cellType = row._isHeaderRow
           ? "text"
           : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
+
         const cellStyle = getEffectiveCellStyle(rowIdx, column.key, row);
         const cellKey = protection.getCellKey(rowIdx, col.key);
         const isProtected = protection.isRowProtected(row.id);
@@ -2850,8 +3298,12 @@ export default function SheetClient() {
           formulas.columnFormulas[col.key] ??
           String(row[column.key] ?? "");
 
-        const inputStyle = {
+        const inputStyle: React.CSSProperties = {
           ...cellStyle,
+          ...(isMergeMaster
+            ? { borderStyle: "none", borderColor: "transparent", borderWidth: 0 }
+            : {}),
+          ...editMergeStyle,
           background: isDark ? "#131620" : "#ffffff",
           color: isDark ? "#e2e8f0" : "#1a1d23",
         };
@@ -2924,11 +3376,18 @@ export default function SheetClient() {
           return (
             <div
               className="w-full h-full flex items-center justify-center cursor-pointer"
-              onClick={() => { setActiveCell({ rowId: row.id, colKey: column.key }); fileInputRef.current?.click(); }}
+              onClick={() => {
+                setActiveCell({ rowId: row.id, colKey: column.key });
+                fileInputRef.current?.click();
+              }}
               style={inputStyle}
             >
               {row[column.key] ? (
-                <img src={row[column.key]} alt="cell" className="max-h-12 max-w-full object-cover rounded" />
+                <img
+                  src={row[column.key]}
+                  alt="cell"
+                  className="max-h-12 max-w-full object-cover rounded"
+                />
               ) : (
                 <span className="text-xs text-gray-400">Upload Image</span>
               )}
@@ -2941,6 +3400,7 @@ export default function SheetClient() {
           return (
             <div
               className="h-full flex items-center justify-center cursor-pointer"
+              style={editMergeStyle}
               onClick={() => {
                 const nextRow = { ...row, [column.key]: !row[column.key] };
                 onRowChange(nextRow);
@@ -2978,7 +3438,10 @@ export default function SheetClient() {
                   const style = getStatusOptionStyle(value);
                   return (
                     <SelectItem key={value} value={value} style={ddItemStyle(isDark)}>
-                      <span className="sheet-badge-pill" style={{ color: style?.color, backgroundColor: style?.bgColor }}>
+                      <span
+                        className="sheet-badge-pill"
+                        style={{ color: style?.color, backgroundColor: style?.bgColor }}
+                      >
                         {style?.label ?? value}
                       </span>
                     </SelectItem>
@@ -3009,7 +3472,9 @@ export default function SheetClient() {
                   const optionLabel = getSelectOptionLabel(opt);
                   return (
                     <SelectItem key={optionLabel} value={optionLabel} style={ddItemStyle(isDark)}>
-                      <span className="sheet-badge-pill" style={getOptionBgStyle(opt)}>{optionLabel}</span>
+                      <span className="sheet-badge-pill" style={getOptionBgStyle(opt)}>
+                        {optionLabel}
+                      </span>
                     </SelectItem>
                   );
                 })}
@@ -3028,8 +3493,15 @@ export default function SheetClient() {
           return (
             <input
               className="w-full h-full px-2.5 text-xs outline-none border-0 text-right tabular-nums font-mono"
-              style={inputStyle} type="text" autoFocus value={editVal}
-              onChange={(e) => cellType === "progress" ? onProgressChange(e.target.value) : onNumChange(e.target.value)}
+              style={inputStyle}
+              type="text"
+              autoFocus
+              value={editVal}
+              onChange={(e) =>
+                cellType === "progress"
+                  ? onProgressChange(e.target.value)
+                  : onNumChange(e.target.value)
+              }
               onBlur={onBlurSave}
             />
           );
@@ -3039,34 +3511,129 @@ export default function SheetClient() {
           return (
             <input
               className="w-full h-full px-2.5 text-xs outline-none border-0"
-              style={inputStyle} type={formulas.formulas[cellKey] ? "text" : "date"}
-              autoFocus value={editVal}
+              style={inputStyle}
+              type={formulas.formulas[cellKey] ? "text" : "date"}
+              autoFocus
+              value={editVal}
               onChange={(e) => onTextChange(e.target.value)}
               onBlur={onBlurSave}
             />
           );
 
         // ---------------- TEXT WRAP ----------------
-        if (textWrap.textWrapColumns.has(col.key))
+        if (textWrap.textWrapColumns.has(`${rowIdx}-${col.key}`))
           return (
             <textarea
               className="w-full h-full px-2.5 py-2 text-xs outline-none border-0 resize-none"
-              style={inputStyle} autoFocus value={editVal}
+              style={inputStyle}
+              autoFocus
+              value={editVal}
               onChange={(e) => onTextChange(e.target.value)}
               onBlur={onBlurSave}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) e.stopPropagation(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
+              }}
             />
           );
 
-        // ---------------- DEFAULT ----------------
-        // ---------------- DEFAULT ----------------
+        // ---------------- DEFAULT (text + merged textarea) ----------------
         const mentionCellKey = `${rowIdx}-${col.key}`;
         const isMentionActive = mentionState.active && mentionState.cellKey === mentionCellKey;
+
+        // Merged master cells with height > 40px get a textarea so text wraps
+        // naturally inside the full merged area
+        // In renderEditCell — replace the isMergeMaster tall textarea branch:
+
+        if (isMergeMaster && (editHeight ?? 0) > 40) {
+          const mergeMode = mergeInfo?.mode;
+          return (
+            <div
+              data-merge-edit="true"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: editWidth ?? "100%",
+                height: editHeight ?? "100%",
+                zIndex: 9,
+                boxSizing: "border-box",
+                background: isDark ? "#131620" : "#ffffff",
+                overflow: "hidden",             // prevents ghost space below
+              }}
+            >
+              <textarea
+                autoFocus
+                value={editVal}
+                onChange={(e) => onTextChange(e.target.value)}
+                onBlur={onBlurSave}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
+                  if (e.key === "Escape") e.currentTarget.blur();
+                }}
+                style={{
+                  // Layout
+                  display: "block",
+                  width: "100%",
+                  height: "100%",
+                  boxSizing: "border-box",
+                  padding: "6px 10px",
+                  margin: 0,
+                  // Typography
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  fontFamily: "inherit",
+                  // Text direction per merge mode
+                  textAlign:
+                    mergeMode === "center"
+                      ? "center"
+                      : "left",                 // merge-down and merge-all always left
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  overflowWrap: "break-word",
+                  verticalAlign: "top",
+                  // Appearance
+                  background: isDark ? "#131620" : "#ffffff",
+                  color: isDark ? "#e2e8f0" : "#1a1d23",
+                  border: "none",
+                  outline: "none",
+                  resize: "none",
+                  overflow: "hidden",          // clip text at container — no scrollbar, no expansion
+                  // Reset anything inherited from cellStyle that could center vertically
+                  alignItems: undefined,
+                  alignSelf: undefined,
+                }}
+              />
+            </div>
+          );
+        }
+
+
+        // Standard single-row input (non-merged or single-row merged)
+        // Standard single-row input (non-merged or single-row merged)
         return (
-          <div style={{ position: "relative", width: "100%", height: "100%" }}>
+          <div
+            data-merge-edit={isMergeMaster ? "true" : undefined}
+            style={{
+              position: isMergeMaster ? "absolute" : "relative",
+              top: isMergeMaster ? 0 : undefined,
+              left: isMergeMaster ? 0 : undefined,
+              width: isMergeMaster ? (editWidth ?? "100%") : "100%",
+              height: "100%",
+              zIndex: isMergeMaster ? 9 : undefined,
+              boxSizing: "border-box",
+            }}
+          >
             <input
               className="w-full h-full px-2.5 text-xs outline-none border-0"
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                width: "100%",
+                height: "100%",
+                textAlign: mergeInfo?.mode === "center" ? "center" : undefined,
+                boxShadow: isMergeMaster
+                  ? "inset 0 0 0 2px var(--primary, #0d7c5f), inset 0 0 0 3px rgba(255,255,255,0.85)"
+                  : undefined,
+              }}
               autoFocus
               value={editVal}
               onChange={(e) => {
@@ -3150,7 +3717,8 @@ export default function SheetClient() {
                       background: "transparent",
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.background = isDark ? "#2d3244" : "#f8fafc";
+                      (e.currentTarget as HTMLDivElement).style.background =
+                        isDark ? "#2d3244" : "#f8fafc";
                     }}
                     onMouseLeave={(e) => {
                       (e.currentTarget as HTMLDivElement).style.background = "transparent";
@@ -3161,7 +3729,8 @@ export default function SheetClient() {
                       const cursor = mentionState.inputRef?.selectionStart ?? currentVal.length;
                       const before = currentVal.slice(0, cursor);
                       const after = currentVal.slice(cursor);
-                      const replaced = before.replace(/@([\w][\w\s]*)?$/, `@${member.name} `) + after;
+                      const replaced =
+                        before.replace(/@([\w][\w\s]*)?$/, `@${member.name} `) + after;
                       onTextChange(replaced);
                       setMentionState((s) => ({ ...s, active: false }));
                       setTimeout(() => mentionState.inputRef?.focus(), 10);
@@ -3242,7 +3811,7 @@ export default function SheetClient() {
     selectionRange, selectedCell, setSheetState, setSelectedColumnKey, setSelectedCell,
     setSelectionRange, setFocusedColumnKey, setRightPanel, setActiveCell,
     saveAllRows, saveAllRows, saveAllColumns, saveFormula, deleteFormula,
-    mentionState, mentionableMembers, setMentionState,
+    mentionState, mentionableMembers, setMentionState, mergeByCell, autoOverflowByCell, selectMergeBlock, rowHeights,
   ]);
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -3342,6 +3911,10 @@ export default function SheetClient() {
               setRightPanel("validation");
             }
           }}
+          canMergeSelection={canMergeSelection}
+          isMergedSelection={Boolean(selectedMergeInfo)}
+          onMergeSelection={handleMergeSelection}
+          onUnmergeSelection={handleUnmergeSelection}
         />
 
         <FormulaBar
@@ -3479,12 +4052,57 @@ export default function SheetClient() {
                 onRowsChange={handleRowsChange}
                 selectedRows={selectedRows} onSelectedRowsChange={setSelectedRows}
                 onColumnResize={(idx, width) => { const col = columns[idx - 1]; if (col) sheetColOps.handleColumnResize(col.key, width); }}
+                // In SheetClient.tsx — replace rowHeight prop on DataGrid:
+
                 rowHeight={(row) => {
+                  // If this row contains a merge-master cell, use fixed height only —
+                  // never auto-expand based on text content because the overlay clips it.
+                  const rowIdx = rows.findIndex((r) => r.id === row.id);
+                  const hasMergeMaster = columns.some((col) => {
+                    const mi = mergeByCell.get(`${rowIdx}-${col.key}`);
+                    return mi && !mi.hidden && mi.rowSpan * mi.colSpan > 1;
+                  });
+
                   const manual = rowHeights[row.id];
+
+                  // Merge rows: manual resize only, never text-wrap auto-height
+                  if (hasMergeMaster) {
+                    const hasMergeWrap = columns.some((col) => {
+                      const mi = mergeByCell.get(`${rowIdx}-${col.key}`);
+                      if (!mi || mi.hidden || mi.rowSpan * mi.colSpan <= 1) return false;
+                      return textWrap.textWrapColumns.has(`${rowIdx}-${col.key}`);
+                    });
+                    if (!hasMergeWrap) return manual ?? 33;
+                    let max = 1;
+                    columns.forEach((col) => {
+                      const mi = mergeByCell.get(`${rowIdx}-${col.key}`);
+                      if (!mi || mi.hidden || mi.rowSpan * mi.colSpan <= 1) return;
+                      if (!textWrap.textWrapColumns.has(`${rowIdx}-${col.key}`)) return;
+                      const v = String(row[col.key] || "");
+                      if (!v) return;
+                      const masterColIdx = columnIndexByKey.get(mi.masterCol) ?? 0;
+                      const totalWidth = columns
+                        .slice(masterColIdx, masterColIdx + mi.colSpan)
+                        .reduce((s, c) => s + (c.width ?? 160), 0);
+                      const charsPerLine = Math.floor((totalWidth - 20) / 7);
+                      const lineCount = v.split("\n").reduce(
+                        (a, l) => a + (Math.ceil(l.length / charsPerLine) || 1), 0
+                      );
+                      if (lineCount > max) max = lineCount;
+                    });
+                    const wrapHeight = Math.max(33, 8 + max * 20);
+                    return manual ? Math.max(wrapHeight, manual) : wrapHeight;
+                  }
+
+                  // Normal rows: existing wrap-height logic unchanged
                   if (textWrap.textWrapColumns.size === 0) return manual ?? 32;
                   let max = 1;
-                  const ri = rows.findIndex((r) => r.id === row.id);
-                  const wk = new Set([...textWrap.textWrapColumns].filter((k) => k.startsWith(`${ri}-`)).map((k) => k.replace(`${ri}-`, "")));
+                  const ri = rowIdx >= 0 ? rowIdx : rows.findIndex((r) => r.id === row.id);
+                  const wk = new Set(
+                    [...textWrap.textWrapColumns]
+                      .filter((k) => k.startsWith(`${ri}-`))
+                      .map((k) => k.replace(`${ri}-`, ""))
+                  );
                   wk.forEach((ck) => {
                     const v = String(row[ck] || "");
                     if (!v) return;
@@ -3496,6 +4114,7 @@ export default function SheetClient() {
                   const wrapHeight = Math.max(32, 8 + max * 20);
                   return manual ? Math.max(wrapHeight, manual) : wrapHeight;
                 }}
+
                 headerRowHeight={33}
                 className={`rdg-sheet fill-grid ${isDark ? "rdg-dark" : "rdg-light"}`}
               />
@@ -3639,19 +4258,106 @@ export default function SheetClient() {
         )}
 
         <style jsx global>{`
-          .sheet-root * { scrollbar-width: thin; scrollbar-color: #c7cdd8 transparent; }
-          .sheet-root *::-webkit-scrollbar { width: 8px; height: 8px; }
-          .sheet-root *::-webkit-scrollbar-thumb { background: #c7cdd8; border-radius: 999px; }
-          .sheet-root *::-webkit-scrollbar-track { background: transparent; }
-          .no-scrollbar { -ms-overflow-style: auto; scrollbar-width: thin; }
-          @media (max-width: 640px) {
-            .rdg-sheet { font-size: 11px !important; }
-            .sheet-column-type-submenu {
-              transform: translate3d(0, 6px, 0) !important;
-              max-width: calc(100vw - 24px);
-            }
-          }
-        `}</style>
+  .sheet-root * { scrollbar-width: thin; scrollbar-color: #c7cdd8 transparent; }
+  .sheet-root *::-webkit-scrollbar { width: 8px; height: 8px; }
+  .sheet-root *::-webkit-scrollbar-thumb { background: #c7cdd8; border-radius: 999px; }
+  .sheet-root *::-webkit-scrollbar-track { background: transparent; }
+  .no-scrollbar { -ms-overflow-style: auto; scrollbar-width: thin; }
+
+/* ── Merge: master ───────────────────────────────────────────── */
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
+    overflow: visible !important;
+    contain: none !important;
+    z-index: 6;
+    border: none !important;
+    background: transparent !important;
+  }
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
+    outline: none !important;
+    background: transparent !important;
+  }
+  /* Suppress rdg's single-cell outline on merge masters — full-block ring
+     is handled by mergeOverrideStyle boxShadow in CellRenderer */
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"]:focus-within,
+  .rdg-sheet .rdg-cell:has([data-merge-edit="true"]) {
+    outline: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    contain: none !important;
+    z-index: 10 !important;
+  }
+  .sheet-cell-merge-master {
+    border: none !important;
+    outline: none !important;
+  }
+
+/* ── Merge: covered ──────────────────────────────────────────── */
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
+    border: none !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    contain: none !important;
+  }
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell)[aria-selected="true"],
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell):hover,
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-merge-covered-cell) {
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  /* Restore bottom border so horizontal row separator shows below merge strip */
+  .rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+    border-bottom: 1px solid var(--rdg-border-color, #e8eaed) !important;
+  }
+  .sheet-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+    border-bottom: 1px solid #1e2330 !important;
+  }
+  .sheet-merge-covered-cell {
+    background: transparent !important;
+    pointer-events: auto;
+    cursor: cell;
+  }
+
+  /* ── Border fix at zoom levels < 100% ───────────────────────── */
+/* ── Border fix at zoom levels < 100% ───────────────────────── */
+/* Normal cells get the selection outline */
+.rdg-sheet .rdg-cell[aria-selected="true"] {
+  outline: 2px solid var(--primary, #0d7c5f) !important;
+  outline-offset: -2px !important;
+}
+/* Merge master: suppress rdg's single-cell outline — the boxShadow on
+   the absolute overlay (mergeOverrideStyle) handles the full-block ring */
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+/* Also suppress when rdg puts the cell into edit mode */
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"]:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+  .rdg-sheet .rdg-header-row .rdg-cell {
+    outline: 1px solid var(--rdg-border-color, #e2e8f0) !important;
+    outline-offset: -1px !important;
+    border: none !important;
+  }
+  .sheet-dark .rdg-sheet .rdg-cell {
+    outline-color: #2a3045 !important;
+  }
+
+  @media (max-width: 640px) {
+    .rdg-sheet { font-size: 11px !important; }
+    .sheet-column-type-submenu {
+      transform: translate3d(0, 6px, 0) !important;
+      max-width: calc(100vw - 24px);
+    }
+  }
+`}</style>
       </div>
     </TooltipProvider>
   );

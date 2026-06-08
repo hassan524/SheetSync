@@ -52,7 +52,6 @@ function SheetsPageClient({ initialFolders }: Props) {
   );
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [onlyStarred, setOnlyStarred] = useState(false);
   const [newSheetOpen, setNewSheetOpen] = useState(false);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
@@ -312,21 +311,24 @@ function SheetsPageClient({ initialFolders }: Props) {
         {/* Sheets */}
         <SheetsGrid
           sheets={filteredSheets}
-          viewMode={viewMode}
           searchQuery={searchQuery}
           folderName={currentFolderData?.name || ""}
           onNewSheet={() => setNewSheetOpen(true)}
-          onViewModeChange={(v) => setViewMode(v)}
+          onDeleted={(id) => {
+            setFolders((prev) =>
+              prev.map((f) => ({
+                ...f,
+                sheets: f.sheets.filter((s) => s.id !== id),
+              })),
+            );
+          }}
         />
       </div>
 
       <NewSheetModal
         open={newSheetOpen}
         onOpenChange={setNewSheetOpen}
-        folders={folders}
-        currentFolder={currentFolder!}
-        onSheetCreated={handleSheetCreated}
-        ShowSaveTo={false}
+        onSheetCreated={(sheet) => handleSheetCreated(sheet, currentFolder!)}
       />
 
       <CreateFolderDialog

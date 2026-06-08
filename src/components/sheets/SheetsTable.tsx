@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { FileSpreadsheet, MoreHorizontal, Star, Download, Trash2, ExternalLink, Pencil } from "lucide-react";
 import {
   DropdownMenu,
@@ -11,47 +11,48 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
-import { getRecentSheets, renameSheet, deleteSheet } from "@/lib/querys/sheets/sheets";
+import { renameSheet, deleteSheet } from "@/lib/querys/sheets/sheets";
+import { updateSheetStarred } from "@/lib/querys/sheet/sheet";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 /* ------------------------------------------------------------------ */
-/*  Types                                                               */
+/*  Types                                                              */
 /* ------------------------------------------------------------------ */
 interface SheetRow {
   id: string;
   title: string;
-  rawDate: string; // ISO string, kept for time-ago calc
-  ownerName?: string;
+  rawDate: string;
+  ownerName: string;
   ownerAvatar?: string;
-  templateId?: string | null;
-  isOrganization?: boolean;
-  organizationName?: string;
-  folderName?: string;
+  isStarred: boolean;
+  isOrganization: boolean;
+  members: {
+    id: string;
+    name: string;
+    avatar?: string;
+  }[];
+}
+
+interface SheetsTableProps {
+  sheets: any[];
+  onDeleted?: (id: string) => void;
+  onRenamed?: (id: string, title: string) => void;
+  emptyText?: string;
+  emptyDescription?: string;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Date helpers                                                        */
+/*  Date helpers                                                       */
 /* ------------------------------------------------------------------ */
 const formatDate = (iso: string) => {
+  if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  // e.g. "8 May 2026"
-};
-
-const timeAgo = (iso: string) => {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins || 1} min${mins !== 1 ? "s" : ""} ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} hour${hrs !== 1 ? "s" : ""} ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days} day${days !== 1 ? "s" : ""} ago`;
-  return formatDate(iso);
 };
 
 /* ------------------------------------------------------------------ */
-/*  Sheet icon — dark green                                             */
+/*  Sheet icon — dark green                                            */
 /* ------------------------------------------------------------------ */
 const SheetIcon = () => (
   <div
@@ -69,22 +70,22 @@ const SheetIcon = () => (
 );
 
 /* ------------------------------------------------------------------ */
-/*  Avatar                                                              */
+/*  Avatar                                                             */
 /* ------------------------------------------------------------------ */
-const Avatar = ({ name, url }: { name: string; url?: string }) => {
+const Avatar = ({ name, url, className = "h-7 w-7 text-[10px]" }: { name: string; url?: string; className?: string }) => {
   const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   if (url) {
-    return <img src={url} alt={name} className="h-7 w-7 rounded-full object-cover shrink-0" />;
+    return <img src={url} alt={name} className={cn("rounded-full object-cover shrink-0", className)} />;
   }
   return (
-    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0 text-[10px] font-semibold text-muted-foreground select-none">
+    <div className={cn("rounded-full bg-muted flex items-center justify-center shrink-0 font-semibold text-muted-foreground select-none", className)}>
       {initials}
     </div>
   );
 };
 
 /* ------------------------------------------------------------------ */
-/*  Three-dot menu                                                      */
+/*  Three-dot menu                                                     */
 /* ------------------------------------------------------------------ */
 const RowMenu = ({
   sheet, open, onOpenChange, onDeleted, onRenamed, onOpen,
@@ -222,7 +223,7 @@ const RowMenu = ({
 };
 
 /* ------------------------------------------------------------------ */
-/*  Row                                                                 */
+/*  Row Component                                                      */
 /* ------------------------------------------------------------------ */
 const SheetTableRow = ({
   sheet, onDeleted, onRenamed, onClick,
@@ -232,9 +233,26 @@ const SheetTableRow = ({
   onRenamed: (id: string, title: string) => void;
   onClick: (id: string) => void;
 }) => {
-  const [starred, setStarred] = useState(false);
+  const [starred, setStarred] = useState(sheet.isStarred);
   const [menuOpen, setMenuOpen] = useState(false);
   const owner = sheet.ownerName ?? "Me";
+
+  useEffect(() => {
+    setStarred(sheet.isStarred);
+  }, [sheet.isStarred]);
+
+  const handleStarToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newStarred = !starred;
+    setStarred(newStarred);
+    try {
+      await updateSheetStarred(sheet.id, newStarred);
+      toast.success(newStarred ? "Added to starred" : "Removed from starred");
+    } catch {
+      setStarred(!newStarred);
+      toast.error("Failed to update star");
+    }
+  };
 
   return (
     <div
@@ -248,7 +266,7 @@ const SheetTableRow = ({
           "shrink-0 w-5 flex items-center justify-center transition-colors focus:outline-none mr-1",
           starred ? "text-yellow-400" : "text-transparent group-hover/row:text-muted-foreground hover:!text-yellow-400",
         )}
-        onClick={(e) => { e.stopPropagation(); setStarred((s) => !s); }}
+        onClick={handleStarToggle}
       >
         <Star className="h-3.5 w-3.5" fill={starred ? "currentColor" : "none"} />
       </button>
@@ -260,6 +278,32 @@ const SheetTableRow = ({
       <span className="flex-1 truncate text-sm font-normal ml-2.5 mr-4" style={{ minWidth: 0 }}>
         {sheet.title}
       </span>
+
+      {/* Center block — members avatars (avaa and me in center) */}
+      <div className="flex-1 hidden md:flex items-center justify-center min-w-0 px-4">
+        {sheet.isOrganization ? (
+          <div className="flex -space-x-1.5 overflow-hidden">
+            {sheet.members.slice(0, 3).map((member, i) => (
+              <div
+                key={member.id ?? i}
+                className="h-5 w-5 rounded-full border border-background overflow-hidden shrink-0"
+                title={member.name}
+              >
+                <Avatar name={member.name} url={member.avatar} className="h-5 w-5 text-[8px]" />
+              </div>
+            ))}
+            {sheet.members.length > 3 && (
+              <div className="h-5 w-5 rounded-full bg-muted border border-background flex items-center justify-center text-[8px] font-semibold text-muted-foreground shrink-0 select-none">
+                +{sheet.members.length - 3}
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="inline-flex rounded-md bg-secondary/80 px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground whitespace-nowrap select-none">
+            Private
+          </span>
+        )}
+      </div>
 
       {/* Owner block — never shrinks, always full width */}
       <div className="flex items-center gap-2.5" style={{ flexShrink: 0 }}>
@@ -276,98 +320,96 @@ const SheetTableRow = ({
       <div className="w-3 shrink-0" />
 
       {/* Three-dot */}
-      <RowMenu sheet={sheet} open={menuOpen} onOpenChange={setMenuOpen} onDeleted={onDeleted} onRenamed={onRenamed} onOpen={onClick} />
+      <RowMenu
+        sheet={sheet}
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        onDeleted={onDeleted}
+        onRenamed={onRenamed}
+        onOpen={onClick}
+      />
     </div>
   );
 };
 
 /* ------------------------------------------------------------------ */
-/*  Skeleton                                                            */
+/*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
-const SkeletonRow = () => (
-  <div className="flex items-center border-b border-border gap-2 px-0 py-2">
-    <div className="w-5 h-3.5 shrink-0" />
-    <div className="w-[22px] h-7 rounded-[3px] shrink-0 animate-pulse bg-muted" />
-    <div className="flex-1 h-3.5 rounded animate-pulse bg-muted mx-2" style={{ maxWidth: 220 }} />
-    <div className="flex items-center gap-2.5 shrink-0">
-      <div className="h-7 w-7 rounded-full animate-pulse bg-muted" />
-      <div style={{ minWidth: 90 }}>
-        <div className="h-2.5 w-14 rounded animate-pulse bg-muted mb-1" />
-        <div className="h-2 w-20 rounded animate-pulse bg-muted" />
-      </div>
-    </div>
-    <div className="w-3 shrink-0" />
-    <div className="w-7 h-7 shrink-0" />
-  </div>
-);
-
-/* ------------------------------------------------------------------ */
-/*  Empty                                                               */
-/* ------------------------------------------------------------------ */
-const EmptyState = () => (
-  <div className="flex flex-col items-center justify-center py-14 gap-3 text-center">
-    <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-      <FileSpreadsheet className="h-6 w-6 text-primary/50" />
-    </div>
-    <div>
-      <p className="text-sm font-semibold">No recent sheets</p>
-      <p className="text-xs text-muted-foreground mt-0.5">Sheets you open will appear here.</p>
-    </div>
-  </div>
-);
-
-/* ------------------------------------------------------------------ */
-/*  Main                                                                */
-/* ------------------------------------------------------------------ */
-const RecentSheets = () => {
+const SheetsTable: React.FC<SheetsTableProps> = ({
+  sheets,
+  onDeleted,
+  onRenamed,
+  emptyText = "No sheets yet",
+  emptyDescription = "Spreadsheets will appear here.",
+}) => {
   const router = useRouter();
-  const [recentSheets, setRecentSheets] = useState<SheetRow[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await getRecentSheets();
-        setRecentSheets(
-          data.map((sheet: any) => ({
-            id: sheet.id,
-            title: sheet.title,
-            rawDate: sheet.lastEdited,
-            ownerName: sheet.owner?.name ?? sheet.ownerName ?? "Me",
-            ownerAvatar: sheet.owner?.avatar_url ?? sheet.owner?.avatar ?? sheet.ownerAvatar ?? undefined,
-            templateId: sheet.templateId,
-            isOrganization: sheet.isOrganization,
-            organizationName: sheet.organization?.name,
-            folderName: sheet.folder?.name,
-          })),
-        );
-      } finally {
-        setLoading(false);
+  const mappedSheets: SheetRow[] = useMemo(() => {
+    return (sheets ?? []).map((s: any) => {
+      const owner = s.owner ?? { name: "You" };
+
+      // Map members
+      let rawMembers: any[] = [];
+      if (Array.isArray(s.members)) {
+        rawMembers = s.members;
+      } else if (Array.isArray(s.sheet_members)) {
+        rawMembers = s.sheet_members;
+      } else if (Array.isArray(s.organization?.members)) {
+        rawMembers = s.organization.members;
+      } else if (Array.isArray(s.organizationMembers)) {
+        rawMembers = s.organizationMembers;
       }
-    })();
-  }, []);
+
+      const mappedMembers = rawMembers.map((member: any) => {
+        const profile = member.profiles ?? member;
+        const name = profile.name ?? profile.email ?? "Member";
+        return {
+          id: member.id ?? profile.id,
+          name: name,
+          avatar: profile.avatar_url ?? profile.avatar ?? undefined,
+        };
+      });
+
+      return {
+        id: s.id,
+        title: s.title,
+        rawDate: s.lastEdited ?? s.updated_at ?? s.created_at ?? "",
+        ownerName: owner.name ?? "You",
+        ownerAvatar: owner.avatar_url ?? owner.avatar ?? undefined,
+        isStarred: s.isStarred ?? s.is_starred ?? false,
+        isOrganization: s.isOrganization || !!s.organization_id || s.source === "organization",
+        members: mappedMembers,
+      };
+    });
+  }, [sheets]);
+
+  if (mappedSheets.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-14 gap-3 text-center border rounded-xl bg-card/30">
+        <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+          <FileSpreadsheet className="h-6 w-6 text-primary/50" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold">{emptyText}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{emptyDescription}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <section className="h-full min-h-0 flex flex-col overflow-hidden">
-      {/* List — vertical scroll, no border on container */}
-      <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar">
-        {loading
-          ? Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
-          : recentSheets.length === 0
-          ? <EmptyState />
-          : recentSheets.map((sheet) => (
-              <SheetTableRow
-                key={sheet.id}
-                sheet={sheet}
-                onDeleted={(id) => setRecentSheets((p) => p.filter((s) => s.id !== id))}
-                onRenamed={(id, title) => setRecentSheets((p) => p.map((s) => s.id === id ? { ...s, title } : s))}
-                onClick={(id) => router.push(`/sheet/${id}`)}
-              />
-            ))
-        }
-      </div>
-    </section>
+    <div className="flex flex-col">
+      {mappedSheets.map((sheet) => (
+        <SheetTableRow
+          key={sheet.id}
+          sheet={sheet}
+          onDeleted={(id) => onDeleted?.(id)}
+          onRenamed={(id, title) => onRenamed?.(id, title)}
+          onClick={(id) => router.push(`/sheet/${id}`)}
+        />
+      ))}
+    </div>
   );
 };
 
-export default RecentSheets;
+export default SheetsTable;

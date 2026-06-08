@@ -12,7 +12,7 @@ import { Star, FileSpreadsheet, Building2, Info } from "lucide-react";
 export const metadata = generateSEO({
   title: "Starred — Quick Access",
   description:
-    "Access your most important spreadsheets instantly. View and manage all sheets you've starred across personal folders and organizations.",
+    "Access your most important spreadsheets instantly. View and manage all sheets you've starred across private sheets and organizations.",
   path: "/starred",
 });
 
@@ -63,7 +63,7 @@ export default async function StarredPage() {
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
               Star any sheet from the sheet editor or right-click menu to pin it
-              here. Starred sheets appear across your personal folders and
+              here. Starred sheets appear across your private sheets and
               organizations.
             </p>
           </div>
@@ -78,10 +78,10 @@ export default async function StarredPage() {
                 description: "Sheets you've starred",
               },
               {
-                label: "Personal",
+                label: "Private",
                 value: personalCount,
                 icon: FileSpreadsheet,
-                description: "From personal folders",
+                description: "Private spreadsheets",
               },
               {
                 label: "Organization",

@@ -97,6 +97,7 @@ export function IconBtn({
   shortcut,
   danger = false,
   badge,
+  iconClassName,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   tooltip: string;
@@ -106,6 +107,7 @@ export function IconBtn({
   shortcut?: string;
   danger?: boolean;
   badge?: number;
+  iconClassName?: string;
 }) {
   return (
     <Tooltip>
@@ -115,7 +117,7 @@ export function IconBtn({
           disabled={disabled}
           className={`sheet-icon-btn relative flex items-center justify-center h-7 w-7 rounded-md transition-all duration-100 flex-shrink-0 ${active ? "sheet-icon-btn--active" : ""} ${danger ? "sheet-icon-btn--danger" : ""} ${disabled ? "opacity-35 cursor-not-allowed" : "cursor-pointer"}`}
         >
-          <Icon className="h-3.5 w-3.5" />
+          <Icon className={`h-3.5 w-3.5 ${iconClassName || ""}`} />
           {badge != null && badge > 0 && (
             <span
               className="sheet-badge absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full text-[8px] font-bold flex items-center justify-center text-white"

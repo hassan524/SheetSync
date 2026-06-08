@@ -78,7 +78,7 @@ export default async function RecentPage() {
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 This page shows spreadsheets you&apos;ve opened or modified in
-                the last 30 days — across your personal folders and all your
+                the last 30 days — across your private sheets and your
                 organizations. Sheets are sorted by most recently accessed.
               </p>
             </div>

@@ -357,3 +357,10 @@ CREATE TABLE IF NOT EXISTS public.protected_rows (
 
 CREATE INDEX IF NOT EXISTS idx_protected_rows_sheet
 ON public.protected_rows(sheet_id);
+
+-- new queries
+ALTER TABLE public.sheets DROP CONSTRAINT IF EXISTS sheets_is_personal_check;
+ALTER TABLE public.sheets DROP CONSTRAINT IF EXISTS sheets_folder_id_fkey;
+ALTER TABLE public.sheets DROP COLUMN IF EXISTS folder_id;
+ALTER TABLE public.sheets DROP COLUMN IF EXISTS is_personal;
+DROP TABLE IF EXISTS public.folders CASCADE;

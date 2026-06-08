@@ -1,54 +1,36 @@
 "use client";
 
 import { Sheet } from "@/types";
-import SheetCard from "@/components/sheets/Sheet-card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileSpreadsheet, FolderOpen, Plus, Grid3X3, List } from "lucide-react";
-import { formatDistanceToNowStrict, parseISO } from "date-fns";
-import { DataTable } from "@/components/common/Data-table";
-import {
-  sheetsPersonalColumns,
-  universalSheetAction,
-  UniversalEmptyIcon,
-  type UniversalSheetRow,
-} from "@/data/tables/universalSheetColumns";
+import { FileSpreadsheet, FolderOpen, Plus } from "lucide-react";
+import { SheetsTable } from "@/components/sheets";
+import { useRouter } from "next/navigation";
 
 interface Props {
   sheets: Sheet[];
-  viewMode: "grid" | "table";
   searchQuery: string;
   folderName: string;
   onNewSheet: () => void;
   onDeleted?: (id: string) => void;
-  onViewModeChange?: (mode: "grid" | "table") => void;
 }
 
 const SheetsGrid = ({
   sheets,
-  viewMode,
   searchQuery,
   folderName,
   onNewSheet,
-  onViewModeChange,
+  onDeleted,
 }: Props) => {
-  const tableRows: UniversalSheetRow[] = sheets.map((s) => ({
-    id: s.id,
-    title: s.title,
-    is_starred: s.is_starred,
-    source: "personal",
-    folderName: folderName || undefined,
-    owner: s.owner ?? { name: "You", initials: "ME" },
-    collaborators: s.collaborators ?? 0,
-    members: (s as any).members ?? (s as any).sheet_members ?? [],
-    lastModified: s.updated_at ?? undefined,
-    createdAt: s.created_at ?? undefined,
-    rows: s.rows ?? undefined,
-    columns: s.columns ?? undefined,
-    templateId: (s as any).templateId ?? (s as any).template_id ?? undefined,
-    visibility: s.visibility,
-    activeEditors: s.activeEditors ?? undefined,
-  }));
+  const router = useRouter();
+
+  const handleDeleted = (id: string) => {
+    onDeleted?.(id);
+    router.refresh();
+  };
+
+  const handleRenamed = () => {
+    router.refresh();
+  };
 
   return (
     <div className="animate-fade-in">
@@ -67,23 +49,6 @@ const SheetsGrid = ({
             </span>
           </div>
         </div>
-
-        {/* Inline view toggle */}
-        {onViewModeChange && (
-          <Tabs
-            value={viewMode}
-            onValueChange={(v) => onViewModeChange(v as "grid" | "table")}
-          >
-            <TabsList className="h-8 p-0.5">
-              <TabsTrigger value="grid" className="h-7 w-8 p-0">
-                <Grid3X3 className="h-3.5 w-3.5" />
-              </TabsTrigger>
-              <TabsTrigger value="table" className="h-7 w-8 p-0">
-                <List className="h-3.5 w-3.5" />
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        )}
       </div>
 
       {/* Empty state */}
@@ -107,46 +72,13 @@ const SheetsGrid = ({
             </Button>
           )}
         </div>
-      ) : viewMode === "grid" ? (
-        /* GRID VIEW */
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          {sheets.map((sheet, index) => {
-            const lastEdited = sheet.updated_at
-              ? formatDistanceToNowStrict(parseISO(sheet.updated_at), {
-                  addSuffix: true,
-                })
-              : "—";
-            return (
-              <div
-                key={sheet.id}
-                style={{ animationDelay: `${index * 50}ms` }}
-                className="animate-scale-in"
-              >
-                <SheetCard
-                  id={sheet.id}
-                  title={sheet.title}
-                  lastEdited={lastEdited}
-                  isStarred={sheet.is_starred}
-                  templateId={sheet.template_id ?? ""}
-                  folderName={folderName}
-                  rows={sheet.rows ?? 0}
-                  cols={sheet.columns ?? 0}
-                  fillPercent={40}
-                />
-              </div>
-            );
-          })}
-        </div>
       ) : (
-        /* TABLE VIEW — same universal table */
-        <DataTable
-          columns={sheetsPersonalColumns}
-          rows={tableRows}
-          getKey={(s) => s.id}
-          action={universalSheetAction}
+        <SheetsTable
+          sheets={sheets}
+          onDeleted={handleDeleted}
+          onRenamed={handleRenamed}
           emptyText="No sheets yet"
           emptyDescription="Sheets in this folder will appear here."
-          emptyIcon={<UniversalEmptyIcon />}
         />
       )}
     </div>
@@ -154,4 +86,3 @@ const SheetsGrid = ({
 };
 
 export default SheetsGrid;
-

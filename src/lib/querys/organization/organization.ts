@@ -164,12 +164,10 @@ export async function getOrganizationById(
         sheets (
           id,
           title,
-          folder_id,
           owner_id,
           organization_id,
           template_id,
           is_starred,
-          is_personal,
           last_modified_by,
           created_at,
           updated_at,
@@ -224,12 +222,11 @@ export async function getOrganizationById(
       .map((sheet: any) => ({
         id: sheet.id,
         title: sheet.title,
-        folder_id: sheet.folder_id ?? null,
+        folder_id: null,
         owner_id: sheet.owner_id,
         organization_id: sheet.organization_id,
         template_id: sheet.template_id ?? "",
         is_starred: sheet.is_starred,
-        is_personal: sheet.is_personal ?? true,
         created_at: sheet.created_at,
         updated_at: sheet.updated_at,
         owner: {
@@ -242,6 +239,13 @@ export async function getOrganizationById(
         lastModifiedBy:
           sheet.lastEditor?.name || sheet.owner?.name || "Unknown",
         collaborators: org.organization_members?.length || 1, // All org members have access
+        members: (org.organization_members ?? []).map((member: any) => ({
+          id: member.profiles?.id ?? member.id,
+          name: member.profiles?.name ?? "Member",
+          email: member.profiles?.email ?? "",
+          avatar: member.profiles?.avatar_url ?? null,
+          status: member.status ?? "offline",
+        })),
         activeEditors: 0,
         size: sheet.size_mb?.toString() || "0",
         rows: sheet.rows?.length ?? 0,

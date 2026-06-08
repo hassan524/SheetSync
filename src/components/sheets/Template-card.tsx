@@ -27,7 +27,7 @@ const TemplateCard = ({
       disabled={disabled}
       aria-disabled={disabled}
       className={cn(
-        "w-full group relative p-4 rounded-xl border border-border bg-card text-left transition-all duration-300 animate-slide-up",
+        "w-full h-full group relative p-4 rounded-xl border border-border bg-card text-left transition-all duration-300 animate-slide-up flex flex-col justify-start",
         disabled
           ? "cursor-not-allowed opacity-70"
           : "cursor-pointer hover:shadow-elevated hover:border-primary/30 hover:-translate-y-1",

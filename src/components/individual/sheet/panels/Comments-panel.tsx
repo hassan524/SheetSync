@@ -267,10 +267,10 @@ export default function CommentsPanel({
                             return (
                                 <div
                                     key={comment.id}
-                                    className={`px-3 py-3 border-b transition-colors ${comment.resolved ? "opacity-40" : ""
+                                    className={`mx-3 my-2 rounded-xl border p-3 transition-all ${comment.resolved ? "opacity-40" : ""
                                         } ${t(
-                                            "border-gray-100 hover:bg-gray-50/50",
-                                            "border-gray-800/60 hover:bg-gray-900/40"
+                                            "border-gray-150 bg-gray-50/30 hover:bg-gray-50/80 shadow-sm",
+                                            "border-slate-800/80 bg-slate-900/35 hover:bg-slate-900/55 shadow-md shadow-black/10"
                                         )}`}
                                 >
                                     {/* Cell label — only in "all" view */}

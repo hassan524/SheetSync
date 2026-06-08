@@ -270,12 +270,12 @@ export default function RightPanel({
 
   return (
     <div
-      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${d ? "bg-gray-950 border-gray-800" : "bg-white border-gray-100"
+      className={`w-80 border-l flex flex-col h-full overflow-hidden shrink-0 ${d ? "bg-slate-950 border-slate-800" : "bg-white border-gray-100"
         }`}
     >
       {/* ── Panel header ── */}
       <div
-        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${d ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"
+        className={`h-10 flex items-center justify-between px-4 border-b shrink-0 ${d ? "border-slate-800 bg-slate-950" : "border-gray-100 bg-white"
           }`}
       >
         <div className="flex items-center gap-2">

@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { useRouter } from "next/navigation";
 import TemplateCard from "@/components/sheets/Template-card";
-import UseTemplateModal from "@/components/sheets/Use-template-modal";
-import { getAllFolders } from "@/lib/querys/folder/folders";
-import { getAllOrganizations } from "@/lib/querys/organization/organization";
+import { createSheet } from "@/lib/querys/sheets/sheets";
+import { logActivity } from "@/lib/querys/activity/activity";
 import { ArrowRight, LayoutTemplate } from "lucide-react";
+import { toast } from "sonner";
 
 const DASHBOARD_TEMPLATE_TITLES = [
   "Blank Sheet",
@@ -18,33 +18,35 @@ const DASHBOARD_TEMPLATE_TITLES = [
 
 const TemplatePicker = () => {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  const [templateModalOpen, setTemplateModalOpen] = React.useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = React.useState<
-    string | null
-  >(null);
-  const [folders, setFolders] = React.useState<any[]>([]);
-  const [organizations, setOrganizations] = React.useState<any[]>([]);
-  const handleTemplateClick = (templateId: string) => {
-    setSelectedTemplateId(templateId);
-    setTemplateModalOpen(true);
+  const handleTemplateClick = async (templateId: string, templateTitle: string) => {
+    if (loading) return;
+    const toastId = toast.loading("Creating sheet from template...");
+    try {
+      setLoading(true);
+      const createdSheet = await createSheet({
+        name: "Untitled Sheet",
+        templateId: templateId,
+        markRecent: true,
+      });
+
+      await logActivity({
+        sheetId: createdSheet.id,
+        organizationId: null,
+        action: "created sheet",
+        target: `Untitled Sheet (${templateTitle})`,
+      });
+
+      toast.success("Sheet created successfully", { id: toastId });
+      router.refresh();
+      router.push(`/sheet/${createdSheet.id}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create sheet", { id: toastId });
+    } finally {
+      setLoading(false);
+    }
   };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [folderData, orgData] = await Promise.all([
-          getAllFolders(),
-          getAllOrganizations(),
-        ]);
-        setFolders(folderData || []);
-        setOrganizations(orgData || []);
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-      }
-    };
-    fetchData();
-  }, []);
 
   return (
     <section className="animate-fade-in">
@@ -86,29 +88,15 @@ const TemplatePicker = () => {
           .map((template) => (
             <div
               key={template!.id}
-              className="cursor-pointer"
-              onClick={() => handleTemplateClick(template!.id)}
+              className="cursor-pointer h-full"
+              onClick={() => handleTemplateClick(template!.id, template!.title)}
             >
               <TemplateCard {...template!} />
             </div>
           ))}
       </div>
-
-      {selectedTemplateId && (
-        <UseTemplateModal
-          open={templateModalOpen}
-          onOpenChange={(open) => {
-            setTemplateModalOpen(open);
-            if (!open) setSelectedTemplateId(null);
-          }}
-          templateId={selectedTemplateId}
-          folders={folders}
-          organizations={organizations}
-        />
-      )}
     </section>
   );
 };
 
 export default TemplatePicker;
-

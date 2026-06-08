@@ -123,6 +123,7 @@
 
 /* ─── Mobile: fixed toolbar height & no scrollbar ────────────────────────── */
 @media (max-width: 768px) {
+
   .sheet-toolbar,
   .sheet-formatting-bar {
     max-height: 44px;
@@ -180,6 +181,149 @@
   background: var(--sh-hover) !important;
 }
 
+.sheet-header-cell--excel {
+  line-height: 1.05;
+}
+
+.sheet-col-letter {
+  color: var(--sh-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.sheet-col-label {
+  color: var(--sh-col-label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* ─── Merge: master cell ─────────────────────────────────────────────────── */
+/*
+  The master cell's rdg-cell container MUST be overflow:visible so the
+  absolute overlay div can expand downward (merge-down) or rightward
+  (merge-across) beyond the single cell boundary into covered siblings.
+  contain:none removes the stacking-context isolation that would clip it.
+*/
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
+  overflow: visible !important;
+  contain: none !important;
+  z-index: 6;
+  border: none !important;
+  background: transparent !important;
+}
+
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
+.rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
+  outline: none !important;
+  background: transparent !important;
+}
+
+/* The inner overlay div — position/size/boxShadow all set inline */
+.sheet-cell-merge-master {
+  border: none !important;
+  outline: none !important;
+}
+
+/* ─── Merge: covered cells ───────────────────────────────────────────────── */
+/*
+  Covered cell rdg-cell containers must be completely invisible:
+  no borders, no backgrounds, no hover/selection artifacts.
+  The .sheet-merge-covered-cell inner div is the click target that
+  redirects selection to the master.
+*/
+/* ─── Merge: covered cells ───────────────────────────────────────────── */
+/*
+  Covered cells must be fully invisible — no border, no bg, no outline.
+  EXCEPT: for merge-across and merge-down, the master's absolute overlay
+  draws its own right border. To prevent the covered cell's rdg border
+  from double-drawing on top of it, we suppress all borders here.
+  The master's mergeOverrideStyle handles the correct border painting.
+*/
+.rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
+  border: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  contain: none !important;
+}
+
+.rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell)[aria-selected="true"],
+.rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell):hover,
+.rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-merge-covered-cell) {
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* ─── Merge: master cell — suppress rdg's own selection outline ─────── */
+/*
+  rdg adds `outline: 2px solid` on [aria-selected="true"]. For merge masters
+  this would only outline the single-cell boundary, not the full merged area.
+  We suppress it here; the selection ring is drawn by mergeOverrideStyle's
+  boxShadow which spans the correct merged dimensions.
+*/
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell)[aria-selected="true"],
+.rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell):hover,
+.rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-merge-covered-cell) {
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Restore bottom border on covered cells so row separator shows */
+.rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+  border-bottom: 1px solid var(--rdg-border-color, #e8eaed) !important;
+}
+.rdg-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+  border-bottom: 1px solid #1e2330 !important;
+}
+
+/* Inner transparent click-target div */
+.sheet-merge-covered-cell {
+  background: transparent !important;
+  pointer-events: auto;
+  cursor: cell;
+}
+
+/* ─── Auto-overflow (text spill) ─────────────────────────────────────────── */
+.sheet-cell-auto-overflow-master {
+  z-index: 3;
+}
+
+.sheet-cell-auto-overflow-content {
+  display: inline-flex;
+  align-items: center;
+  min-height: 100%;
+  position: relative;
+  z-index: 3;
+}
+
+.sheet-cell-auto-overflow-covered {
+  background: transparent;
+}
+
+.rdg-cell:has(.sheet-cell-auto-overflow-master) {
+  z-index: 3;
+}
+
+.rdg-cell:has(.sheet-cell-auto-overflow-covered) {
+  border-right-color: transparent !important;
+  background: transparent !important;
+}
+
+/* ─── Save / live / org badges ───────────────────────────────────────────── */
 .sheet-save-status {
   background: var(--sh-save-bg);
 }
@@ -493,7 +637,7 @@
   padding: 0 !important;
   background-color: var(--rdg-background-color);
   cursor: cell;
-  overflow: visible;
+  overflow: hidden;
   contain: style;
   transition: background-color 0.06s ease;
 }
@@ -583,8 +727,7 @@
   background: rgba(52, 211, 153, 0.14) !important;
 }
 
-/* ── Dark mode: force cell backgrounds so react-data-grid's built-in white   */
-/* stylesheet cannot bleed through the custom dark theme.                     */
+/* ── Dark mode: force cell backgrounds ──────────────────────────────────── */
 .rdg-dark .rdg-cell {
   background-color: #0f1117 !important;
   color: #e2e8f0;
@@ -639,13 +782,22 @@
   background-color: #0f1117 !important;
 }
 
+/* auto-overflow covered cells stay transparent in dark mode too */
+.rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
+.rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-auto-overflow-covered),
+.rdg-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
+.rdg-dark .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-auto-overflow-covered) {
+  border-right-color: transparent !important;
+  border-bottom-color: transparent !important;
+  background: transparent !important;
+}
+
 /* Smooth cursor on non-editing cells */
-.rdg-cell > * {
+.rdg-cell>* {
   cursor: inherit;
 }
 
 /* ─── Popover / Dropdown (Radix portals) ─────────────────────────────────── */
-/* These render at <body> level so we target them globally with data attrs    */
 [data-radix-popper-content-wrapper] {
   --popover-bg: #ffffff;
   --popover-border: #e8eaed;
@@ -655,8 +807,6 @@
   --popover-sep: #e8eaed;
 }
 
-/* When a .sheet-dark ancestor exists, override the tokens via JS class on <html> or body.
-   We handle this with a data attribute set by the component — see SheetClient. */
 body[data-sheet-dark="true"] [data-radix-popper-content-wrapper],
 body[data-sheet-dark="true"] [data-radix-select-viewport] {
   --popover-bg: #1a1f2e;
@@ -667,9 +817,9 @@ body[data-sheet-dark="true"] [data-radix-select-viewport] {
   --popover-sep: #2a3045;
 }
 
-[data-radix-popper-content-wrapper] > [role="menu"],
-[data-radix-popper-content-wrapper] > [role="listbox"],
-[data-radix-popper-content-wrapper] > div[data-state],
+[data-radix-popper-content-wrapper]>[role="menu"],
+[data-radix-popper-content-wrapper]>[role="listbox"],
+[data-radix-popper-content-wrapper]>div[data-state],
 [data-radix-select-viewport] {
   background: var(--popover-bg) !important;
   border-color: var(--popover-border) !important;
@@ -677,7 +827,6 @@ body[data-sheet-dark="true"] [data-radix-select-viewport] {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18) !important;
 }
 
-/* Items */
 [role="menuitem"],
 [role="option"] {
   color: var(--popover-text, #1a1d23) !important;
@@ -696,7 +845,7 @@ body[data-sheet-dark="true"] [data-radix-select-viewport] {
   background: var(--popover-sep, #e8eaed) !important;
 }
 
-[role="group"] > [class*="Label"],
+[role="group"]>[class*="Label"],
 [data-radix-dropdown-menu-label] {
   color: var(--popover-muted, #9ca3af) !important;
 }
@@ -748,9 +897,7 @@ body[data-sheet-dark="true"] [role="dialog"] .border-b {
   border-color: #2a3045 !important;
 }
 
-body[data-sheet-dark="true"]
-  [role="dialog"]
-  button:not(.bg-primary):not([class*="btn-primary"]) {
+body[data-sheet-dark="true"] [role="dialog"] button:not(.bg-primary):not([class*="btn-primary"]) {
   border-color: #2a3045 !important;
   color: #8892a4 !important;
 }
@@ -834,6 +981,7 @@ body[data-sheet-dark="true"] [role="dialog"] .bg-gray-900 {
 }
 
 @keyframes collab-pulse {
+
   0%,
   100% {
     opacity: 1;
