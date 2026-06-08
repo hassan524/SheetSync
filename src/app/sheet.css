@@ -123,6 +123,7 @@
 
 /* ─── Mobile ────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
+
   .sheet-toolbar,
   .sheet-formatting-bar {
     max-height: 44px;
@@ -254,10 +255,22 @@
 }
 
 /* ─── Merge: covered cells ───────────────────────────────────────────────── */
+/*
+  Covered cell rdg-cell containers must be completely invisible:
+  no borders, no backgrounds, no hover/selection artifacts.
+  The .sheet-merge-covered-cell inner div is the click target that
+  redirects selection to the master.
+*/
+/* ─── Merge: covered cells ───────────────────────────────────────────── */
+/*
+  Covered cells must be fully invisible — no border, no bg, no outline.
+  EXCEPT: for merge-across and merge-down, the master's absolute overlay
+  draws its own right border. To prevent the covered cell's rdg border
+  from double-drawing on top of it, we suppress all borders here.
+  The master's mergeOverrideStyle handles the correct border painting.
+*/
 .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
   border: none !important;
-  border-top: none !important;
-  border-left: none !important;
   border-right: none !important;
   border-bottom: none !important;
   outline: none !important;
@@ -314,6 +327,35 @@
   outline: none !important;
   background: transparent !important;
   box-shadow: none !important;
+  border: none !important;
+}
+
+/* ─── Merge: master cell — suppress rdg's own selection outline ─────── */
+/*
+  rdg adds `outline: 2px solid` on [aria-selected="true"]. For merge masters
+  this would only outline the single-cell boundary, not the full merged area.
+  We suppress it here; the selection ring is drawn by mergeOverrideStyle's
+  boxShadow which spans the correct merged dimensions.
+*/
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell)[aria-selected="true"],
+.rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell):hover,
+.rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-merge-covered-cell) {
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Restore bottom border on covered cells so row separator shows */
+.rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+  border-bottom: 1px solid var(--rdg-border-color, #e8eaed) !important;
+}
+.rdg-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+  border-bottom: 1px solid #1e2330 !important;
 }
 
 .sheet-merge-covered-cell {
@@ -882,16 +924,14 @@
 .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
 .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-auto-overflow-covered),
 .rdg-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
-.rdg-dark
-  .rdg-sheet
-  .rdg-row:hover
-  .rdg-cell:has(.sheet-cell-auto-overflow-covered) {
+.rdg-dark .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-auto-overflow-covered) {
   border-right-color: transparent !important;
   border-bottom-color: transparent !important;
   background: transparent !important;
 }
 
-.rdg-cell > * {
+/* Smooth cursor on non-editing cells */
+.rdg-cell>* {
   cursor: inherit;
 }
 
@@ -915,9 +955,9 @@ body[data-sheet-dark="true"] [data-radix-select-viewport] {
   --popover-sep: #2a3045;
 }
 
-[data-radix-popper-content-wrapper] > [role="menu"],
-[data-radix-popper-content-wrapper] > [role="listbox"],
-[data-radix-popper-content-wrapper] > div[data-state],
+[data-radix-popper-content-wrapper]>[role="menu"],
+[data-radix-popper-content-wrapper]>[role="listbox"],
+[data-radix-popper-content-wrapper]>div[data-state],
 [data-radix-select-viewport] {
   background: var(--popover-bg) !important;
   border-color: var(--popover-border) !important;
@@ -944,7 +984,7 @@ body[data-sheet-dark="true"] [data-radix-select-viewport] {
   background: var(--popover-sep, #e8eaed) !important;
 }
 
-[role="group"] > [class*="Label"],
+[role="group"]>[class*="Label"],
 [data-radix-dropdown-menu-label] {
   color: var(--popover-muted, #9ca3af) !important;
 }
@@ -996,9 +1036,7 @@ body[data-sheet-dark="true"] [role="dialog"] .border-b {
   border-color: #2a3045 !important;
 }
 
-body[data-sheet-dark="true"]
-  [role="dialog"]
-  button:not(.bg-primary):not([class*="btn-primary"]) {
+body[data-sheet-dark="true"] [role="dialog"] button:not(.bg-primary):not([class*="btn-primary"]) {
   border-color: #2a3045 !important;
   color: #8892a4 !important;
 }
@@ -1082,6 +1120,7 @@ body[data-sheet-dark="true"] [role="dialog"] .bg-gray-900 {
 }
 
 @keyframes collab-pulse {
+
   0%,
   100% {
     opacity: 1;

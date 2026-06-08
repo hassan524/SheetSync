@@ -1788,23 +1788,70 @@ export default function SheetClient() {
     return rowSpan > 1 || colSpan > 1;
   }, [selectionRange]);
 
-  const selectMergeBlock = useCallback(
-    (merge: MergeInfo) => {
-      const masterColIndex = columnIndexByKey.get(merge.masterCol);
-      if (masterColIndex === undefined) return;
-      setSelectedColumnKey(null);
-      setSelectedCell({ row: merge.masterRow, col: merge.masterCol });
-      setSelectionRange({
-        start: { row: merge.masterRow, colIndex: masterColIndex },
-        end: {
-          row: merge.masterRow + merge.rowSpan - 1,
-          colIndex: masterColIndex + merge.colSpan - 1,
-        },
-      });
-      setActiveCommentCell(`${merge.masterRow}-${merge.masterCol}`);
-    },
-    [columnIndexByKey, setSelectedColumnKey, setSelectedCell, setSelectionRange, setActiveCommentCell],
-  );
+  const selectMergeBlock = useCallback((merge: MergeInfo) => {
+    const masterColIndex = columnIndexByKey.get(merge.masterCol);
+    if (masterColIndex === undefined) return;
+    setSelectedColumnKey(null);
+    setSelectedCell({ row: merge.masterRow, col: merge.masterCol });
+
+    // For merge-across: rowSpan is 1, so end.row === start.row (correct — one row)
+    // For merge-down:   colSpan is 1, so end.colIndex === start.colIndex (correct — one col)
+    // For merge-all:    both rowSpan and colSpan > 1 (correct — full block)
+    // The selectionRange drives the blue highlight on covered cells AND the
+    // inSelection check that marks isSelected=true on the master for the boxShadow ring.
+    setSelectionRange({
+      start: { row: merge.masterRow, colIndex: masterColIndex },
+      end: {
+        row: merge.masterRow + merge.rowSpan - 1,
+        colIndex: masterColIndex + merge.colSpan - 1,
+      },
+    });
+    setActiveCommentCell(`${merge.masterRow}-${merge.masterCol}`);
+  }, [columnIndexByKey, setSelectedColumnKey, setSelectedCell, setSelectionRange, setActiveCommentCell]);
+
+  const clearMergeFormatsInRange = useCallback((
+    nextFormats: Record<string, CellFormat>,
+    startRow: number,
+    endRow: number,
+    startCol: number,
+    endCol: number,
+  ) => {
+    const mergeKeys = new Set<string>();
+    for (let rowIdx = startRow; rowIdx <= endRow; rowIdx += 1) {
+      for (let colIdx = startCol; colIdx <= endCol; colIdx += 1) {
+        const colKey = columns[colIdx]?.key;
+        if (!colKey) continue;
+        const merge = mergeByCell.get(`${rowIdx}-${colKey}`);
+        if (!merge) continue;
+        const masterColIndex = columnIndexByKey.get(merge.masterCol);
+        if (masterColIndex === undefined) continue;
+        for (let mr = merge.masterRow; mr < merge.masterRow + merge.rowSpan; mr += 1) {
+          for (let mc = masterColIndex; mc < masterColIndex + merge.colSpan; mc += 1) {
+            const mergedColKey = columns[mc]?.key;
+            if (mergedColKey) mergeKeys.add(`${mr}-${mergedColKey}`);
+          }
+        }
+      }
+    }
+    mergeKeys.forEach((cellKey) => {
+      const { merge: _merge, ...rest } = nextFormats[cellKey] ?? {};
+      if (Object.keys(rest).length > 0) nextFormats[cellKey] = rest;
+      else delete nextFormats[cellKey];
+    });
+  }, [columnIndexByKey, columns, mergeByCell]);
+
+  const persistCellFormatMap = useCallback(async (nextFormats: Record<string, CellFormat>) => {
+    formatting.setCellFormats(nextFormats);
+    markSaving();
+    try {
+      await saveAllCellFormats(sheetId, nextFormats);
+      broadcastSheetSnapshot({ cellFormats: nextFormats });
+      markSaved();
+    } catch {
+      setSaveStatus("saved");
+      toast.error("Failed to save cell formatting.");
+    }
+  }, [broadcastSheetSnapshot, formatting.setCellFormats, markSaved, markSaving, setSaveStatus, sheetId]);
 
   const clearMergeFormatsInRange = useCallback(
     (
@@ -2193,43 +2240,45 @@ export default function SheetClient() {
         setSaveStatus("saved");
       }
     }, 50);
-  }, [
-    canEditSheet, showViewerEditMessage, clipboard.pasteCellOrRange, selectedCell,
-    rows, protection.isRowProtected, sheetId, rowsHistory, markSaving, markSaved,
-    setSaveStatus, formulas, formatting, setSheetState,
-  ]);
+  }, [canEditSheet, showViewerEditMessage, clipboard.pasteCellOrRange, selectedCell, rows, protection.isRowProtected, sheetId, rowsHistory, markSaving, markSaved, setSaveStatus, formulas, formatting, setSheetState]);
 
-  const onCellPointerDown = useCallback(
-    (rowIdx: number, colKey: string, e: React.PointerEvent) => {
-      e.preventDefault();
-      setSelectedColumnKey(null);
-      const colIndex = columns.findIndex((c) => c.key === colKey);
-      if (colIndex === -1) return;
-      selectionAnchorRef.current = { row: rowIdx, colIndex };
-      setSelectionRange({ start: { row: rowIdx, colIndex }, end: { row: rowIdx, colIndex } });
-      isDraggingRef.current = true;
-      const onUp = () => {
-        isDraggingRef.current = false;
-        selectionAnchorRef.current = null;
-        window.removeEventListener("pointerup", onUp);
-      };
-      window.addEventListener("pointerup", onUp);
-    },
-    [columns],
-  );
+  const onCellPointerDown = useCallback((rowIdx: number, colKey: string, e: React.PointerEvent) => {
+    e.preventDefault();
+    setSelectedColumnKey(null);
+    const colIndex = columns.findIndex((c) => c.key === colKey);
+    if (colIndex === -1) return;
 
-  const onCellPointerEnter = useCallback(
-    (rowIdx: number, colKey: string) => {
-      if (!isDraggingRef.current || !selectionAnchorRef.current) return;
-      const colIndex = columns.findIndex((c) => c.key === colKey);
-      if (colIndex === -1) return;
-      setSelectionRange({
-        start: selectionAnchorRef.current,
-        end: { row: rowIdx, colIndex },
-      });
-    },
-    [columns],
-  );
+    // If this cell is part of a merge block, let onCellClick → selectMergeBlock
+    // handle the selection. Starting a drag anchor here would reset selectionRange
+    // to a single cell and override the full-block selection.
+    const cellKey = `${rowIdx}-${colKey}`;
+    const mergeInfo = mergeByCell.get(cellKey);
+    if (mergeInfo) {
+      isDraggingRef.current = false;
+      selectionAnchorRef.current = null;
+      return;
+    }
+
+    selectionAnchorRef.current = { row: rowIdx, colIndex };
+    setSelectionRange({ start: { row: rowIdx, colIndex }, end: { row: rowIdx, colIndex } });
+    isDraggingRef.current = true;
+    const onUp = () => { isDraggingRef.current = false; selectionAnchorRef.current = null; window.removeEventListener("pointerup", onUp); };
+    window.addEventListener("pointerup", onUp);
+  }, [columns, mergeByCell]);
+
+  const onCellPointerEnter = useCallback((rowIdx: number, colKey: string) => {
+    if (!isDraggingRef.current || !selectionAnchorRef.current) return;
+    const colIndex = columns.findIndex((c) => c.key === colKey);
+    if (colIndex === -1) return;
+
+    // Don't extend a drag selection into a merge block — it would create a
+    // partial selection that doesn't align with the merged boundaries.
+    const cellKey = `${rowIdx}-${colKey}`;
+    const mergeInfo = mergeByCell.get(cellKey);
+    if (mergeInfo) return;
+
+    setSelectionRange({ start: selectionAnchorRef.current, end: { row: rowIdx, colIndex } });
+  }, [columns, mergeByCell]);
 
   const buildFillValue = useCallback((base: any, offset: number, step = 1) => {
     const raw = String(base ?? "");
@@ -3726,78 +3775,101 @@ export default function SheetClient() {
                 });
               }
             }}
-            draggable
-            onDragStart={() => colOps.handleColumnDragStart(col.key)}
-            onDragOver={(e) =>
-              colOps.handleColumnDragOver(
-                e,
-                col.key,
-                (u: any) =>
-                  setSheetState((p) => ({
-                    ...p,
-                    columns: typeof u === "function" ? u(p.columns) : u,
-                  })),
-              )
-            }
-            onDragEnd={sheetColOps.handleColumnDragEnd}
-          >
-            <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-move opacity-0 group-hover/header:opacity-100 transition-opacity" />
-            <div className="min-w-0 flex-1">
-              <div className="sheet-col-letter truncate">
-                {columnIndexToName(columns.findIndex((c) => c.key === col.key))}
-              </div>
-              <div className="sheet-col-label truncate">
-                {col.name ||
-                  columnIndexToName(columns.findIndex((c) => c.key === col.key))}
-              </div>
-            </div>
-            {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && (
-              <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60" />
-            )}
-            <ColumnHeaderMenu
-              column={col}
-              onChangeType={(t) => {
-                if (!canEditSheet) {
-                  showViewerEditMessage();
-                  return;
-                }
-                sheetColOps.handleChangeColumnType(col.key, t);
-                setTimeout(() => {
-                  const clearedRows = rowsHistory.currentState.map((row) => {
-                    const rowTypes = { ...(row[ROW_CELL_TYPES_KEY] ?? {}) };
-                    delete rowTypes[col.key];
-                    const rowSelects = { ...(row[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}) };
-                    delete rowSelects[col.key];
-                    const defaultVal = getDefaultValueForType(t);
-                    const currentVal = row[col.key];
-                    const shouldApplyDefault =
-                      currentVal === "" ||
-                      currentVal === null ||
-                      currentVal === undefined;
-                    return {
-                      ...row,
-                      ...(shouldApplyDefault ? { [col.key]: defaultVal } : {}),
-                      [ROW_CELL_TYPES_KEY]: rowTypes,
-                      [ROW_CELL_SELECT_OPTIONS_KEY]: rowSelects,
-                    };
-                  });
-                  rowsHistory.pushState(clearedRows);
-                  setSheetState((p) => ({ ...p, rows: clearedRows }));
-                  saveAllRows(sheetId, clearedRows).catch(console.error);
-                  broadcastSheetSnapshot({ rows: clearedRows });
-                }, 60);
-                if (t === "select") {
-                  setFocusedColumnKey(col.key);
-                  setRightPanel("select-options");
-                }
+            onOpenColumnPanel={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
+              setFocusedColumnKey(col.key);
+              setRightPanel(col.type === "select" ? "select-options" : "columns");
+            }}
+            onDelete={() => canEditSheet ? sheetColOps.handleDeleteColumn(col.key) : showViewerEditMessage()}
+            onRename={(newName) => canEditSheet ? sheetColOps.handleRenameColumn(col.key, newName) : showViewerEditMessage()}
+            onToggleTextWrap={() => canEditSheet ? handleTextWrapToggle() : showViewerEditMessage()}
+            textWrapEnabled={textWrap.textWrapColumns.has(col.key)}
+            columnFormula={formulas.columnFormulas[col.key]}
+            onApplyColumnFormula={(f) => canEditSheet ? handleApplyFormulaToColumn(col.key, f) : showViewerEditMessage()}
+            onRemoveColumnFormula={() => canEditSheet ? handleRemoveColumnFormula(col.key) : showViewerEditMessage()}
+            selectOptions={col.selectOptions}
+            onUpdateSelectOptions={(opts) => canEditSheet ? sheetColOps.handleUpdateSelectOptions(col.key, opts) : showViewerEditMessage()}
+            onFillColumnNumbers={() => canEditSheet ? handleFillColumnNumbers(col.key) : showViewerEditMessage()}
+            onFillColumnHashNumbers={() => canEditSheet ? handleFillColumnHashNumbers(col.key) : showViewerEditMessage()}
+            onInsertLeft={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
+              const idx = columns.findIndex((c) => c.key === col.key);
+              sheetColOps.insertColumnAt(idx, null, "blank");
+              setTimeout(async () => {
+                markSaving();
+                await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]);
+                markSaved();
+              }, 50);
+            }}
+            onInsertRight={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
+              const idx = columns.findIndex((c) => c.key === col.key);
+              sheetColOps.insertColumnAt(idx + 1, null, "blank");
+              setTimeout(async () => {
+                markSaving();
+                await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]);
+                markSaved();
+              }, 50);
+            }}
+            onDuplicate={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
+              const idx = columns.findIndex((c) => c.key === col.key);
+              sheetColOps.insertColumnAt(idx + 1, col, "duplicate");
+              setTimeout(async () => {
+                markSaving();
+                await Promise.all([saveAllColumns(sheetId, columnsHistory.currentState), saveAllRows(sheetId, rowsHistory.currentState)]);
+                markSaved();
+              }, 50);
+            }}
+            onClearColumn={() => canEditSheet ? sheetColOps.clearColumnValues(col) : showViewerEditMessage()}
+            onSortAsc={() => canEditSheet ? sheetRowOps.handleSortByColumn(col.key, "asc") : showViewerEditMessage()}
+            onSortDesc={() => canEditSheet ? sheetRowOps.handleSortByColumn(col.key, "desc") : showViewerEditMessage()}
+            onSetCurrency={(currencyCode) => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
+              const updated = columns.map((c) => c.key === col.key ? { ...c, currencyCode } : c);
+              setSheetState((p) => ({ ...p, columns: updated }));
+              columnsHistory.pushState(updated);
+              setTimeout(async () => { markSaving(); await saveAllColumns(sheetId, columnsHistory.currentState); markSaved(); }, 50);
+            }}
+            onApplyColumnFormat={(fmt) => canEditSheet ? handleApplyColumnFormat(col.key, fmt) : showViewerEditMessage()}
+            onToggleFreeze={() => canEditSheet ? handleToggleFreezeColumn(col.key) : showViewerEditMessage()}
+            onOpenValidationPanel={() => {
+              if (!canEditSheet) { showViewerEditMessage(); return; }
+              setFocusedColumnKey(col.key);
+              setRightPanel("validation");
+            }}
+          />
+        </div>
+      ),
+      renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
+        const rowIdx = rows.findIndex((r) => r.id === props.row.id);
+        const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
+        const autoOverflowInfo = autoOverflowByCell.get(`${rowIdx}-${col.key}`);
+        // In gridColumns → renderCell (covered cell branch)
+        // In renderCell — covered cell branch (full replacement)
+        if (mergeInfo?.hidden) {
+          // Look up the master's canonical merge info (it has hidden: undefined).
+          // The covered cell's copy is correct but using the master entry is safer
+          // and ensures selectMergeBlock always receives the non-hidden version.
+          const masterKey = `${mergeInfo.masterRow}-${mergeInfo.masterCol}`;
+          const masterMergeInfo = mergeByCell.get(masterKey) ?? mergeInfo;
+          return (
+            <div
+              className="sheet-merge-covered-cell"
+              data-merge-covered="true"
+              style={{
+                position: "absolute",
+                inset: 0,
+                pointerEvents: "auto",
+                userSelect: "none",
+                cursor: "cell",
+                background: "transparent",
+                zIndex: 5,
               }}
-              onOpenColumnPanel={() => {
-                if (!canEditSheet) {
-                  showViewerEditMessage();
-                  return;
-                }
-                setFocusedColumnKey(col.key);
-                setRightPanel(col.type === "select" ? "select-options" : "columns");
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                selectMergeBlock(masterMergeInfo);  // ← FIXED: always uses master's info
               }}
               onDelete={() =>
                 canEditSheet
@@ -4336,7 +4408,7 @@ export default function SheetClient() {
             isTall,
           }) => (
             <div
-              className={isMergeMaster ? "sheet-cell-merge-master sheet-cell-active-selected" : ""}
+              data-merge-edit="true"
               style={{
                 position: isMergeMaster ? "absolute" : "relative",
                 top: 0,
@@ -4365,176 +4437,62 @@ export default function SheetClient() {
             color: isDark ? "#e2e8f0" : "#1a1d23",
           };
 
-          // ── IMAGE ─────────────────────────────────────────────────────
-          if (cellType === "image") {
-            return (
-              <EditorWrapper>
-                <div
-                  className="w-full h-full flex items-center justify-center cursor-pointer"
-                  onClick={() => {
-                    setActiveCell({ rowId: row.id, colKey: column.key });
-                    fileInputRef.current?.click();
-                  }}
-                  style={inputStyle}
-                >
-                  {row[column.key] ? (
-                    <img
-                      src={row[column.key]}
-                      alt="cell"
-                      className="max-h-12 max-w-full object-cover rounded"
-                    />
-                  ) : (
-                    <span className="text-xs text-gray-400">Upload Image</span>
-                  )}
-                </div>
-              </EditorWrapper>
-            );
-          }
-
-          // ── CHECKBOX ──────────────────────────────────────────────────
-          if (cellType === "checkbox") {
-            return (
-              <EditorWrapper>
-                <div
-                  className="h-full w-full flex items-center justify-center cursor-pointer"
-                  onClick={() => {
-                    const nextRow = { ...row, [column.key]: !row[column.key] };
-                    onRowChange(nextRow);
-                    publishLiveEdit(nextRow);
-                  }}
-                >
-                  {row[column.key] ? (
-                    <span className="h-6 w-6 rounded-md bg-emerald-500/15 border border-emerald-600/60 flex items-center justify-center">
-                      <Check className="h-4 w-4 text-emerald-700" />
-                    </span>
-                  ) : (
-                    <span className="h-5 w-5 rounded border border-gray-400/80 bg-white" />
-                  )}
-                </div>
-              </EditorWrapper>
-            );
-          }
-
-          // ── PRIORITY / STATUS ─────────────────────────────────────────
-          if (cellType === "priority" || cellType === "status") {
-            const opts = getChoiceOptionsForColumn({ ...column, type: cellType });
-            return (
-              <EditorWrapper>
-                <Select
-                  value={String(row[column.key] ?? "")}
-                  onValueChange={(v) => {
-                    const nextRow = { ...row, [column.key]: v };
-                    onRowChange(nextRow);
-                    publishLiveEdit(nextRow);
-                  }}
-                >
-                  <SelectTrigger className="w-full h-full border-0 text-xs rounded-none focus:ring-0 bg-transparent">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent
-                    side="bottom"
-                    align="start"
-                    avoidCollisions={false}
-                    style={selStyle}
-                  >
-                    {opts.map((option) => {
-                      const value = getSelectOptionLabel(option);
-                      const style = getStatusOptionStyle(value);
-                      return (
-                        <SelectItem
-                          key={value}
-                          value={value}
-                          style={ddItemStyle(isDark)}
-                        >
-                          <span
-                            className="sheet-badge-pill"
-                            style={{
-                              color: style?.color,
-                              backgroundColor: style?.bgColor,
-                            }}
-                          >
-                            {style?.label ?? value}
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </EditorWrapper>
-            );
-          }
-
-          // ── SELECT ────────────────────────────────────────────────────
-          if (cellType === "select") {
-            const selectOpts = getChoiceOptionsForColumn(
-              column,
-              cellSelectOptions[cellKey] ?? [],
-            );
-            return (
-              <EditorWrapper>
-                <Select
-                  value={String(row[column.key] ?? "")}
-                  onValueChange={(v) => {
-                    const nextRow = { ...row, [column.key]: v };
-                    onRowChange(nextRow);
-                    publishLiveEdit(nextRow);
-                  }}
-                >
-                  <SelectTrigger className="w-full h-full border-0 text-xs rounded-none focus:ring-0 bg-transparent">
-                    <SelectValue placeholder="Select…" />
-                  </SelectTrigger>
-                  <SelectContent
-                    side="bottom"
-                    align="start"
-                    avoidCollisions={false}
-                    style={selStyle}
-                  >
-                    {selectOpts.map((opt) => {
-                      const optionLabel = getSelectOptionLabel(opt);
-                      return (
-                        <SelectItem
-                          key={optionLabel}
-                          value={optionLabel}
-                          style={ddItemStyle(isDark)}
-                        >
-                          <span
-                            className="sheet-badge-pill"
-                            style={getOptionBgStyle(opt)}
-                          >
-                            {optionLabel}
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                    {selectOpts.length === 0 && (
-                      <div className="px-2.5 py-2 text-[11px] text-gray-400 italic">
-                        No options — edit column to add some.
-                      </div>
-                    )}
-                  </SelectContent>
-                </Select>
-              </EditorWrapper>
-            );
-          }
-
-          // ── NUMBER / CURRENCY / PROGRESS ──────────────────────────────
-          if (
-            cellType === "number" ||
-            cellType === "currency" ||
-            cellType === "progress"
-          ) {
-            return (
-              <EditorWrapper>
-                <input
-                  className="w-full h-full px-2.5 text-xs outline-none border-0 text-right tabular-nums font-mono bg-transparent"
-                  style={inputStyle}
-                  type="text"
-                  autoFocus
-                  value={editVal}
-                  onChange={(e) =>
-                    cellType === "progress"
-                      ? onProgressChange(e.target.value)
-                      : onNumChange(e.target.value)
+        // Standard single-row input (non-merged or single-row merged)
+        // Standard single-row input (non-merged or single-row merged)
+        return (
+          <div
+            data-merge-edit={isMergeMaster ? "true" : undefined}
+            style={{
+              position: isMergeMaster ? "absolute" : "relative",
+              top: isMergeMaster ? 0 : undefined,
+              left: isMergeMaster ? 0 : undefined,
+              width: isMergeMaster ? (editWidth ?? "100%") : "100%",
+              height: "100%",
+              zIndex: isMergeMaster ? 9 : undefined,
+              boxSizing: "border-box",
+            }}
+          >
+            <input
+              className="w-full h-full px-2.5 text-xs outline-none border-0"
+              style={{
+                ...inputStyle,
+                width: "100%",
+                height: "100%",
+                textAlign: mergeInfo?.mode === "center" ? "center" : undefined,
+                boxShadow: isMergeMaster
+                  ? "inset 0 0 0 2px var(--primary, #0d7c5f), inset 0 0 0 3px rgba(255,255,255,0.85)"
+                  : undefined,
+              }}
+              autoFocus
+              value={editVal}
+              onChange={(e) => {
+                const val = e.target.value;
+                const cursor = e.target.selectionStart ?? val.length;
+                const textBeforeCursor = val.slice(0, cursor);
+                const atMatch = textBeforeCursor.match(/@([\w][\w\s]*)$/);
+                const justAt = textBeforeCursor.match(/@$/);
+                if ((atMatch || justAt) && isOrgSheet && orgMembers.length > 0) {
+                  setMentionState({
+                    active: true,
+                    query: atMatch ? atMatch[1] : "",
+                    anchor: null,
+                    cellKey: mentionCellKey,
+                    inputRef: e.target,
+                  });
+                } else {
+                  if (mentionState.active) setMentionState((s) => ({ ...s, active: false }));
+                }
+                onTextChange(val);
+              }}
+              onKeyDown={(e) => {
+                if (isMentionActive) {
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    setMentionState((s) => ({ ...s, active: false }));
+                  }
+                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    e.stopPropagation();
+                    e.preventDefault();
                   }
                   onBlur={onBlurSave}
                 />
@@ -5597,67 +5555,98 @@ export default function SheetClient() {
           </div>
         )}
 
-        {/* ── Global styles ─────────────────────────────────────────── */}
         <style jsx global>{`
-          /* Scrollbars */
-          .sheet-root * {
-            scrollbar-width: thin;
-            scrollbar-color: #c7cdd8 transparent;
-          }
-          .sheet-root *::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-          }
-          .sheet-root *::-webkit-scrollbar-thumb {
-            background: #c7cdd8;
-            border-radius: 999px;
-          }
-          .sheet-root *::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          .no-scrollbar {
-            -ms-overflow-style: auto;
-            scrollbar-width: thin;
-          }
+  .sheet-root * { scrollbar-width: thin; scrollbar-color: #c7cdd8 transparent; }
+  .sheet-root *::-webkit-scrollbar { width: 8px; height: 8px; }
+  .sheet-root *::-webkit-scrollbar-thumb { background: #c7cdd8; border-radius: 999px; }
+  .sheet-root *::-webkit-scrollbar-track { background: transparent; }
+  .no-scrollbar { -ms-overflow-style: auto; scrollbar-width: thin; }
 
-          /*
-           * ── Merge master cell ─────────────────────────────────────
-           * The grid cell wrapper must overflow so the absolutely-
-           * positioned master box can paint across its siblings.
-           */
-          .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
-            overflow: visible !important;
-            contain: none !important;
-            z-index: 6;
-            border: none !important;
-            background: transparent !important;
-          }
-          .rdg-sheet
-            .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
-          .rdg-sheet
-            .rdg-row:hover
-            .rdg-cell:has(.sheet-cell-merge-master) {
-            outline: none !important;
-            background: transparent !important;
-          }
-          /* Draw the 1px grid border on the master element itself */
-          .sheet-cell-merge-master {
-            border: 1px solid var(--rdg-border-color, #e8eaed) !important;
-          }
-          /* Selection / edit highlight for master */
-          .sheet-cell-merge-master.sheet-cell-active-selected,
-          .sheet-cell-merge-master:has(input:focus),
-          .sheet-cell-merge-master:has(textarea:focus) {
-            outline: 2px solid var(--primary, #0d7c5f) !important;
-            outline-offset: -2px !important;
-          }
+/* ── Merge: master ───────────────────────────────────────────── */
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
+    overflow: visible !important;
+    contain: none !important;
+    z-index: 6;
+    border: none !important;
+    background: transparent !important;
+  }
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
+    outline: none !important;
+    background: transparent !important;
+  }
+  /* Suppress rdg's single-cell outline on merge masters — full-block ring
+     is handled by mergeOverrideStyle boxShadow in CellRenderer */
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"]:focus-within,
+  .rdg-sheet .rdg-cell:has([data-merge-edit="true"]) {
+    outline: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    contain: none !important;
+    z-index: 10 !important;
+  }
+  .sheet-cell-merge-master {
+    border: none !important;
+    outline: none !important;
+  }
 
-          /* Suppress rdg-cell row hover highlight bleeding into merge master */
-.rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
+/* ── Merge: covered ──────────────────────────────────────────── */
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
+    border: none !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    contain: none !important;
+  }
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell)[aria-selected="true"],
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell):hover,
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-merge-covered-cell) {
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  /* Restore bottom border so horizontal row separator shows below merge strip */
+  .rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+    border-bottom: 1px solid var(--rdg-border-color, #e8eaed) !important;
+  }
+  .sheet-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+    border-bottom: 1px solid #1e2330 !important;
+  }
+  .sheet-merge-covered-cell {
+    background: transparent !important;
+    pointer-events: auto;
+    cursor: cell;
+  }
+
+  /* ── Border fix at zoom levels < 100% ───────────────────────── */
+/* ── Border fix at zoom levels < 100% ───────────────────────── */
+/* Normal cells get the selection outline */
+.rdg-sheet .rdg-cell[aria-selected="true"] {
+  outline: 2px solid var(--primary, #0d7c5f) !important;
+  outline-offset: -2px !important;
+}
+/* Merge master: suppress rdg's single-cell outline — the boxShadow on
+   the absolute overlay (mergeOverrideStyle) handles the full-block ring */
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
+  outline: none !important;
+  box-shadow: none !important;
   background: transparent !important;
+}
+/* Also suppress when rdg puts the cell into edit mode */
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"]:focus-within {
   outline: none !important;
   box-shadow: none !important;
 }
+  .rdg-sheet .rdg-header-row .rdg-cell {
+    outline: 1px solid var(--rdg-border-color, #e2e8f0) !important;
+    outline-offset: -1px !important;
+    border: none !important;
+  }
+  .sheet-dark .rdg-sheet .rdg-cell {
+    outline-color: #2a3045 !important;
+  }
 
 /* Suppress the selection outline on the rdg-cell wrapper — 
    the master div draws its own outline */
