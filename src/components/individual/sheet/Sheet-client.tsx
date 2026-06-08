@@ -5652,6 +5652,20 @@ export default function SheetClient() {
             outline-offset: -2px !important;
           }
 
+          /* Suppress rdg-cell row hover highlight bleeding into merge master */
+.rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Suppress the selection outline on the rdg-cell wrapper — 
+   the master div draws its own outline */
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
+  outline: none !important;
+  background: transparent !important;
+}
+
           /*
            * ── Covered (slave) cells ─────────────────────────────────
            * Strip all visual chrome; let clicks fall through to our

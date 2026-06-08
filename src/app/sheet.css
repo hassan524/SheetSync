@@ -9,9 +9,9 @@
   --sh-text: #1a1d23;
   --sh-text2: #6b7280;
   --sh-muted: #9ca3af;
-  --sh-hover: rgba(0, 0, 0, 0.04);
-  --sh-active: rgba(13, 124, 95, 0.08);
-  --sh-div: #e8eaed;
+  --sh-hover: rgba(0, 0, 0, 0.055);
+  --sh-active: rgba(13, 124, 95, 0.1);
+  --sh-div: #e2e5e9;
   --sh-pop-bg: #ffffff;
   --sh-pop-border: #e8eaed;
   --sh-pop-text: #1a1d23;
@@ -39,8 +39,8 @@
   --sh-text: #e2e8f0;
   --sh-text2: #8892a4;
   --sh-muted: #4a5568;
-  --sh-hover: rgba(255, 255, 255, 0.05);
-  --sh-active: rgba(13, 124, 95, 0.15);
+  --sh-hover: rgba(255, 255, 255, 0.07);
+  --sh-active: rgba(13, 124, 95, 0.18);
   --sh-div: #1e2330;
   --sh-pop-bg: #1a1f2e;
   --sh-pop-border: #2a3045;
@@ -121,7 +121,7 @@
   background-clip: content-box;
 }
 
-/* ─── Mobile: fixed toolbar height & no scrollbar ────────────────────────── */
+/* ─── Mobile ────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .sheet-toolbar,
   .sheet-formatting-bar {
@@ -134,7 +134,6 @@
     overflow-x: hidden;
   }
 
-  /* Center submenu portal on mobile screens to prevent horizontal overflow */
   body [data-radix-popper-content-wrapper]:has(.sheet-mobile-submenu) {
     left: 50% !important;
     top: 50% !important;
@@ -200,16 +199,24 @@
 }
 
 /* ─── Merge: master cell ─────────────────────────────────────────────────── */
-/*
-  The master cell's rdg-cell container MUST be overflow:visible so the
-  absolute overlay div can expand downward (merge-down) or rightward
-  (merge-across) beyond the single cell boundary into covered siblings.
-  contain:none removes the stacking-context isolation that would clip it.
-*/
 .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
   overflow: visible !important;
   contain: none !important;
   z-index: 6;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-merge-master) {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.rdg-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-merge-master) {
   border: none !important;
   background: transparent !important;
 }
@@ -220,15 +227,11 @@
   background: transparent !important;
 }
 
-/* The inner overlay div — position/size/boxShadow all set inline */
-/* Draw the regular grid line around merged areas */
 .sheet-cell-merge-master {
-  /* use your theme border token */
   border: 1px solid var(--sh-border) !important;
   outline: none !important;
 }
 
-/* When that merged cell is selected, highlight it */
 .sheet-cell-merge-master.sheet-cell-active-selected,
 .sheet-cell-merge-master:has(input:focus),
 .sheet-cell-merge-master:has(textarea:focus) {
@@ -236,21 +239,73 @@
   outline-offset: -2px !important;
 }
 
+.rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master),
+.rdg-sheet
+  .rdg-row
+  .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) .sheet-row-num::after,
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) .sheet-row-num:hover::after {
+  display: none !important;
+}
+
 /* ─── Merge: covered cells ───────────────────────────────────────────────── */
-/*
-  Covered cell rdg-cell containers must be completely invisible:
-  no borders, no backgrounds, no hover/selection artifacts.
-  The .sheet-merge-covered-cell inner div is the click target that
-  redirects selection to the master.
-*/
 .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
+  border: none !important;
   border-top: none !important;
   border-left: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
   outline: none !important;
   background: transparent !important;
   box-shadow: none !important;
   overflow: visible !important;
   contain: none !important;
+}
+
+.rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+  border: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+.rdg-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-merge-covered-cell) {
+  border: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+/* ─── Formatting bar layout ──────────────────────────────────────────────── */
+.sheet-formatting-bar {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  white-space: nowrap !important;
+}
+
+.sheet-formatting-bar > * {
+  flex-shrink: 0 !important;
+}
+
+/* ── Remove ALL borders from toolbar buttons ─────────────────────────────── */
+.sheet-formatting-bar button,
+.sheet-formatting-bar [role="button"],
+.sheet-toolbar button,
+.sheet-toolbar [role="button"] {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+/* Focus-visible ring only — no black outlines */
+.sheet-formatting-bar button:focus-visible,
+.sheet-toolbar button:focus-visible {
+  outline: 2px solid var(--primary, #0d7c5f) !important;
+  outline-offset: -2px !important;
 }
 
 .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell)[aria-selected="true"],
@@ -261,14 +316,13 @@
   box-shadow: none !important;
 }
 
-/* Inner transparent click-target div */
 .sheet-merge-covered-cell {
   background: transparent !important;
   pointer-events: auto;
   cursor: cell;
 }
 
-/* ─── Auto-overflow (text spill) ─────────────────────────────────────────── */
+/* ─── Auto-overflow ──────────────────────────────────────────────────────── */
 .sheet-cell-auto-overflow-master {
   z-index: 3;
 }
@@ -320,6 +374,8 @@
   background: var(--primary);
   color: #fff;
   box-shadow: 0 1px 3px rgba(13, 124, 95, 0.3);
+  border: none !important;
+  cursor: pointer;
 }
 
 .sheet-btn-primary:hover {
@@ -330,6 +386,7 @@
   background: var(--sh-hover);
   color: var(--sh-text2);
   border: 1px solid var(--sh-border);
+  cursor: pointer;
 }
 
 .sheet-btn-secondary:hover {
@@ -341,20 +398,54 @@
   color: var(--sh-fx-text);
   border: 1px solid var(--sh-fx-border);
   border-radius: 5px;
+  cursor: pointer;
+  transition: opacity 0.12s ease;
 }
 
 .sheet-formula-btn:hover {
-  opacity: 0.85;
+  opacity: 0.82;
+  background: rgba(13, 124, 95, 0.12);
 }
 
+/* ─── Icon buttons — Excel-like, no borders ──────────────────────────────── */
 .sheet-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent;
   color: var(--sh-text2);
-  border-radius: 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease,
+    transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .sheet-icon-btn:hover:not(:disabled) {
   background: var(--sh-hover);
   color: var(--sh-text);
+}
+
+.sheet-icon-btn:active:not(:disabled) {
+  background: var(--sh-active);
+  color: var(--primary);
+  transform: scale(0.9);
+}
+
+.sheet-icon-btn:focus-visible {
+  outline: 2px solid var(--primary, #0d7c5f) !important;
+  outline-offset: -2px !important;
+}
+
+.sheet-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .sheet-icon-btn--active {
@@ -367,17 +458,41 @@
   color: #ef4444 !important;
 }
 
+/* ─── Action buttons (text + icon combos in toolbar) ─────────────────────── */
 .sheet-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent;
   cursor: pointer;
   color: var(--sh-text2);
-  border-radius: 5px;
+  border-radius: 4px;
   font-size: 11px;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease,
+    transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .sheet-action-btn:hover:not(:disabled) {
   background: var(--sh-hover);
   color: var(--sh-text);
-  background-color: transparent;
+}
+
+.sheet-action-btn:active:not(:disabled) {
+  background: var(--sh-active);
+  color: var(--primary);
+  transform: scale(0.93);
+}
+
+.sheet-action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .sheet-action-btn--active {
@@ -393,12 +508,24 @@
   background: rgba(239, 68, 68, 0.08) !important;
 }
 
+/* ─── Radix DropdownMenuTrigger / SelectTrigger in toolbar ───────────────── */
+/* Prevent Radix from adding a border/ring on the trigger buttons */
+[data-radix-collection-item],
+[data-radix-dropdown-menu-trigger],
+[data-radix-select-trigger] {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
 /* ─── Select / Search / Filter ───────────────────────────────────────────── */
 .sheet-select {
   background: transparent;
   border-color: var(--sh-border) !important;
   color: var(--sh-text2);
   font-size: 11px;
+  cursor: pointer;
 }
 
 .sheet-search-input {
@@ -427,6 +554,7 @@
 
 .sheet-clear-filter {
   color: #b45309;
+  cursor: pointer;
 }
 
 .sheet-clear-filter:hover {
@@ -454,7 +582,6 @@
   font-family: "Geist Mono", monospace;
 }
 
-/* Row resize affordance */
 .sheet-row-num::after {
   content: "";
   position: absolute;
@@ -501,6 +628,7 @@
 .sheet-link {
   color: var(--primary);
   font-size: 11.5px;
+  cursor: pointer;
 }
 
 .sheet-link:hover {
@@ -622,7 +750,6 @@
   border-bottom-color: #1e2330 !important;
 }
 
-/* mention chip display in cells */
 .sheet-mention {
   color: #c2185b;
   font-weight: 500;
@@ -635,7 +762,6 @@
   background: var(--rdg-row-hover-background-color) !important;
 }
 
-/* Excel-like hover ring per cell */
 .rdg-cell:hover:not([aria-selected="true"]) {
   outline: 1px solid rgba(13, 124, 95, 0.35);
   outline-offset: -1px;
@@ -698,7 +824,7 @@
   background: rgba(52, 211, 153, 0.14) !important;
 }
 
-/* ── Dark mode: force cell backgrounds ──────────────────────────────────── */
+/* ── Dark mode cell backgrounds ─────────────────────────────────────────── */
 .rdg-dark .rdg-cell {
   background-color: #0f1117 !important;
   color: #e2e8f0;
@@ -753,7 +879,6 @@
   background-color: #0f1117 !important;
 }
 
-/* auto-overflow covered cells stay transparent in dark mode too */
 .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
 .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-auto-overflow-covered),
 .rdg-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
@@ -766,12 +891,11 @@
   background: transparent !important;
 }
 
-/* Smooth cursor on non-editing cells */
 .rdg-cell > * {
   cursor: inherit;
 }
 
-/* ─── Popover / Dropdown (Radix portals) ─────────────────────────────────── */
+/* ─── Popover / Dropdown ─────────────────────────────────────────────────── */
 [data-radix-popper-content-wrapper] {
   --popover-bg: #ffffff;
   --popover-border: #e8eaed;
@@ -804,6 +928,7 @@ body[data-sheet-dark="true"] [data-radix-select-viewport] {
 [role="menuitem"],
 [role="option"] {
   color: var(--popover-text, #1a1d23) !important;
+  cursor: pointer;
 }
 
 [role="menuitem"]:hover,
@@ -824,7 +949,7 @@ body[data-sheet-dark="true"] [data-radix-select-viewport] {
   color: var(--popover-muted, #9ca3af) !important;
 }
 
-/* ─── Dialog (also a Radix portal) ──────────────────────────────────────── */
+/* ─── Dialog ─────────────────────────────────────────────────────────────── */
 [data-radix-dialog-overlay] {
   background: rgba(0, 0, 0, 0.5);
 }
@@ -923,7 +1048,7 @@ body[data-sheet-dark="true"] [role="dialog"] .bg-gray-900 {
   background: #0a0d13 !important;
 }
 
-/* ─── Real-time collaboration cell highlights ─────────────────────────────── */
+/* ─── Real-time collaboration ────────────────────────────────────────────── */
 .cell-collab-highlight {
   position: relative;
   z-index: 2;
@@ -961,7 +1086,6 @@ body[data-sheet-dark="true"] [role="dialog"] .bg-gray-900 {
   100% {
     opacity: 1;
   }
-
   50% {
     opacity: 0.6;
   }

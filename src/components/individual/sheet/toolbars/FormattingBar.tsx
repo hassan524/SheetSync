@@ -3,8 +3,8 @@
 import React from "react";
 import {
   Undo2, Redo2, Copy, Scissors, Clipboard, WrapText, Lock, Unlock,
-  Sigma, SlidersHorizontal, Search, X, ChevronsLeftRight, ChevronsRightLeft, Maximize2,
-  Merge, Split,
+  Sigma, SlidersHorizontal, Search, X, ChevronsLeftRight, ChevronsRightLeft,
+  Maximize2, Merge, Split,
 } from "lucide-react";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -81,8 +81,9 @@ export function FormattingBar({
   canUndo, canRedo, currentFormat,
   onUndo, onRedo, onZoomChange, onCopy, onCut, onPaste,
   onFontFamilyChange, onFontSizeChange, onFormatChange, onCellTypeChange,
-  onTextWrapToggle, onProtectionToggle, onFillColumnNumbers = () => { }, onFillColumnHashNumbers = () => { }, onFormulaOpen,
-  onSearchToggle, onSearchChange, onSearchClose, onSort, onHideColumn,
+  onTextWrapToggle, onProtectionToggle,
+  onFillColumnNumbers = () => { }, onFillColumnHashNumbers = () => { },
+  onFormulaOpen, onSearchToggle, onSearchChange, onSearchClose, onSort, onHideColumn,
   selectedColumnKey, selectedColumnWidth, onSetColumnWidth, onExpandAllColumns,
   onDragResizeAllColumns, onEndResizeAllColumns, onOpenValidation,
   canMergeSelection = false, isMergedSelection = false, onMergeSelection, onUnmergeSelection,
@@ -98,7 +99,6 @@ export function FormattingBar({
     dragResizeStartX.current = e.clientX;
     setIsDraggingAll(true);
   };
-
   const handleAllColumnsPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (dragResizeStartX.current === null) return;
     const deltaX = e.clientX - dragResizeStartX.current;
@@ -107,7 +107,6 @@ export function FormattingBar({
       dragResizeStartX.current = e.clientX;
     }
   };
-
   const handleAllColumnsPointerEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
@@ -118,20 +117,29 @@ export function FormattingBar({
   };
 
   const [widthVal, setWidthVal] = React.useState(String(selectedColumnWidth ?? 160));
-
   React.useEffect(() => {
     setWidthVal(String(selectedColumnWidth ?? 160));
   }, [selectedColumnWidth]);
 
   return (
-    <div className="sheet-toolbar sheet-formatting-bar border-b shrink-0" style={{ height: "40px" }}>
-      <div className="sheet-header-scrollbar h-full flex items-center px-2 gap-0.5 overflow-x-auto min-w-0">
+    <div
+      className="sheet-toolbar sheet-formatting-bar border-b shrink-0"
+      style={{ height: "36px" }}
+    >
+      {/* Single scrollable row */}
+      <div
+        className="sheet-header-scrollbar h-full flex items-center gap-0.5 px-2 overflow-x-auto"
+        style={{ flexWrap: "nowrap", minWidth: 0 }}
+      >
+        {/* Undo / Redo */}
         <IconBtn icon={Undo2} tooltip="Undo" shortcut="Ctrl+Z" onClick={onUndo} disabled={!canUndo} />
         <IconBtn icon={Redo2} tooltip="Redo" shortcut="Ctrl+Y" onClick={onRedo} disabled={!canRedo} />
         <ToolSep />
+
+        {/* Zoom */}
         <Select value={String(zoomLevel)} onValueChange={(v) => onZoomChange(Number(v))}>
           <SelectTrigger
-            className="sheet-select h-7 w-[68px] text-[11px] not-italic rounded-md px-2 border shrink-0"
+            className="sheet-select h-[22px] w-[54px] text-[10px] rounded px-1.5 shrink-0"
             style={selStyle}
           >
             <SelectValue />
@@ -144,89 +152,36 @@ export function FormattingBar({
             ))}
           </SelectContent>
         </Select>
-
-        {/* Global Column Width Expand/Shrink buttons */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => onExpandAllColumns?.(-15)}
-              className="sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0 ml-1"
-            >
-              <ChevronsRightLeft className="h-3.5 w-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
-            Shrink all columns
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => onExpandAllColumns?.(15)}
-              className="sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0"
-            >
-              <ChevronsLeftRight className="h-3.5 w-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
-            Expand all columns
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onPointerDown={handleAllColumnsPointerDown}
-              onPointerMove={handleAllColumnsPointerMove}
-              onPointerUp={handleAllColumnsPointerEnd}
-              onPointerCancel={handleAllColumnsPointerEnd}
-              className={`sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0 ${isDraggingAll ? "bg-primary/15" : ""}`}
-              title="Drag to resize all columns"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
-            Drag to resize all columns
-          </TooltipContent>
-        </Tooltip>
-
         <ToolSep />
+
+        {/* Clipboard */}
         <IconBtn icon={Copy} tooltip="Copy" shortcut="Ctrl+C" onClick={onCopy} />
         <IconBtn icon={Scissors} tooltip="Cut" shortcut="Ctrl+X" onClick={onCut} />
         <IconBtn icon={Clipboard} tooltip="Paste" shortcut="Ctrl+V" onClick={onPaste} />
         <ToolSep />
+
+        {/* Merge */}
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
                 <button
-                  className={`sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0 ${canMergeSelection && !isMergedSelection ? "sheet-icon-btn--active" : ""}`}
-                  disabled={!canMergeSelection}
-                  aria-label="Merge cells"
+                  className={`sheet-icon-btn h-[22px] px-1.5 rounded flex items-center gap-1 shrink-0 text-[10px] font-medium ${canMergeSelection && !isMergedSelection ? "sheet-icon-btn--active" : ""}`}
+                  disabled={!canMergeSelection && !isMergedSelection}
                 >
-                  <Merge className="h-3.5 w-3.5" />
+                  <Merge className="h-3 w-3" />
+                  <span>Merge</span>
                 </button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
-              Merge cells
-            </TooltipContent>
+            <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">Merge cells</TooltipContent>
           </Tooltip>
-          <DropdownMenuContent align="start" style={selStyle} className="w-44">
-            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("all")} style={ddItemStyle(isDark)}>
-              Merge all
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("across")} style={ddItemStyle(isDark)}>
-              Merge across
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("down")} style={ddItemStyle(isDark)}>
-              Merge down
-            </DropdownMenuItem>
+          <DropdownMenuContent align="start" style={selStyle} className="w-40">
+            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("all")} style={ddItemStyle(isDark)}>Merge all</DropdownMenuItem>
+            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("across")} style={ddItemStyle(isDark)}>Merge across</DropdownMenuItem>
+            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("down")} style={ddItemStyle(isDark)}>Merge down</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("center")} style={ddItemStyle(isDark)}>
-              Merge & center
-            </DropdownMenuItem>
+            <DropdownMenuItem className="text-xs" onClick={() => onMergeSelection?.("center")} style={ddItemStyle(isDark)}>Merge &amp; center</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <IconBtn
@@ -237,9 +192,11 @@ export function FormattingBar({
           active={isMergedSelection}
         />
         <ToolSep />
+
+        {/* Font family */}
         <Select value={fontFamily} onValueChange={onFontFamilyChange}>
           <SelectTrigger
-            className="sheet-select h-7 w-[100px] text-[11px] not-italic rounded-md px-2 border shrink-0"
+            className="sheet-select h-[22px] w-[84px] text-[10px] rounded px-1.5 shrink-0"
             style={selStyle}
           >
             <SelectValue />
@@ -252,9 +209,11 @@ export function FormattingBar({
             ))}
           </SelectContent>
         </Select>
+
+        {/* Font size */}
         <Select value={fontSize} onValueChange={onFontSizeChange}>
           <SelectTrigger
-            className="sheet-select h-7 w-[54px] text-[11px] not-italic tabular-nums rounded-md px-2 border ml-1 shrink-0"
+            className="sheet-select h-[22px] w-[42px] text-[10px] rounded px-1.5 ml-0.5 shrink-0"
             style={selStyle}
           >
             <SelectValue />
@@ -268,35 +227,153 @@ export function FormattingBar({
           </SelectContent>
         </Select>
         <ToolSep />
+
+        {/* Cell type (only when cell selected, no column) */}
         {selectedCell && selectedCellType && !selectedColumnKey && (
           <>
             <CellTypeSelector currentType={selectedCellType} onChangeType={onCellTypeChange} />
             <ToolSep />
           </>
         )}
+
+        {/* Formatting toolbar (bold, italic, underline, colors, align) */}
         <FormattingToolbar
           currentFormat={currentFormat}
           onFormatChange={onFormatChange}
           disabled={!selectedCell}
         />
-        {/* Advanced dropdown */}
+        <ToolSep />
+
+        {/* Wrap + Protect */}
+        <IconBtn
+          icon={WrapText}
+          tooltip="Text Wrap"
+          onClick={onTextWrapToggle}
+          disabled={!selectedCell}
+          active={isSelectedColumnWrapped}
+        />
+        <IconBtn
+          icon={isProtected ? Lock : Unlock}
+          tooltip={canProtectRows ? "Protect row" : "Owner only"}
+          onClick={onProtectionToggle}
+          disabled={!selectedCell || !canProtectRows}
+          active={isProtected}
+        />
+        <ToolSep />
+
+        {/* Formula */}
+        <button
+          onClick={onFormulaOpen}
+          className="sheet-formula-btn flex items-center gap-1 h-[22px] px-2 rounded text-[10px] font-medium shrink-0"
+        >
+          <Sigma className="h-3 w-3" />
+          <span>Formula</span>
+        </button>
+        <ToolSep />
+
+        {/* Column resize */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button onClick={() => onExpandAllColumns?.(-15)} className="sheet-icon-btn h-[22px] w-[22px] rounded flex items-center justify-center shrink-0">
+              <ChevronsRightLeft className="h-3 w-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">Shrink all columns</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button onClick={() => onExpandAllColumns?.(15)} className="sheet-icon-btn h-[22px] w-[22px] rounded flex items-center justify-center shrink-0">
+              <ChevronsLeftRight className="h-3 w-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">Expand all columns</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onPointerDown={handleAllColumnsPointerDown}
+              onPointerMove={handleAllColumnsPointerMove}
+              onPointerUp={handleAllColumnsPointerEnd}
+              onPointerCancel={handleAllColumnsPointerEnd}
+              className={`sheet-icon-btn h-[22px] w-[22px] rounded flex items-center justify-center shrink-0 ${isDraggingAll ? "bg-primary/15" : ""}`}
+            >
+              <Maximize2 className="h-3 w-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">Drag to resize all columns</TooltipContent>
+        </Tooltip>
+        <ToolSep />
+
+        {/* Column-specific: width + validation */}
+        {selectedColumnKey && (
+          <>
+            <span className="text-[9px] uppercase font-bold tracking-wider select-none shrink-0" style={{ color: isDark ? "#4a5568" : "#9ca3af" }}>W</span>
+            <input
+              type="text"
+              className="h-[22px] w-10 rounded border border-border bg-background px-1 text-[10px] text-center outline-none focus:ring-1 focus:ring-primary/30 font-mono ml-0.5 shrink-0"
+              value={widthVal}
+              onChange={(e) => setWidthVal(e.target.value)}
+              onBlur={() => {
+                const val = Number(widthVal.replace(/[^\d]/g, ""));
+                if (!Number.isNaN(val) && val >= 30 && val <= 600) {
+                  onSetColumnWidth?.(val);
+                } else {
+                  setWidthVal(String(selectedColumnWidth ?? 160));
+                }
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+            <ToolSep />
+            <button
+              onClick={onOpenValidation}
+              className="sheet-icon-btn h-[22px] px-1.5 rounded flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 shrink-0 text-[10px] font-semibold"
+            >
+              <SlidersHorizontal className="h-3 w-3" />
+              <span>Validation</span>
+            </button>
+            <ToolSep />
+          </>
+        )}
+
+        {/* Search */}
+        {showSearch ? (
+          <div className="flex items-center gap-0.5 shrink-0">
+            <div className="relative">
+              <Search className="absolute left-1.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-gray-400" />
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Search…"
+                className="sheet-search-input h-[22px] w-28 pl-5 pr-2 text-[10px] rounded"
+              />
+              {searchQuery && (
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-gray-400">
+                  {filteredRowsCount}
+                </span>
+              )}
+            </div>
+            <button className="sheet-icon-btn h-[22px] w-[22px] rounded flex items-center justify-center shrink-0" onClick={onSearchClose}>
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </div>
+        ) : (
+          <IconBtn icon={Search} tooltip="Search" shortcut="Ctrl+F" onClick={onSearchToggle} />
+        )}
+        <ToolSep />
+
+        {/* More dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="sheet-icon-btn h-7 px-2 rounded flex items-center gap-1.5 shrink-0"
+              className="sheet-icon-btn h-[22px] px-1.5 rounded flex items-center gap-1 shrink-0 text-[10px]"
               disabled={!selectedCell}
-              title="Advanced formatting"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              <span className="text-[11px]">Advanced</span>
+              <SlidersHorizontal className="h-3 w-3" />
+              <span>More</span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            collisionPadding={10}
-            className="w-56 max-h-[min(60vh,300px)] overflow-y-auto hide-scrollbar"
-            style={selStyle}
-          >
+          <DropdownMenuContent align="start" collisionPadding={10} className="w-52 max-h-[min(60vh,300px)] overflow-y-auto hide-scrollbar" style={selStyle}>
             <DropdownMenuLabel className="text-[10px] uppercase tracking-wider" style={{ color: isDark ? "#4a5568" : "#9ca3af" }}>Text style</DropdownMenuLabel>
             {[
               ["Bold", () => onFormatChange({ bold: !currentFormat.bold })],
@@ -304,9 +381,7 @@ export function FormattingBar({
               ["Underline", () => onFormatChange({ underline: !currentFormat.underline })],
               ["Strikethrough", () => onFormatChange({ strikethrough: !currentFormat.strikethrough })],
             ].map(([label, action]) => (
-              <DropdownMenuItem key={label as string} className="text-xs" onClick={action as any} style={ddItemStyle(isDark)}>
-                {label as string}
-              </DropdownMenuItem>
+              <DropdownMenuItem key={label as string} className="text-xs" onClick={action as any} style={ddItemStyle(isDark)}>{label as string}</DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-[10px] uppercase tracking-wider" style={{ color: isDark ? "#4a5568" : "#9ca3af" }}>Alignment</DropdownMenuLabel>
@@ -349,103 +424,7 @@ export function FormattingBar({
             <DropdownMenuItem className="text-xs" onClick={onHideColumn} style={ddItemStyle(isDark)}>Hide selected column</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <ToolSep />
-        <IconBtn icon={WrapText} tooltip="Text Wrap" onClick={onTextWrapToggle} disabled={!selectedCell} active={isSelectedColumnWrapped} />
-        <IconBtn
-          icon={isProtected ? Lock : Unlock}
-          tooltip={canProtectRows ? "Protect row" : "Protect row is owner-only"}
-          onClick={onProtectionToggle}
-          disabled={!selectedCell || !canProtectRows}
-          active={isProtected}
-        />
-        <ToolSep />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={onFormulaOpen}
-              className="sheet-formula-btn flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium transition-all shrink-0"
-            >
-              <Sigma className="h-3.5 w-3.5" />
-              <span>Formulas</span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
-            Browse and insert formulas
-          </TooltipContent>
-        </Tooltip>
 
-        {/* Selected Column Specific Controls (Width & Validation) */}
-        {selectedColumnKey && (
-          <>
-            <ToolSep />
-            <div className="flex items-center gap-1.5 shrink-0 ml-1">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider select-none">Col Width</span>
-              <input
-                type="text"
-                className="h-7 w-12 rounded-md border border-border bg-background px-1 text-xs text-center outline-none focus:ring-2 focus:ring-primary/30 font-mono font-medium"
-                value={widthVal}
-                onChange={(e) => setWidthVal(e.target.value)}
-                onBlur={() => {
-                  const val = Number(widthVal.replace(/[^\d]/g, ""));
-                  if (!Number.isNaN(val) && val >= 30 && val <= 600) {
-                    onSetColumnWidth?.(val);
-                  } else {
-                    setWidthVal(String(selectedColumnWidth ?? 160));
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.currentTarget.blur();
-                  }
-                }}
-              />
-            </div>
-            <ToolSep />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onOpenValidation}
-                  className="sheet-icon-btn h-7 px-2.5 rounded-md flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all shrink-0 font-semibold"
-                >
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                  <span className="text-[11px]">Validation</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
-                Add data validation for this column
-              </TooltipContent>
-            </Tooltip>
-          </>
-        )}
-
-        <ToolSep />
-        {showSearch ? (
-          <div className="flex items-center gap-1 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
-              <input
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Search…"
-                className="sheet-search-input h-7 w-32 sm:w-44 pl-6 pr-2 text-[11px] rounded-md"
-              />
-              {searchQuery && (
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
-                  {filteredRowsCount}
-                </span>
-              )}
-            </div>
-            <button
-              className="sheet-icon-btn h-7 w-7 rounded flex items-center justify-center shrink-0"
-              onClick={onSearchClose}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        ) : (
-          <IconBtn icon={Search} tooltip="Search" shortcut="Ctrl+F" onClick={onSearchToggle} />
-        )}
       </div>
     </div>
   );
