@@ -344,7 +344,7 @@
 }
 
 .rdg-cell:has(.sheet-cell-auto-overflow-covered) {
-  border-right-color: transparent !important;
+  border-right-color: var(--rdg-border-color) !important;
   background: transparent !important;
 }
 
@@ -737,7 +737,7 @@
   background-color: var(--rdg-background-color);
   cursor: cell;
   overflow: hidden;
-  contain: style;
+  contain: strict;
   transition: background-color 0.06s ease;
 }
 
@@ -832,6 +832,16 @@
   border-bottom-color: #1e2330 !important;
 }
 
+.rdg-dark .rdg-cell .sheet-cell-text,
+.rdg-dark .rdg-cell span:not([class*="badge"]):not([class*="pill"]) {
+  color: #e2e8f0 !important;
+}
+
+.rdg-dark .rdg-cell input::placeholder,
+.rdg-dark .rdg-cell textarea::placeholder {
+  color: #4a5568 !important;
+}
+
 .rdg-dark .rdg-header-row {
   background-color: #131620 !important;
   border-bottom-color: #1e2330 !important;
@@ -886,9 +896,15 @@
   .rdg-sheet
   .rdg-row:hover
   .rdg-cell:has(.sheet-cell-auto-overflow-covered) {
-  border-right-color: transparent !important;
-  border-bottom-color: transparent !important;
+  border-right-color: var(--rdg-border-color) !important;
+  border-bottom-color: var(--rdg-border-color) !important;
   background: transparent !important;
+}
+
+.rdg-cell {
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rdg-cell > * {
