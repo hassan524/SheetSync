@@ -4419,7 +4419,7 @@ export default function SheetClient() {
 
           // ── PRIORITY / STATUS ─────────────────────────────────────────
           if (cellType === "priority" || cellType === "status") {
-          const opts = getChoiceOptionsForColumn({ ...colDef, type: cellType });
+            const opts = getChoiceOptionsForColumn({ ...colDef, type: cellType });
             return (
               <EditorWrapper>
                 <Select
@@ -5250,7 +5250,15 @@ export default function SheetClient() {
                 onSelectedRowsChange={setSelectedRows}
                 onColumnResize={(idx, width) => {
                   const col = columns[idx - 1];
-                  if (col) sheetColOps.handleColumnResize(col.key, width);
+                  console.log('RESIZE — col:', col?.name, 'new width:', width, 'db width before save:', col?.width);
+                  if (col) {
+                    sheetColOps.handleColumnResize(col.key, width);
+                    // ensure it persists
+                    clearTimeout((window as any).__colResizeTimer);
+                    (window as any).__colResizeTimer = setTimeout(() => {
+                      saveAllColumns(sheetId, columnsHistory.currentState).catch(console.error);
+                    }, 600);
+                  }
                 }}
                 onCellDoubleClick={handleCellDoubleClick}
                 rowHeight={(row) => {
