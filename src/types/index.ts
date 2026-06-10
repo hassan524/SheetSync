@@ -208,14 +208,29 @@ export interface CellFormat {
   borderStyle?: "none" | "solid" | "dashed" | "dotted";
   borderColor?: string;
   borderWidth?: number;
+  borderBottom?: string;
+  borderTop?: string;
+  borderLeft?: string;
+  borderRight?: string;
   merge?: {
     masterRow: number;
     masterCol: string;
     rowSpan: number;
     colSpan: number;
     hidden?: boolean;
+    auto?: boolean;
     mode?: "all" | "across" | "down" | "center";
   };
+}
+
+export interface FloatingImage {
+  id: string;
+  src: string;
+  name?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export type ConditionalFormatOperator =
@@ -357,6 +372,7 @@ export interface SheetState {
   forkedAt?: string | null;
   forkedByUserId?: string | null;
   userRole?: Role;
+  templateId?: string | null;
 }
 
 export type FilterOperator =

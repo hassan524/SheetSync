@@ -14,7 +14,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { Check, Loader2, GripVertical, WrapText, Lock, MessageSquare } from "lucide-react";
+import { Check, Loader2, GripVertical, WrapText, Lock, MessageSquare, X } from "lucide-react";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -71,14 +71,16 @@ import {
   SelectOption,
   SavedFilterView,
   AutomationRule,
+  FloatingImage,
 } from "@/types/index";
-import { getTemplateData } from "@/lib/sheet-templates";
+import { buildProfessionalTemplateLayout, getTemplateData, LAYOUT_CONFIGS, getTemplateChartPreset, getTemplateChartY } from "@/lib/sheet-templates";
 import {
   updateSheetTitle,
   updateSheetStarred,
   loadSheet,
   updateSheetCharts,
   updateSheetRowHeights,
+  updateSheetFloatingImages,
 } from "@/lib/querys/sheet/sheet";
 import { saveRow, saveAllRows } from "@/lib/querys/sheet/rows";
 import { saveAllColumns } from "@/lib/querys/sheet/columns";
@@ -132,6 +134,11 @@ import {
   conditionalRuleMatches,
 } from "@/lib/sheet-formatting-helpers";
 // @ts-ignore
+// import {
+//   buildProfessionalTemplateLayout,
+//   getTemplateData,
+//   getTemplateChartPreset,   // add this
+// } from "@/lib/sheet-templates";
 import "@/app/sheet.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -196,6 +203,24 @@ function isMergeInfo(value: any): value is MergeInfo {
     typeof value.colSpan === "number",
   );
 }
+
+// function getTemplateChartY(
+//   bufferedRows: SheetRow[],
+//   rowHeights: Record<string, number>,
+//   showTitleBanner: boolean,
+// ): number {
+//   // Sum row heights for rows 0..(fieldRowCount+banner).
+//   // With banner: rows 0,1,2 are banner+2 field rows → skip 3.
+//   // Without banner: rows 0,1,2 are 3 field rows → skip 3.
+//   // Either way we skip 3 rows then add 8px breathing room.
+//   let y = 0;
+//   for (let i = 0; i < 3; i++) {
+//     const rowId = bufferedRows[i]?.id;
+//     y += rowId ? (rowHeights[rowId] ?? 36) : 36;
+//   }
+//   return y + 8;
+// }
+
 
 function shouldAutoOverflowValue(value: any) {
   return typeof value === "string" && value.trim().length > 0 && !value.includes("\n");
@@ -520,7 +545,17 @@ export default function SheetClient() {
 
   // ── Refs ───────────────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const floatingImageInputRef = useRef<HTMLInputElement | null>(null);
   const [activeCell, setActiveCell] = useState<{ rowId: string; colKey: string } | null>(null);
+  const [floatingImages, setFloatingImages] = useState<FloatingImage[]>([]);
+  const floatingImageDragRef = useRef<{
+    id: string;
+    pointerId: number;
+    mode: "move" | "resize";
+    startX: number;
+    startY: number;
+    original: FloatingImage;
+  } | null>(null);
   const [focusedColumnKey, setFocusedColumnKey] = useState<string | null>(null);
   const [selectedColumnKey, setSelectedColumnKey] = useState<string | null>(null);
   const [mentionState, setMentionState] = useState<{
@@ -594,6 +629,7 @@ export default function SheetClient() {
   const lastViewerEditToastRef = useRef(0);
   const localSaveRef = useRef(false);
   const remoteRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoMergeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const chartBtnRef = useRef<HTMLButtonElement | null>(null);
   const chartsHydratedRef = useRef(false);
@@ -871,26 +907,36 @@ export default function SheetClient() {
     if (!sheetId || !inviteReady) return;
     chartsHydratedRef.current = false;
     queueMicrotask(() => setIsLoading(true));
+
     loadSheet(sheetId)
       .then(async (data) => {
+        const savedFormats = data.cellFormats ?? {};
+        const hasSavedFormats = Object.keys(savedFormats).length > 0;
+
+        // ════════════════════════════════════════════════════════════════
+        // PATH A — sheet already has rows/columns (normal reload)
+        // ════════════════════════════════════════════════════════════════
         if (data.rows.length > 0 || data.columns.length > 0) {
           const sheetIsOrg = data.isPersonal === false || isOrganizationSheet;
+
+          // ── Restore cell formats ──────────────────────────────────────
           let wrapSet = new Set<string>();
-          if (data.cellFormats) {
+          if (hasSavedFormats) {
             wrapSet = new Set<string>(
-              Object.entries(data.cellFormats)
+              Object.entries(savedFormats)
                 .filter(([, fmt]) => (fmt as any).textWrap === true)
                 .map(([k]) => k),
             );
-            if (Object.keys(data.cellFormats).length > 0)
-              formatting.setCellFormats(data.cellFormats);
+            formatting.setCellFormats(savedFormats);
             const selectByCell: Record<string, string[]> = {};
-            Object.entries(data.cellFormats).forEach(([key, fmt]) => {
+            Object.entries(savedFormats).forEach(([key, fmt]) => {
               const opts = (fmt as any)?.selectOptions;
               if (Array.isArray(opts) && opts.length > 0) selectByCell[key] = opts;
             });
             if (Object.keys(selectByCell).length > 0) setCellSelectOptions(selectByCell);
           }
+
+          // ── Restore formulas / protection / text-wrap ─────────────────
           if (data.formulas && Object.keys(data.formulas).length > 0)
             formulas.setFormulas(data.formulas);
           if (data.columnFormulas && Object.keys(data.columnFormulas).length > 0)
@@ -899,6 +945,7 @@ export default function SheetClient() {
             protection.setProtectedCells(data.protectedCells);
           if (wrapSet.size > 0) textWrap.setTextWrapColumns(wrapSet);
 
+          // ── Build row buffer and extract per-cell type overrides ───────
           const bufferedRows = ensureWorkingRowBuffer(data.rows, data.columns);
           const typeOverrides: Record<string, ColumnDef["type"]> = {};
           const rowSelectOptions: Record<string, string[]> = {};
@@ -922,6 +969,7 @@ export default function SheetClient() {
           if (Object.keys(rowSelectOptions).length > 0)
             setCellSelectOptions((prev) => ({ ...prev, ...rowSelectOptions }));
 
+          // ── Push into history + state ──────────────────────────────────
           rowsHistory.pushState(bufferedRows);
           columnsHistory.pushState(data.columns);
           setSheetState({
@@ -941,30 +989,144 @@ export default function SheetClient() {
             forkedByUserId: data.forked_by_user_id,
             userRole: sheetIsOrg ? "viewer" : "owner",
           });
+
+          // ── Restore charts, row heights, floating images ───────────────
           if (Array.isArray((data as any).charts)) {
             charts.replaceAll((data as any).charts);
           }
           chartsHydratedRef.current = true;
           if (Array.isArray((data as any).forks)) setForks((data as any).forks);
           if ((data as any).rowHeights) setRowHeights((data as any).rowHeights);
+          if (Array.isArray((data as any).floatingImages)) {
+            setFloatingImages((data as any).floatingImages);
+          }
+
+          // ── KEY FIX: formats lost on first save (race condition) ───────
+          // Re-build and re-save the template layout, then insert chart.
+          const activeTemplateId = (data as any).templateId || templateId;
+          if (activeTemplateId && activeTemplateId !== "blank" && !hasSavedFormats) {
+            const td = getTemplateData(activeTemplateId);
+            const effectiveCols = data.columns.length > 0 ? data.columns : td.columns;
+
+            // Build layout against bufferedRows (real IDs already assigned)
+            const layout = buildProfessionalTemplateLayout(
+              data.title || td.title,
+              effectiveCols,
+              bufferedRows,
+              activeTemplateId,
+            );
+            const finalRows = layout.rows;
+            const actualRowHeights: Record<string, number> = { ...layout.rowHeights };
+
+            // Always apply formats + row values + heights on template load
+            formatting.setCellFormats(layout.cellFormats);
+            setRowHeights(actualRowHeights);
+            rowsHistory.pushState(finalRows);
+            setSheetState((prev) => ({ ...prev, rows: finalRows }));
+
+            // Suppress realtime refresh while we save
+            localSaveRef.current = true;
+            await Promise.all([
+              saveAllRows(sheetId, finalRows),
+              saveAllCellFormats(sheetId, layout.cellFormats),
+              updateSheetRowHeights(sheetId, actualRowHeights),
+            ]);
+            setTimeout(() => { localSaveRef.current = false; }, 3000);
+
+            // Auto-insert chart if none exists yet
+            const chartPreset = getTemplateChartPreset(activeTemplateId, effectiveCols);
+            const cfg = LAYOUT_CONFIGS[activeTemplateId];
+            if (chartPreset && charts.charts.length === 0) {
+              const chartY = getTemplateChartY(
+                finalRows,
+                actualRowHeights,
+                cfg?.showTitleBanner ?? true,
+              );
+              charts.insertChart(chartPreset.kind as any, finalRows, effectiveCols, {
+                labelColumnKey: chartPreset.labelColumnKey,
+                seriesKeys: chartPreset.seriesKeys,
+                aggregateMode: chartPreset.aggregateMode,
+                title: chartPreset.title,
+                x: 20,
+                y: chartY,
+                width: 440,
+                height: 260,
+              });
+              setTimeout(() => {
+                updateSheetCharts(sheetId, charts.charts).catch(console.error);
+              }, 400);
+            }
+          }
+
+          // ════════════════════════════════════════════════════════════════
+          // PATH B — fresh sheet, no rows yet (first ever load of template)
+          // ════════════════════════════════════════════════════════════════
         } else {
-          const td = getTemplateData(templateId);
+          const activeTemplateId = (data as any).templateId || templateId;
+          const td = getTemplateData(activeTemplateId);
+
+          // Buffer FIRST so IDs are stable before layout builds rowHeights
           const bufferedRows = ensureWorkingRowBuffer(td.rows, td.columns);
-          rowsHistory.pushState(bufferedRows);
+
+          // Build layout against buffered rows (real IDs already assigned)
+          const layout = buildProfessionalTemplateLayout(
+            td.title,
+            td.columns,
+            bufferedRows,
+            activeTemplateId,
+          );
+          const finalRows = layout.rows;
+
+          const actualRowHeights: Record<string, number> = { ...layout.rowHeights };
+
+          rowsHistory.pushState(finalRows);
           columnsHistory.pushState(td.columns);
+          formatting.setCellFormats(layout.cellFormats);
+          setRowHeights(actualRowHeights);
           setSheetState((p) => ({
             ...p,
             title: data.title || td.title,
             starred: false,
-            rows: bufferedRows,
+            rows: finalRows,
             columns: td.columns,
           }));
+
+          // Suppress realtime refresh while we save everything
+          localSaveRef.current = true;
           await Promise.all([
-            saveAllRows(sheetId, bufferedRows),
+            saveAllRows(sheetId, finalRows),
             saveAllColumns(sheetId, td.columns),
+            saveAllCellFormats(sheetId, layout.cellFormats),
+            updateSheetRowHeights(sheetId, actualRowHeights),
           ]);
           chartsHydratedRef.current = true;
+          setTimeout(() => { localSaveRef.current = false; }, 3000);
+
+          // Auto-insert chart into the open borderless zone
+          const chartPreset = getTemplateChartPreset(activeTemplateId, td.columns);
+          const cfg = LAYOUT_CONFIGS[activeTemplateId];
+          if (chartPreset) {
+            const chartY = getTemplateChartY(
+              finalRows,
+              actualRowHeights,
+              cfg?.showTitleBanner ?? true,
+            );
+            charts.insertChart(chartPreset.kind as any, finalRows, td.columns, {
+              labelColumnKey: chartPreset.labelColumnKey,
+              seriesKeys: chartPreset.seriesKeys,
+              aggregateMode: chartPreset.aggregateMode,
+              title: chartPreset.title,
+              x: 20,
+              y: chartY,
+              width: 440,
+              height: 260,
+            });
+            setTimeout(() => {
+              updateSheetCharts(sheetId, charts.charts).catch(console.error);
+            }, 400);
+          }
         }
+
         await trackSheetOpen(sheetId);
       })
       .catch((err) => {
@@ -976,6 +1138,7 @@ export default function SheetClient() {
         window.dispatchEvent(new Event("__sheet-ready"));
       });
   }, [sheetId, inviteReady, charts.replaceAll]);
+
 
   // ── Persist charts / row heights ───────────────────────────────────────
   useEffect(() => {
@@ -993,6 +1156,14 @@ export default function SheetClient() {
     }, 600);
     return () => clearTimeout(t);
   }, [rowHeights, sheetId]);
+
+  useEffect(() => {
+    if (!sheetId || !chartsHydratedRef.current) return;
+    const t = setTimeout(() => {
+      updateSheetFloatingImages(sheetId, floatingImages).catch(console.error);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [floatingImages, sheetId]);
 
   // ── Auth + realtime ────────────────────────────────────────────────────
   useEffect(() => {
@@ -1063,6 +1234,9 @@ export default function SheetClient() {
       protection.setProtectedCells(data.protectedCells ?? new Set());
       if (Array.isArray((data as any).charts)) charts.replaceAll((data as any).charts);
       if ((data as any).rowHeights) setRowHeights((data as any).rowHeights);
+      if (Array.isArray((data as any).floatingImages)) {
+        setFloatingImages((data as any).floatingImages);
+      }
 
       if (
         JSON.stringify(bufferedRows) !== JSON.stringify(rowsHistory.currentState)
@@ -1708,6 +1882,7 @@ export default function SheetClient() {
     const visibleColumns = columns.filter((column) => !column.hidden);
 
     rows.forEach((row, rowIdx) => {
+      if (rowIdx < 10) return;
       visibleColumns.forEach((column, visibleColIdx) => {
         const cellKey = `${rowIdx}-${column.key}`;
         if (textWrap.textWrapColumns.has(cellKey) || mergeByCell.has(cellKey)) return;
@@ -1758,6 +1933,97 @@ export default function SheetClient() {
 
     return map;
   }, [columns, mergeByCell, rows, textWrap.textWrapColumns]);
+
+  useEffect(() => {
+    if (!sheetId || rows.length === 0 || columns.length === 0) return;
+    if (autoMergeTimeoutRef.current) clearTimeout(autoMergeTimeoutRef.current);
+    autoMergeTimeoutRef.current = setTimeout(async () => {
+      const nextFormats: Record<string, CellFormat> = {};
+      Object.entries(formatting.cellFormats).forEach(([cellKey, format]) => {
+        if (format.merge?.auto) {
+          const { merge: _merge, ...rest } = format;
+          if (Object.keys(rest).length > 0) nextFormats[cellKey] = rest;
+          return;
+        }
+        nextFormats[cellKey] = format;
+      });
+
+      const visibleColumns = columns.filter((column) => !column.hidden);
+      const manualMergeKeys = new Set(
+        Object.entries(nextFormats)
+          .filter(([, format]) => format.merge && !format.merge.auto)
+          .map(([cellKey]) => cellKey),
+      );
+
+      rows.forEach((row, rowIdx) => {
+        if (rowIdx < 10) return; // skip template layout rows
+        visibleColumns.forEach((column, visibleColIdx) => {
+          const cellKey = `${rowIdx}-${column.key}`;
+          if (textWrap.textWrapColumns.has(cellKey) || manualMergeKeys.has(cellKey)) return;
+          if (textWrap.textWrapColumns.has(cellKey) || manualMergeKeys.has(cellKey)) return;
+          const value = row[column.key];
+          if (!shouldAutoOverflowValue(value)) return;
+          const ownWidth = column.width ?? 160;
+          const estimatedTextWidth = Math.ceil(String(value).length * 7.2) + 24;
+          if (estimatedTextWidth <= ownWidth) return;
+
+          let width = ownWidth;
+          let colSpan = 1;
+          for (
+            let nextIdx = visibleColIdx + 1;
+            nextIdx < visibleColumns.length && width < estimatedTextWidth;
+            nextIdx += 1
+          ) {
+            const nextColumn = visibleColumns[nextIdx];
+            const nextKey = `${rowIdx}-${nextColumn.key}`;
+            if (textWrap.textWrapColumns.has(nextKey) || manualMergeKeys.has(nextKey)) break;
+            const nextValue = row[nextColumn.key];
+            if (nextValue !== undefined && nextValue !== null && String(nextValue) !== "") break;
+            width += nextColumn.width ?? 160;
+            colSpan += 1;
+          }
+          if (colSpan <= 1) return;
+          const merge: MergeInfo = {
+            masterRow: rowIdx,
+            masterCol: column.key,
+            rowSpan: 1,
+            colSpan,
+            mode: "across",
+            auto: true,
+          };
+          for (let idx = 0; idx < colSpan; idx += 1) {
+            const colKey = visibleColumns[visibleColIdx + idx]?.key;
+            if (!colKey) continue;
+            const key = `${rowIdx}-${colKey}`;
+            nextFormats[key] =
+              idx === 0
+                ? { ...(nextFormats[key] ?? {}), merge }
+                : { merge: { ...merge, hidden: true } };
+          }
+        });
+      });
+
+      if (JSON.stringify(nextFormats) === JSON.stringify(formatting.cellFormats)) return;
+      formatting.setCellFormats(nextFormats);
+      try {
+        await saveAllCellFormats(sheetId, nextFormats);
+        broadcastSheetSnapshot({ cellFormats: nextFormats });
+      } catch {
+        toast.error("Failed to save automatic text merge.");
+      }
+    }, 400);
+    return () => {
+      if (autoMergeTimeoutRef.current) clearTimeout(autoMergeTimeoutRef.current);
+    };
+  }, [
+    sheetId,
+    rows,
+    columns,
+    textWrap.textWrapColumns,
+    formatting.cellFormats,
+    formatting.setCellFormats,
+    broadcastSheetSnapshot,
+  ]);
 
   const selectedMergeInfo = useMemo(() => {
     if (!selectedCell) return null;
@@ -3254,6 +3520,95 @@ export default function SheetClient() {
     [activeCell, rows, rowsHistory, sheetId, markSaving, markSaved, setSaveStatus],
   );
 
+  const handleFloatingImageChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+      if (!canEditSheet) {
+        showViewerEditMessage();
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const next: FloatingImage = {
+          id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          src: String(reader.result),
+          name: file.name,
+          x: 120,
+          y: 120,
+          width: 280,
+          height: 180,
+        };
+        setFloatingImages((prev) => [...prev, next]);
+        markSaving();
+        setTimeout(markSaved, 150);
+      };
+      reader.readAsDataURL(file);
+    },
+    [canEditSheet, showViewerEditMessage, markSaving, markSaved],
+  );
+
+  const updateFloatingImage = useCallback(
+    (id: string, patch: Partial<FloatingImage>) => {
+      setFloatingImages((prev) =>
+        prev.map((image) => (image.id === id ? { ...image, ...patch } : image)),
+      );
+    },
+    [],
+  );
+
+  const removeFloatingImage = useCallback((id: string) => {
+    setFloatingImages((prev) => prev.filter((image) => image.id !== id));
+  }, []);
+
+  const handleFloatingImagePointerDown = useCallback(
+    (image: FloatingImage, mode: "move" | "resize", e: React.PointerEvent) => {
+      if (!canEditSheet) {
+        showViewerEditMessage();
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      floatingImageDragRef.current = {
+        id: image.id,
+        pointerId: e.pointerId,
+        mode,
+        startX: e.clientX,
+        startY: e.clientY,
+        original: image,
+      };
+    },
+    [canEditSheet, showViewerEditMessage],
+  );
+
+  const handleFloatingImagePointerMove = useCallback((e: React.PointerEvent) => {
+    const drag = floatingImageDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (drag.mode === "move") {
+      updateFloatingImage(drag.id, {
+        x: Math.max(0, drag.original.x + dx),
+        y: Math.max(0, drag.original.y + dy),
+      });
+    } else {
+      updateFloatingImage(drag.id, {
+        width: Math.max(80, drag.original.width + dx),
+        height: Math.max(60, drag.original.height + dy),
+      });
+    }
+  }, [updateFloatingImage]);
+
+  const handleFloatingImagePointerUp = useCallback((e: React.PointerEvent) => {
+    const drag = floatingImageDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    floatingImageDragRef.current = null;
+    markSaving();
+    setTimeout(markSaved, 150);
+  }, [markSaving, markSaved]);
+
   const handleSheetImport = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -3709,10 +4064,10 @@ export default function SheetClient() {
         renderHeaderCell: () => (
           <div
             className={`h-full w-full relative flex items-center justify-center group/header sheet-header-cell sheet-header-cell--excel border-r cursor-pointer select-none ${selectedColumnKey === col.key
-                ? "bg-primary/15"
-                : selectedCell && selectedCell.col === col.key
-                  ? "bg-primary/10"
-                  : ""
+              ? "bg-primary/15"
+              : selectedCell && selectedCell.col === col.key
+                ? "bg-primary/10"
+                : ""
               }`}
             onClick={(e) => {
               if ((e.target as HTMLElement).closest("button")) return;
@@ -4604,7 +4959,10 @@ export default function SheetClient() {
                     fontSize: 12,
                     lineHeight: 1.5,
                     fontFamily: "inherit",
-                    textAlign: mergeMode === "center" ? "center" : "left",
+                    textAlign:
+                      mergeMode === "center"
+                        ? "center"
+                        : ((cellStyle.textAlign as React.CSSProperties["textAlign"]) ?? "left"),
                     whiteSpace: "pre-wrap",
                     wordBreak: "break-word",
                     overflowWrap: "break-word",
@@ -4628,7 +4986,10 @@ export default function SheetClient() {
                 className="w-full h-full px-2.5 text-xs outline-none border-0 bg-transparent"
                 style={{
                   ...inputStyle,
-                  textAlign: mergeInfo?.mode === "center" ? "center" : undefined,
+                  textAlign:
+                    mergeInfo?.mode === "center"
+                      ? "center"
+                      : (cellStyle.textAlign as React.CSSProperties["textAlign"]) ?? undefined,
                 }}
                 autoFocus
                 value={editVal}
@@ -4864,6 +5225,13 @@ export default function SheetClient() {
           className="hidden"
           onChange={handleSheetImport}
           disabled={isImportingSheet}
+        />
+        <input
+          ref={floatingImageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFloatingImageChange}
         />
 
         <FormattingBar
@@ -5153,6 +5521,7 @@ export default function SheetClient() {
           }
           onToggleDark={() => setIsDark(!isDark)}
           onToggleFreezeRows={handleToggleFreezeRows}
+          onInsertFloatingImage={() => floatingImageInputRef.current?.click()}
           chartBtnRef={chartBtnRef as any}
         />
 
@@ -5358,6 +5727,58 @@ export default function SheetClient() {
                 onChange={handleImageChange}
               />
             </div>
+
+            {floatingImages.map((image) => (
+              <div
+                key={image.id}
+                className="absolute z-20 rounded-md border bg-white shadow-xl overflow-hidden"
+                style={{
+                  left: image.x,
+                  top: image.y,
+                  width: image.width,
+                  height: image.height,
+                  borderColor: isDark ? "#334155" : "#cbd5e1",
+                }}
+                onPointerMove={handleFloatingImagePointerMove}
+                onPointerUp={handleFloatingImagePointerUp}
+                onPointerCancel={handleFloatingImagePointerUp}
+              >
+                <div
+                  className="absolute left-0 right-0 top-0 z-10 flex h-7 items-center justify-between bg-black/55 px-2 text-white"
+                  style={{ cursor: "grab", touchAction: "none" }}
+                  onPointerDown={(e) => handleFloatingImagePointerDown(image, "move", e)}
+                >
+                  <span className="truncate text-[11px] font-medium">
+                    {image.name || "Image"}
+                  </span>
+                  <button
+                    type="button"
+                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-white/20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFloatingImage(image.id);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+                <img
+                  src={image.src}
+                  alt={image.name || "Floating image"}
+                  className="h-full w-full object-contain"
+                  draggable={false}
+                />
+                <div
+                  className="absolute bottom-0 right-0 h-6 w-6 cursor-se-resize"
+                  style={{ touchAction: "none" }}
+                  onPointerDown={(e) => handleFloatingImagePointerDown(image, "resize", e)}
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18" className="absolute bottom-1 right-1">
+                    <path d="M16 6L6 16M16 11L11 16" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+            ))}
 
             {/* Charts */}
             {charts.charts.map((chart) => (

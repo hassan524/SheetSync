@@ -69,6 +69,10 @@ export function useSheetFormatting(onSave: () => void) {
           ]
             .filter(Boolean)
             .join(" ") || "inherit",
+        borderBottom: format.borderBottom || undefined,
+        borderTop: format.borderTop || undefined,
+        borderLeft: format.borderLeft || undefined,
+        borderRight: format.borderRight || undefined,
         borderStyle:
           format.borderStyle && format.borderStyle !== "none"
             ? format.borderStyle

@@ -47,6 +47,8 @@ export async function loadSheet(sheetId: string) {
     forked_by_user_id: sheet.data.forked_by_user_id,
     charts: sheet.data.charts ?? null,
     rowHeights: sheet.data.row_heights ?? null,
+    floatingImages: sheet.data.floating_images ?? null,
+    templateId: sheet.data.template_id,
     forks: (forks.data ?? []) as {
       id: string;
       title: string;
@@ -135,6 +137,17 @@ export async function updateSheetRowHeights(
     .update({ row_heights: rowHeights, updated_at: new Date().toISOString() })
     .eq("id", sheetId);
   if (error) throw new Error(`Failed to update row heights: ${error.message}`);
+}
+
+export async function updateSheetFloatingImages(
+  sheetId: string,
+  floatingImages: any[] | null,
+) {
+  const { error } = await supabase
+    .from("sheets")
+    .update({ floating_images: floatingImages, updated_at: new Date().toISOString() })
+    .eq("id", sheetId);
+  if (error) throw new Error(`Failed to update floating images: ${error.message}`);
 }
 
 export async function updateSheetTitle(sheetId: string, title: string) {

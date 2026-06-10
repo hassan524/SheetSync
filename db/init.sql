@@ -293,6 +293,10 @@ ADD COLUMN IF NOT EXISTS border_style text DEFAULT 'none',
 ADD COLUMN IF NOT EXISTS border_color text DEFAULT '#d1d5db',
 ADD COLUMN IF NOT EXISTS border_width integer DEFAULT 1;
 
+-- Merged cell metadata for Google Sheets-style merge blocks.
+ALTER TABLE public.cell_formats
+ADD COLUMN IF NOT EXISTS merge JSONB DEFAULT NULL;
+
 -- ============================================================
 -- Sheet Row Heights
 -- Stores per-row height overrides (keyed by row_key) as JSONB
@@ -300,6 +304,11 @@ ADD COLUMN IF NOT EXISTS border_width integer DEFAULT 1;
 -- ============================================================
 ALTER TABLE public.sheets
 ADD COLUMN IF NOT EXISTS row_heights JSONB DEFAULT NULL;
+
+-- Floating images placed above the grid. Stored as an array of
+-- { id, src, name, x, y, width, height } objects.
+ALTER TABLE public.sheets
+ADD COLUMN IF NOT EXISTS floating_images JSONB DEFAULT NULL;
 
 -- ============================================================
 -- Forking Feature
