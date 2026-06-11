@@ -140,6 +140,7 @@ import {
 //   getTemplateChartPreset,   // add this
 // } from "@/lib/sheet-templates";
 import "@/app/sheet.css";
+import { renameSheet } from "@/lib/querys/sheets/sheets";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 import { SheetState, AdvancedFilterRule } from "@/types/index";
@@ -1010,7 +1011,7 @@ export default function SheetClient() {
 
             // Build layout against bufferedRows (real IDs already assigned)
             const layout = buildProfessionalTemplateLayout(
-              data.title || td.title,
+              td.title,
               effectiveCols,
               bufferedRows,
               activeTemplateId,
@@ -2265,16 +2266,53 @@ export default function SheetClient() {
         showViewerEditMessage();
         return;
       }
+      // Only update state — blur will handle saving
       setSheetState((p) => ({ ...p, title: t }));
-      markSaving();
-      clearTimeout(titleSaveTimeout.current);
-      titleSaveTimeout.current = setTimeout(async () => {
-        await updateSheetTitle(sheetId, t);
-        markSaved();
-        broadcastSheetSnapshot({ title: t });
-      }, 1000);
     },
-    [canEditSheet, showViewerEditMessage, sheetId, markSaving, markSaved],
+    [canEditSheet, showViewerEditMessage],
+  );
+
+  const handleTitleBlur = useCallback(
+    async (t: string) => {
+      if (!canEditSheet) return;
+      const trimmed = t.trim();
+      if (!trimmed) return;
+
+      // 1. Save title to sheets table
+      try {
+        const { error } = await supabase
+          .from("sheets")
+          .update({ title: trimmed, updated_at: new Date().toISOString() })
+          .eq("id", sheetId);
+
+        if (error) {
+          console.error("Title save error:", error);
+          toast.error("Failed to save title");
+          return;
+        }
+      } catch (err) {
+        console.error("Title save failed:", err);
+        toast.error("Failed to save title");
+        return;
+      }
+
+      // 2. Update local state
+      setSheetState((p) => ({ ...p, title: trimmed }));
+      markSaved();
+      broadcastSheetSnapshot({ title: trimmed });
+
+      // 3. Also update row 0 cell if template sheet
+      const firstCol = columns.find((c) => !c.isExtra);
+      if (!firstCol) return;
+      const currentRows = rowsHistory.currentState;
+      const nextRows = currentRows.map((row, idx) =>
+        idx !== 0 ? row : { ...row, [firstCol.key]: trimmed.toUpperCase() }
+      );
+      rowsHistory.pushState(nextRows);
+      setSheetState((p) => ({ ...p, rows: nextRows }));
+      await saveAllRows(sheetId, nextRows).catch(console.error);
+    },
+    [canEditSheet, columns, rowsHistory, sheetId, setSheetState, markSaved, broadcastSheetSnapshot],
   );
 
   const handleStarredToggle = useCallback(async () => {
@@ -4061,239 +4099,250 @@ export default function SheetClient() {
           return true;
         },
 
-        renderHeaderCell: () => (
-          <div
-            className={`h-full w-full relative flex items-center justify-center group/header sheet-header-cell sheet-header-cell--excel border-r cursor-pointer select-none ${selectedColumnKey === col.key
-              ? "bg-primary/15"
-              : selectedCell && selectedCell.col === col.key
-                ? "bg-primary/10"
-                : ""
-              }`}
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest("button")) return;
-              if ((e.target as HTMLElement).closest("[data-col-resize]")) return;
-              setSelectedColumnKey(col.key);
-              setSelectedCell({ row: 0, col: col.key });
-              const colIdx = columns.findIndex((c) => c.key === col.key);
-              if (colIdx >= 0) {
-                setSelectionRange({
-                  start: { row: 0, colIndex: colIdx },
-                  end: { row: rows.length - 1, colIndex: colIdx },
-                });
-              }
-            }}
-            draggable
-            onDragStart={() => colOps.handleColumnDragStart(col.key)}
-            onDragOver={(e) =>
-              colOps.handleColumnDragOver(
-                e,
-                col.key,
-                (u: any) =>
-                  setSheetState((p) => ({
-                    ...p,
-                    columns: typeof u === "function" ? u(p.columns) : u,
-                  })),
-              )
-            }
-            onDragEnd={sheetColOps.handleColumnDragEnd}
-          >
-            {/* Letter label — zooms + highlights on hover */}
-            <div className="flex-1 flex items-center justify-center min-w-0 px-1">
-              <span className="text-xs font-medium truncate transition-all duration-150 group-hover/header:text-primary group-hover/header:scale-110 inline-block">
-                {columnIndexToName(columns.findIndex((c) => c.key === col.key))}
-              </span>
-            </div>
-
-            {/* Text wrap indicator */}
-            {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && (
-              <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60 mr-0.5" />
-            )}
-
-            {/* 3-dots dropdown */}
-            <ColumnHeaderMenu
-              column={col}
-              onChangeType={(t) => {
-                if (!canEditSheet) { showViewerEditMessage(); return; }
-                sheetColOps.handleChangeColumnType(col.key, t);
-                setTimeout(() => {
-                  const clearedRows = rowsHistory.currentState.map((row) => {
-                    const rowTypes = { ...(row[ROW_CELL_TYPES_KEY] ?? {}) };
-                    delete rowTypes[col.key];
-                    const rowSelects = { ...(row[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}) };
-                    delete rowSelects[col.key];
-                    const defaultVal = getDefaultValueForType(t);
-                    const currentVal = row[col.key];
-                    const shouldApplyDefault =
-                      currentVal === "" || currentVal === null || currentVal === undefined;
-                    return {
-                      ...row,
-                      ...(shouldApplyDefault ? { [col.key]: defaultVal } : {}),
-                      [ROW_CELL_TYPES_KEY]: rowTypes,
-                      [ROW_CELL_SELECT_OPTIONS_KEY]: rowSelects,
-                    };
+        renderHeaderCell: () => {
+          if (col.isExtra) {
+            return <div className="h-full w-full border-r" style={{ background: 'var(--rdg-header-background-color)' }} />;
+          }
+          return (
+            <div
+              className={`h-full w-full relative flex items-center justify-center group/header sheet-header-cell sheet-header-cell--excel border-r cursor-pointer select-none ${selectedColumnKey === col.key
+                ? "bg-primary/15"
+                : selectedCell && selectedCell.col === col.key
+                  ? "bg-primary/10"
+                  : ""
+                }`}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("button")) return;
+                if ((e.target as HTMLElement).closest("[data-col-resize]")) return;
+                setSelectedColumnKey(col.key);
+                setSelectedCell({ row: 0, col: col.key });
+                const colIdx = columns.findIndex((c) => c.key === col.key);
+                if (colIdx >= 0) {
+                  setSelectionRange({
+                    start: { row: 0, colIndex: colIdx },
+                    end: { row: rows.length - 1, colIndex: colIdx },
                   });
-                  rowsHistory.pushState(clearedRows);
-                  setSheetState((p) => ({ ...p, rows: clearedRows }));
-                  saveAllRows(sheetId, clearedRows).catch(console.error);
-                  broadcastSheetSnapshot({ rows: clearedRows });
-                }, 60);
-                if (t === "select") {
-                  setFocusedColumnKey(col.key);
-                  setRightPanel("select-options");
                 }
               }}
-              onOpenColumnPanel={() => {
-                if (!canEditSheet) { showViewerEditMessage(); return; }
-                setFocusedColumnKey(col.key);
-                setRightPanel(col.type === "select" ? "select-options" : "columns");
-              }}
-              onDelete={() =>
-                canEditSheet ? sheetColOps.handleDeleteColumn(col.key) : showViewerEditMessage()
+              draggable
+              onDragStart={() => colOps.handleColumnDragStart(col.key)}
+              onDragOver={(e) =>
+                colOps.handleColumnDragOver(
+                  e,
+                  col.key,
+                  (u: any) =>
+                    setSheetState((p) => ({
+                      ...p,
+                      columns: typeof u === "function" ? u(p.columns) : u,
+                    })),
+                )
               }
-              onToggleTextWrap={() =>
-                canEditSheet ? handleTextWrapToggle() : showViewerEditMessage()
-              }
-              textWrapEnabled={textWrap.textWrapColumns.has(col.key)}
-              columnFormula={formulas.columnFormulas[col.key]}
-              onApplyColumnFormula={(f) =>
-                canEditSheet ? handleApplyFormulaToColumn(col.key, f) : showViewerEditMessage()
-              }
-              onRemoveColumnFormula={() =>
-                canEditSheet ? handleRemoveColumnFormula(col.key) : showViewerEditMessage()
-              }
-              selectOptions={col.selectOptions}
-              onUpdateSelectOptions={(opts) =>
-                canEditSheet
-                  ? sheetColOps.handleUpdateSelectOptions(col.key, opts)
-                  : showViewerEditMessage()
-              }
-              onFillColumnNumbers={() =>
-                canEditSheet ? handleFillColumnNumbers(col.key) : showViewerEditMessage()
-              }
-              onFillColumnHashNumbers={() =>
-                canEditSheet ? handleFillColumnHashNumbers(col.key) : showViewerEditMessage()
-              }
-              onInsertLeft={() => {
-                if (!canEditSheet) { showViewerEditMessage(); return; }
-                const idx = columns.findIndex((c) => c.key === col.key);
-                sheetColOps.insertColumnAt(idx, null, "blank");
-                setTimeout(async () => {
-                  markSaving();
-                  await Promise.all([
-                    saveAllColumns(sheetId, columnsHistory.currentState),
-                    saveAllRows(sheetId, rowsHistory.currentState),
-                  ]);
-                  markSaved();
-                }, 50);
-              }}
-              onInsertRight={() => {
-                if (!canEditSheet) { showViewerEditMessage(); return; }
-                const idx = columns.findIndex((c) => c.key === col.key);
-                sheetColOps.insertColumnAt(idx + 1, null, "blank");
-                setTimeout(async () => {
-                  markSaving();
-                  await Promise.all([
-                    saveAllColumns(sheetId, columnsHistory.currentState),
-                    saveAllRows(sheetId, rowsHistory.currentState),
-                  ]);
-                  markSaved();
-                }, 50);
-              }}
-              onDuplicate={() => {
-                if (!canEditSheet) { showViewerEditMessage(); return; }
-                const idx = columns.findIndex((c) => c.key === col.key);
-                sheetColOps.insertColumnAt(idx + 1, col, "duplicate");
-                setTimeout(async () => {
-                  markSaving();
-                  await Promise.all([
-                    saveAllColumns(sheetId, columnsHistory.currentState),
-                    saveAllRows(sheetId, rowsHistory.currentState),
-                  ]);
-                  markSaved();
-                }, 50);
-              }}
-              onClearColumn={() =>
-                canEditSheet ? sheetColOps.clearColumnValues(col) : showViewerEditMessage()
-              }
-              onSortAsc={() =>
-                canEditSheet
-                  ? sheetRowOps.handleSortByColumn(col.key, "asc")
-                  : showViewerEditMessage()
-              }
-              onSortDesc={() =>
-                canEditSheet
-                  ? sheetRowOps.handleSortByColumn(col.key, "desc")
-                  : showViewerEditMessage()
-              }
-              onSetCurrency={(currencyCode) => {
-                if (!canEditSheet) { showViewerEditMessage(); return; }
-                const updated = columns.map((c) =>
-                  c.key === col.key ? { ...c, currencyCode } : c,
-                );
-                setSheetState((p) => ({ ...p, columns: updated }));
-                columnsHistory.pushState(updated);
-                setTimeout(async () => {
-                  markSaving();
-                  await saveAllColumns(sheetId, columnsHistory.currentState);
-                  markSaved();
-                }, 50);
-              }}
-              onApplyColumnFormat={(fmt) =>
-                canEditSheet ? handleApplyColumnFormat(col.key, fmt) : showViewerEditMessage()
-              }
-              onToggleFreeze={() =>
-                canEditSheet ? handleToggleFreezeColumn(col.key) : showViewerEditMessage()
-              }
-              onOpenValidationPanel={() => {
-                if (!canEditSheet) { showViewerEditMessage(); return; }
-                setFocusedColumnKey(col.key);
-                setRightPanel("validation");
-              }}
-            />
+              onDragEnd={sheetColOps.handleColumnDragEnd}
+            >
+              {/* Letter label — zooms + highlights on hover */}
+              <div className="flex-1 flex items-center justify-center min-w-0 px-1">
+                <span className="text-xs font-medium truncate transition-all duration-150 group-hover/header:text-primary group-hover/header:scale-110 inline-block">
+                  {columnIndexToName(columns.findIndex((c) => c.key === col.key))}
+                </span>
+              </div>
 
-            {/* Bottom-right column resize handle */}
-            <div
-              data-col-resize="true"
-              className="absolute bottom-0 right-0 w-4 h-4 opacity-0 group-hover/header:opacity-100 transition-opacity flex items-end justify-end pb-0.5 pr-0.5"
-              style={{ cursor: "col-resize", touchAction: "none" }}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const startX = e.clientX;
-                const startWidth = col.width ?? 160;
-                const pointerId = e.pointerId;
-                (e.currentTarget as HTMLElement).setPointerCapture(pointerId);
-                const onMove = (ev: PointerEvent) => {
-                  if (ev.pointerId !== pointerId) return;
-                  const newWidth = Math.max(40, Math.min(600, startWidth + (ev.clientX - startX)));
-                  sheetColOps.handleColumnResize(col.key, newWidth);
-                };
-                const onUp = (ev: PointerEvent) => {
-                  if (ev.pointerId !== pointerId) return;
+              {/* Text wrap indicator */}
+              {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && (
+                <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60 mr-0.5" />
+              )}
+
+              {/* 3-dots dropdown */}
+              <ColumnHeaderMenu
+                column={col}
+                onChangeType={(t) => {
+                  if (!canEditSheet) { showViewerEditMessage(); return; }
+                  sheetColOps.handleChangeColumnType(col.key, t);
+                  setTimeout(() => {
+                    const clearedRows = rowsHistory.currentState.map((row) => {
+                      const rowTypes = { ...(row[ROW_CELL_TYPES_KEY] ?? {}) };
+                      delete rowTypes[col.key];
+                      const rowSelects = { ...(row[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}) };
+                      delete rowSelects[col.key];
+                      const defaultVal = getDefaultValueForType(t);
+                      const currentVal = row[col.key];
+                      const shouldApplyDefault =
+                        currentVal === "" || currentVal === null || currentVal === undefined;
+                      return {
+                        ...row,
+                        ...(shouldApplyDefault ? { [col.key]: defaultVal } : {}),
+                        [ROW_CELL_TYPES_KEY]: rowTypes,
+                        [ROW_CELL_SELECT_OPTIONS_KEY]: rowSelects,
+                      };
+                    });
+                    rowsHistory.pushState(clearedRows);
+                    setSheetState((p) => ({ ...p, rows: clearedRows }));
+                    saveAllRows(sheetId, clearedRows).catch(console.error);
+                    broadcastSheetSnapshot({ rows: clearedRows });
+                  }, 60);
+                  if (t === "select") {
+                    setFocusedColumnKey(col.key);
+                    setRightPanel("select-options");
+                  }
+                }}
+                onOpenColumnPanel={() => {
+                  if (!canEditSheet) { showViewerEditMessage(); return; }
+                  setFocusedColumnKey(col.key);
+                  setRightPanel(col.type === "select" ? "select-options" : "columns");
+                }}
+                onDelete={() =>
+                  canEditSheet ? sheetColOps.handleDeleteColumn(col.key) : showViewerEditMessage()
+                }
+                onToggleTextWrap={() =>
+                  canEditSheet ? handleTextWrapToggle() : showViewerEditMessage()
+                }
+                textWrapEnabled={textWrap.textWrapColumns.has(col.key)}
+                columnFormula={formulas.columnFormulas[col.key]}
+                onApplyColumnFormula={(f) =>
+                  canEditSheet ? handleApplyFormulaToColumn(col.key, f) : showViewerEditMessage()
+                }
+                onRemoveColumnFormula={() =>
+                  canEditSheet ? handleRemoveColumnFormula(col.key) : showViewerEditMessage()
+                }
+                selectOptions={col.selectOptions}
+                onUpdateSelectOptions={(opts) =>
+                  canEditSheet
+                    ? sheetColOps.handleUpdateSelectOptions(col.key, opts)
+                    : showViewerEditMessage()
+                }
+                onFillColumnNumbers={() =>
+                  canEditSheet ? handleFillColumnNumbers(col.key) : showViewerEditMessage()
+                }
+                onFillColumnHashNumbers={() =>
+                  canEditSheet ? handleFillColumnHashNumbers(col.key) : showViewerEditMessage()
+                }
+                onInsertLeft={() => {
+                  if (!canEditSheet) { showViewerEditMessage(); return; }
+                  const idx = columns.findIndex((c) => c.key === col.key);
+                  sheetColOps.insertColumnAt(idx, null, "blank");
                   setTimeout(async () => {
                     markSaving();
-                    await saveAllColumns(sheetId, columnsHistory.currentState).catch(console.error);
+                    await Promise.all([
+                      saveAllColumns(sheetId, columnsHistory.currentState),
+                      saveAllRows(sheetId, rowsHistory.currentState),
+                    ]);
                     markSaved();
                   }, 50);
-                  window.removeEventListener("pointermove", onMove);
-                  window.removeEventListener("pointerup", onUp);
-                };
-                window.addEventListener("pointermove", onMove);
-                window.addEventListener("pointerup", onUp);
-              }}
-            >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                <path d="M1 7L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-gray-400" />
-                <path d="M4 7L7 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-gray-400" />
-              </svg>
+                }}
+                onInsertRight={() => {
+                  if (!canEditSheet) { showViewerEditMessage(); return; }
+                  const idx = columns.findIndex((c) => c.key === col.key);
+                  sheetColOps.insertColumnAt(idx + 1, null, "blank");
+                  setTimeout(async () => {
+                    markSaving();
+                    await Promise.all([
+                      saveAllColumns(sheetId, columnsHistory.currentState),
+                      saveAllRows(sheetId, rowsHistory.currentState),
+                    ]);
+                    markSaved();
+                  }, 50);
+                }}
+                onDuplicate={() => {
+                  if (!canEditSheet) { showViewerEditMessage(); return; }
+                  const idx = columns.findIndex((c) => c.key === col.key);
+                  sheetColOps.insertColumnAt(idx + 1, col, "duplicate");
+                  setTimeout(async () => {
+                    markSaving();
+                    await Promise.all([
+                      saveAllColumns(sheetId, columnsHistory.currentState),
+                      saveAllRows(sheetId, rowsHistory.currentState),
+                    ]);
+                    markSaved();
+                  }, 50);
+                }}
+                onClearColumn={() =>
+                  canEditSheet ? sheetColOps.clearColumnValues(col) : showViewerEditMessage()
+                }
+                onSortAsc={() =>
+                  canEditSheet
+                    ? sheetRowOps.handleSortByColumn(col.key, "asc")
+                    : showViewerEditMessage()
+                }
+                onSortDesc={() =>
+                  canEditSheet
+                    ? sheetRowOps.handleSortByColumn(col.key, "desc")
+                    : showViewerEditMessage()
+                }
+                onSetCurrency={(currencyCode) => {
+                  if (!canEditSheet) { showViewerEditMessage(); return; }
+                  const updated = columns.map((c) =>
+                    c.key === col.key ? { ...c, currencyCode } : c,
+                  );
+                  setSheetState((p) => ({ ...p, columns: updated }));
+                  columnsHistory.pushState(updated);
+                  setTimeout(async () => {
+                    markSaving();
+                    await saveAllColumns(sheetId, columnsHistory.currentState);
+                    markSaved();
+                  }, 50);
+                }}
+                onApplyColumnFormat={(fmt) =>
+                  canEditSheet ? handleApplyColumnFormat(col.key, fmt) : showViewerEditMessage()
+                }
+                onToggleFreeze={() =>
+                  canEditSheet ? handleToggleFreezeColumn(col.key) : showViewerEditMessage()
+                }
+                onOpenValidationPanel={() => {
+                  if (!canEditSheet) { showViewerEditMessage(); return; }
+                  setFocusedColumnKey(col.key);
+                  setRightPanel("validation");
+                }}
+              />
+
+              {/* Bottom-right column resize handle */}
+              <div
+                data-col-resize="true"
+                className="absolute bottom-0 right-0 w-4 h-4 opacity-0 group-hover/header:opacity-100 transition-opacity flex items-end justify-end pb-0.5 pr-0.5"
+                style={{ cursor: "col-resize", touchAction: "none" }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const startX = e.clientX;
+                  const startWidth = col.width ?? 160;
+                  const pointerId = e.pointerId;
+                  (e.currentTarget as HTMLElement).setPointerCapture(pointerId);
+                  const onMove = (ev: PointerEvent) => {
+                    if (ev.pointerId !== pointerId) return;
+                    const newWidth = Math.max(40, Math.min(600, startWidth + (ev.clientX - startX)));
+                    sheetColOps.handleColumnResize(col.key, newWidth);
+                  };
+                  const onUp = (ev: PointerEvent) => {
+                    if (ev.pointerId !== pointerId) return;
+                    setTimeout(async () => {
+                      markSaving();
+                      await saveAllColumns(sheetId, columnsHistory.currentState).catch(console.error);
+                      markSaved();
+                    }, 50);
+                    window.removeEventListener("pointermove", onMove);
+                    window.removeEventListener("pointerup", onUp);
+                  };
+                  window.addEventListener("pointermove", onMove);
+                  window.addEventListener("pointerup", onUp);
+                }}
+              >
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M1 7L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-gray-400" />
+                  <path d="M4 7L7 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-gray-400" />
+                </svg>
+              </div>
             </div>
-          </div>
-        ),
+          );
+        },
 
         renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
           const rowIdx = rows.findIndex((r) => r.id === props.row.id);
           const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
           const autoOverflowInfo = autoOverflowByCell.get(`${rowIdx}-${col.key}`);
+
+          const effectiveCellStyle = getEffectiveCellStyle(
+            rowIdx,
+            col.key,
+            props.row,
+          );
 
           // ── Covered (slave) cell — render an invisible click-through overlay ──
           if (mergeInfo?.hidden) {
@@ -4307,7 +4356,7 @@ export default function SheetClient() {
                   pointerEvents: "auto",
                   userSelect: "none",
                   cursor: "cell",
-                  background: "transparent",
+                  background: (effectiveCellStyle.backgroundColor as string) || "transparent",
                   zIndex: 5,
                 }}
                 onClick={(e) => {
@@ -4381,19 +4430,24 @@ export default function SheetClient() {
           const activeCollabEntry = Object.values(activeCursors).find(
             (c) => c.row === rowIdx && c.col === col.key,
           );
-          const effectiveCellStyle = getEffectiveCellStyle(
-            rowIdx,
-            col.key,
-            props.row,
-          );
+          // const effectiveCellStyle = getEffectiveCellStyle(
+          //   rowIdx,
+          //   col.key,
+          //   props.row,
+          // );
+          const layoutFlag = formatting.cellFormats[`${rowIdx}-${col.key}`]?.isLayoutRow;
           const mergedCellStyle = isMergeMaster
             ? {
               ...effectiveCellStyle,
               borderStyle: "none",
               borderColor: "transparent",
               borderWidth: 0,
+              ...(layoutFlag ? { isLayoutRow: true } : {}),
             }
-            : effectiveCellStyle;
+            : {
+              ...effectiveCellStyle,
+              ...(layoutFlag ? { isLayoutRow: true } : {}),
+            };
           const inSelection =
             selectionRange && !mergeInfo?.hidden
               ? (() => {
@@ -4513,7 +4567,8 @@ export default function SheetClient() {
           const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
           if (mergeInfo?.hidden)
             return <div className="h-full w-full sheet-cell-merge-covered" />;
-          const type = props.row._isHeaderRow
+          const isLayoutRow = rowIdx <= 1 || !!formatting.cellFormats[`${rowIdx}-${col.key}`]?.isLayoutRow;
+          const type = (props.row._isHeaderRow || isLayoutRow)
             ? "text"
             : cellTypes.getCellType(rowIdx, col.key, col.type || "text");
           const formula = formulas.getFormula(rowIdx, col.key);
@@ -5212,6 +5267,7 @@ export default function SheetClient() {
           canEditSheet={canEditSheet}
           canShareSheet={isOwner}
           onTitleChange={handleTitleChange}
+          onTitleBlur={handleTitleBlur}
           onStarredToggle={handleStarredToggle}
           onImportClick={() => importInputRef.current?.click()}
           onExport={persistence.handleExport}
@@ -6050,13 +6106,16 @@ export default function SheetClient() {
            * The grid cell wrapper must overflow so the absolutely-
            * positioned master box can paint across its siblings.
            */
-          .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
-            overflow: visible !important;
-            contain: none !important;
-            z-index: 6;
-            border: none !important;
-            background: transparent !important;
-          }
+.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
+  overflow: visible !important;
+  contain: none !important;
+  z-index: 6;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  isolation: isolate;          /* ← add this */
+}
           .rdg-sheet
             .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
           .rdg-sheet

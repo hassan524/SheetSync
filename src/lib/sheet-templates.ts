@@ -15,6 +15,14 @@ export interface CellFormat {
   borderLeft?: string;
   borderRight?: string;
   merge?: any;
+  /**
+   * When true, the cell renderer must skip ALL type-based rendering
+   * (progress bars, status badges, date pickers, etc.) and treat the
+   * cell as plain styled text. Set on every layout/header row cell so
+   * column names never get parsed as data values (e.g. "Progress (%)"
+   * → NaN%).
+   */
+  isLayoutRow?: boolean;
 }
 
 export type CellType =
@@ -136,7 +144,7 @@ const buildExtraColumns = (startIndex: number): ColumnDef[] =>
     const letter = getColumnLetter(idx);
     return {
       key: `__extra_${letter}`,
-      name: letter,
+      name: "",
       width: 120,
       editable: true,
       type: "text" as CellType,
@@ -166,78 +174,69 @@ const makeRows = (
     return base;
   });
 
+// ================= COLOR HELPERS =================
+
+/**
+ * Blend a hex color toward white at `ratio` (0 = original color, 1 = pure white).
+ * Used to generate light tints from the accent color.
+ */
+const blendToWhite = (hex: string, ratio: number): string => {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const blend = (c: number) => Math.round(c + (255 - c) * ratio);
+  return `#${[blend(r), blend(g), blend(b)]
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("")}`;
+};
+
+/** Title row background: accent at ~10% opacity (very light tint) */
+const accentLight = (hex: string) => blendToWhite(hex, 0.9);
+
+/** Header row background: accent at ~6% opacity (even subtler tint) */
+const accentSubtle = (hex: string) => blendToWhite(hex, 0.94);
+
 // ================= LAYOUT CONFIG =================
 
-type FieldRow =
-  | null // spacer
-  | {
-      left: string;          // label text
-      right?: string | null; // right-side label (null = extend underline full width)
-      leftPlaceholder?: string; // gray hint text shown in the value cell
-      rightPlaceholder?: string;
-    };
-
 type LayoutConfig = {
-  /** Disable layout styling entirely so data starts from top */
   disabled?: boolean;
   simple?: boolean;
-  /** Show the big accent title banner in row 0 */
   showTitleBanner: boolean;
-  /** Accent hex colour */
   accent: string;
-  /**
-   * Rows 1-N (after optional title banner).
-   * Each entry describes one metadata row.
-   * null = blank spacer row.
-   */
-  fieldRows: FieldRow[];
-  /** Label shown in the dark data-entry banner */
+  fieldRows: never[];
   dataLabel: string;
 };
 
 export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
   "c9fb4014-cccf-4394-9c3f-5eb16c00cc47": {
+    simple: true,
     showTitleBanner: false,
     accent: "#1e3a5f",
-    fieldRows: [
-      { left: "Project Owner", right: "Due Date" },
-      { left: "Phase", right: "Status" },
-    ],
+    fieldRows: [],
     dataLabel: "TASKS",
   },
-
   "2a197048-b791-490e-aaff-9b00785b2b27": {
+    simple: true,
     showTitleBanner: false,
     accent: "#0f766e",
-    fieldRows: [
-      { left: "Company / Client", right: "Period" },
-      { left: "Prepared By", right: "Approved By" },
-      { left: "Reporting Currency", right: "Prepared Date" },
-    ],
+    fieldRows: [],
     dataLabel: "TRANSACTIONS",
   },
-
   "e73711d5-aab0-4281-bc8f-486ad6c6aaac": {
+    simple: true,
     showTitleBanner: false,
     accent: "#7f1d1d",
-    fieldRows: [
-      { left: "Product", right: "Version" },
-      { left: "Sprint", right: "Lead Tester" },
-    ],
+    fieldRows: [],
     dataLabel: "BUG LOG",
   },
-
   "a1b2c3d4-e5f6-7890-abcd-ef1234567890": {
+    simple: true,
     showTitleBanner: false,
     accent: "#5b21b6",
-    fieldRows: [
-      { left: "Account Name", right: "Region" },
-      { left: "Sales Representative", right: "Quarter" },
-      { left: "Target Revenue ($)", right: "Pipeline Stage" },
-    ],
+    fieldRows: [],
     dataLabel: "CONTACTS",
   },
-
   "b2c3d4e5-f6a7-8901-bcde-f12345678901": {
     simple: true,
     showTitleBanner: false,
@@ -245,27 +244,20 @@ export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
     fieldRows: [],
     dataLabel: "DIRECTORY",
   },
-
   "c3d4e5f6-a7b8-9012-cdef-123456789012": {
+    simple: true,
     showTitleBanner: false,
     accent: "#92400e",
-    fieldRows: [
-      { left: "Warehouse / Location", right: "Manager" },
-      { left: "Last Audit Date", right: "Currency" },
-    ],
+    fieldRows: [],
     dataLabel: "INVENTORY",
   },
-
   "d4e5f6a7-b8c9-0123-defa-234567890123": {
+    simple: true,
     showTitleBanner: false,
     accent: "#831843",
-    fieldRows: [
-      { left: "Marketing Team", right: "Quarter" },
-      { left: "Total Budget ($)", right: "Brand Guidelines" },
-    ],
+    fieldRows: [],
     dataLabel: "CAMPAIGNS",
   },
-
   "e5f6a7b8-c9d0-1234-efab-345678901234": {
     simple: true,
     showTitleBanner: false,
@@ -273,7 +265,6 @@ export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
     fieldRows: [],
     dataLabel: "SESSIONS",
   },
-
   "f6a7b8c9-d0e1-2345-fabc-456789012345": {
     simple: true,
     showTitleBanner: false,
@@ -281,17 +272,13 @@ export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
     fieldRows: [],
     dataLabel: "BACKLOG",
   },
-
   "a7b8c9d0-e1f2-3456-abcd-567890123456": {
+    simple: true,
     showTitleBanner: false,
     accent: "#78350f",
-    fieldRows: [
-      { left: "Employee Name", right: "Department" },
-      { left: "Reporting Manager", right: "Reporting Period" },
-    ],
+    fieldRows: [],
     dataLabel: "EXPENSES",
   },
-
   "b8c9d0e1-f2a3-4567-bcde-678901234567": {
     simple: true,
     showTitleBanner: false,
@@ -299,18 +286,13 @@ export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
     fieldRows: [],
     dataLabel: "CONTENT",
   },
-
   "c9d0e1f2-a3b4-5678-cdef-789012345678": {
+    simple: true,
     showTitleBanner: false,
     accent: "#b45309",
-    fieldRows: [
-      { left: "Event Name", right: "Event Date" },
-      { left: "Event Venue", right: "Organizer" },
-      { left: "Total Budget ($)", right: "Approved By" },
-    ],
+    fieldRows: [],
     dataLabel: "EVENT ITEMS",
   },
-
   "d0e1f2a3-b4c5-6789-defa-890123456789": {
     simple: true,
     showTitleBanner: false,
@@ -328,42 +310,19 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
   dataLabel: "DATA",
 };
 
-// ================= UNDERLINE CELL FORMAT HELPER =================
+// ================= LAYOUT BUILDER =================
 
 /**
- * Returns a cell format that renders as an underline-only field —
- * the bold label on the left, an empty editable area with just a bottom border.
+ * Unified light layout for all templates:
+ *   Row 0 — merged title banner (very light accent tint bg, accent-colored bold text)
+ *   Row 1 — column headers (slightly deeper tint bg, accent-colored bold text)
+ *   Row 2+ — data rows start immediately
+ *
+ * IMPORTANT: Every cell in rows 0 and 1 gets `isLayoutRow: true` so that the
+ * cell renderer skips ALL type-based rendering (progress bars, status badges,
+ * date pickers, currency formatting, etc.). Without this flag a progress column
+ * header like "Progress (%)" gets parsed as a number → NaN%.
  */
-const labelFormat = (accent: string): CellFormat => ({
-  bold: true,
-  fontSize: 10,
-  textColor: "#94a3b8",
-  bgColor: "#ffffff",
-  borderBottom: "none",
-  borderTop: "none",
-  borderLeft: "none",
-  borderRight: "none",
-});
-
-const valueFormat = (): CellFormat => ({
-  bgColor: "#ffffff",
-  textColor: "#1e293b",
-  fontSize: 11,
-  borderBottom: "none",
-  borderTop: "none",
-  borderLeft: "none",
-  borderRight: "none",
-});
-
-const spacerFormat = (): CellFormat => ({
-  bgColor: "#ffffff",
-  borderTop: "none",
-  borderBottom: "none",
-  borderLeft: "none",
-  borderRight: "none",
-});
-
-
 export const buildSimpleTemplateLayout = (
   title: string,
   columns: ColumnDef[],
@@ -375,21 +334,25 @@ export const buildSimpleTemplateLayout = (
     return { rows, cellFormats: {}, rowHeights: {} };
   }
 
-  const colSpan = Math.min(workingColumns.length, 10);
+  const colSpan = workingColumns.length;
   const cellFormats: Record<string, CellFormat> = {};
 
+  // Clone only the first 2 layout rows; leave everything else untouched
   const nextRows: SheetRow[] = rows.map((row, i) => {
     if (i >= 2) return row;
     const cleared: SheetRow = { id: row.id };
     Object.keys(row).forEach((k) => {
       if (!workingColumns.find((c) => c.key === k)) cleared[k] = row[k];
     });
-    workingColumns.forEach((col) => { cleared[col.key] = ""; });
+    workingColumns.forEach((col) => {
+      cleared[col.key] = "";
+    });
     return cleared;
   });
 
-  // Row 0: merged title
+  // ── Row 0: merged title ───────────────────────────────────────────────
   nextRows[0][workingColumns[0].key] = title.toUpperCase();
+
   const mergeDescriptor = {
     masterRow: 0,
     masterCol: workingColumns[0].key,
@@ -397,32 +360,66 @@ export const buildSimpleTemplateLayout = (
     colSpan,
     mode: "center" as const,
   };
+
   for (let i = 0; i < colSpan; i++) {
     const colKey = workingColumns[i]?.key;
     if (!colKey) continue;
     cellFormats[`0-${colKey}`] =
       i === 0
-        ? { bold: true, fontSize: 16, textColor: "#ffffff", bgColor: accent, align: "center", merge: mergeDescriptor }
-        : { merge: { ...mergeDescriptor, hidden: true } };
+        ? {
+          bold: true,
+          fontSize: 15,
+          textColor: accent,
+          bgColor: accentLight(accent),
+          align: "center",
+          borderTop: "none",
+          borderBottom: "none",
+          borderLeft: "none",
+          borderRight: "none",
+          merge: mergeDescriptor,
+          // ↓ CRITICAL: prevents any type-based renderer from running on this cell
+          isLayoutRow: true,
+        }
+        : {
+          bgColor: accentLight(accent),
+          borderTop: "none",
+          borderBottom: "none",
+          borderLeft: "none",
+          borderRight: "none",
+          merge: { ...mergeDescriptor, hidden: true },
+          isLayoutRow: true,
+        };
   }
 
-  // Row 1: column headers
-  workingColumns.forEach((col, i) => {
-    const inLayout = i < colSpan;
+  // ── Row 1: column headers ─────────────────────────────────────────────
+  // ── Row 1: column headers ─────────────────────────────────────────────
+  workingColumns.forEach((col) => {
     cellFormats[`1-${col.key}`] = {
       bold: true,
       fontSize: 11,
-      textColor: inLayout ? "#ffffff" : "#334155",
-      bgColor: inLayout ? accent : "#f1f5f9",
+      textColor: accent,
+      bgColor: accentSubtle(accent),
       align: "center",
       borderTop: "none",
       borderBottom: "none",
       borderLeft: "none",
       borderRight: "none",
+      isLayoutRow: true,
     };
-    if (inLayout) nextRows[1][col.key] = col.name;
+    nextRows[1][col.key] = col.name;
   });
 
+  // ── Row 0 + Row 1: apply accent bg to ALL columns including extra ─────
+  const allColumns = columns; // includes isExtra cols
+  const extraColumns = columns.filter((col) => col.isExtra);
+  extraColumns.forEach((col) => {
+    cellFormats[`0-${col.key}`] = { isLayoutRow: true };
+    cellFormats[`1-${col.key}`] = { isLayoutRow: true };
+    nextRows[0][col.key] = "";
+    nextRows[1][col.key] = "";
+  });
+
+  // ── Row heights (keyed by actual row.id so they survive buffer passes) ─
   const rowHeights: Record<string, number> = {};
   if (nextRows[0]?.id) rowHeights[nextRows[0].id] = 44;
   if (nextRows[1]?.id) rowHeights[nextRows[1].id] = 32;
@@ -430,14 +427,12 @@ export const buildSimpleTemplateLayout = (
   return { rows: nextRows, cellFormats, rowHeights };
 };
 
-// ================= MAIN LAYOUT BUILDER =================
+// ================= MAIN LAYOUT ENTRY POINT =================
 
 /**
- * FIXED: accepts real rows (with their DB-assigned IDs) and uses row.id
- * for rowHeights keys — so heights survive ensureWorkingRowBuffer.
- *
- * Cell format keys still use the grid row INDEX (e.g. "0-task") because
- * the DataGrid looks up formats by `rows.findIndex(r => r.id === row.id)`.
+ * Single entry point called by the sheet. Routes every template through
+ * buildSimpleTemplateLayout using the accent from LAYOUT_CONFIGS.
+ * The old complex field-row builder has been removed.
  */
 export const buildProfessionalTemplateLayout = (
   title: string,
@@ -445,228 +440,15 @@ export const buildProfessionalTemplateLayout = (
   rows: SheetRow[],
   templateId?: string,
 ): ProfessionalTemplateLayout => {
-  const cfg: LayoutConfig =
-    (templateId ? LAYOUT_CONFIGS[templateId] : undefined) ?? DEFAULT_LAYOUT_CONFIG;
+  const cfg =
+    (templateId ? LAYOUT_CONFIGS[templateId] : undefined) ??
+    DEFAULT_LAYOUT_CONFIG;
 
-if (cfg.disabled) {
+  if (cfg.disabled) {
     return { rows, cellFormats: {}, rowHeights: {} };
   }
 
-  if (cfg.simple) {
-    return buildSimpleTemplateLayout(title, columns, rows, cfg.accent);
-  }
-
-  const workingColumns = columns.filter((col) => !col.isExtra);
-  if (workingColumns.length === 0 || rows.length < 10) {
-    return { rows, cellFormats: {}, rowHeights: {} };
-  }
-
-  const numCols = workingColumns.length;
-  const colSpan = Math.min(numCols, 10);
-  const { accent, showTitleBanner, fieldRows, dataLabel } = cfg;
-
-  // ── Clone rows (only layout rows 0-9) ─────────────────────────────────
-  const nextRows: SheetRow[] = rows.map((row, i) => {
-    if (i >= 10) return row;
-    const cleared: SheetRow = { id: row.id };
-    // Copy over non-column keys (like _automationRuns etc.)
-    Object.keys(row).forEach((k) => {
-      if (!workingColumns.find((c) => c.key === k)) cleared[k] = row[k];
-    });
-    // Clear all working-column values for the layout rows
-    workingColumns.forEach((col) => { cleared[col.key] = ""; });
-    return cleared;
-  });
-
-  const cellFormats: Record<string, CellFormat> = {};
-
-  // ── Low-level helpers ─────────────────────────────────────────────────
-
-  /** Write a display value into a layout row */
-  const setValue = (rowIdx: number, colIdx: number, value: string) => {
-    if (colIdx < 0 || colIdx >= workingColumns.length) return;
-    if (rowIdx < 0 || rowIdx >= nextRows.length) return;
-    nextRows[rowIdx][workingColumns[colIdx].key] = value;
-  };
-
-  /** Apply a merge block across a row, using the GRID ROW INDEX as key */
-  const mergeBlock = (
-    rowIdx: number,
-    startColIdx: number,
-    span: number,
-    format: CellFormat,
-  ) => {
-    const effectiveSpan = Math.min(span, numCols - startColIdx);
-    if (effectiveSpan <= 0 || startColIdx < 0 || startColIdx >= numCols) return;
-    const masterColKey = workingColumns[startColIdx].key;
-    const mergeDescriptor = {
-      masterRow: rowIdx,
-      masterCol: masterColKey,
-      rowSpan: 1,
-      colSpan: effectiveSpan,
-      mode: (format.align === "center" ? "center" : "across") as "center" | "across",
-    };
-    for (let i = 0; i < effectiveSpan; i++) {
-      const colKey = workingColumns[startColIdx + i]?.key;
-      if (!colKey) continue;
-      cellFormats[`${rowIdx}-${colKey}`] =
-        i === 0
-          ? { ...format, merge: mergeDescriptor }
-          : { merge: { ...mergeDescriptor, hidden: true } };
-    }
-  };
-
-  /** Apply format to every cell in a row range, no merge */
-  const applyRowFmt = (rowIdx: number, startCol: number, endCol: number, fmt: CellFormat) => {
-    for (let c = startCol; c < endCol && c < numCols; c++) {
-      const colKey = workingColumns[c]?.key;
-      if (colKey) cellFormats[`${rowIdx}-${colKey}`] = fmt;
-    }
-  };
-
-  // ── Row 0: title banner (optional) ───────────────────────────────────
-  let currentRow = 0;
-
-  if (showTitleBanner) {
-    setValue(0, 0, title.toUpperCase());
-    mergeBlock(0, 0, colSpan, {
-      bold: true,
-      fontSize: 20,
-      textColor: "#ffffff",
-      bgColor: accent,
-      align: "center",
-    });
-    currentRow = 1;
-  }
-
-  // ── Field rows ────────────────────────────────────────────────────────
-  //
-  // Each FieldRow renders like:
-  //   [LABEL TEXT]  ___________  [LABEL TEXT]  ___________
-  //
-  // where ___ is an underlined blank input zone.
-  // If right === null the underline spans the full remaining width.
-
-  fieldRows.forEach((pair, i) => {
-    const ri = currentRow + i;
-    if (ri >= 8 || ri >= nextRows.length) return;
-
-    if (pair === null) {
-      // Spacer row
-      applyRowFmt(ri, 0, colSpan, spacerFormat());
-      return;
-    }
-
-    const { left: leftLabel, right: rightLabel } = pair;
-    const halfSpan = Math.floor(colSpan / 2);
-
-    // ── Left label cell ────────────────────────────────────────────────
-    setValue(ri, 0, leftLabel);
-    cellFormats[`${ri}-${workingColumns[0].key}`] = labelFormat(accent);
-
-    // ── Left value cells (cols 1 … halfSpan-1) ────────────────────────
-    if (rightLabel !== undefined) {
-      // Two-column layout
-      for (let c = 1; c < halfSpan && c < numCols; c++) {
-        const colKey = workingColumns[c]?.key;
-        if (colKey) cellFormats[`${ri}-${colKey}`] = valueFormat();
-      }
-
-      // ── Right label cell ─────────────────────────────────────────────
-      if (rightLabel && halfSpan < numCols) {
-        setValue(ri, halfSpan, rightLabel);
-        cellFormats[`${ri}-${workingColumns[halfSpan].key}`] = labelFormat(accent);
-
-        // ── Right value cells ─────────────────────────────────────────
-        for (let c = halfSpan + 1; c < colSpan && c < numCols; c++) {
-          const colKey = workingColumns[c]?.key;
-          if (colKey) cellFormats[`${ri}-${colKey}`] = valueFormat();
-        }
-      } else if (!rightLabel) {
-        // right === null → extend underline across whole right half
-        for (let c = halfSpan; c < colSpan && c < numCols; c++) {
-          const colKey = workingColumns[c]?.key;
-          if (colKey) cellFormats[`${ri}-${colKey}`] = valueFormat();
-        }
-      }
-    } else {
-      // No right label — full-width underline (right is not specified)
-      for (let c = 1; c < colSpan && c < numCols; c++) {
-        const colKey = workingColumns[c]?.key;
-        if (colKey) cellFormats[`${ri}-${colKey}`] = valueFormat();
-      }
-    }
-  });
-
-  // ── Open borderless zone (chart area: rows after fields up to row 7) ──
-  const chartZoneStart = currentRow + fieldRows.length;
-  for (let ri = chartZoneStart; ri <= 7 && ri < nextRows.length; ri++) {
-    applyRowFmt(ri, 0, colSpan, {
-      bgColor: "#ffffff",
-      borderTop: "none",
-      borderBottom: "none",
-      borderLeft: "none",
-      borderRight: "none",
-    });
-  }
-
-  // ── Row 8: data-entry dark banner ────────────────────────────────────
-  setValue(8, 0, dataLabel);
-  mergeBlock(8, 0, colSpan, {
-    bold: true,
-    fontSize: 12,
-    textColor: "#ffffff",
-    bgColor: "#1e293b",
-    align: "center",
-  });
-
-  // ── Row 9: column header labels (accent background) ──────────────────
-  workingColumns.forEach((col, i) => {
-    const inLayout = i < colSpan;
-    cellFormats[`9-${col.key}`] = {
-      bold: true,
-      fontSize: 11,
-      textColor: inLayout ? "#ffffff" : "#334155",
-      bgColor: inLayout ? accent : "#f1f5f9",
-      align: "center",
-      borderTop: "none",
-      borderBottom: "none",
-      borderLeft: "none",
-      borderRight: "none",
-    };
-    if (inLayout) setValue(9, i, col.name);
-  });
-
-  // ── Row heights — FIXED: key by actual row.id (not row index) ─────────
-  //
-  // This is the critical fix. Previously the code used nextRows[idx]?.id
-  // which happened to be String(idx+1) for fresh rows, but after
-  // ensureWorkingRowBuffer the IDs become "row_timestamp_random" strings.
-  // We key by row.id here so the heights survive the buffer pass.
-
-  const DEFAULT_BANNER_H = showTitleBanner ? 54 : 38;
-
-  const HEIGHT_MAP: Record<number, number> = {
-    0: DEFAULT_BANNER_H,
-    1: 38,
-    2: 38,
-    3: 38,
-    4: 36,
-    5: 36,
-    6: 36,
-    7: 36,
-    8: 34,
-    9: 32,
-  };
-
-  const rowHeights: Record<string, number> = {};
-  Object.entries(HEIGHT_MAP).forEach(([idxStr, h]) => {
-    const idx = Number(idxStr);
-    const rowId = nextRows[idx]?.id;
-    if (rowId) rowHeights[rowId] = h;
-  });
-
-  return { rows: nextRows, cellFormats, rowHeights };
+  return buildSimpleTemplateLayout(title, columns, rows, cfg.accent);
 };
 
 // ================= CHART PRESET =================
@@ -820,10 +602,14 @@ export const getTemplateData = (
         { key: "owner", name: "Owner", width: 150, editable: true, type: "text" },
         { key: "start", name: "Start Date", width: 130, editable: true, type: "date" },
         { key: "due", name: "Due Date", width: 130, editable: true, type: "date" },
-        { key: "status", name: "Status", width: 140, editable: true, type: "status",
-          statusOptions: [STATUS_COLORS["Not Started"], STATUS_COLORS["In Progress"], STATUS_COLORS["Done"], STATUS_COLORS["Blocked"]] },
-        { key: "priority", name: "Priority", width: 120, editable: true, type: "priority",
-          statusOptions: [STATUS_COLORS["High"], STATUS_COLORS["Medium"], STATUS_COLORS["Low"]] },
+        {
+          key: "status", name: "Status", width: 140, editable: true, type: "status",
+          statusOptions: [STATUS_COLORS["Not Started"], STATUS_COLORS["In Progress"], STATUS_COLORS["Done"], STATUS_COLORS["Blocked"]],
+        },
+        {
+          key: "priority", name: "Priority", width: 120, editable: true, type: "priority",
+          statusOptions: [STATUS_COLORS["High"], STATUS_COLORS["Medium"], STATUS_COLORS["Low"]],
+        },
         { key: "progress", name: "Progress (%)", width: 130, editable: true, type: "progress" },
         { key: "notes", name: "Notes", width: 240, editable: true, type: "text" },
       ];
@@ -833,9 +619,10 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], PROJECT_DEFAULTS),
       };
     }
+
     case "2a197048-b791-490e-aaff-9b00785b2b27": {
       const templateCols: ColumnDef[] = [
-        { key: "date", name: "Date", width: 130, editable: true, type: "text" },
+        { key: "date", name: "Date", width: 130, editable: true, type: "date" },
         { key: "category", name: "Category", width: 160, editable: true, type: "text" },
         { key: "desc", name: "Description", width: 240, editable: true, type: "text" },
         { key: "income", name: "Income", width: 140, editable: true, type: "currency" },
@@ -849,6 +636,7 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], FINANCE_DEFAULTS),
       };
     }
+
     case "e73711d5-aab0-4281-bc8f-486ad6c6aaac": {
       const templateCols: ColumnDef[] = [
         { key: "bugId", name: "Bug ID", width: 100, editable: true, type: "text" },
@@ -857,12 +645,16 @@ export const getTemplateData = (
         { key: "environment", name: "Environment", width: 140, editable: true, type: "text" },
         { key: "steps", name: "Steps to Reproduce", width: 280, editable: true, type: "text" },
         { key: "screenshot", name: "Screenshot", width: 160, editable: true, type: "text" },
-        { key: "severity", name: "Severity", width: 120, editable: true, type: "priority",
-          statusOptions: [STATUS_COLORS["Critical"], STATUS_COLORS["High"], STATUS_COLORS["Medium"], STATUS_COLORS["Low"]] },
+        {
+          key: "severity", name: "Severity", width: 120, editable: true, type: "priority",
+          statusOptions: [STATUS_COLORS["Critical"], STATUS_COLORS["High"], STATUS_COLORS["Medium"], STATUS_COLORS["Low"]],
+        },
         { key: "reporter", name: "Reported By", width: 140, editable: true, type: "text" },
         { key: "assigned", name: "Assign To", width: 140, editable: true, type: "text" },
-        { key: "status", name: "Status", width: 130, editable: true, type: "status",
-          statusOptions: [STATUS_COLORS["Not Started"], STATUS_COLORS["In Progress"], STATUS_COLORS["In Review"], STATUS_COLORS["Done"], STATUS_COLORS["Blocked"]] },
+        {
+          key: "status", name: "Status", width: 130, editable: true, type: "status",
+          statusOptions: [STATUS_COLORS["Not Started"], STATUS_COLORS["In Progress"], STATUS_COLORS["In Review"], STATUS_COLORS["Done"], STATUS_COLORS["Blocked"]],
+        },
       ];
       return {
         title: "QA Tracker",
@@ -870,12 +662,15 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], QA_DEFAULTS),
       };
     }
+
     case "a1b2c3d4-e5f6-7890-abcd-ef1234567890": {
       const templateCols: ColumnDef[] = [
         { key: "contact", name: "Contact Name", width: 180, editable: true, type: "text" },
         { key: "company", name: "Company", width: 160, editable: true, type: "text" },
-        { key: "stage", name: "Stage", width: 140, editable: true, type: "status",
-          statusOptions: [STATUS_COLORS["Lead"], STATUS_COLORS["Contacted"], STATUS_COLORS["Proposal"], STATUS_COLORS["Won"], STATUS_COLORS["Lost"]] },
+        {
+          key: "stage", name: "Stage", width: 140, editable: true, type: "status",
+          statusOptions: [STATUS_COLORS["Lead"], STATUS_COLORS["Contacted"], STATUS_COLORS["Proposal"], STATUS_COLORS["Won"], STATUS_COLORS["Lost"]],
+        },
         { key: "value", name: "Lead Value", width: 130, editable: true, type: "currency" },
         { key: "email", name: "Email", width: 200, editable: true, type: "url" },
         { key: "phone", name: "Phone", width: 140, editable: true, type: "text" },
@@ -887,6 +682,7 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], CRM_DEFAULTS),
       };
     }
+
     case "b2c3d4e5-f6a7-8901-bcde-f12345678901": {
       const templateCols: ColumnDef[] = [
         { key: "name", name: "Name", width: 180, editable: true, type: "text" },
@@ -895,8 +691,10 @@ export const getTemplateData = (
         { key: "email", name: "Email", width: 200, editable: true, type: "url" },
         { key: "phone", name: "Phone", width: 140, editable: true, type: "text" },
         { key: "startDate", name: "Start Date", width: 130, editable: true, type: "date" },
-        { key: "status", name: "Status", width: 130, editable: true, type: "status",
-          statusOptions: [STATUS_COLORS["Active"], STATUS_COLORS["On Leave"], STATUS_COLORS["Terminated"]] },
+        {
+          key: "status", name: "Status", width: 130, editable: true, type: "status",
+          statusOptions: [STATUS_COLORS["Active"], STATUS_COLORS["On Leave"], STATUS_COLORS["Terminated"]],
+        },
       ];
       return {
         title: "Employee Directory",
@@ -904,6 +702,7 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], EMPLOYEE_DEFAULTS),
       };
     }
+
     case "c3d4e5f6-a7b8-9012-cdef-123456789012": {
       const templateCols: ColumnDef[] = [
         { key: "item", name: "Item Name", width: 200, editable: true, type: "text" },
@@ -920,6 +719,7 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], INVENTORY_DEFAULTS),
       };
     }
+
     case "d4e5f6a7-b8c9-0123-defa-234567890123": {
       const templateCols: ColumnDef[] = [
         { key: "campaign", name: "Campaign Name", width: 220, editable: true, type: "text" },
@@ -928,8 +728,10 @@ export const getTemplateData = (
         { key: "endDate", name: "End Date", width: 130, editable: true, type: "date" },
         { key: "budget", name: "Budget", width: 120, editable: true, type: "currency" },
         { key: "spend", name: "Spend", width: 120, editable: true, type: "currency" },
-        { key: "status", name: "Status", width: 130, editable: true, type: "status",
-          statusOptions: [STATUS_COLORS["Planning"], STATUS_COLORS["In Progress"], STATUS_COLORS["Completed"], STATUS_COLORS["Paused"]] },
+        {
+          key: "status", name: "Status", width: 130, editable: true, type: "status",
+          statusOptions: [STATUS_COLORS["Planning"], STATUS_COLORS["In Progress"], STATUS_COLORS["Completed"], STATUS_COLORS["Paused"]],
+        },
       ];
       return {
         title: "Marketing Calendar",
@@ -937,6 +739,7 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], MARKETING_DEFAULTS),
       };
     }
+
     case "e5f6a7b8-c9d0-1234-efab-345678901234": {
       const templateCols: ColumnDef[] = [
         { key: "title", name: "Meeting Title", width: 220, editable: true, type: "text" },
@@ -953,14 +756,19 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], MEETING_DEFAULTS),
       };
     }
+
     case "f6a7b8c9-d0e1-2345-fabc-456789012345": {
       const templateCols: ColumnDef[] = [
         { key: "story", name: "User Story / Task", width: 260, editable: true, type: "text" },
         { key: "assignee", name: "Assignee", width: 150, editable: true, type: "text" },
-        { key: "status", name: "Status", width: 130, editable: true, type: "status",
-          statusOptions: [STATUS_COLORS["Not Started"], STATUS_COLORS["In Progress"], STATUS_COLORS["In Review"], STATUS_COLORS["Done"], STATUS_COLORS["Blocked"]] },
-        { key: "priority", name: "Priority", width: 120, editable: true, type: "priority",
-          statusOptions: [STATUS_COLORS["High"], STATUS_COLORS["Medium"], STATUS_COLORS["Low"]] },
+        {
+          key: "status", name: "Status", width: 130, editable: true, type: "status",
+          statusOptions: [STATUS_COLORS["Not Started"], STATUS_COLORS["In Progress"], STATUS_COLORS["In Review"], STATUS_COLORS["Done"], STATUS_COLORS["Blocked"]],
+        },
+        {
+          key: "priority", name: "Priority", width: 120, editable: true, type: "priority",
+          statusOptions: [STATUS_COLORS["High"], STATUS_COLORS["Medium"], STATUS_COLORS["Low"]],
+        },
         { key: "points", name: "Story Points", width: 120, editable: true, type: "number" },
         { key: "sprint", name: "Sprint", width: 110, editable: true, type: "text" },
         { key: "notes", name: "Notes", width: 220, editable: true, type: "text" },
@@ -971,6 +779,7 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], SPRINT_DEFAULTS),
       };
     }
+
     case "a7b8c9d0-e1f2-3456-abcd-567890123456": {
       const templateCols: ColumnDef[] = [
         { key: "date", name: "Expense Date", width: 130, editable: true, type: "date" },
@@ -978,8 +787,10 @@ export const getTemplateData = (
         { key: "description", name: "Description", width: 240, editable: true, type: "text" },
         { key: "amount", name: "Amount", width: 130, editable: true, type: "currency" },
         { key: "receipt", name: "Receipt Link", width: 180, editable: true, type: "url" },
-        { key: "status", name: "Status", width: 130, editable: true, type: "status",
-          statusOptions: [STATUS_COLORS["Pending"], STATUS_COLORS["Approved"], STATUS_COLORS["Failed"]] },
+        {
+          key: "status", name: "Status", width: 130, editable: true, type: "status",
+          statusOptions: [STATUS_COLORS["Pending"], STATUS_COLORS["Approved"], STATUS_COLORS["Failed"]],
+        },
         { key: "approvedBy", name: "Approved By", width: 150, editable: true, type: "text" },
       ];
       return {
@@ -988,12 +799,15 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], EXPENSE_DEFAULTS),
       };
     }
+
     case "b8c9d0e1-f2a3-4567-bcde-678901234567": {
       const templateCols: ColumnDef[] = [
         { key: "title", name: "Content Title", width: 220, editable: true, type: "text" },
         { key: "format", name: "Format", width: 130, editable: true, type: "text" },
-        { key: "status", name: "Status", width: 130, editable: true, type: "status",
-          statusOptions: [STATUS_COLORS["Draft"], STATUS_COLORS["Writing"], STATUS_COLORS["Editing"], STATUS_COLORS["Scheduled"], STATUS_COLORS["Published"]] },
+        {
+          key: "status", name: "Status", width: 130, editable: true, type: "status",
+          statusOptions: [STATUS_COLORS["Draft"], STATUS_COLORS["Writing"], STATUS_COLORS["Editing"], STATUS_COLORS["Scheduled"], STATUS_COLORS["Published"]],
+        },
         { key: "owner", name: "Owner", width: 150, editable: true, type: "text" },
         { key: "dueDate", name: "Due Date", width: 130, editable: true, type: "date" },
         { key: "publishDate", name: "Publish Date", width: 130, editable: true, type: "date" },
@@ -1005,6 +819,7 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], CONTENT_DEFAULTS),
       };
     }
+
     case "c9d0e1f2-a3b4-5678-cdef-789012345678": {
       const templateCols: ColumnDef[] = [
         { key: "item", name: "Item / Task", width: 200, editable: true, type: "text" },
@@ -1013,8 +828,10 @@ export const getTemplateData = (
         { key: "estCost", name: "Estimated Cost", width: 130, editable: true, type: "currency" },
         { key: "actCost", name: "Actual Cost", width: 130, editable: true, type: "currency" },
         { key: "dueDate", name: "Due Date", width: 130, editable: true, type: "date" },
-        { key: "status", name: "Paid Status", width: 130, editable: true, type: "status",
-          statusOptions: [STATUS_COLORS["Unpaid"], STATUS_COLORS["Pending"], STATUS_COLORS["Paid"]] },
+        {
+          key: "status", name: "Paid Status", width: 130, editable: true, type: "status",
+          statusOptions: [STATUS_COLORS["Unpaid"], STATUS_COLORS["Pending"], STATUS_COLORS["Paid"]],
+        },
       ];
       return {
         title: "Event Planner",
@@ -1022,6 +839,7 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], EVENT_DEFAULTS),
       };
     }
+
     case "d0e1f2a3-b4c5-6789-defa-890123456789": {
       const templateCols: ColumnDef[] = [
         { key: "name", name: "Student Name", width: 180, editable: true, type: "text" },
@@ -1038,6 +856,7 @@ export const getTemplateData = (
         rows: makeRows(DEFAULT_WORKING_ROW_COUNT, templateCols.map((c) => c.key), [], GRADEBOOK_DEFAULTS),
       };
     }
+
     case "f628aed8-bca7-4f51-b687-6db9f932be34":
     default: {
       const blankCols: ColumnDef[] = Array.from({ length: 12 }, (_, i) => ({
@@ -1052,7 +871,9 @@ export const getTemplateData = (
         columns: blankCols,
         rows: Array.from({ length: DEFAULT_WORKING_ROW_COUNT }, (_, i) => {
           const row: SheetRow = { id: String(i + 1) };
-          blankCols.forEach((c) => { row[c.key] = ""; });
+          blankCols.forEach((c) => {
+            row[c.key] = "";
+          });
           return row;
         }),
       };

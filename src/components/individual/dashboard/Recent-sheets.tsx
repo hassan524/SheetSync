@@ -113,6 +113,7 @@ const RowMenu = ({
       onOpenChange(false);
     } catch (err) {
       toast.error("Failed to rename sheet");
+      console.log("Rename error:", err);
     }
   };
 

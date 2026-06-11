@@ -79,16 +79,16 @@ export async function getAllSheets(folderId?: string) {
       folder: null,
       organization: org
         ? {
-            id: org.id,
-            name: org.name,
-            members: (org.organization_members ?? []).map((member: any) => ({
-              id: member.profiles?.id ?? member.id,
-              name: member.profiles?.name ?? "Member",
-              email: member.profiles?.email ?? "",
-              avatar: member.profiles?.avatar_url ?? null,
-              status: member.status ?? "offline",
-            })),
-          }
+          id: org.id,
+          name: org.name,
+          members: (org.organization_members ?? []).map((member: any) => ({
+            id: member.profiles?.id ?? member.id,
+            name: member.profiles?.name ?? "Member",
+            email: member.profiles?.email ?? "",
+            avatar: member.profiles?.avatar_url ?? null,
+            status: member.status ?? "offline",
+          })),
+        }
         : null,
       owner: {
         name: ownerName,
@@ -98,8 +98,8 @@ export async function getAllSheets(folderId?: string) {
       },
       rows: Array.isArray(sheet.rows) ? sheet.rows.length : sheet.rows,
       columns: Array.isArray(sheet.columns)
-          ? sheet.columns.length
-          : sheet.columns,
+        ? sheet.columns.length
+        : sheet.columns,
     };
   });
 }
@@ -209,73 +209,73 @@ export async function importPersonalSheetToOrganization({
   const writes = await Promise.all([
     columns?.length
       ? supabase.from("columns").insert(
-          columns.map((col: any) => ({
-            sheet_id: created.id,
-            column_key: col.column_key,
-            name: col.name,
-            type: col.type,
-            width: col.width,
-            position: col.position,
-            select_options: col.select_options,
-            currency_code: col.currency_code,
-            frozen: col.frozen,
-            hidden: col.hidden,
-            conditional_formatting: col.conditional_formatting,
-            group_id: col.group_id,
-            validation_rules: col.validation_rules,
-          })),
-        )
+        columns.map((col: any) => ({
+          sheet_id: created.id,
+          column_key: col.column_key,
+          name: col.name,
+          type: col.type,
+          width: col.width,
+          position: col.position,
+          select_options: col.select_options,
+          currency_code: col.currency_code,
+          frozen: col.frozen,
+          hidden: col.hidden,
+          conditional_formatting: col.conditional_formatting,
+          group_id: col.group_id,
+          validation_rules: col.validation_rules,
+        })),
+      )
       : Promise.resolve({ error: null }),
     rows?.length
       ? supabase.from("rows").insert(
-          rows.map((row: any) => ({
-            sheet_id: created.id,
-            row_key: row.row_key,
-            position: row.position,
-            data: row.data,
-            updated_at: new Date().toISOString(),
-          })),
-        )
+        rows.map((row: any) => ({
+          sheet_id: created.id,
+          row_key: row.row_key,
+          position: row.position,
+          data: row.data,
+          updated_at: new Date().toISOString(),
+        })),
+      )
       : Promise.resolve({ error: null }),
     formulas?.length
       ? supabase.from("formulas").insert(
-          formulas.map((formula: any) => ({
-            sheet_id: created.id,
-            cell_key: formula.cell_key,
-            formula: formula.formula,
-          })),
-        )
+        formulas.map((formula: any) => ({
+          sheet_id: created.id,
+          cell_key: formula.cell_key,
+          formula: formula.formula,
+        })),
+      )
       : Promise.resolve({ error: null }),
     formats?.length
       ? supabase.from("cell_formats").insert(
-          formats.map((format: any) => ({
-            sheet_id: created.id,
-            cell_key: format.cell_key,
-            bold: format.bold,
-            italic: format.italic,
-            underline: format.underline,
-            strikethrough: format.strikethrough,
-            font_size: format.font_size,
-            font_family: format.font_family,
-            text_color: format.text_color,
-            bg_color: format.bg_color,
-            text_align: format.text_align,
-            text_wrap: format.text_wrap,
-            border_style: format.border_style,
-            border_color: format.border_color,
-            border_width: format.border_width,
-          })),
-        )
+        formats.map((format: any) => ({
+          sheet_id: created.id,
+          cell_key: format.cell_key,
+          bold: format.bold,
+          italic: format.italic,
+          underline: format.underline,
+          strikethrough: format.strikethrough,
+          font_size: format.font_size,
+          font_family: format.font_family,
+          text_color: format.text_color,
+          bg_color: format.bg_color,
+          text_align: format.text_align,
+          text_wrap: format.text_wrap,
+          border_style: format.border_style,
+          border_color: format.border_color,
+          border_width: format.border_width,
+        })),
+      )
       : Promise.resolve({ error: null }),
     protectedRows?.length
       ? supabase.from("protected_rows").insert(
-          protectedRows.map((row: any) => ({
-            sheet_id: created.id,
-            row_key: row.row_key,
-            user_id: row.user_id,
-            created_at: row.created_at,
-          })),
-        )
+        protectedRows.map((row: any) => ({
+          sheet_id: created.id,
+          row_key: row.row_key,
+          user_id: row.user_id,
+          created_at: row.created_at,
+        })),
+      )
       : Promise.resolve({ error: null }),
   ]);
 
@@ -363,25 +363,101 @@ export async function renameSheet(input: {
   sheet_id: string;
   newName: string;
 }) {
-  const supabase = await createSupabaseServerClient();
-  const parsed = renameSheetSchema.safeParse(input);
-  if (!parsed.success) throw new Error("Invalid sheet rename data");
+  console.log("==== RENAME SHEET DEBUG START ====");
 
+  const supabase = await createSupabaseServerClient();
+
+  // 1. Validate input
+  const parsed = renameSheetSchema.safeParse(input);
+  if (!parsed.success) {
+    console.log("❌ INVALID INPUT:", parsed.error);
+    throw new Error("Invalid sheet rename data");
+  }
+
+  console.log("✅ INPUT:", parsed.data);
+
+  // 2. Get user
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
-  if (!user) throw new Error("Unauthorized");
+  if (userError) {
+    console.log("❌ USER FETCH ERROR:", userError);
+    throw new Error(userError.message);
+  }
 
+  if (!user) {
+    console.log("❌ NO USER FOUND");
+    throw new Error("Unauthorized");
+  }
+
+  console.log("✅ USER ID:", user.id);
+
+  // 3. Check if sheet exists (ignore owner)
+  const { data: sheetCheck, error: sheetCheckError } = await supabase
+    .from("sheets")
+    .select("*")
+    .eq("id", parsed.data.sheet_id);
+
+  if (sheetCheckError) {
+    console.log("❌ SHEET CHECK ERROR:", sheetCheckError);
+  }
+
+  console.log("🔍 SHEET EXISTS CHECK:", sheetCheck);
+
+  if (!sheetCheck || sheetCheck.length === 0) {
+    console.log("❌ SHEET DOES NOT EXIST");
+  }
+
+  // 4. Check owner
+  if (sheetCheck && sheetCheck.length > 0) {
+    console.log("🔍 OWNER IN DB:", sheetCheck[0].owner_id);
+    console.log("🔍 USER ID:", user.id);
+    console.log(
+      "🔍 OWNER MATCH:",
+      sheetCheck[0].owner_id === user.id
+    );
+  }
+
+  // 5. Try update WITHOUT owner filter (to detect issue)
+  const { data: updateNoOwner, error: updateNoOwnerError } =
+    await supabase
+      .from("sheets")
+      .update({ title: parsed.data.newName })
+      .eq("id", parsed.data.sheet_id)
+      .select();
+
+  console.log("🧪 UPDATE WITHOUT OWNER:", updateNoOwner, updateNoOwnerError);
+
+  // 6. Actual update (with owner)
   const { data, error } = await supabase
     .from("sheets")
-    .update({ name: parsed.data.newName })
+    .update({ title: parsed.data.newName })
     .eq("id", parsed.data.sheet_id)
     .eq("owner_id", user.id)
     .select()
-    .single();
+    .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  console.log("🎯 FINAL RESULT:", data, error);
+
+  if (error) {
+    console.log("❌ FINAL ERROR:", error);
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    console.log("❌ NO DATA RETURNED → likely causes:");
+    console.log("- wrong sheet_id");
+    console.log("- owner_id mismatch");
+    console.log("- RLS blocking update");
+
+    throw new Error("Sheet not found or unauthorized");
+  }
+
+  console.log("✅ SUCCESS:", data);
+  console.log("==== RENAME SHEET DEBUG END ====");
+
   return data;
 }
 
@@ -475,17 +551,17 @@ export async function getRecentSheets(limit?: number) {
       isOrganization: !!sheet.organization_id,
       organization: org
         ? {
-            id: org.id,
-            name: org.name,
-            membersCount: org.organization_members?.length ?? 0,
-            members: (org.organization_members ?? []).map((member: any) => ({
-              id: member.profiles?.id ?? member.id,
-              name: member.profiles?.name ?? "Member",
-              email: member.profiles?.email ?? "",
-              avatar: member.profiles?.avatar_url ?? null,
-              status: member.status ?? "offline",
-            })),
-          }
+          id: org.id,
+          name: org.name,
+          membersCount: org.organization_members?.length ?? 0,
+          members: (org.organization_members ?? []).map((member: any) => ({
+            id: member.profiles?.id ?? member.id,
+            name: member.profiles?.name ?? "Member",
+            email: member.profiles?.email ?? "",
+            avatar: member.profiles?.avatar_url ?? null,
+            status: member.status ?? "offline",
+          })),
+        }
         : null,
       folder: null,
       rowsCount: sheet.rows?.length ?? 0,
@@ -546,17 +622,17 @@ export async function getStarredSheets() {
       isOrganization: !!sheet.organization_id,
       organization: org
         ? {
-            id: org.id,
-            name: org.name,
-            membersCount: org.organization_members?.length ?? 0,
-            members: (org.organization_members ?? []).map((member: any) => ({
-              id: member.profiles?.id ?? member.id,
-              name: member.profiles?.name ?? "Member",
-              email: member.profiles?.email ?? "",
-              avatar: member.profiles?.avatar_url ?? null,
-              status: member.status ?? "offline",
-            })),
-          }
+          id: org.id,
+          name: org.name,
+          membersCount: org.organization_members?.length ?? 0,
+          members: (org.organization_members ?? []).map((member: any) => ({
+            id: member.profiles?.id ?? member.id,
+            name: member.profiles?.name ?? "Member",
+            email: member.profiles?.email ?? "",
+            avatar: member.profiles?.avatar_url ?? null,
+            status: member.status ?? "offline",
+          })),
+        }
         : null,
       folder: null,
       rowsCount: sheet.rows?.length ?? 0,

@@ -177,6 +177,7 @@ export interface ColumnDef {
   group_id?: string; // Group ID for column grouping
   validation_rules?: any; // Validation rules for column
   position?: number; // Column order position
+  isExtra?: boolean; // Indicates if this is an extra column (e.g. for row numbers)
 }
 
 export interface SavedFilterView {
@@ -221,6 +222,7 @@ export interface CellFormat {
     auto?: boolean;
     mode?: "all" | "across" | "down" | "center";
   };
+  isLayoutRow?: boolean; // Special formatting for layout/header rows
 }
 
 export interface FloatingImage {

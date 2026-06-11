@@ -98,6 +98,7 @@ export async function loadSheet(sheetId: string) {
           borderStyle: f.border_style ?? "none",
           borderColor: f.border_color ?? "#d1d5db",
           borderWidth: f.border_width ?? 1,
+          merge: f.merge ?? null,   
         },
       ]),
     ),
