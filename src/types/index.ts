@@ -177,6 +177,7 @@ export interface ColumnDef {
   group_id?: string; // Group ID for column grouping
   validation_rules?: any; // Validation rules for column
   position?: number; // Column order position
+  isExtra?: boolean; // Indicates if this is an extra column (e.g. for row numbers)
 }
 
 export interface SavedFilterView {
@@ -208,14 +209,30 @@ export interface CellFormat {
   borderStyle?: "none" | "solid" | "dashed" | "dotted";
   borderColor?: string;
   borderWidth?: number;
+  borderBottom?: string;
+  borderTop?: string;
+  borderLeft?: string;
+  borderRight?: string;
   merge?: {
     masterRow: number;
     masterCol: string;
     rowSpan: number;
     colSpan: number;
     hidden?: boolean;
+    auto?: boolean;
     mode?: "all" | "across" | "down" | "center";
   };
+  isLayoutRow?: boolean; // Special formatting for layout/header rows
+}
+
+export interface FloatingImage {
+  id: string;
+  src: string;
+  name?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export type ConditionalFormatOperator =
@@ -357,6 +374,7 @@ export interface SheetState {
   forkedAt?: string | null;
   forkedByUserId?: string | null;
   userRole?: Role;
+  templateId?: string | null;
 }
 
 export type FilterOperator =

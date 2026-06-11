@@ -5,7 +5,7 @@ import {
   Plus, Trash2, ArrowDownAZ, ArrowUpAZ, SlidersHorizontal, Eye, EyeOff,
   BarChart3, MessageSquare, Users, Clock, Columns3, Code2, Paintbrush,
   Sun, Moon, Keyboard, ChevronDown, Rows3, PanelRight, Lock, Zap, Sparkles, ListChecks,
-  Pin,
+  Pin, ImagePlus,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -52,6 +52,7 @@ interface ActionBarProps {
   selectedRowPinned?: boolean;
   onToggleDark: () => void;
   onToggleFreezeRows?: () => void;
+  onInsertFloatingImage?: () => void;
   chartBtnRef: React.RefObject<HTMLButtonElement>;
 }
 
@@ -72,6 +73,7 @@ export function ActionBar({
   onToggleFilters, onHideColumn, onToggleChartPicker, onTogglePanel,
   onToggleRowProtection, onToggleDark, onToggleFreezeRows, chartBtnRef,
   onTogglePinRow, selectedRowPinned, canProtectRows, canEditSheet,
+  onInsertFloatingImage,
 }: ActionBarProps) {
   const selStyle = ddStyle(isDark);
   const canEdit = canEditSheet ?? userRole !== "viewer";
@@ -255,6 +257,19 @@ export function ActionBar({
         <ToolSep />
 
         {/* Panel toggles — IconBtn already gets cursor-pointer via sheet-icon-btn class */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button className={AB_BTN} onClick={onInsertFloatingImage} disabled={!canEdit}>
+              <ImagePlus className="h-3.5 w-3.5" />
+              Image
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="sheet-tooltip text-[11px]">
+            Insert a floating image that can be moved anywhere
+          </TooltipContent>
+        </Tooltip>
+
+        <ToolSep />
         <IconBtn icon={MessageSquare} tooltip="Comments" onClick={() => onTogglePanel("comments")} active={effectiveRightPanel === "comments"} badge={totalComments} />
         <IconBtn icon={PanelRight} tooltip="Row details" onClick={() => onTogglePanel("row-details")} active={effectiveRightPanel === "row-details"} disabled={!selectedCell} />
         <IconBtn icon={Pin} tooltip="Pin row" onClick={onTogglePinRow} active={!!selectedRowPinned} disabled={!canEdit || !selectedCell || !onTogglePinRow} />

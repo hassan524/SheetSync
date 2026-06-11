@@ -21,6 +21,7 @@ export function useSheetStateVars(isOrganizationSheet: boolean, importedFrom: st
     forkedFromSnapshotLabel: null,
     forkedAt: null,
     forkedByUserId: null,
+    templateId: null,
   });
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");

@@ -24,6 +24,7 @@ export async function saveCellFormat(
       border_style: format.borderStyle ?? "none",
       border_color: format.borderColor ?? "#d1d5db",
       border_width: format.borderWidth ?? 1,
+      merge: format.merge ?? null,
     },
     { onConflict: "sheet_id,cell_key" },
   );
@@ -36,6 +37,12 @@ export async function saveAllCellFormats(
   formats: Record<string, CellFormat>,
 ) {
   const entries = Object.entries(formats);
+  const deleteResult = await supabase
+    .from("cell_formats")
+    .delete()
+    .eq("sheet_id", sheetId);
+  if (deleteResult.error)
+    throw new Error(`Failed to replace cell formats: ${deleteResult.error.message}`);
   if (entries.length === 0) return;
 
   const rows = entries.map(([cellKey, format]) => ({
@@ -54,6 +61,7 @@ export async function saveAllCellFormats(
     border_style: format.borderStyle ?? "none",
     border_color: format.borderColor ?? "#d1d5db",
     border_width: format.borderWidth ?? 1,
+    merge: format.merge ?? null,
   }));
 
   const { error } = await supabase

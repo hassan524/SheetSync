@@ -73,8 +73,12 @@ export function CellRenderer({
   mergedHeight,
 }: CellRendererProps) {
 
-  // ── Resolve mergeMode once so both cellContent and outer div can use it ──
+ // ── Resolve mergeMode once so both cellContent and outer div can use it ──
   const mergeMode = (mergeStyle as any)?.__mergeMode as string | undefined;
+
+  // ── If this is a layout/header row cell, force plain text rendering ──
+  const effectiveType: ColumnDef["type"] =
+    (cellStyle as any)?.isLayoutRow ? "text" : type;
 
   // ── Cell content by type ───────────────────────────────────────────────
   const cellContent = (() => {
@@ -86,7 +90,7 @@ export function CellRenderer({
       );
     }
 
-    switch (type) {
+   switch (effectiveType) {
       case "status":
       case "priority": {
         const opt = getStatusOptionStyle(String(displayValue ?? ""));
@@ -118,16 +122,19 @@ export function CellRenderer({
           </div>
         ) : null;
 
-      case "currency":
-        return displayValue ? (
+      case "currency": {
+        const num = Number(displayValue);
+        if (!displayValue || displayValue === "" || isNaN(num) || num === 0) return "";
+        return (
           <span className="tabular-nums sheet-cell-mono">
             {new Intl.NumberFormat("en-US", {
               style: "currency",
               currency: colDef?.currencyCode || "USD",
               minimumFractionDigits: 2,
-            }).format(Number(displayValue))}
+            }).format(num)}
           </span>
-        ) : "";
+        );
+      }
 
       case "image": {
         const imgSrc = String(displayValue ?? "").trim();
@@ -335,12 +342,15 @@ export function CellRenderer({
     : "";
 
   // ── Merge master background (paints over covered cells) ───────────────
-  const mergeBg =
-    cellStyle.backgroundColor && cellStyle.backgroundColor !== "transparent"
-      ? cellStyle.backgroundColor
-      : typeof document !== "undefined" && document.body.dataset.sheetDark === "true"
-        ? "#131620"
-        : "#ffffff";
+  const isDarkMode = typeof document !== "undefined" && document.body.dataset.sheetDark === "true";
+  const rawBg = cellStyle.backgroundColor;
+  const isTransparent = !rawBg ||
+    rawBg === "transparent" ||
+    rawBg === "rgba(0, 0, 0, 0)" ||
+    rawBg === "rgba(0,0,0,0)";
+  const mergeBg = isTransparent
+    ? (isDarkMode ? "#131620" : "#ffffff")
+    : rawBg;
 
   // ── Merge master absolute-positioning override ────────────────────────
   // react-data-grid has no native colspan/rowspan; we fake it by making the
@@ -354,28 +364,32 @@ export function CellRenderer({
   // Always applied for merge masters. The absolute div escapes the rdg-cell
   // boundary (which must have overflow:visible in CSS) to visually span
   // all merged rows/columns.
+  // In CellRenderer.tsx, change mergeOverrideStyle:
   const mergeOverrideStyle: React.CSSProperties = isMergeMaster
     ? {
       position: "absolute",
       top: 0,
       left: 0,
-      width: mergeMode === "across" || mergeMode === "all" || mergeMode === "center"
-        ? (autoOverflowWidth ? `${autoOverflowWidth - 1}px` : "calc(100% - 1px)")
-        : "calc(100% - 1px)",
-      height: mergeMode === "down" || mergeMode === "all" || mergeMode === "center"
-        ? (mergedHeight ? `${mergedHeight - 1}px` : "calc(100% - 1px)")
-        : "calc(100% - 1px)",
+      width: (() => {
+        if (mergeMode === "across" || mergeMode === "all" || mergeMode === "center") {
+          return autoOverflowWidth ? `${autoOverflowWidth}px` : "100%";
+        }
+        return "100%";
+      })(),
+      height: (() => {
+        if (mergeMode === "down" || mergeMode === "all" || mergeMode === "center") {
+          return mergedHeight ? `${mergedHeight}px` : "100%";
+        }
+        return "100%";
+      })(),
       zIndex: 8,
       backgroundColor: mergeBg,
-      borderTop: "none",
-      borderLeft: "none",
-      borderRight: `1px solid var(--rdg-border-color, #e8eaed)`,
-      borderBottom: `1px solid var(--rdg-border-color, #e8eaed)`,
-      boxShadow: isSelected
-        ? "inset 0 0 0 2px var(--primary, #0d7c5f)"
-        : "none",
-      boxSizing: "border-box",
+      border: `1px solid var(--rdg-border-color, #e8eaed)`,
+      boxSizing: "border-box" as const,
       overflow: "hidden",
+      clipPath: "inset(0 0 0 0)",
+      willChange: "transform",
+      transform: "translateZ(0)",
       transition: "background-color 0.1s ease",
       outline: "none",
     }

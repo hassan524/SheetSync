@@ -57,6 +57,7 @@ interface TitleBarProps {
   onExport: (format: ExportFormat) => void;
   onShareClick: () => void;
   onNotificationsClick: () => void;
+  onTitleBlur: (t: string) => void;
 }
 
 const Avatar = SheetAvatar;
@@ -76,6 +77,7 @@ export function TitleBar({
   canEditSheet = true,
   canShareSheet = true,
   onTitleChange,
+  onTitleBlur,
   onStarredToggle,
   onImportClick,
   onExport,
@@ -115,8 +117,13 @@ export function TitleBar({
           <Input
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
+            onBlur={(e) => onTitleBlur(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+              }
+            }}
             disabled={!canEditSheet}
-            className="sheet-title-input h-7 border-0 bg-transparent font-semibold not-italic text-[13px] tracking-tight focus-visible:ring-1 px-1.5 rounded-md w-24 sm:w-44 md:w-56 min-w-0"
           />
           <button
             onClick={onStarredToggle}

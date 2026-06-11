@@ -207,6 +207,11 @@
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
+  isolation: isolate; /* ← add this */
+}
+
+.rdg-sheet .rdg-cell[aria-colindex="1"] {
+  z-index: 10 !important;
 }
 
 .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-merge-master) {
