@@ -36,7 +36,6 @@ interface ColumnHeaderMenuProps {
   onChangeType: (type: ColumnDef["type"]) => void;
   onOpenColumnPanel?: () => void;
   onDelete: () => void;
-  onRename?: (newName: string) => void;
   onToggleTextWrap?: () => void;
   textWrapEnabled?: boolean;
   columnFormula?: string;
@@ -59,27 +58,26 @@ interface ColumnHeaderMenuProps {
 }
 
 const COLUMN_TYPES = [
-  { type: "text" as const,     label: "Text",     icon: Type },
-  { type: "number" as const,   label: "Number",   icon: Hash },
+  { type: "text" as const, label: "Text", icon: Type },
+  { type: "number" as const, label: "Number", icon: Hash },
   { type: "currency" as const, label: "Currency", icon: DollarSign },
-  { type: "date" as const,     label: "Date",     icon: Calendar },
+  { type: "date" as const, label: "Date", icon: Calendar },
   { type: "checkbox" as const, label: "Checkbox", icon: CheckSquare },
-  { type: "url" as const,      label: "URL",      icon: Link },
+  { type: "url" as const, label: "URL", icon: Link },
   { type: "priority" as const, label: "Priority", icon: AlertCircle },
-  { type: "status" as const,   label: "Status",   icon: AlertCircle },
-  { type: "select" as const,   label: "Select",   icon: ListChecks },
+  { type: "status" as const, label: "Status", icon: AlertCircle },
+  { type: "select" as const, label: "Select", icon: ListChecks },
   { type: "progress" as const, label: "Progress", icon: BarChart2 },
-  { type: "image" as const,    label: "Image",    icon: Link },
+  { type: "image" as const, label: "Image", icon: Link },
 ];
 
 const CURRENCY_CODES = [
-  "USD","EUR","GBP","PKR","INR","AED","JPY","CAD","AUD","CHF","CNY","HKD",
-  "NZD","SEK","KRW","SGD","NOK","MXN","RUB","ZAR","BRL","TRY","TWD","DKK",
-  "PLN","THB","IDR","HUF","CZK","ILS","CLP","PHP","MYR","COP","SAR","RON",
-  "VND","EGP","NGN","BDT","KES","GHS","TZS","UGX","MAD",
+  "USD", "EUR", "GBP", "PKR", "INR", "AED", "JPY", "CAD", "AUD", "CHF", "CNY", "HKD",
+  "NZD", "SEK", "KRW", "SGD", "NOK", "MXN", "RUB", "ZAR", "BRL", "TRY", "TWD", "DKK",
+  "PLN", "THB", "IDR", "HUF", "CZK", "ILS", "CLP", "PHP", "MYR", "COP", "SAR", "RON",
+  "VND", "EGP", "NGN", "BDT", "KES", "GHS", "TZS", "UGX", "MAD",
 ].sort();
 
-// Shared class for all clickable rows — consistent hover + cursor
 const ROW_CLS =
   "cursor-pointer w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md " +
   "hover:bg-accent hover:text-accent-foreground active:bg-accent/80 transition-colors select-none";
@@ -89,7 +87,6 @@ export default function ColumnHeaderMenu({
   onChangeType,
   onOpenColumnPanel,
   onDelete,
-  onRename,
   onToggleTextWrap,
   textWrapEnabled,
   columnFormula,
@@ -110,9 +107,8 @@ export default function ColumnHeaderMenu({
   onToggleFreeze,
   onOpenValidationPanel,
 }: ColumnHeaderMenuProps) {
-  const [renameValue, setRenameValue]       = useState(column.name);
-  const [open, setOpen]                     = useState(false);
-  const [typeExpanded, setTypeExpanded]     = useState(false);
+  const [open, setOpen] = useState(false);
+  const [typeExpanded, setTypeExpanded] = useState(false);
   const [currencyExpanded, setCurrencyExpanded] = useState(false);
   const [currencySearch, setCurrencySearch] = useState("");
 
@@ -121,14 +117,10 @@ export default function ColumnHeaderMenu({
   );
   const canSortColumn = column.type !== "image";
 
-  const handleRenameSubmit = () => {
-    if (renameValue.trim() && onRename) onRename(renameValue.trim());
-  };
-
   const handleOpenChange = (v: boolean) => {
     setOpen(v);
     if (!v) { setTypeExpanded(false); setCurrencyExpanded(false); }
-    if (v)  { setCurrencySearch(""); }
+    if (v) { setCurrencySearch(""); }
   };
 
   return (
@@ -137,7 +129,7 @@ export default function ColumnHeaderMenu({
         <Button
           variant="ghost"
           size="icon"
-          className="h-5 w-5 opacity-100 sm:opacity-0 sm:group-hover/header:opacity-100 transition-opacity"
+          className="h-5 w-5 opacity-0 group-hover/header:opacity-100 transition-all duration-150 hover:scale-110 hover:bg-accent"
         >
           <MoreVertical className="h-3 w-3" />
         </Button>
@@ -152,31 +144,7 @@ export default function ColumnHeaderMenu({
             "min(var(--radix-dropdown-menu-content-available-height), calc(100vh - 7rem), 28rem)",
         }}
       >
-        {/* ── Rename ── */}
-        {onRename && (
-          <>
-            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
-              Column Name
-            </DropdownMenuLabel>
-            <div className="px-1.5 pb-2">
-              <input
-                className="w-full h-8 px-2.5 text-xs rounded-md border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={handleRenameSubmit}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { handleRenameSubmit(); setOpen(false); }
-                  if (e.key === "Escape") setRenameValue(column.name);
-                  e.stopPropagation();
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-            <DropdownMenuSeparator />
-          </>
-        )}
-
-        {/* ── Change Type — inline accordion ── */}
+        {/* ── Change Type ── */}
         <button
           className={ROW_CLS}
           onClick={(e) => {
@@ -223,7 +191,7 @@ export default function ColumnHeaderMenu({
           </div>
         )}
 
-        {/* ── Currency picker — inline accordion ── */}
+        {/* ── Currency picker ── */}
         {column.type === "currency" && onSetCurrency && (
           <>
             <DropdownMenuSeparator />
@@ -294,56 +262,56 @@ export default function ColumnHeaderMenu({
         {/* ── Quick actions ── */}
         {(onInsertLeft || onInsertRight || onDuplicate || onClearColumn ||
           (canSortColumn && (onSortAsc || onSortDesc))) && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
-              Quick actions
-            </DropdownMenuLabel>
-            {onInsertLeft && (
-              <DropdownMenuItem onClick={onInsertLeft} className="cursor-pointer text-xs gap-2">
-                <Plus className="h-3.5 w-3.5" />Insert column left
-              </DropdownMenuItem>
-            )}
-            {onInsertRight && (
-              <DropdownMenuItem onClick={onInsertRight} className="cursor-pointer text-xs gap-2">
-                <Plus className="h-3.5 w-3.5" />Insert column right
-              </DropdownMenuItem>
-            )}
-            {onDuplicate && (
-              <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer text-xs gap-2">
-                <Copy className="h-3.5 w-3.5" />Duplicate column
-              </DropdownMenuItem>
-            )}
-            {canSortColumn && onSortAsc && (
-              <DropdownMenuItem onClick={onSortAsc} className="cursor-pointer text-xs gap-2">
-                Sort A → Z
-              </DropdownMenuItem>
-            )}
-            {canSortColumn && onSortDesc && (
-              <DropdownMenuItem onClick={onSortDesc} className="cursor-pointer text-xs gap-2">
-                Sort Z → A
-              </DropdownMenuItem>
-            )}
-            {onFillColumnNumbers && (
-              <DropdownMenuItem onClick={onFillColumnNumbers} className="cursor-pointer text-xs gap-2">
-                <Hash className="h-3.5 w-3.5" />Fill sequential numbers
-              </DropdownMenuItem>
-            )}
-            {onFillColumnHashNumbers && (
-              <DropdownMenuItem onClick={onFillColumnHashNumbers} className="cursor-pointer text-xs gap-2">
-                <Hash className="h-3.5 w-3.5" />Fill #1, #2, #3…
-              </DropdownMenuItem>
-            )}
-            {onClearColumn && (
-              <DropdownMenuItem
-                onClick={onClearColumn}
-                className="cursor-pointer text-xs gap-2 text-amber-700 focus:text-amber-700"
-              >
-                <Trash2 className="h-3.5 w-3.5" />Clear column values
-              </DropdownMenuItem>
-            )}
-          </>
-        )}
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider pb-1 px-2">
+                Quick actions
+              </DropdownMenuLabel>
+              {onInsertLeft && (
+                <DropdownMenuItem onClick={onInsertLeft} className="cursor-pointer text-xs gap-2">
+                  <Plus className="h-3.5 w-3.5" />Insert column left
+                </DropdownMenuItem>
+              )}
+              {onInsertRight && (
+                <DropdownMenuItem onClick={onInsertRight} className="cursor-pointer text-xs gap-2">
+                  <Plus className="h-3.5 w-3.5" />Insert column right
+                </DropdownMenuItem>
+              )}
+              {onDuplicate && (
+                <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer text-xs gap-2">
+                  <Copy className="h-3.5 w-3.5" />Duplicate column
+                </DropdownMenuItem>
+              )}
+              {canSortColumn && onSortAsc && (
+                <DropdownMenuItem onClick={onSortAsc} className="cursor-pointer text-xs gap-2">
+                  Sort A → Z
+                </DropdownMenuItem>
+              )}
+              {canSortColumn && onSortDesc && (
+                <DropdownMenuItem onClick={onSortDesc} className="cursor-pointer text-xs gap-2">
+                  Sort Z → A
+                </DropdownMenuItem>
+              )}
+              {onFillColumnNumbers && (
+                <DropdownMenuItem onClick={onFillColumnNumbers} className="cursor-pointer text-xs gap-2">
+                  <Hash className="h-3.5 w-3.5" />Fill sequential numbers
+                </DropdownMenuItem>
+              )}
+              {onFillColumnHashNumbers && (
+                <DropdownMenuItem onClick={onFillColumnHashNumbers} className="cursor-pointer text-xs gap-2">
+                  <Hash className="h-3.5 w-3.5" />Fill #1, #2, #3…
+                </DropdownMenuItem>
+              )}
+              {onClearColumn && (
+                <DropdownMenuItem
+                  onClick={onClearColumn}
+                  className="cursor-pointer text-xs gap-2 text-amber-700 focus:text-amber-700"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />Clear column values
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
 
         {/* ── Select options ── */}
         {column.type === "select" && onOpenColumnPanel && (

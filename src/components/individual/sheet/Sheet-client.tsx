@@ -3708,14 +3708,15 @@ export default function SheetClient() {
 
         renderHeaderCell: () => (
           <div
-            className={`h-full w-full flex items-center gap-1.5 px-2 group/header sheet-header-cell sheet-header-cell--excel border-r cursor-pointer ${selectedColumnKey === col.key
-              ? "bg-primary/15"
-              : selectedCell && selectedCell.col === col.key
-                ? "bg-primary/10"
-                : ""
+            className={`h-full w-full relative flex items-center justify-center group/header sheet-header-cell sheet-header-cell--excel border-r cursor-pointer select-none ${selectedColumnKey === col.key
+                ? "bg-primary/15"
+                : selectedCell && selectedCell.col === col.key
+                  ? "bg-primary/10"
+                  : ""
               }`}
             onClick={(e) => {
               if ((e.target as HTMLElement).closest("button")) return;
+              if ((e.target as HTMLElement).closest("[data-col-resize]")) return;
               setSelectedColumnKey(col.key);
               setSelectedCell({ row: 0, col: col.key });
               const colIdx = columns.findIndex((c) => c.key === col.key);
@@ -3741,26 +3742,23 @@ export default function SheetClient() {
             }
             onDragEnd={sheetColOps.handleColumnDragEnd}
           >
-            <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-move opacity-0 group-hover/header:opacity-100 transition-opacity" />
-            <div className="min-w-0 flex-1">
-              <div className="sheet-col-letter truncate">
+            {/* Letter label — zooms + highlights on hover */}
+            <div className="flex-1 flex items-center justify-center min-w-0 px-1">
+              <span className="text-xs font-medium truncate transition-all duration-150 group-hover/header:text-primary group-hover/header:scale-110 inline-block">
                 {columnIndexToName(columns.findIndex((c) => c.key === col.key))}
-              </div>
-              <div className="sheet-col-label truncate">
-                {col.name ||
-                  columnIndexToName(columns.findIndex((c) => c.key === col.key))}
-              </div>
+              </span>
             </div>
+
+            {/* Text wrap indicator */}
             {[...textWrap.textWrapColumns].some((k) => k.endsWith(`-${col.key}`)) && (
-              <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60" />
+              <WrapText className="h-3 w-3 text-primary shrink-0 opacity-60 mr-0.5" />
             )}
+
+            {/* 3-dots dropdown */}
             <ColumnHeaderMenu
               column={col}
               onChangeType={(t) => {
-                if (!canEditSheet) {
-                  showViewerEditMessage();
-                  return;
-                }
+                if (!canEditSheet) { showViewerEditMessage(); return; }
                 sheetColOps.handleChangeColumnType(col.key, t);
                 setTimeout(() => {
                   const clearedRows = rowsHistory.currentState.map((row) => {
@@ -3771,9 +3769,7 @@ export default function SheetClient() {
                     const defaultVal = getDefaultValueForType(t);
                     const currentVal = row[col.key];
                     const shouldApplyDefault =
-                      currentVal === "" ||
-                      currentVal === null ||
-                      currentVal === undefined;
+                      currentVal === "" || currentVal === null || currentVal === undefined;
                     return {
                       ...row,
                       ...(shouldApplyDefault ? { [col.key]: defaultVal } : {}),
@@ -3792,22 +3788,12 @@ export default function SheetClient() {
                 }
               }}
               onOpenColumnPanel={() => {
-                if (!canEditSheet) {
-                  showViewerEditMessage();
-                  return;
-                }
+                if (!canEditSheet) { showViewerEditMessage(); return; }
                 setFocusedColumnKey(col.key);
                 setRightPanel(col.type === "select" ? "select-options" : "columns");
               }}
               onDelete={() =>
-                canEditSheet
-                  ? sheetColOps.handleDeleteColumn(col.key)
-                  : showViewerEditMessage()
-              }
-              onRename={(newName) =>
-                canEditSheet
-                  ? sheetColOps.handleRenameColumn(col.key, newName)
-                  : showViewerEditMessage()
+                canEditSheet ? sheetColOps.handleDeleteColumn(col.key) : showViewerEditMessage()
               }
               onToggleTextWrap={() =>
                 canEditSheet ? handleTextWrapToggle() : showViewerEditMessage()
@@ -3815,14 +3801,10 @@ export default function SheetClient() {
               textWrapEnabled={textWrap.textWrapColumns.has(col.key)}
               columnFormula={formulas.columnFormulas[col.key]}
               onApplyColumnFormula={(f) =>
-                canEditSheet
-                  ? handleApplyFormulaToColumn(col.key, f)
-                  : showViewerEditMessage()
+                canEditSheet ? handleApplyFormulaToColumn(col.key, f) : showViewerEditMessage()
               }
               onRemoveColumnFormula={() =>
-                canEditSheet
-                  ? handleRemoveColumnFormula(col.key)
-                  : showViewerEditMessage()
+                canEditSheet ? handleRemoveColumnFormula(col.key) : showViewerEditMessage()
               }
               selectOptions={col.selectOptions}
               onUpdateSelectOptions={(opts) =>
@@ -3831,20 +3813,13 @@ export default function SheetClient() {
                   : showViewerEditMessage()
               }
               onFillColumnNumbers={() =>
-                canEditSheet
-                  ? handleFillColumnNumbers(col.key)
-                  : showViewerEditMessage()
+                canEditSheet ? handleFillColumnNumbers(col.key) : showViewerEditMessage()
               }
               onFillColumnHashNumbers={() =>
-                canEditSheet
-                  ? handleFillColumnHashNumbers(col.key)
-                  : showViewerEditMessage()
+                canEditSheet ? handleFillColumnHashNumbers(col.key) : showViewerEditMessage()
               }
               onInsertLeft={() => {
-                if (!canEditSheet) {
-                  showViewerEditMessage();
-                  return;
-                }
+                if (!canEditSheet) { showViewerEditMessage(); return; }
                 const idx = columns.findIndex((c) => c.key === col.key);
                 sheetColOps.insertColumnAt(idx, null, "blank");
                 setTimeout(async () => {
@@ -3857,10 +3832,7 @@ export default function SheetClient() {
                 }, 50);
               }}
               onInsertRight={() => {
-                if (!canEditSheet) {
-                  showViewerEditMessage();
-                  return;
-                }
+                if (!canEditSheet) { showViewerEditMessage(); return; }
                 const idx = columns.findIndex((c) => c.key === col.key);
                 sheetColOps.insertColumnAt(idx + 1, null, "blank");
                 setTimeout(async () => {
@@ -3873,10 +3845,7 @@ export default function SheetClient() {
                 }, 50);
               }}
               onDuplicate={() => {
-                if (!canEditSheet) {
-                  showViewerEditMessage();
-                  return;
-                }
+                if (!canEditSheet) { showViewerEditMessage(); return; }
                 const idx = columns.findIndex((c) => c.key === col.key);
                 sheetColOps.insertColumnAt(idx + 1, col, "duplicate");
                 setTimeout(async () => {
@@ -3889,9 +3858,7 @@ export default function SheetClient() {
                 }, 50);
               }}
               onClearColumn={() =>
-                canEditSheet
-                  ? sheetColOps.clearColumnValues(col)
-                  : showViewerEditMessage()
+                canEditSheet ? sheetColOps.clearColumnValues(col) : showViewerEditMessage()
               }
               onSortAsc={() =>
                 canEditSheet
@@ -3904,10 +3871,7 @@ export default function SheetClient() {
                   : showViewerEditMessage()
               }
               onSetCurrency={(currencyCode) => {
-                if (!canEditSheet) {
-                  showViewerEditMessage();
-                  return;
-                }
+                if (!canEditSheet) { showViewerEditMessage(); return; }
                 const updated = columns.map((c) =>
                   c.key === col.key ? { ...c, currencyCode } : c,
                 );
@@ -3920,24 +3884,54 @@ export default function SheetClient() {
                 }, 50);
               }}
               onApplyColumnFormat={(fmt) =>
-                canEditSheet
-                  ? handleApplyColumnFormat(col.key, fmt)
-                  : showViewerEditMessage()
+                canEditSheet ? handleApplyColumnFormat(col.key, fmt) : showViewerEditMessage()
               }
               onToggleFreeze={() =>
-                canEditSheet
-                  ? handleToggleFreezeColumn(col.key)
-                  : showViewerEditMessage()
+                canEditSheet ? handleToggleFreezeColumn(col.key) : showViewerEditMessage()
               }
               onOpenValidationPanel={() => {
-                if (!canEditSheet) {
-                  showViewerEditMessage();
-                  return;
-                }
+                if (!canEditSheet) { showViewerEditMessage(); return; }
                 setFocusedColumnKey(col.key);
                 setRightPanel("validation");
               }}
             />
+
+            {/* Bottom-right column resize handle */}
+            <div
+              data-col-resize="true"
+              className="absolute bottom-0 right-0 w-4 h-4 opacity-0 group-hover/header:opacity-100 transition-opacity flex items-end justify-end pb-0.5 pr-0.5"
+              style={{ cursor: "col-resize", touchAction: "none" }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const startX = e.clientX;
+                const startWidth = col.width ?? 160;
+                const pointerId = e.pointerId;
+                (e.currentTarget as HTMLElement).setPointerCapture(pointerId);
+                const onMove = (ev: PointerEvent) => {
+                  if (ev.pointerId !== pointerId) return;
+                  const newWidth = Math.max(40, Math.min(600, startWidth + (ev.clientX - startX)));
+                  sheetColOps.handleColumnResize(col.key, newWidth);
+                };
+                const onUp = (ev: PointerEvent) => {
+                  if (ev.pointerId !== pointerId) return;
+                  setTimeout(async () => {
+                    markSaving();
+                    await saveAllColumns(sheetId, columnsHistory.currentState).catch(console.error);
+                    markSaved();
+                  }, 50);
+                  window.removeEventListener("pointermove", onMove);
+                  window.removeEventListener("pointerup", onUp);
+                };
+                window.addEventListener("pointermove", onMove);
+                window.addEventListener("pointerup", onUp);
+              }}
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M1 7L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-gray-400" />
+                <path d="M4 7L7 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-gray-400" />
+              </svg>
+            </div>
           </div>
         ),
 
@@ -4419,7 +4413,7 @@ export default function SheetClient() {
 
           // ── PRIORITY / STATUS ─────────────────────────────────────────
           if (cellType === "priority" || cellType === "status") {
-          const opts = getChoiceOptionsForColumn({ ...colDef, type: cellType });
+            const opts = getChoiceOptionsForColumn({ ...colDef, type: cellType });
             return (
               <EditorWrapper>
                 <Select
@@ -5250,7 +5244,15 @@ export default function SheetClient() {
                 onSelectedRowsChange={setSelectedRows}
                 onColumnResize={(idx, width) => {
                   const col = columns[idx - 1];
-                  if (col) sheetColOps.handleColumnResize(col.key, width);
+                  console.log('RESIZE — col:', col?.name, 'new width:', width, 'db width before save:', col?.width);
+                  if (col) {
+                    sheetColOps.handleColumnResize(col.key, width);
+                    // ensure it persists
+                    clearTimeout((window as any).__colResizeTimer);
+                    (window as any).__colResizeTimer = setTimeout(() => {
+                      saveAllColumns(sheetId, columnsHistory.currentState).catch(console.error);
+                    }, 600);
+                  }
                 }}
                 onCellDoubleClick={handleCellDoubleClick}
                 rowHeight={(row) => {
