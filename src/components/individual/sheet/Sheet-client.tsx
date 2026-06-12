@@ -544,6 +544,8 @@ export default function SheetClient() {
   // ── Ref for DataGrid instance (programmatic editing of master cells) ───
   const gridRef = useRef<any>(null);
 
+  const chartInsertedRef = useRef(false);
+
   // ── Refs ───────────────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const floatingImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -907,6 +909,7 @@ export default function SheetClient() {
   useEffect(() => {
     if (!sheetId || !inviteReady) return;
     chartsHydratedRef.current = false;
+    chartInsertedRef.current = false; // ← reset on every fresh load
     queueMicrotask(() => setIsLoading(true));
 
     loadSheet(sheetId)
@@ -914,13 +917,9 @@ export default function SheetClient() {
         const savedFormats = data.cellFormats ?? {};
         const hasSavedFormats = Object.keys(savedFormats).length > 0;
 
-        // ════════════════════════════════════════════════════════════════
-        // PATH A — sheet already has rows/columns (normal reload)
-        // ════════════════════════════════════════════════════════════════
         if (data.rows.length > 0 || data.columns.length > 0) {
           const sheetIsOrg = data.isPersonal === false || isOrganizationSheet;
 
-          // ── Restore cell formats ──────────────────────────────────────
           let wrapSet = new Set<string>();
           if (hasSavedFormats) {
             wrapSet = new Set<string>(
@@ -937,7 +936,6 @@ export default function SheetClient() {
             if (Object.keys(selectByCell).length > 0) setCellSelectOptions(selectByCell);
           }
 
-          // ── Restore formulas / protection / text-wrap ─────────────────
           if (data.formulas && Object.keys(data.formulas).length > 0)
             formulas.setFormulas(data.formulas);
           if (data.columnFormulas && Object.keys(data.columnFormulas).length > 0)
@@ -946,7 +944,6 @@ export default function SheetClient() {
             protection.setProtectedCells(data.protectedCells);
           if (wrapSet.size > 0) textWrap.setTextWrapColumns(wrapSet);
 
-          // ── Build row buffer and extract per-cell type overrides ───────
           const bufferedRows = ensureWorkingRowBuffer(data.rows, data.columns);
           const typeOverrides: Record<string, ColumnDef["type"]> = {};
           const rowSelectOptions: Record<string, string[]> = {};
@@ -970,7 +967,6 @@ export default function SheetClient() {
           if (Object.keys(rowSelectOptions).length > 0)
             setCellSelectOptions((prev) => ({ ...prev, ...rowSelectOptions }));
 
-          // ── Push into history + state ──────────────────────────────────
           rowsHistory.pushState(bufferedRows);
           columnsHistory.pushState(data.columns);
           setSheetState({
@@ -991,9 +987,16 @@ export default function SheetClient() {
             userRole: sheetIsOrg ? "viewer" : "owner",
           });
 
-          // ── Restore charts, row heights, floating images ───────────────
-          if (Array.isArray((data as any).charts)) {
-            charts.replaceAll((data as any).charts);
+          const dbCharts = (data as any).charts ?? [];
+          if (dbCharts.length > 0) {
+            const uniqueCharts = dbCharts.filter(
+              (chart: any, index: number, arr: any[]) =>
+                arr.findIndex((c: any) => c.title === chart.title) === index
+            );
+            charts.replaceAll(uniqueCharts);
+            if (uniqueCharts.length !== dbCharts.length) {
+              setTimeout(() => updateSheetCharts(sheetId, uniqueCharts).catch(console.error), 500);
+            }
           }
           chartsHydratedRef.current = true;
           if (Array.isArray((data as any).forks)) setForks((data as any).forks);
@@ -1002,14 +1005,14 @@ export default function SheetClient() {
             setFloatingImages((data as any).floatingImages);
           }
 
-          // ── KEY FIX: formats lost on first save (race condition) ───────
-          // Re-build and re-save the template layout, then insert chart.
           const activeTemplateId = (data as any).templateId || templateId;
-          if (activeTemplateId && activeTemplateId !== "blank" && !hasSavedFormats) {
+          const savedFormatsHaveLayoutRows = Object.values(savedFormats).some(
+            (fmt: any) => fmt?.isLayoutRow === true,
+          );
+          if (activeTemplateId && activeTemplateId !== "blank" && (!hasSavedFormats || !savedFormatsHaveLayoutRows)) {
             const td = getTemplateData(activeTemplateId);
             const effectiveCols = data.columns.length > 0 ? data.columns : td.columns;
 
-            // Build layout against bufferedRows (real IDs already assigned)
             const layout = buildProfessionalTemplateLayout(
               td.title,
               effectiveCols,
@@ -1019,13 +1022,11 @@ export default function SheetClient() {
             const finalRows = layout.rows;
             const actualRowHeights: Record<string, number> = { ...layout.rowHeights };
 
-            // Always apply formats + row values + heights on template load
             formatting.setCellFormats(layout.cellFormats);
             setRowHeights(actualRowHeights);
             rowsHistory.pushState(finalRows);
             setSheetState((prev) => ({ ...prev, rows: finalRows }));
 
-            // Suppress realtime refresh while we save
             localSaveRef.current = true;
             await Promise.all([
               saveAllRows(sheetId, finalRows),
@@ -1034,16 +1035,21 @@ export default function SheetClient() {
             ]);
             setTimeout(() => { localSaveRef.current = false; }, 3000);
 
-            // Auto-insert chart if none exists yet
+            // ── PATH A chart insert: strictly once, never twice ──────────
             const chartPreset = getTemplateChartPreset(activeTemplateId, effectiveCols);
             const cfg = LAYOUT_CONFIGS[activeTemplateId];
-            if (chartPreset && charts.charts.length === 0) {
+            if (
+              chartPreset &&
+              dbCharts.length === 0 &&
+              !chartInsertedRef.current  // hard guard — if already inserted, skip unconditionally
+            ) {
+              chartInsertedRef.current = true; // lock immediately before any async gap
               const chartY = getTemplateChartY(
                 finalRows,
                 actualRowHeights,
                 cfg?.showTitleBanner ?? true,
               );
-              charts.insertChart(chartPreset.kind as any, finalRows, effectiveCols, {
+              const inserted = charts.insertChart(chartPreset.kind as any, finalRows, effectiveCols, {
                 labelColumnKey: chartPreset.labelColumnKey,
                 seriesKeys: chartPreset.seriesKeys,
                 aggregateMode: chartPreset.aggregateMode,
@@ -1053,23 +1059,18 @@ export default function SheetClient() {
                 width: 440,
                 height: 260,
               });
-              setTimeout(() => {
-                updateSheetCharts(sheetId, charts.charts).catch(console.error);
-              }, 400);
+              // Save exactly this one chart — no second call possible
+              await updateSheetCharts(sheetId, [inserted]).catch(console.error);
             }
           }
 
-          // ════════════════════════════════════════════════════════════════
-          // PATH B — fresh sheet, no rows yet (first ever load of template)
-          // ════════════════════════════════════════════════════════════════
         } else {
+          chartsHydratedRef.current = true;
           const activeTemplateId = (data as any).templateId || templateId;
           const td = getTemplateData(activeTemplateId);
 
-          // Buffer FIRST so IDs are stable before layout builds rowHeights
           const bufferedRows = ensureWorkingRowBuffer(td.rows, td.columns);
 
-          // Build layout against buffered rows (real IDs already assigned)
           const layout = buildProfessionalTemplateLayout(
             td.title,
             td.columns,
@@ -1077,7 +1078,6 @@ export default function SheetClient() {
             activeTemplateId,
           );
           const finalRows = layout.rows;
-
           const actualRowHeights: Record<string, number> = { ...layout.rowHeights };
 
           rowsHistory.pushState(finalRows);
@@ -1092,7 +1092,6 @@ export default function SheetClient() {
             columns: td.columns,
           }));
 
-          // Suppress realtime refresh while we save everything
           localSaveRef.current = true;
           await Promise.all([
             saveAllRows(sheetId, finalRows),
@@ -1100,19 +1099,22 @@ export default function SheetClient() {
             saveAllCellFormats(sheetId, layout.cellFormats),
             updateSheetRowHeights(sheetId, actualRowHeights),
           ]);
-          chartsHydratedRef.current = true;
           setTimeout(() => { localSaveRef.current = false; }, 3000);
 
-          // Auto-insert chart into the open borderless zone
+          // ── PATH B chart insert: strictly once, never twice ──────────
           const chartPreset = getTemplateChartPreset(activeTemplateId, td.columns);
           const cfg = LAYOUT_CONFIGS[activeTemplateId];
-          if (chartPreset) {
+          if (
+            chartPreset &&
+            !chartInsertedRef.current  // hard guard — if already inserted, skip unconditionally
+          ) {
+            chartInsertedRef.current = true; // lock immediately before any async gap
             const chartY = getTemplateChartY(
               finalRows,
               actualRowHeights,
               cfg?.showTitleBanner ?? true,
             );
-            charts.insertChart(chartPreset.kind as any, finalRows, td.columns, {
+            const inserted = charts.insertChart(chartPreset.kind as any, finalRows, td.columns, {
               labelColumnKey: chartPreset.labelColumnKey,
               seriesKeys: chartPreset.seriesKeys,
               aggregateMode: chartPreset.aggregateMode,
@@ -1122,9 +1124,8 @@ export default function SheetClient() {
               width: 440,
               height: 260,
             });
-            setTimeout(() => {
-              updateSheetCharts(sheetId, charts.charts).catch(console.error);
-            }, 400);
+            // Save exactly this one chart — no second call possible
+            await updateSheetCharts(sheetId, [inserted]).catch(console.error);
           }
         }
 
@@ -4435,18 +4436,19 @@ export default function SheetClient() {
           //   col.key,
           //   props.row,
           // );
-          const layoutFlag = formatting.cellFormats[`${rowIdx}-${col.key}`]?.isLayoutRow;
+          // REPLACE WITH:
+          const layoutFlag = rowIdx <= 1 || (formatting.cellFormats[`${rowIdx}-${col.key}`]?.isLayoutRow ?? false);
           const mergedCellStyle = isMergeMaster
             ? {
               ...effectiveCellStyle,
               borderStyle: "none",
               borderColor: "transparent",
               borderWidth: 0,
-              ...(layoutFlag ? { isLayoutRow: true } : {}),
+              isLayoutRow: layoutFlag,
             }
             : {
               ...effectiveCellStyle,
-              ...(layoutFlag ? { isLayoutRow: true } : {}),
+              isLayoutRow: layoutFlag,
             };
           const inSelection =
             selectionRange && !mergeInfo?.hidden
@@ -4558,6 +4560,7 @@ export default function SheetClient() {
                 selectedCell.col === col.key
               }
               validationWarning={validationWarning}
+              isLayoutRow={!!layoutFlag}
             />
           );
         },

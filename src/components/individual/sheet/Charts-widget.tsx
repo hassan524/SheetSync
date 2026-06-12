@@ -6,6 +6,7 @@
  * Draggable + resizable floating chart widget.
  * FIXED: isUnconfigured now correctly allows pie/donut/radar with just a label column (no Y needed)
  * FIXED: resolveChartData handles count mode for categorical charts
+ * FIXED: Scroll support for many data points; removed harsh tick capping
  */
 
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
@@ -36,12 +37,18 @@ const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 //  RESOLVE CHART DATA (self-contained, correct logic)
 // ─────────────────────────────────────────────────────────────
 
+
+function formatChartAxisDate(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function resolveChartData(
   chart: SheetChart,
   rows: SheetRow[],
   columns: ColumnDef[],
 ): { categories: string[]; series: { name: string; data: number[] }[] } {
-  // ── MANUAL MODE ──
   if (chart.dataMode === "manual") {
     return {
       categories: chart.manualCategories,
@@ -49,84 +56,83 @@ function resolveChartData(
     };
   }
 
-  // ── SHEET MODE ──
   if (!chart.labelColumnKey) return { categories: [], series: [] };
   const labelColumn = columns.find((c) => c.key === chart.labelColumnKey);
   if (!isChartableLabelColumn(labelColumn)) return { categories: [], series: [] };
   const isDateLabel = labelColumn?.type === "date";
+  const formatLabel = (raw: string) => (isDateLabel ? formatChartAxisDate(raw) : raw);
 
   const start = Math.max(0, chart.startRow ?? 0);
-  const end =
-    chart.endRow != null
-      ? Math.min(rows.length - 1, chart.endRow)
-      : rows.length - 1;
+  const end = chart.endRow != null ? Math.min(rows.length - 1, chart.endRow) : rows.length - 1;
 
-  const sliced = rows
-    .slice(start, end + 1)
-    .filter(
-      (r) =>
-        r[chart.labelColumnKey!] !== undefined &&
-        r[chart.labelColumnKey!] !== null &&
-        String(r[chart.labelColumnKey!]).trim() !== "",
-    );
+  const sliced = rows.slice(start, end + 1).filter((r) => {
+    const labelVal = r[chart.labelColumnKey!];
+    if (labelVal === undefined || labelVal === null || String(labelVal).trim() === "") return false;
+    const labelStr = String(labelVal).trim();
+    if (/^[A-Z\s]{4,}$/.test(labelStr) && !/^\d/.test(labelStr)) return false;
+    if (isDateLabel) {
+      const d = new Date(labelStr);
+      if (Number.isNaN(d.getTime())) return false;
+    }
+    return true;
+  });
 
   if (sliced.length === 0) return { categories: [], series: [] };
 
   const isCat = CATEGORICAL_KINDS.has(chart.kind);
   const noSeries = chart.seriesKeys.length === 0;
+  const isCountMode = (isCat && noSeries) || chart.aggregateMode === "count";
 
-  // COUNT MODE — pie/donut/radar with no Y column, or explicit count aggregate
-  if ((isCat && noSeries) || chart.aggregateMode === "count") {
+  // Only keep rows that actually have data — skips the thousands of
+  // blank template rows so the chart doesn't span years of empty dates.
+  let dataRows = sliced;
+  if (!isCountMode) {
+    dataRows = sliced.filter((r) =>
+      chart.seriesKeys.some((key) => {
+        const v = coerceChartNumber(r[key]);
+        return v !== null && v !== 0;
+      }),
+    );
+    if (dataRows.length === 0) return { categories: [], series: [] };
+  }
+
+  // COUNT MODE
+  if (isCountMode) {
     const countMap = new Map<string, number>();
     sliced.forEach((r) => {
-      const rawLabel = String(r[chart.labelColumnKey!]).trim();
-      const label = isDateLabel ? formatSheetDate(rawLabel) : rawLabel;
+      const label = formatLabel(String(r[chart.labelColumnKey!]).trim());
       if (label) countMap.set(label, (countMap.get(label) ?? 0) + 1);
     });
     const categories = Array.from(countMap.keys());
     return {
       categories,
-      series: [
-        { name: "Count", data: categories.map((l) => countMap.get(l)!) },
-      ],
+      series: [{ name: "Count", data: categories.map((l) => countMap.get(l)!) }],
     };
   }
 
   // NO GROUPING — each row is one data point
   if (chart.aggregateMode === "none") {
-    let displayRows = sliced;
-    const max = chart.maxXLabels ?? 12;
-    if (sliced.length > max) {
-      const step = Math.ceil(sliced.length / max);
-      displayRows = sliced.filter((_, i) => i % step === 0);
-    }
-    const categories = displayRows.map((r) => {
-      const raw = String(r[chart.labelColumnKey!]).trim();
-      return isDateLabel ? formatSheetDate(raw) : raw;
-    });
+    const categories = dataRows.map((r) => formatLabel(String(r[chart.labelColumnKey!]).trim()));
     const series = chart.seriesKeys.map((key) => {
       const col = columns.find((c) => c.key === key);
       return {
         name: col?.name ?? key,
-        data: displayRows.map((r) => {
-          return coerceChartNumber(r[key]) ?? 0;
-        }),
+        data: dataRows.map((r) => coerceChartNumber(r[key]) ?? 0),
       };
     });
     return { categories, series };
   }
 
-  // SUM / AVG per unique label
+  // SUM / AVG per unique label, preserving first-seen order
   const labelMap = new Map<string, { sums: number[]; counts: number[] }>();
   const sc = chart.seriesKeys.length;
-  sliced.forEach((r) => {
-    const rawLabel = String(r[chart.labelColumnKey!]).trim();
-    const label = isDateLabel ? formatSheetDate(rawLabel) : rawLabel;
-    if (!labelMap.has(label))
-      labelMap.set(label, {
-        sums: new Array(sc).fill(0),
-        counts: new Array(sc).fill(0),
-      });
+  const order: string[] = [];
+  dataRows.forEach((r) => {
+    const label = formatLabel(String(r[chart.labelColumnKey!]).trim());
+    if (!labelMap.has(label)) {
+      labelMap.set(label, { sums: new Array(sc).fill(0), counts: new Array(sc).fill(0) });
+      order.push(label);
+    }
     const entry = labelMap.get(label)!;
     chart.seriesKeys.forEach((key, si) => {
       const v = coerceChartNumber(r[key]);
@@ -137,28 +143,19 @@ function resolveChartData(
     });
   });
 
-  let allLabels = Array.from(labelMap.keys());
-  const max = chart.maxXLabels ?? 12;
-  if (allLabels.length > max) {
-    const step = Math.ceil(allLabels.length / max);
-    allLabels = allLabels.filter((_, i) => i % step === 0);
-  }
-
   const series = chart.seriesKeys.map((key, si) => {
     const col = columns.find((c) => c.key === key);
     return {
       name: col?.name ?? key,
-      data: allLabels.map((label) => {
+      data: order.map((label) => {
         const e = labelMap.get(label);
         if (!e || e.counts[si] === 0) return 0;
-        return chart.aggregateMode === "avg"
-          ? e.sums[si] / e.counts[si]
-          : e.sums[si];
+        return chart.aggregateMode === "avg" ? e.sums[si] / e.counts[si] : e.sums[si];
       }),
     };
   });
 
-  return { categories: allLabels, series };
+  return { categories: order, series };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -178,9 +175,10 @@ function buildOptions(
   const isRadar = chart.kind === "radar";
   const isMobile = widgetWidth < 360;
 
+  // CHANGE 3: softer threshold + no tickAmount cap
   const labelCount = categories.length;
-  const rotate = labelCount > 8 ? -45 : 0;
-  const maxHeight = labelCount > 8 ? 72 : 36;
+  const rotate = labelCount > 6 ? -45 : 0;
+  const maxHeight = labelCount > 6 ? 60 : 36;
 
   return {
     chart: {
@@ -224,11 +222,11 @@ function buildOptions(
       gradient:
         chart.kind === "area"
           ? {
-              shadeIntensity: 1,
-              opacityFrom: 0.25,
-              opacityTo: 0.02,
-              stops: [0, 100],
-            }
+            shadeIntensity: 1,
+            opacityFrom: 0.25,
+            opacityTo: 0.02,
+            stops: [0, 100],
+          }
           : undefined,
     },
 
@@ -253,31 +251,31 @@ function buildOptions(
 
     ...(!isPolar &&
       !isRadar && {
-        xaxis: {
-          categories,
-          labels: {
-            style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
-            rotate,
-            trim: true,
-            maxHeight,
-            hideOverlappingLabels: true,
-          },
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-          tickAmount: Math.min(categories.length, chart.maxXLabels ?? 12),
+      xaxis: {
+        categories,
+        labels: {
+          style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
+          rotate,
+          trim: true,
+          maxHeight,
+          hideOverlappingLabels: true,
         },
-        yaxis: {
-          labels: {
-            style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
-            formatter: (val: number) =>
-              typeof val === "number"
-                ? val >= 1000
-                  ? `${(val / 1000).toFixed(1)}k`
-                  : String(Math.round(val))
-                : String(val),
-          },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        // CHANGE 3: tickAmount line removed — no more tick capping
+      },
+      yaxis: {
+        labels: {
+          style: { colors: textC, fontSize: isMobile ? "9px" : "11px" },
+          formatter: (val: number) =>
+            typeof val === "number"
+              ? val >= 1000
+                ? `${(val / 1000).toFixed(1)}k`
+                : String(Math.round(val))
+              : String(val),
         },
-      }),
+      },
+    }),
 
     ...(isPolar && { labels: categories }),
 
@@ -296,7 +294,6 @@ function buildOptions(
           labels: {
             show: chart.showLabels,
 
-            // ✅ CORRECT styling places
             name: {
               color: textC,
               fontSize: "12px",
@@ -306,7 +303,6 @@ function buildOptions(
               fontSize: "12px",
             },
 
-            // ✅ FIXED: removed invalid `style`
             total: {
               show: chart.showLabels,
               label: "Total",
@@ -591,6 +587,20 @@ export default function ChartWidget({
     series.length > 0 &&
     series.some((s) => s.data.length > 0);
 
+  // CHANGE 4: polar/radar flags + scroll sizing
+  const isPolar = chart.kind === "pie" || chart.kind === "donut";
+  const isRadar = chart.kind === "radar";
+
+  const PX_PER_CATEGORY = 56;
+  const PX_PER_BAR_ROW = 32;
+  const needsHorizontalScroll =
+    !isPolar && !isRadar && chart.kind !== "bar" &&
+    categories.length * PX_PER_CATEGORY > size.w - 24;
+  const needsVerticalScroll =
+    chart.kind === "bar" && categories.length * PX_PER_BAR_ROW > size.h - 60;
+  const scrollChartWidth = categories.length * PX_PER_CATEGORY;
+  const scrollChartHeight = categories.length * PX_PER_BAR_ROW;
+
   // ── CORRECT isUnconfigured check ──
   // Categorical charts (pie/donut/radar) only need labelColumnKey
   // Other charts need labelColumnKey + at least one seriesKey
@@ -604,10 +614,10 @@ export default function ChartWidget({
   const isUnconfigured =
     chart.dataMode === "sheet"
       ? !chart.labelColumnKey ||
-        invalidLabelColumn ||
-        (!isCat && chart.seriesKeys.length === 0)
+      invalidLabelColumn ||
+      (!isCat && chart.seriesKeys.length === 0)
       : chart.manualCategories.length === 0 ||
-        chart.manualSeries.every((s) => s.values.length === 0);
+      chart.manualSeries.every((s) => s.values.length === 0);
 
   // ── Theme ──
   const accent = "#1a7a4a";
@@ -776,28 +786,45 @@ export default function ChartWidget({
               </button>
             </div>
           ) : hasData ? (
-            <ApexChart
-              key={`${chart.id}-${chart.kind}-${chart.colorScheme}-${categories.length}-${series.length}`}
-              type={
-                chart.kind === "donut"
-                  ? "donut"
-                  : chart.kind === "pie"
-                    ? "pie"
-                    : chart.kind === "radar"
-                      ? "radar"
-                      : chart.kind === "area"
-                        ? "area"
-                        : chart.kind === "scatter"
-                          ? "scatter"
-                          : chart.kind === "line"
-                            ? "line"
-                            : "bar"
-              }
-              options={apexOptions}
-              series={apexSeries as any}
-              width="100%"
-              height={isMobile ? 260 : size.h - 52}
-            />
+            // CHANGE 5: scroll wrapper
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                overflowX: needsHorizontalScroll ? "auto" : "hidden",
+                overflowY: needsVerticalScroll ? "auto" : "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: needsHorizontalScroll ? scrollChartWidth : "100%",
+                  height: needsVerticalScroll ? scrollChartHeight : "100%",
+                }}
+              >
+                <ApexChart
+                  key={`${chart.id}-${chart.kind}-${chart.colorScheme}-${categories.length}-${series.length}`}
+                  type={
+                    chart.kind === "donut"
+                      ? "donut"
+                      : chart.kind === "pie"
+                        ? "pie"
+                        : chart.kind === "radar"
+                          ? "radar"
+                          : chart.kind === "area"
+                            ? "area"
+                            : chart.kind === "scatter"
+                              ? "scatter"
+                              : chart.kind === "line"
+                                ? "line"
+                                : "bar"
+                  }
+                  options={apexOptions}
+                  series={apexSeries as any}
+                  width="100%"
+                  height={needsVerticalScroll ? scrollChartHeight : (isMobile ? 260 : size.h - 52)}
+                />
+              </div>
+            </div>
           ) : (
             // Has config but rows returned nothing
             <div
@@ -832,7 +859,6 @@ export default function ChartWidget({
               width="12"
               height="12"
               viewBox="0 0 12 12"
-              className=""
             >
               <path
                 d="M10 2L2 10M10 6L6 10M10 10"
@@ -847,4 +873,3 @@ export default function ChartWidget({
     </div>
   );
 }
-

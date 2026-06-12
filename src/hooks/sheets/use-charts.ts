@@ -275,13 +275,32 @@ export function resolveChartData(
   const sliced = rows
     .slice(start, end + 1)
     .filter(
-      (r) =>
-        r[chart.labelColumnKey!] !== undefined &&
-        r[chart.labelColumnKey!] !== null &&
-        String(r[chart.labelColumnKey!]).trim() !== "",
+      (r) => {
+        const labelVal = r[chart.labelColumnKey!];
+        if (labelVal === undefined || labelVal === null || String(labelVal).trim() === "") return false;
+        // Skip layout rows (title banner, column header row)
+        const labelStr = String(labelVal).trim();
+        if (/^[A-Z\s]{4,}$/.test(labelStr) && !/^\d/.test(labelStr)) return false;
+        // For date columns, skip non-date values
+        if (labelColumn?.type === "date") {
+          const d = new Date(labelStr);
+          if (isNaN(d.getTime())) return false;
+        }
+        return true;
+      }
     );
 
   if (sliced.length === 0) return { categories: [], series: [] };
+
+  // For sum/avg mode, skip rows where ALL series values are 0 or empty
+  const hasAnyData = sliced.some((r) =>
+    chart.seriesKeys.some((key) => {
+      const v = coerceChartNumber(r[key]);
+      return v !== null && v !== 0;
+    })
+  );
+  if (!hasAnyData && chart.aggregateMode !== "count") return { categories: [], series: [] };
+
 
   const isCategorical = CATEGORICAL_KINDS.has(chart.kind);
   const noSeriesKeys = chart.seriesKeys.length === 0;

@@ -40,26 +40,26 @@ export async function saveRow(
   if (error) throw new Error(`Failed to save row: ${error.message}`);
 }
 
+// REPLACE WITH:
 export async function saveAllRows(
   sheetId: string,
   rows: SheetRow[],
   client = defaultSupabase
 ) {
-  const { error: deleteError } = await client
-    .from("rows")
-    .delete()
-    .eq("sheet_id", sheetId);
-
-  if (deleteError)
-    throw new Error(`Failed to clear rows: ${deleteError.message}`);
-
-  if (rows.length === 0) return;
+  if (rows.length === 0) {
+    await client.from("rows").delete().eq("sheet_id", sheetId);
+    return;
+  }
 
   const lastUsed = getLastUsedRowIndex(rows);
   const effectiveRows = lastUsed >= 0 ? rows.slice(0, lastUsed + 1) : [];
-  if (effectiveRows.length === 0) return;
 
-  const rowsToInsert = effectiveRows.map((row, idx) => {
+  if (effectiveRows.length === 0) {
+    await client.from("rows").delete().eq("sheet_id", sheetId);
+    return;
+  }
+
+  const rowsToUpsert = effectiveRows.map((row, idx) => {
     const { id, ...data } = row;
     return {
       sheet_id: sheetId,
@@ -70,12 +70,34 @@ export async function saveAllRows(
     };
   });
 
-  const { error: insertError } = await client
-    .from("rows")
-    .insert(rowsToInsert);
+  // Upsert in chunks to stay under Supabase payload limits
+  const CHUNK = 500;
+  for (let i = 0; i < rowsToUpsert.length; i += CHUNK) {
+    const chunk = rowsToUpsert.slice(i, i + CHUNK);
+    const { error } = await client
+      .from("rows")
+      .upsert(chunk, { onConflict: "sheet_id,row_key" });
+    if (error) throw new Error(`Failed to save rows: ${error.message}`);
+  }
 
-  if (insertError)
-    throw new Error(`Failed to save rows: ${insertError.message}`);
+  // Delete rows that are no longer in the effective set
+  const activeKeys = new Set(effectiveRows.map((r) => r.id));
+  const { data: existingRows } = await client
+    .from("rows")
+    .select("row_key")
+    .eq("sheet_id", sheetId);
+  if (existingRows) {
+    const toDelete = existingRows
+      .map((r) => r.row_key)
+      .filter((k) => !activeKeys.has(k));
+    if (toDelete.length > 0) {
+      await client
+        .from("rows")
+        .delete()
+        .eq("sheet_id", sheetId)
+        .in("row_key", toDelete);
+    }
+  }
 }
 
 export async function deleteRows(
