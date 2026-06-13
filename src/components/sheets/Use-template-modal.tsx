@@ -12,22 +12,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Building2, User, X, FolderPlus } from "lucide-react";
+import { Building2, User, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SHEET_TEMPLATES } from "@/constants/Sheet-templates";
 import { createSheet } from "@/lib/querys/sheets/sheets";
-import { createFolder } from "@/lib/querys/folder/folders";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { toast } from "sonner";
 import { ICON_MAP } from "@/constants/Sheet-templates";
-import CreateFolderDialog from "@/components/individual/Personalsheets/Create-folder-dialog";
 import CreateOrganizationDialog from "@/components/individual/organization/Create-organization-dialog";
 
 export interface UseTemplateModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   templateId: string;
-  folders?: any[];
   organizations?: any[];
 }
 
@@ -35,17 +32,13 @@ const UseTemplateModal = ({
   open,
   onOpenChange,
   templateId,
-  folders: externalFolders,
   organizations,
 }: UseTemplateModalProps) => {
   const [sheetName, setSheetName] = useState("");
   const [saveToOrg, setSaveToOrg] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<string>("");
-  const [selectedFolder, setSelectedFolder] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
-  const [localFolders, setLocalFolders] = useState<any[]>([]);
   const [localOrganizations, setLocalOrganizations] = useState<any[]>([]);
 
   const router = useRouter();
@@ -54,19 +47,12 @@ const UseTemplateModal = ({
   const Icon = template ? ICON_MAP[template.iconName] : null;
   const accent = template?.accent;
 
-  const folders = [
-    ...(externalFolders || []),
-    ...localFolders.filter(
-      (lf) => !(externalFolders || []).find((f: any) => f.id === lf.id)
-    ),
-  ];
   const organizationOptions = [
     ...(organizations || []),
     ...localOrganizations.filter(
       (lo) => !(organizations || []).find((org: any) => org.id === lo.id)
     ),
   ];
-  const hasFolders = folders.length > 0;
   const hasOrganizations = organizationOptions.length > 0;
 
   useEffect(() => {
@@ -76,32 +62,16 @@ const UseTemplateModal = ({
   const handleToggleOrg = (checked: boolean) => {
     setSaveToOrg(checked);
     setSelectedOrg("");
-    setSelectedFolder("");
-  };
-
-  const handleCreateFolder = async (name: string) => {
-    try {
-      const data = await createFolder(name);
-      await logActivity({ organizationId: null, action: "created folder", target: name });
-      const newFolder = { ...data, sheets: [] };
-      setLocalFolders((prev) => [...prev, newFolder]);
-      setSelectedFolder(newFolder.id);
-      toast.success(`Folder "${name}" created`);
-    } catch (err: any) {
-      toast.error(err.message || "Error creating folder");
-    }
   };
 
   const handleCreateSheet = async () => {
     if (!template || !sheetName.trim()) return;
-    if (!saveToOrg && !hasFolders) return;
     try {
       setLoading(true);
       const createdSheet = await createSheet({
         name: sheetName.trim(),
         templateId: template.id,
         organizationId: saveToOrg ? selectedOrg || undefined : undefined,
-        folder_id: !saveToOrg ? selectedFolder || undefined : undefined,
       });
       const isOrg = saveToOrg && selectedOrg;
       await logActivity({
@@ -121,7 +91,7 @@ const UseTemplateModal = ({
     }
   };
 
-  const canCreate = !!sheetName.trim() && (saveToOrg ? !!selectedOrg : hasFolders);
+  const canCreate = !!sheetName.trim() && (saveToOrg ? !!selectedOrg : true);
 
   if (!template) return null;
 
@@ -197,7 +167,7 @@ const UseTemplateModal = ({
                       : <User className="h-3.5 w-3.5 text-zinc-400" />
                     }
                     <span className="text-sm text-zinc-600">
-                      {saveToOrg ? "Organization" : "Personal"}
+                      {saveToOrg ? "Organization" : "Sheet"}
                     </span>
                   </div>
                   <Switch checked={saveToOrg} onCheckedChange={handleToggleOrg} />
@@ -234,40 +204,7 @@ const UseTemplateModal = ({
                       />
                     )}
                   </div>
-                )}
-
-                {/* Folder picker */}
-                {!saveToOrg && (
-                  <div className="space-y-2">
-                    {hasFolders ? (
-                      <>
-                        <Select value={selectedFolder} onValueChange={setSelectedFolder}>
-                          <SelectTrigger className="h-9 rounded-lg border-zinc-200 bg-zinc-50 text-sm">
-                            <SelectValue placeholder="Select folder..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {folders.map((f) => (
-                              <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <button
-                          className="text-xs text-zinc-400 flex items-center gap-1 hover:text-zinc-600 transition-colors duration-150"
-                          onClick={() => setCreateFolderOpen(true)}
-                        >
-                          <FolderPlus className="h-3 w-3" /> New folder
-                        </button>
-                      </>
-                    ) : (
-                      <EmptyState
-                        icon={FolderPlus}
-                        label="No folders yet"
-                        action="Create one"
-                        onAction={() => setCreateFolderOpen(true)}
-                      />
                     )}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -301,11 +238,7 @@ const UseTemplateModal = ({
         </DialogContent>
       </Dialog>
 
-      <CreateFolderDialog
-        open={createFolderOpen}
-        onOpenChange={setCreateFolderOpen}
-        onConfirm={handleCreateFolder}
-      />
+
       <CreateOrganizationDialog
         open={createOrgOpen}
         onOpenChange={setCreateOrgOpen}

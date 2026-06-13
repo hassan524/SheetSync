@@ -485,7 +485,7 @@ export function getTemplateChartPreset(
         : null;
     case "2a197048-b791-490e-aaff-9b00785b2b27":
       return has("income") && has("expense")
-        ? { kind: "bar", labelColumnKey: "category", seriesKeys: ["income", "expense"], aggregateMode: "sum", title: "Income vs Expense" }
+        ? { kind: "bar", labelColumnKey: "date", seriesKeys: ["income", "expense"], aggregateMode: "sum", title: "Income vs Expense" }
         : null;
     case "e73711d5-aab0-4281-bc8f-486ad6c6aaac":
       return has("severity")

@@ -38,6 +38,7 @@ interface ShareDialogProps {
   /** The org already scoped to (inside org page or org sheet) */
   currentOrg?: Organization;
   onInvited?: () => void;
+  onShared?: (orgId: string) => void;
 }
 
 export default function ShareDialog({
@@ -48,6 +49,7 @@ export default function ShareDialog({
   organizations,
   currentOrg,
   onInvited,
+  onShared,
 }: ShareDialogProps) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("editor");
@@ -66,9 +68,9 @@ export default function ShareDialog({
       ),
     );
 
-  // Show org selector when we're NOT inside a specific org/sheet
+  // Show org selector when we're NOT inside a specific org/sheet, or when inside a personal sheet
   const showOrgSelector =
-    !currentOrg && !sheetId && organizations && organizations.length > 0;
+    !sheetId && !currentOrg && organizations && organizations.length > 0;
   const effectiveOrg = currentOrg || selectedOrg;
 
   useEffect(() => {
@@ -107,12 +109,13 @@ export default function ShareDialog({
         }
         setEmail("");
         setRole("editor");
+        if (effectiveOrg && onShared) onShared(effectiveOrg.id);
         if (onInvited) onInvited();
       } catch (err: any) {
         toast.error(
           err?.response?.data?.error ||
-            err?.message ||
-            "Failed to send invitation",
+          err?.message ||
+          "Failed to send invitation",
         );
       } finally {
         setSending(false);
@@ -138,8 +141,8 @@ export default function ShareDialog({
       } catch (err: any) {
         toast.error(
           err?.response?.data?.error ||
-            err?.message ||
-            "Failed to send invitation",
+          err?.message ||
+          "Failed to send invitation",
         );
       } finally {
         setSending(false);
@@ -154,18 +157,20 @@ export default function ShareDialog({
       setCreatingLink(true);
       const response = await api.post("/invites/link", {
         sheetId,
-        orgId: sheetId ? undefined : effectiveOrg?.id,
+        orgId: effectiveOrg?.id,
         role,
       });
       const data = response?.data ?? response;
       const inviteUrl = data?.inviteUrl ?? "";
       setShareUrl(inviteUrl);
+      if (effectiveOrg && onShared) onShared(effectiveOrg.id);
+      if (onInvited) onInvited();
       return inviteUrl;
     } catch (err: any) {
       toast.error(
         err?.response?.data?.error ||
-          err?.message ||
-          "Failed to create share link",
+        err?.message ||
+        "Failed to create share link",
       );
       return "";
     } finally {
@@ -183,7 +188,9 @@ export default function ShareDialog({
   // Dynamic title based on context
   const dialogTitle = sheetId ? "Share sheet" : "Invite members";
   const dialogDesc = sheetId
-    ? "Invite collaborators or share a link"
+    ? currentOrg
+      ? `Invite collaborators to ${currentOrg.name} or share a link`
+      : "Invite collaborators or share a link"
     : currentOrg
       ? `Invite collaborators to ${currentOrg.name} or share an invite link`
       : "Select an organization and invite collaborators";
@@ -193,7 +200,7 @@ export default function ShareDialog({
       ? `${getCurrentAppOrigin()}/sheet/${sheetId}?invited=true...`
       : effectiveOrg
         ? `${getCurrentAppOrigin()}/invite/...`
-      : getCurrentAppOrigin());
+        : getCurrentAppOrigin());
 
   return (
     <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
@@ -203,6 +210,11 @@ export default function ShareDialog({
           <DialogDescription>{dialogDesc}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {!currentOrg && (!organizations || organizations.length === 0) && (
+            <div className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+              You must create an organization first from the dashboard to share sheets with team members.
+            </div>
+          )}
           <div className="flex gap-2">
             <Input
               placeholder="Emails separated by comma or space"
@@ -212,7 +224,7 @@ export default function ShareDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleInvite();
               }}
-              disabled={sending}
+              disabled={sending || (!currentOrg && (!organizations || organizations.length === 0))}
             />
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger className="w-28 text-sm">
@@ -227,7 +239,7 @@ export default function ShareDialog({
             <Button
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 text-sm"
               onClick={handleInvite}
-              disabled={sending || !email.trim() || (!effectiveOrg && !sheetId)}
+              disabled={sending || !email.trim() || !effectiveOrg}
             >
               {sending ? "Sending…" : "Invite"}
             </Button>

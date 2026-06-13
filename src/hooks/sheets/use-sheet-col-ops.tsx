@@ -32,6 +32,7 @@ interface UseColOpsProps {
   rowsHistory: { currentState: SheetRow[]; pushState: (rows: SheetRow[]) => void };
   markSaving: () => void;
   markSaved: () => void;
+  broadcastSheetSnapshot?: (patch: Record<string, any>) => void;
   currentUser: { id: string } | null;
   selectedCell: { row: number; col: string } | null;
 }
@@ -53,6 +54,7 @@ export function useSheetColOps({
   markSaved,
   currentUser,
   selectedCell,
+  broadcastSheetSnapshot,
 }: UseColOpsProps) {
   const persistColumns = useCallback(
     async (nextColumns: ColumnDef[]) => {
@@ -64,6 +66,7 @@ export function useSheetColOps({
     },
     [columnsHistory, markSaved, markSaving, sheetId, setSheetState],
   );
+
 
   const handleInsertColumn = useCallback(
     async (type: ColumnDef["type"]) => {
@@ -251,9 +254,15 @@ export function useSheetColOps({
       };
       const nextCols = [...columns];
       nextCols.splice(Math.max(0, Math.min(nextCols.length, index)), 0, newCol);
-      const namedCols = mode === "duplicate" ? nextCols : normalizeGeneratedColumnNames(nextCols);
+      // Normalize position for all columns
+      const positionedCols = nextCols.map((col, idx) => ({
+        ...col,
+        position: idx,
+      }));
+      const namedCols = mode === "duplicate" ? positionedCols : normalizeGeneratedColumnNames(positionedCols);
       columnsHistory.pushState(namedCols);
       setSheetState((p: any) => ({ ...p, columns: namedCols }));
+      
       const nextRows = rows.map((r) => {
         const nr: any = { ...r };
         if (mode === "duplicate" && base) {
@@ -270,8 +279,44 @@ export function useSheetColOps({
         return nr;
       });
       rowsHistory.pushState(nextRows);
+      setSheetState((p: any) => ({ ...p, rows: nextRows }));
+
+      // Save immediately to DB to prevent stale closures
+      setTimeout(async () => {
+        markSaving();
+        try {
+          await Promise.all([
+            saveAllColumns(sheetId, namedCols),
+            saveAllRows(sheetId, nextRows),
+          ]);
+          markSaved();
+          if (broadcastSheetSnapshot) {
+            broadcastSheetSnapshot({ columns: namedCols, rows: nextRows });
+          }
+          toast.success(
+            mode === "duplicate"
+              ? `Column "${base?.name}" duplicated`
+              : `Column inserted`
+          );
+          if (isOrgSheet) {
+            logColAdd(sheetId, newCol.name, type);
+          }
+          logActivity({
+            sheetId,
+            organizationId: organizationId ?? undefined,
+            action: mode === "duplicate"
+              ? `duplicated column "${base?.name}"`
+              : `inserted column "${newCol.name}"`,
+            target: title,
+          }).catch(() => {});
+        } catch (error) {
+          console.error("Failed to save column at:", error);
+          toast.error("Failed to persist column.");
+          setSaveStatus("saved");
+        }
+      }, 50);
     },
-    [columns, rows, columnsHistory, rowsHistory, setSheetState],
+    [columns, rows, columnsHistory, rowsHistory, setSheetState, markSaving, markSaved, broadcastSheetSnapshot, sheetId, isOrgSheet, organizationId, title, setSaveStatus],
   );
 
   const clearColumnValues = useCallback(

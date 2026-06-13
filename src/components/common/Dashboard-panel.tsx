@@ -241,7 +241,7 @@ export default function ActivityPanel() {
             : a.sheets?.title || a.target || "Unknown Sheet",
           subtitle: a.organizations?.name
             ? `${a.organizations.name} · Org`
-            : "Personal",
+            : "Sheet",
           created_at: a.created_at,
           type: "activity",
         }));

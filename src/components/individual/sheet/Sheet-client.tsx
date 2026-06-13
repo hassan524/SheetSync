@@ -101,6 +101,7 @@ import {
   MAX_IMPORT_BYTES,
 } from "@/lib/import-sheet";
 import { getSheetOrgMembers, type OrgMember } from "@/lib/querys/organization/get-sheet-members";
+import { getAllOrganizations } from "@/lib/querys/organization/organization";
 import { supabase } from "@/lib/supabase/client";
 import { api } from "@/lib/api/api-client";
 import { useAuth } from "@/context/AuthContext";
@@ -544,6 +545,8 @@ export default function SheetClient() {
   // ── Ref for DataGrid instance (programmatic editing of master cells) ───
   const gridRef = useRef<any>(null);
 
+  const chartInsertedRef = useRef(false);
+
   // ── Refs ───────────────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const floatingImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -566,6 +569,7 @@ export default function SheetClient() {
     cellKey: string;
     inputRef: HTMLInputElement | null;
   }>({ active: false, query: "", anchor: null, cellKey: "", inputRef: null });
+  const [userOrganizations, setUserOrganizations] = useState<any[]>([]);
 
   const sv = useSheetStateVars(isOrganizationSheet, importedFrom);
   const {
@@ -811,6 +815,18 @@ export default function SheetClient() {
   }, [sheetId]);
 
   useEffect(() => {
+    if (!isOrgSheet && currentUser && isOwner) {
+      getAllOrganizations()
+        .then((orgs) => {
+          setUserOrganizations(orgs);
+        })
+        .catch((err) => {
+          console.error("Failed to load organizations:", err);
+        });
+    }
+  }, [isOrgSheet, currentUser, isOwner]);
+
+  useEffect(() => {
     if (!sheetId || typeof window === "undefined") return;
     const raw = window.localStorage.getItem(`sheetsync:${sheetId}:frozen-rows`);
     setFrozenRowsCount(raw === "1" ? 1 : 0);
@@ -850,6 +866,38 @@ export default function SheetClient() {
       }
     },
     [sheetId],
+  );
+
+  const broadcastSheetSnapshot = useCallback(
+    (patch: Record<string, any>) => {
+      if (!presenceChannelRef.current || !currentUser || !isOrgSheet) return;
+      presenceChannelRef.current.send({
+        type: "broadcast",
+        event: "sheet_snapshot",
+        payload: {
+          actorId: currentUser.id,
+          title,
+          rows,
+          columns,
+          formulas: formulas.formulas,
+          columnFormulas: formulas.columnFormulas,
+          cellFormats: formatting.cellFormats,
+          textWrapColumns: [...textWrap.textWrapColumns],
+          cellTypeOverrides: cellTypes.cellTypeOverrides,
+          cellSelectOptions,
+          charts: charts.charts,
+          rowHeights,
+          ...patch,
+        },
+      });
+    },
+    [
+      currentUser, isOrgSheet, title, rows, columns,
+      formulas.formulas, formulas.columnFormulas,
+      formatting.cellFormats, textWrap.textWrapColumns,
+      cellTypes.cellTypeOverrides, cellSelectOptions,
+      charts.charts, rowHeights,
+    ],
   );
 
   // ── Persistence hook ───────────────────────────────────────────────────
@@ -901,26 +949,27 @@ export default function SheetClient() {
     markSaved,
     currentUser,
     selectedCell,
+    broadcastSheetSnapshot,
   });
 
   // ── Load sheet ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!sheetId || !inviteReady) return;
     chartsHydratedRef.current = false;
+    chartInsertedRef.current = false;
     queueMicrotask(() => setIsLoading(true));
+
+    const templateAppliedKey = `sheetsync:${sheetId}:template-applied`;
+    const templateAlreadyApplied = !!localStorage.getItem(templateAppliedKey);
 
     loadSheet(sheetId)
       .then(async (data) => {
         const savedFormats = data.cellFormats ?? {};
         const hasSavedFormats = Object.keys(savedFormats).length > 0;
 
-        // ════════════════════════════════════════════════════════════════
-        // PATH A — sheet already has rows/columns (normal reload)
-        // ════════════════════════════════════════════════════════════════
         if (data.rows.length > 0 || data.columns.length > 0) {
           const sheetIsOrg = data.isPersonal === false || isOrganizationSheet;
 
-          // ── Restore cell formats ──────────────────────────────────────
           let wrapSet = new Set<string>();
           if (hasSavedFormats) {
             wrapSet = new Set<string>(
@@ -937,7 +986,6 @@ export default function SheetClient() {
             if (Object.keys(selectByCell).length > 0) setCellSelectOptions(selectByCell);
           }
 
-          // ── Restore formulas / protection / text-wrap ─────────────────
           if (data.formulas && Object.keys(data.formulas).length > 0)
             formulas.setFormulas(data.formulas);
           if (data.columnFormulas && Object.keys(data.columnFormulas).length > 0)
@@ -946,7 +994,6 @@ export default function SheetClient() {
             protection.setProtectedCells(data.protectedCells);
           if (wrapSet.size > 0) textWrap.setTextWrapColumns(wrapSet);
 
-          // ── Build row buffer and extract per-cell type overrides ───────
           const bufferedRows = ensureWorkingRowBuffer(data.rows, data.columns);
           const typeOverrides: Record<string, ColumnDef["type"]> = {};
           const rowSelectOptions: Record<string, string[]> = {};
@@ -970,7 +1017,6 @@ export default function SheetClient() {
           if (Object.keys(rowSelectOptions).length > 0)
             setCellSelectOptions((prev) => ({ ...prev, ...rowSelectOptions }));
 
-          // ── Push into history + state ──────────────────────────────────
           rowsHistory.pushState(bufferedRows);
           columnsHistory.pushState(data.columns);
           setSheetState({
@@ -991,9 +1037,16 @@ export default function SheetClient() {
             userRole: sheetIsOrg ? "viewer" : "owner",
           });
 
-          // ── Restore charts, row heights, floating images ───────────────
-          if (Array.isArray((data as any).charts)) {
-            charts.replaceAll((data as any).charts);
+          const dbCharts = (data as any).charts ?? [];
+          if (dbCharts.length > 0) {
+            const uniqueCharts = dbCharts.filter(
+              (chart: any, index: number, arr: any[]) =>
+                arr.findIndex((c: any) => c.title === chart.title) === index
+            );
+            charts.replaceAll(uniqueCharts);
+            if (uniqueCharts.length !== dbCharts.length) {
+              setTimeout(() => updateSheetCharts(sheetId, uniqueCharts).catch(console.error), 500);
+            }
           }
           chartsHydratedRef.current = true;
           if (Array.isArray((data as any).forks)) setForks((data as any).forks);
@@ -1002,14 +1055,17 @@ export default function SheetClient() {
             setFloatingImages((data as any).floatingImages);
           }
 
-          // ── KEY FIX: formats lost on first save (race condition) ───────
-          // Re-build and re-save the template layout, then insert chart.
           const activeTemplateId = (data as any).templateId || templateId;
-          if (activeTemplateId && activeTemplateId !== "blank" && !hasSavedFormats) {
+          const isBlankTemplate =
+            !activeTemplateId ||
+            activeTemplateId === "blank" ||
+            activeTemplateId === "f628aed8-bca7-4f51-b687-6db9f932be34";
+
+          // Only apply template layout on very first load — never again after that
+          if (activeTemplateId && !isBlankTemplate && !templateAlreadyApplied) {
             const td = getTemplateData(activeTemplateId);
             const effectiveCols = data.columns.length > 0 ? data.columns : td.columns;
 
-            // Build layout against bufferedRows (real IDs already assigned)
             const layout = buildProfessionalTemplateLayout(
               td.title,
               effectiveCols,
@@ -1019,13 +1075,11 @@ export default function SheetClient() {
             const finalRows = layout.rows;
             const actualRowHeights: Record<string, number> = { ...layout.rowHeights };
 
-            // Always apply formats + row values + heights on template load
             formatting.setCellFormats(layout.cellFormats);
             setRowHeights(actualRowHeights);
             rowsHistory.pushState(finalRows);
             setSheetState((prev) => ({ ...prev, rows: finalRows }));
 
-            // Suppress realtime refresh while we save
             localSaveRef.current = true;
             await Promise.all([
               saveAllRows(sheetId, finalRows),
@@ -1034,16 +1088,14 @@ export default function SheetClient() {
             ]);
             setTimeout(() => { localSaveRef.current = false; }, 3000);
 
-            // Auto-insert chart if none exists yet
+            localStorage.setItem(templateAppliedKey, "1");
+
             const chartPreset = getTemplateChartPreset(activeTemplateId, effectiveCols);
             const cfg = LAYOUT_CONFIGS[activeTemplateId];
-            if (chartPreset && charts.charts.length === 0) {
-              const chartY = getTemplateChartY(
-                finalRows,
-                actualRowHeights,
-                cfg?.showTitleBanner ?? true,
-              );
-              charts.insertChart(chartPreset.kind as any, finalRows, effectiveCols, {
+            if (chartPreset && dbCharts.length === 0 && !chartInsertedRef.current) {
+              chartInsertedRef.current = true;
+              const chartY = getTemplateChartY(finalRows, actualRowHeights, cfg?.showTitleBanner ?? true);
+              const inserted = charts.insertChart(chartPreset.kind as any, finalRows, effectiveCols, {
                 labelColumnKey: chartPreset.labelColumnKey,
                 seriesKeys: chartPreset.seriesKeys,
                 aggregateMode: chartPreset.aggregateMode,
@@ -1053,23 +1105,18 @@ export default function SheetClient() {
                 width: 440,
                 height: 260,
               });
-              setTimeout(() => {
-                updateSheetCharts(sheetId, charts.charts).catch(console.error);
-              }, 400);
+              await updateSheetCharts(sheetId, [inserted]).catch(console.error);
             }
           }
 
-          // ════════════════════════════════════════════════════════════════
-          // PATH B — fresh sheet, no rows yet (first ever load of template)
-          // ════════════════════════════════════════════════════════════════
         } else {
+          // No rows/columns yet — fresh sheet, always apply template
+          chartsHydratedRef.current = true;
           const activeTemplateId = (data as any).templateId || templateId;
           const td = getTemplateData(activeTemplateId);
 
-          // Buffer FIRST so IDs are stable before layout builds rowHeights
           const bufferedRows = ensureWorkingRowBuffer(td.rows, td.columns);
 
-          // Build layout against buffered rows (real IDs already assigned)
           const layout = buildProfessionalTemplateLayout(
             td.title,
             td.columns,
@@ -1077,7 +1124,6 @@ export default function SheetClient() {
             activeTemplateId,
           );
           const finalRows = layout.rows;
-
           const actualRowHeights: Record<string, number> = { ...layout.rowHeights };
 
           rowsHistory.pushState(finalRows);
@@ -1092,7 +1138,6 @@ export default function SheetClient() {
             columns: td.columns,
           }));
 
-          // Suppress realtime refresh while we save everything
           localSaveRef.current = true;
           await Promise.all([
             saveAllRows(sheetId, finalRows),
@@ -1100,19 +1145,16 @@ export default function SheetClient() {
             saveAllCellFormats(sheetId, layout.cellFormats),
             updateSheetRowHeights(sheetId, actualRowHeights),
           ]);
-          chartsHydratedRef.current = true;
           setTimeout(() => { localSaveRef.current = false; }, 3000);
 
-          // Auto-insert chart into the open borderless zone
+          localStorage.setItem(templateAppliedKey, "1");
+
           const chartPreset = getTemplateChartPreset(activeTemplateId, td.columns);
           const cfg = LAYOUT_CONFIGS[activeTemplateId];
-          if (chartPreset) {
-            const chartY = getTemplateChartY(
-              finalRows,
-              actualRowHeights,
-              cfg?.showTitleBanner ?? true,
-            );
-            charts.insertChart(chartPreset.kind as any, finalRows, td.columns, {
+          if (chartPreset && !chartInsertedRef.current) {
+            chartInsertedRef.current = true;
+            const chartY = getTemplateChartY(finalRows, actualRowHeights, cfg?.showTitleBanner ?? true);
+            const inserted = charts.insertChart(chartPreset.kind as any, finalRows, td.columns, {
               labelColumnKey: chartPreset.labelColumnKey,
               seriesKeys: chartPreset.seriesKeys,
               aggregateMode: chartPreset.aggregateMode,
@@ -1122,9 +1164,7 @@ export default function SheetClient() {
               width: 440,
               height: 260,
             });
-            setTimeout(() => {
-              updateSheetCharts(sheetId, charts.charts).catch(console.error);
-            }, 400);
+            await updateSheetCharts(sheetId, [inserted]).catch(console.error);
           }
         }
 
@@ -1139,7 +1179,6 @@ export default function SheetClient() {
         window.dispatchEvent(new Event("__sheet-ready"));
       });
   }, [sheetId, inviteReady, charts.replaceAll]);
-
 
   // ── Persist charts / row heights ───────────────────────────────────────
   useEffect(() => {
@@ -1195,12 +1234,12 @@ export default function SheetClient() {
         const currentMember = currentUser
           ? data.members.find((member) => member.id === currentUser.id)
           : null;
-        if (currentMember) {
-          setSheetState((prev) => ({
-            ...prev,
-            userRole: currentMember.role as SheetState["userRole"],
-          }));
-        }
+        setSheetState((prev) => ({
+          ...prev,
+          userRole: (currentMember?.role ?? prev.userRole) as SheetState["userRole"],
+          organizationId: data.orgId,
+          organizationName: data.orgName,
+        }));
       })
       .catch(console.error);
   }, [sheetId, isOrgSheet, currentUser, setSheetState]);
@@ -1391,37 +1430,6 @@ export default function SheetClient() {
     applyBroadcastSnapshotRef.current = applyBroadcastSnapshot;
   }, [applyBroadcastSnapshot]);
 
-  const broadcastSheetSnapshot = useCallback(
-    (patch: Record<string, any>) => {
-      if (!presenceChannelRef.current || !currentUser || !isOrgSheet) return;
-      presenceChannelRef.current.send({
-        type: "broadcast",
-        event: "sheet_snapshot",
-        payload: {
-          actorId: currentUser.id,
-          title,
-          rows,
-          columns,
-          formulas: formulas.formulas,
-          columnFormulas: formulas.columnFormulas,
-          cellFormats: formatting.cellFormats,
-          textWrapColumns: [...textWrap.textWrapColumns],
-          cellTypeOverrides: cellTypes.cellTypeOverrides,
-          cellSelectOptions,
-          charts: charts.charts,
-          rowHeights,
-          ...patch,
-        },
-      });
-    },
-    [
-      currentUser, isOrgSheet, title, rows, columns,
-      formulas.formulas, formulas.columnFormulas,
-      formatting.cellFormats, textWrap.textWrapColumns,
-      cellTypes.cellTypeOverrides, cellSelectOptions,
-      charts.charts, rowHeights,
-    ],
-  );
 
   const applyRemoteCellSelection = useCallback(
     (payload: SheetPresence & { userId?: string }) => {
@@ -1624,7 +1632,49 @@ export default function SheetClient() {
 
   const getEffectiveCellStyle = useCallback(
     (rowIdx: number, colKey: string, row: SheetRow): React.CSSProperties => {
-      const base = formatting.getCellStyle(rowIdx, colKey, textWrap.textWrapColumns);
+      const cellFormatKey = `${rowIdx}-${colKey}`;
+      const cellFormat = formatting.cellFormats[cellFormatKey] || {};
+      const rowFormat = formatting.cellFormats[`row:${row.id}`] || {};
+      const format = { ...rowFormat, ...cellFormat };
+      const isWrapEnabled = textWrap.textWrapColumns.has(colKey);
+
+      const base: React.CSSProperties = {
+        whiteSpace: isWrapEnabled ? "pre-wrap" : "nowrap",
+        wordBreak: isWrapEnabled ? "break-word" : "normal",
+        overflow: isWrapEnabled ? "visible" : "hidden",
+        textOverflow: isWrapEnabled ? "clip" : "ellipsis",
+        backgroundColor: format.bgColor || undefined,
+        textAlign: (format.align as any) || undefined,
+        fontFamily: format.fontFamily || "inherit",
+        fontWeight: format.bold ? 700 : "inherit",
+        fontStyle: format.italic ? "italic" : "inherit",
+        fontSize: format.fontSize ? `${format.fontSize}px` : "inherit",
+        color: format.textColor || "inherit",
+        textDecoration:
+          [
+            format.underline && "underline",
+            format.strikethrough && "line-through",
+          ]
+            .filter(Boolean)
+            .join(" ") || "inherit",
+        borderBottom: format.borderBottom || undefined,
+        borderTop: format.borderTop || undefined,
+        borderLeft: format.borderLeft || undefined,
+        borderRight: format.borderRight || undefined,
+        borderStyle:
+          format.borderStyle && format.borderStyle !== "none"
+            ? format.borderStyle
+            : undefined,
+        borderColor:
+          format.borderStyle && format.borderStyle !== "none"
+            ? format.borderColor || "#d1d5db"
+            : undefined,
+        borderWidth:
+          format.borderStyle && format.borderStyle !== "none"
+            ? `${format.borderWidth ?? 1}px`
+            : undefined,
+      };
+
       const colIdx = columns.findIndex((col) => col.key === colKey);
       const columnFormat = columns[colIdx]?.conditional_formatting?.columnFormat ?? {};
       const conditionalFormat = conditionalRules
@@ -1658,7 +1708,7 @@ export default function SheetClient() {
     [
       columns,
       conditionalRules,
-      formatting.getCellStyle,
+      formatting.cellFormats,
       normalizeDarkCellBackground,
       textWrap.textWrapColumns,
     ],
@@ -1837,10 +1887,15 @@ export default function SheetClient() {
   );
 
   const isSelectedRowProtected = useMemo(() => {
-    if (!selectedCell) return false;
+    if (!selectedCell) {
+      if (selectedRows && selectedRows.size > 0) {
+        return Array.from(selectedRows).some((rowId) => protection.isRowProtected(rowId));
+      }
+      return false;
+    }
     const rowId = rows[selectedCell.row]?.id;
     return rowId ? protection.isRowProtected(rowId) : false;
-  }, [selectedCell, rows, protection.isRowProtected]);
+  }, [selectedCell, selectedRows, rows, protection.isRowProtected]);
 
   const getSuggestedChartPreset = useCallback(
     (kind: any) => {
@@ -2344,12 +2399,57 @@ export default function SheetClient() {
     [columns, sheetColOps.persistColumns, broadcastSheetSnapshot],
   );
 
+  const getCellAndRowFormat = useCallback(
+    (selectedCell: { row: number; col: string } | null): CellFormat => {
+      if (!selectedCell) {
+        if (selectedRows && selectedRows.size > 0) {
+          const firstRowId = Array.from(selectedRows)[0];
+          return formatting.cellFormats[`row:${firstRowId}`] || {};
+        }
+        return {};
+      }
+      const cellKey = `${selectedCell.row}-${selectedCell.col}`;
+      const cellFormat = formatting.cellFormats[cellKey] || {};
+      const rowId = rows[selectedCell.row]?.id;
+      const rowFormat = rowId ? (formatting.cellFormats[`row:${rowId}`] || {}) : {};
+      return { ...rowFormat, ...cellFormat };
+    },
+    [formatting.cellFormats, rows, selectedRows],
+  );
+
   const handleFormatChange = useCallback(
     async (format: any) => {
       if (!canEditSheet) {
         showViewerEditMessage();
         return;
       }
+
+      // If we have selected rows, format all cells in those rows
+      if (selectedRows && selectedRows.size > 0) {
+        const ops: Promise<any>[] = [];
+        const updatedFormats = { ...formatting.cellFormats };
+
+        for (const rowId of Array.from(selectedRows)) {
+          const rowKey = `row:${rowId}`;
+          const currentFormat = formatting.cellFormats[rowKey] || {};
+          const merged = { ...currentFormat, ...format };
+          updatedFormats[rowKey] = merged;
+          ops.push(saveCellFormat(sheetId, rowKey, merged));
+        }
+
+        formatting.setCellFormats(updatedFormats);
+        markSaving();
+        try {
+          await Promise.all(ops);
+          toast.success("Applied format to selected row(s)");
+        } catch {
+          toast.error("Failed to persist some formats.");
+        }
+        broadcastSheetSnapshot({ cellFormats: updatedFormats });
+        markSaved();
+        return;
+      }
+
       if (selectedColumnKey) {
         await handleApplyColumnFormat(selectedColumnKey, format);
         toast.success("Applied format to entire column");
@@ -2398,7 +2498,8 @@ export default function SheetClient() {
     [
       canEditSheet, showViewerEditMessage, selectedCell, selectionRange, sheetId,
       markSaving, markSaved, formatting.applyFormat, formatting.getCurrentCellFormat,
-      columns, selectedColumnKey, handleApplyColumnFormat,
+      formatting.setCellFormats, columns, selectedColumnKey, handleApplyColumnFormat,
+      selectedRows, rows, formatting.cellFormats, saveCellFormat, broadcastSheetSnapshot,
     ],
   );
 
@@ -2686,34 +2787,46 @@ export default function SheetClient() {
       toast.error("Only the sheet owner can protect rows.");
       return;
     }
-    if (!selectedCell) {
+    const targetRowIds: string[] = [];
+    if (selectedCell) {
+      const row = rows[selectedCell.row];
+      if (row) targetRowIds.push(row.id);
+    } else if (selectedRows && selectedRows.size > 0) {
+      targetRowIds.push(...Array.from(selectedRows));
+    }
+
+    if (targetRowIds.length === 0) {
       toast.info("Select a row first to protect it");
       return;
     }
-    const rowIdx = selectedCell.row;
-    const row = rows[rowIdx];
-    if (!row) return;
-    const rowKey = protection.getRowKey(row.id);
-    const nextSet = new Set(protection.protectedCells);
-    const rowIsProtected = protection.isRowProtected(row.id);
+
     markSaving();
+    const nextSet = new Set(protection.protectedCells);
     try {
-      if (rowIsProtected) {
-        nextSet.delete(rowKey);
-        await unprotectRow(sheetId, rowKey);
-      } else {
-        nextSet.add(rowKey);
-        await protectRow(sheetId, rowKey);
-      }
+      const firstRowId = targetRowIds[0];
+      const shouldProtect = !protection.isRowProtected(firstRowId);
+
+      const ops = targetRowIds.map(async (rowId) => {
+        const rowKey = protection.getRowKey(rowId);
+        if (shouldProtect) {
+          nextSet.add(rowKey);
+          await protectRow(sheetId, rowKey);
+        } else {
+          nextSet.delete(rowKey);
+          await unprotectRow(sheetId, rowKey);
+        }
+      });
+
+      await Promise.all(ops);
       protection.setProtectedCells(nextSet);
-      toast.success(rowIsProtected ? "Row unlocked" : "Row protected");
+      toast.success(shouldProtect ? `${targetRowIds.length} row(s) protected` : `${targetRowIds.length} row(s) unlocked`);
     } catch (err) {
       console.error(err);
       toast.error("Failed to update row protection.");
     } finally {
       markSaved();
     }
-  }, [canProtectRows, selectedCell, rows, protection, sheetId, markSaving, markSaved]);
+  }, [canProtectRows, selectedCell, selectedRows, rows, protection, sheetId, markSaving, markSaved]);
 
   const handleTextWrapToggle = useCallback(async () => {
     if (!selectedCell) return;
@@ -3075,15 +3188,24 @@ export default function SheetClient() {
   );
 
   const handleTogglePinRow = useCallback(async () => {
-    if (!selectedCell) {
+    const targetRows: SheetRow[] = [];
+    if (selectedCell) {
+      const row = rows[selectedCell.row];
+      if (row) targetRows.push(row);
+    } else if (selectedRows && selectedRows.size > 0) {
+      targetRows.push(...rows.filter((r) => selectedRows.has(r.id)));
+    }
+
+    if (targetRows.length === 0) {
       toast.info("Select a row first");
       return;
     }
-    const row = rows[selectedCell.row];
-    if (!row) return;
-    const newPinned = !(row.pinned ?? false);
-    await handleUpdateRow(row.id, { pinned: newPinned });
-  }, [selectedCell, rows, handleUpdateRow]);
+
+    const firstRow = targetRows[0];
+    const newPinned = !(firstRow.pinned ?? false);
+    const ops = targetRows.map((r) => handleUpdateRow(r.id, { pinned: newPinned }));
+    await Promise.all(ops);
+  }, [selectedCell, selectedRows, rows, handleUpdateRow]);
 
   const handleApplyFormulaToColumn = useCallback(
     async (columnKey: string, formula: string) => {
@@ -4070,7 +4192,7 @@ export default function SheetClient() {
         );
       },
       renderSummaryCell(props: any) {
-        const rowIdx = activeRows.findIndex((r) => r.id === props.row.id);
+        const displayIdx = filteredRows.findIndex((r) => r.id === props.row.id);
         return (
           <div className="h-full w-full flex items-center justify-center sheet-row-num sheet-row-num--selected border-r">
             <span className="sheet-row-num-text">{rowIdx + 1}</span>
@@ -4219,40 +4341,16 @@ export default function SheetClient() {
                   if (!canEditSheet) { showViewerEditMessage(); return; }
                   const idx = columns.findIndex((c) => c.key === col.key);
                   sheetColOps.insertColumnAt(idx, null, "blank");
-                  setTimeout(async () => {
-                    markSaving();
-                    await Promise.all([
-                      saveAllColumns(sheetId, columnsHistory.currentState),
-                      saveAllRows(sheetId, rowsHistory.currentState),
-                    ]);
-                    markSaved();
-                  }, 50);
                 }}
                 onInsertRight={() => {
                   if (!canEditSheet) { showViewerEditMessage(); return; }
                   const idx = columns.findIndex((c) => c.key === col.key);
                   sheetColOps.insertColumnAt(idx + 1, null, "blank");
-                  setTimeout(async () => {
-                    markSaving();
-                    await Promise.all([
-                      saveAllColumns(sheetId, columnsHistory.currentState),
-                      saveAllRows(sheetId, rowsHistory.currentState),
-                    ]);
-                    markSaved();
-                  }, 50);
                 }}
                 onDuplicate={() => {
                   if (!canEditSheet) { showViewerEditMessage(); return; }
                   const idx = columns.findIndex((c) => c.key === col.key);
                   sheetColOps.insertColumnAt(idx + 1, col, "duplicate");
-                  setTimeout(async () => {
-                    markSaving();
-                    await Promise.all([
-                      saveAllColumns(sheetId, columnsHistory.currentState),
-                      saveAllRows(sheetId, rowsHistory.currentState),
-                    ]);
-                    markSaved();
-                  }, 50);
                 }}
                 onClearColumn={() =>
                   canEditSheet ? sheetColOps.clearColumnValues(col) : showViewerEditMessage()
@@ -4274,11 +4372,14 @@ export default function SheetClient() {
                   );
                   setSheetState((p) => ({ ...p, columns: updated }));
                   columnsHistory.pushState(updated);
-                  setTimeout(async () => {
-                    markSaving();
-                    await saveAllColumns(sheetId, columnsHistory.currentState);
-                    markSaved();
-                  }, 50);
+                  markSaving();
+                  saveAllColumns(sheetId, updated)
+                    .then(() => markSaved())
+                    .catch((err) => {
+                      console.error("Failed to save currency code change:", err);
+                      toast.error("Failed to save currency code change.");
+                      setSaveStatus("saved");
+                    });
                 }}
                 onApplyColumnFormat={(fmt) =>
                   canEditSheet ? handleApplyColumnFormat(col.key, fmt) : showViewerEditMessage()
@@ -4435,18 +4536,19 @@ export default function SheetClient() {
           //   col.key,
           //   props.row,
           // );
-          const layoutFlag = formatting.cellFormats[`${rowIdx}-${col.key}`]?.isLayoutRow;
+          // REPLACE WITH:
+          const layoutFlag = rowIdx <= 1 || (formatting.cellFormats[`${rowIdx}-${col.key}`]?.isLayoutRow ?? false);
           const mergedCellStyle = isMergeMaster
             ? {
               ...effectiveCellStyle,
               borderStyle: "none",
               borderColor: "transparent",
               borderWidth: 0,
-              ...(layoutFlag ? { isLayoutRow: true } : {}),
+              isLayoutRow: layoutFlag,
             }
             : {
               ...effectiveCellStyle,
-              ...(layoutFlag ? { isLayoutRow: true } : {}),
+              isLayoutRow: layoutFlag,
             };
           const inSelection =
             selectionRange && !mergeInfo?.hidden
@@ -4558,6 +4660,7 @@ export default function SheetClient() {
                 selectedCell.col === col.key
               }
               validationWarning={validationWarning}
+              isLayoutRow={!!layoutFlag}
             />
           );
         },
@@ -5265,7 +5368,7 @@ export default function SheetClient() {
           isImportingSheet={isImportingSheet}
           totalComments={totalComments}
           canEditSheet={canEditSheet}
-          canShareSheet={isOwner}
+         canShareSheet={!!currentUser}
           onTitleChange={handleTitleChange}
           onTitleBlur={handleTitleBlur}
           onStarredToggle={handleStarredToggle}
@@ -5305,7 +5408,7 @@ export default function SheetClient() {
           showSearch={showSearch}
           canUndo={rowsHistory.canUndo}
           canRedo={rowsHistory.canRedo}
-          currentFormat={formatting.getCurrentCellFormat(selectedCell)}
+          currentFormat={getCellAndRowFormat(selectedCell)}
           onUndo={rowsHistory.undo}
           onRedo={rowsHistory.redo}
           onZoomChange={(z) => setZoomLevel(Math.max(50, Math.min(200, z)))}
@@ -5323,14 +5426,15 @@ export default function SheetClient() {
           onPaste={handlePaste}
           onFontFamilyChange={(f) => {
             setFontFamily(f);
-            if (selectedCell) handleFormatChange({ fontFamily: f });
+            if (selectedCell || (selectedRows && selectedRows.size > 0)) handleFormatChange({ fontFamily: f });
           }}
           onFontSizeChange={(s) => {
             setFontSize(s);
-            if (selectedCell) handleFormatChange({ fontSize: Number(s) });
+            if (selectedCell || (selectedRows && selectedRows.size > 0)) handleFormatChange({ fontSize: Number(s) });
           }}
           onFormatChange={handleFormatChange}
           onCellTypeChange={handleSelectedCellTypeChange}
+          selectedRows={selectedRows}
           onTextWrapToggle={handleTextWrapToggle}
           onProtectionToggle={handleToggleRowProtection}
           onFormulaOpen={() => {
@@ -5379,11 +5483,13 @@ export default function SheetClient() {
               );
               setSheetState((p) => ({ ...p, columns: updated }));
               columnsHistory.pushState(updated);
-              setTimeout(async () => {
-                markSaving();
-                await saveAllColumns(sheetId, columnsHistory.currentState);
-                markSaved();
-              }, 50);
+              markSaving();
+              saveAllColumns(sheetId, updated)
+                .then(() => markSaved())
+                .catch((err) => {
+                  console.error("Failed to save column width:", err);
+                  setSaveStatus("saved");
+                });
             }
           }}
           onExpandAllColumns={(amount) => {
@@ -5393,11 +5499,13 @@ export default function SheetClient() {
             }));
             setSheetState((p) => ({ ...p, columns: updated }));
             columnsHistory.pushState(updated);
-            setTimeout(async () => {
-              markSaving();
-              await saveAllColumns(sheetId, columnsHistory.currentState);
-              markSaved();
-            }, 50);
+            markSaving();
+            saveAllColumns(sheetId, updated)
+              .then(() => markSaved())
+              .catch((err) => {
+                console.error("Failed to save column widths:", err);
+                setSaveStatus("saved");
+              });
           }}
           onDragResizeAllColumns={(amount) => {
             const updated = columns.map((c) => ({
@@ -5410,7 +5518,7 @@ export default function SheetClient() {
           onEndResizeAllColumns={() => {
             setTimeout(async () => {
               markSaving();
-              await saveAllColumns(sheetId, columnsHistory.currentState);
+              await saveAllColumns(sheetId, columnsHistory.stateRef.current).catch(console.error);
               markSaved();
             }, 50);
           }}
@@ -5573,7 +5681,11 @@ export default function SheetClient() {
           canProtectRows={canProtectRows}
           onTogglePinRow={handleTogglePinRow}
           selectedRowPinned={
-            selectedCell ? (rows[selectedCell.row]?.pinned ?? false) : false
+            selectedCell
+              ? (rows[selectedCell.row]?.pinned ?? false)
+              : (selectedRows && selectedRows.size > 0
+                ? (rows.find((r) => selectedRows.has(r.id))?.pinned ?? false)
+                : false)
           }
           onToggleDark={() => setIsDark(!isDark)}
           onToggleFreezeRows={handleToggleFreezeRows}
@@ -5974,12 +6086,21 @@ export default function SheetClient() {
         />
 
         {/* ── Modals ───────────────────────────────────────────────── */}
-        {isOrgSheet && isOwner && (
+       {currentUser && (
           <ShareDialog
             showShareDialog={showShareDialog}
             setShowShareDialog={setShowShareDialog}
             sheetId={sheetId}
             isDark={isDark}
+            organizations={userOrganizations}
+            currentOrg={sheetState.organizationId ? { id: sheetState.organizationId, name: sheetState.organizationName || "" } : undefined}
+            onShared={(orgId) => {
+              setSheetState((prev) => ({
+                ...prev,
+                isOrgSheet: true,
+                organizationId: orgId,
+              }));
+            }}
           />
         )}
 

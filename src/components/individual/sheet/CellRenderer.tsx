@@ -40,7 +40,9 @@ interface CellRendererProps {
   isAutoOverflowMaster?: boolean;
   isAutoOverflowCovered?: boolean;
   mergedHeight?: number;
+  isLayoutRow?: boolean;
 }
+
 
 export function CellRenderer({
   type,
@@ -71,14 +73,15 @@ export function CellRenderer({
   isAutoOverflowMaster,
   isAutoOverflowCovered,
   mergedHeight,
+  isLayoutRow,
 }: CellRendererProps) {
 
- // ── Resolve mergeMode once so both cellContent and outer div can use it ──
+  // ── Resolve mergeMode once so both cellContent and outer div can use it ──
   const mergeMode = (mergeStyle as any)?.__mergeMode as string | undefined;
 
   // ── If this is a layout/header row cell, force plain text rendering ──
   const effectiveType: ColumnDef["type"] =
-    (cellStyle as any)?.isLayoutRow ? "text" : type;
+    (isLayoutRow || (cellStyle as any)?.isLayoutRow) ? "text" : type;
 
   // ── Cell content by type ───────────────────────────────────────────────
   const cellContent = (() => {
@@ -90,7 +93,7 @@ export function CellRenderer({
       );
     }
 
-   switch (effectiveType) {
+    switch (effectiveType) {
       case "status":
       case "priority": {
         const opt = getStatusOptionStyle(String(displayValue ?? ""));

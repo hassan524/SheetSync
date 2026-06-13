@@ -1,5 +1,4 @@
-// hooks/useHistory.ts
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 // types are imported from @/types when needed
 
 export function useHistory<T>(initialState: T) {
@@ -7,9 +6,12 @@ export function useHistory<T>(initialState: T) {
   const [history, setHistory] = useState<T[]>([initialState]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
+  const stateRef = useRef<T>(initialState);
+
   // Add new state to history
   const pushState = useCallback(
     (newState: T) => {
+      stateRef.current = newState;
       setHistory((prev) => {
         // Remove any future states if we're not at the end
         const newHistory = prev.slice(0, historyIndex + 1);
@@ -25,6 +27,7 @@ export function useHistory<T>(initialState: T) {
   const undo = useCallback(() => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
+      stateRef.current = history[newIndex];
       setHistoryIndex(newIndex);
       setCurrentState(history[newIndex]);
     }
@@ -34,6 +37,7 @@ export function useHistory<T>(initialState: T) {
   const redo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       const newIndex = historyIndex + 1;
+      stateRef.current = history[newIndex];
       setHistoryIndex(newIndex);
       setCurrentState(history[newIndex]);
     }
@@ -45,6 +49,7 @@ export function useHistory<T>(initialState: T) {
 
   // Reset history
   const resetHistory = useCallback((newState: T) => {
+    stateRef.current = newState;
     setHistory([newState]);
     setHistoryIndex(0);
     setCurrentState(newState);
@@ -52,6 +57,7 @@ export function useHistory<T>(initialState: T) {
 
   return {
     currentState,
+    stateRef,
     pushState,
     undo,
     redo,
@@ -60,4 +66,5 @@ export function useHistory<T>(initialState: T) {
     resetHistory,
   };
 }
+
 

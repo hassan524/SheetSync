@@ -366,6 +366,7 @@ export interface SheetState {
   updatedAt: string | null;
   ownerId: string | null;
   organizationId: string | null;
+  organizationName?: string | null;
   starred: boolean;
   rows: SheetRow[];
   columns: ColumnDef[];

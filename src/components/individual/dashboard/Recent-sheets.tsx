@@ -59,7 +59,7 @@ const SheetIcon = () => (
     style={{ width: 22, height: 28, background: "#1a7340" }}
   >
     <svg viewBox="0 0 14 18" fill="none" width="14" height="17">
-      <rect x="2.5" y="6"   width="9" height="1.1" fill="white" fillOpacity="0.9" />
+      <rect x="2.5" y="6" width="9" height="1.1" fill="white" fillOpacity="0.9" />
       <rect x="2.5" y="8.7" width="9" height="1.1" fill="white" fillOpacity="0.9" />
       <rect x="2.5" y="11.4" width="6" height="1.1" fill="white" fillOpacity="0.9" />
       <path d="M9 1 L13 5 L9 5 Z" fill="white" fillOpacity="0.3" />
@@ -329,18 +329,32 @@ const RecentSheets = () => {
     (async () => {
       try {
         const data = await getRecentSheets();
+
+        // Sort by latest edited (just in case backend doesn't)
+        const sorted = data.sort(
+          (a: any, b: any) =>
+            new Date(b.lastEdited).getTime() - new Date(a.lastEdited).getTime()
+        );
+
+        // Take only last 10
+        const last10 = sorted.slice(0, 10);
+
         setRecentSheets(
-          data.map((sheet: any) => ({
+          last10.map((sheet: any) => ({
             id: sheet.id,
             title: sheet.title,
             rawDate: sheet.lastEdited,
             ownerName: sheet.owner?.name ?? sheet.ownerName ?? "Me",
-            ownerAvatar: sheet.owner?.avatar_url ?? sheet.owner?.avatar ?? sheet.ownerAvatar ?? undefined,
+            ownerAvatar:
+              sheet.owner?.avatar_url ??
+              sheet.owner?.avatar ??
+              sheet.ownerAvatar ??
+              undefined,
             templateId: sheet.templateId,
             isOrganization: sheet.isOrganization,
             organizationName: sheet.organization?.name,
             folderName: sheet.folder?.name,
-          })),
+          }))
         );
       } finally {
         setLoading(false);
@@ -355,8 +369,8 @@ const RecentSheets = () => {
         {loading
           ? Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
           : recentSheets.length === 0
-          ? <EmptyState />
-          : recentSheets.map((sheet) => (
+            ? <EmptyState />
+            : recentSheets.map((sheet) => (
               <SheetTableRow
                 key={sheet.id}
                 sheet={sheet}
