@@ -279,16 +279,17 @@ export function TitleBar({
             <DropdownMenuSeparator style={{ background: isDark ? "#1e2330" : "#e8eaed" }} />
             {(
               [
-                ["csv", "CSV (.csv)", FileSpreadsheet],
-                ["xlsx", "Excel (.xlsx)", Layers],
-                ["pdf", "PDF (.pdf)", Printer],
-                ["json", "JSON (.json)", Code2],
+                ["csv", "CSV (.csv)", FileSpreadsheet, false],
+                ["xlsx", "Excel (.xlsx) (Under Work)", Layers, true],
+                ["pdf", "PDF (.pdf)", Printer, false],
+                ["json", "JSON (.json)", Code2, false],
               ] as const
-            ).map(([fmt, label, Icon]) => (
+            ).map(([fmt, label, Icon, disabled]) => (
               <DropdownMenuItem
                 key={fmt}
-                onClick={() => onExport(fmt)}
-                className="text-xs"
+                onClick={() => !disabled && onExport(fmt)}
+                className={`text-xs ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                disabled={disabled}
                 style={ddItemStyle(isDark)}
               >
                 <Icon className="h-3 w-3" />

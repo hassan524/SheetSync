@@ -120,6 +120,7 @@ const FilesList: React.FC<FilesListProps> = ({ sheets: initialSheets }) => {
         onRenamed={handleRenamed}
         emptyText="No files found"
         emptyDescription="Your sheets and organization sheets will appear here."
+        hidePrivate={true}
       />
     </>
   );

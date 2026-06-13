@@ -16,9 +16,9 @@ export const metadata = generateSEO({
 const ImportPage = async () => {
   return (
     <DashboardLayout breadcrumbItems={["SheetSync", "Import"]}>
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        <section className="w-full rounded-lg border border-dashed border-border bg-card p-6 sm:p-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+      <div className="mx-auto max-w-4xl px-4 py-4 sm:py-6">
+        <section className="w-full rounded-lg border border-dashed border-border bg-card p-4 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <UploadCloud className="h-6 w-6 text-primary" />
             </div>
@@ -27,16 +27,16 @@ const ImportPage = async () => {
               <div>
                 <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Import is temporarily disabled
+                  Excel Import & Export are currently under work
                 </div>
                 <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-                  Real Excel import is in progress
+                  Excel Import & Export is under development
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  I am working on making this realistic so users can import real
-                  Excel and CSV files into SheetSync without losing sheet data,
-                  formulas, formatting, or workspace context. Uploads are paused
-                  for now while that flow is being finished.
+                  We are working on making this realistic so users can import and export real
+                  Excel files into SheetSync without losing sheet data, formulas, formatting, 
+                  or workspace context. Spreadsheet uploads and downloads are paused for now 
+                  while that flow is being finished.
                 </p>
               </div>
 

@@ -40,6 +40,7 @@ interface SheetsTableProps {
   onRenamed?: (id: string, title: string) => void;
   emptyText?: string;
   emptyDescription?: string;
+  hidePrivate?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -137,7 +138,7 @@ const RowMenu = ({
             className={cn(
               "h-7 w-7 shrink-0 flex items-center justify-center rounded-md text-muted-foreground",
               "hover:bg-accent hover:text-foreground transition-colors focus:outline-none",
-              open ? "opacity-100" : "opacity-0 group-hover/row:opacity-100",
+              open ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100",
             )}
             onClick={(e) => e.stopPropagation()}
           >
@@ -226,12 +227,13 @@ const RowMenu = ({
 /*  Row Component                                                      */
 /* ------------------------------------------------------------------ */
 const SheetTableRow = ({
-  sheet, onDeleted, onRenamed, onClick,
+  sheet, onDeleted, onRenamed, onClick, hidePrivate,
 }: {
   sheet: SheetRow;
   onDeleted: (id: string) => void;
   onRenamed: (id: string, title: string) => void;
   onClick: (id: string) => void;
+  hidePrivate?: boolean;
 }) => {
   const [starred, setStarred] = useState(sheet.isStarred);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -274,13 +276,28 @@ const SheetTableRow = ({
       {/* Icon */}
       <SheetIcon />
 
-      {/* Name — flex-1, truncate */}
-      <span className="flex-1 truncate text-sm font-normal ml-2.5 mr-4" style={{ minWidth: 0 }}>
-        {sheet.title}
-      </span>
+      {/* Name block — left-aligned */}
+      <div className="flex items-center min-w-0 flex-[1.5] md:flex-[1.5] mr-2 md:mr-4">
+        <span className="whitespace-nowrap text-sm font-normal ml-2.5">
+          {sheet.title}
+        </span>
+      </div>
 
-      {/* Center block — members avatars (avaa and me in center) */}
-      <div className="flex-1 hidden md:flex items-center justify-center min-w-0 px-4">
+      {/* Owner block — left-aligned on mobile, centered on desktop */}
+      <div className="flex-1 flex items-center justify-start md:justify-center min-w-0 px-2 md:px-4">
+        <div className="flex items-center gap-2.5">
+          <Avatar name={owner} url={sheet.ownerAvatar} />
+          <div style={{ minWidth: 90 }} className="text-left">
+            <p className="text-xs font-medium leading-tight whitespace-nowrap">{owner}</p>
+            <p className="text-[11px] text-muted-foreground leading-tight whitespace-nowrap mt-0.5">
+              {formatDate(sheet.rawDate)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Center block — members avatars (avaa and me in center-right) */}
+      <div className="flex-[1] hidden md:flex items-center justify-center min-w-0 px-4">
         {sheet.isOrganization ? (
           <div className="flex -space-x-1.5 overflow-hidden">
             {sheet.members.slice(0, 3).map((member, i) => (
@@ -298,36 +315,24 @@ const SheetTableRow = ({
               </div>
             )}
           </div>
-        ) : (
+        ) : hidePrivate ? null : (
           <span className="inline-flex rounded-md bg-secondary/80 px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground whitespace-nowrap select-none">
             Private
           </span>
         )}
       </div>
 
-      {/* Owner block — never shrinks, always full width */}
-      <div className="flex items-center gap-2.5" style={{ flexShrink: 0 }}>
-        <Avatar name={owner} url={sheet.ownerAvatar} />
-        <div style={{ minWidth: 90 }}>
-          <p className="text-xs font-medium leading-tight whitespace-nowrap">{owner}</p>
-          <p className="text-[11px] text-muted-foreground leading-tight whitespace-nowrap mt-0.5">
-            {formatDate(sheet.rawDate)}
-          </p>
-        </div>
+      {/* Three-dot container — normal (not sticky) on the right side */}
+      <div className="shrink-0 flex items-center justify-end w-10 pr-2 pl-2">
+        <RowMenu
+          sheet={sheet}
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          onDeleted={onDeleted}
+          onRenamed={onRenamed}
+          onOpen={onClick}
+        />
       </div>
-
-      {/* Gap before dots */}
-      <div className="w-3 shrink-0" />
-
-      {/* Three-dot */}
-      <RowMenu
-        sheet={sheet}
-        open={menuOpen}
-        onOpenChange={setMenuOpen}
-        onDeleted={onDeleted}
-        onRenamed={onRenamed}
-        onOpen={onClick}
-      />
     </div>
   );
 };
@@ -341,6 +346,7 @@ const SheetsTable: React.FC<SheetsTableProps> = ({
   onRenamed,
   emptyText = "No sheets yet",
   emptyDescription = "Spreadsheets will appear here.",
+  hidePrivate = false,
 }) => {
   const router = useRouter();
 
@@ -385,7 +391,7 @@ const SheetsTable: React.FC<SheetsTableProps> = ({
 
   if (mappedSheets.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-14 gap-3 text-center border rounded-xl bg-card/30">
+      <div className="flex flex-col items-center justify-center py-14 gap-3 text-center border rounded-xl bg-card/30 min-h-[300px]">
         <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
           <FileSpreadsheet className="h-6 w-6 text-primary/50" />
         </div>
@@ -398,16 +404,19 @@ const SheetsTable: React.FC<SheetsTableProps> = ({
   }
 
   return (
-    <div className="flex flex-col">
-      {mappedSheets.map((sheet) => (
-        <SheetTableRow
-          key={sheet.id}
-          sheet={sheet}
-          onDeleted={(id) => onDeleted?.(id)}
-          onRenamed={(id, title) => onRenamed?.(id, title)}
-          onClick={(id) => router.push(`/sheet/${id}`)}
-        />
-      ))}
+    <div className="w-full overflow-x-auto styled-scrollbar">
+      <div className="flex flex-col min-h-[300px] min-w-[480px] md:min-w-0">
+        {mappedSheets.map((sheet) => (
+          <SheetTableRow
+            key={sheet.id}
+            sheet={sheet}
+            onDeleted={(id) => onDeleted?.(id)}
+            onRenamed={(id, title) => onRenamed?.(id, title)}
+            onClick={(id) => router.push(`/sheet/${id}`)}
+            hidePrivate={hidePrivate}
+          />
+        ))}
+      </div>
     </div>
   );
 };
