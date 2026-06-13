@@ -504,6 +504,12 @@ export async function getRecentSheets(limit?: number) {
       id, title, template_id, is_starred,
       created_at, updated_at, last_opened_at,
       organization_id, size_mb,
+      owner:profiles!sheets_owner_id_fkey (
+        id,
+        name,
+        email,
+        avatar_url
+      ),
       organizations (
         id,
         name,
@@ -563,6 +569,11 @@ export async function getRecentSheets(limit?: number) {
           })),
         }
         : null,
+      owner: {
+        name: sheet.owner?.name ?? "Unknown",
+        email: sheet.owner?.email ?? "",
+        avatar: sheet.owner?.avatar_url ?? undefined,
+      },
       folder: null,
       rowsCount: sheet.rows?.length ?? 0,
       colsCount: sheet.columns?.length ?? 0,
@@ -585,6 +596,12 @@ export async function getStarredSheets() {
       id, title, template_id, is_starred,
       created_at, updated_at, last_opened_at,
       organization_id, size_mb,
+      owner:profiles!sheets_owner_id_fkey (
+        id,
+        name,
+        email,
+        avatar_url
+      ),
       organizations (
         id,
         name,
@@ -634,6 +651,11 @@ export async function getStarredSheets() {
           })),
         }
         : null,
+      owner: {
+        name: sheet.owner?.name ?? "Unknown",
+        email: sheet.owner?.email ?? "",
+        avatar: sheet.owner?.avatar_url ?? undefined,
+      },
       folder: null,
       rowsCount: sheet.rows?.length ?? 0,
       colsCount: sheet.columns?.length ?? 0,
