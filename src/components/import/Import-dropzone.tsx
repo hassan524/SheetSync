@@ -36,10 +36,7 @@ interface OrganizationOption {
   name: string;
 }
 
-interface FolderOption {
-  id: string;
-  name: string;
-}
+
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -50,10 +47,8 @@ const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
 
 const ImportDropzone = ({
   organizations = [],
-  folders = [],
 }: {
   organizations?: OrganizationOption[];
-  folders?: FolderOption[];
 }) => {
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
@@ -62,7 +57,6 @@ const ImportDropzone = ({
   const [destinationType, setDestinationType] = useState<
     "skip" | "personal" | "organization"
   >("skip");
-  const [selectedFolderId, setSelectedFolderId] = useState("");
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
 
   const handleDestinationTypeChange = (
@@ -70,16 +64,13 @@ const ImportDropzone = ({
   ) => {
     setDestinationType(type);
     if (type === "skip") {
-      setSelectedFolderId("");
       setSelectedOrganizationId("");
       return;
     }
     if (type === "personal") {
       setSelectedOrganizationId("");
-      setSelectedFolderId((prev) => prev || folders[0]?.id || "");
       return;
     }
-    setSelectedFolderId("");
     setSelectedOrganizationId((prev) => prev || organizations[0]?.id || "");
   };
 
@@ -186,10 +177,7 @@ const ImportDropzone = ({
           const created = await createSheet({
             name: title,
             templateId: BLANK_TEMPLATE_ID,
-            folder_id:
-              destinationType === "personal" && selectedFolderId
-                ? selectedFolderId
-                : undefined,
+            folder_id: undefined,
             organizationId:
               destinationType === "organization" && selectedOrganizationId
                 ? selectedOrganizationId
@@ -242,7 +230,7 @@ const ImportDropzone = ({
 
       setBusy(false);
     },
-    [destinationType, router, selectedFolderId, selectedOrganizationId],
+    [destinationType, router, selectedOrganizationId],
   );
 
   const handleDrop = useCallback(
@@ -276,7 +264,7 @@ const ImportDropzone = ({
           <p className="text-sm font-medium">Import destination</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             By default the imported sheet opens now and appears in Recent. You
-            can also save it to a personal folder or organization.
+            can also save it as a sheet in your workspace or to an organization.
           </p>
         </div>
 
@@ -287,14 +275,14 @@ const ImportDropzone = ({
                 type: "skip" as const,
                 icon: FileSpreadsheet,
                 label: "Recent only",
-                sub: "Open now without a folder",
+                sub: "Open now without saving to workspace",
                 disabled: organizations.length === 0,
 
               },
               {
                 type: "personal" as const,
                 icon: User,
-                label: "Personal",
+                label: "Sheet",
                 sub: "Save in my workspace",
                 disabled: organizations.length === 0,
 
@@ -330,29 +318,7 @@ const ImportDropzone = ({
           ))}
         </div>
 
-        {destinationType === "personal" &&
-          (folders.length > 0 ? (
-            <label className="block">
-              <span className="text-xs font-medium">Personal folder</span>
-              <select
-                className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/25"
-                value={selectedFolderId}
-                onChange={(e) => setSelectedFolderId(e.target.value)}
-                disabled={busy}
-              >
-                {folders.map((folder) => (
-                  <option key={folder.id} value={folder.id}>
-                    {folder.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              <Folder className="h-4 w-4" />
-              Create a personal folder first, or use No folder.
-            </div>
-          ))}
+
 
         {destinationType === "organization" && (
           <label className="block">

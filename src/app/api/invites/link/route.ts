@@ -38,53 +38,63 @@ export async function POST(req: NextRequest) {
 
     const { data: sheet, error: sheetError } = sheetId
       ? await supabase
-          .from("sheets")
-          .select("id, title, organization_id")
-          .eq("id", sheetId)
-          .maybeSingle()
+        .from("sheets")
+        .select("id, title, organization_id, owner_id")
+        .eq("id", sheetId)
+        .maybeSingle()
       : { data: null, error: null };
 
-    if (sheetId && (sheetError || !sheet?.organization_id)) {
+    if (sheetId && (sheetError || !sheet)) {
       return NextResponse.json(
-        { error: "Organization sheet not found" },
+        { error: "Sheet not found" },
         { status: 404 },
       );
     }
 
     const organizationId = sheet?.organization_id ?? orgId;
-    if (!organizationId) {
-      return NextResponse.json(
-        { error: "Organization ID is required" },
-        { status: 400 },
-      );
+
+    if (sheetId && !sheet?.organization_id) {
+      // No org — just check ownership, generate a direct sheet link
+      if (!sheet || sheet.owner_id !== user.id) {
+        return NextResponse.json(
+          { error: "Only the sheet owner can share this sheet" },
+          { status: 403 },
+        );
+      }
     }
 
-    const { data: inviterMember, error: memberError } = await supabase
-      .from("organization_members")
-      .select("role, organizations(name)")
-      .eq("organization_id", organizationId)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    let inviterOrgName = sheet?.title ?? "Sheet";
 
-    if (memberError || !inviterMember) {
-      return NextResponse.json(
-        { error: "You are not a member of this organization" },
-        { status: 403 },
-      );
-    }
+    if (organizationId) {
+      const { data: inviterMember, error: memberError } = await supabase
+        .from("organization_members")
+        .select("role, organizations(name)")
+        .eq("organization_id", organizationId)
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    if (inviterMember.role !== "owner") {
-      return NextResponse.json(
-        { error: "Only the organization owner can create share links" },
-        { status: 403 },
-      );
+      if (memberError || !inviterMember) {
+        return NextResponse.json(
+          { error: "You are not a member of this organization" },
+          { status: 403 },
+        );
+      }
+
+      if (inviterMember.role !== "owner") {
+        return NextResponse.json(
+          { error: "Only the organization owner can create share links" },
+          { status: 403 },
+        );
+      }
+
+      inviterOrgName = (inviterMember as any).organizations?.name ?? inviterOrgName;
     }
 
     const token = randomUUID();
     const { error: insertError } = await supabase
       .from("organization_invites")
       .insert({
-        organization_id: organizationId,
+        organization_id: organizationId ?? "00000000-0000-0000-0000-000000000000",
         email: `link-${token}@sheetsync.local`,
         role,
         token,
@@ -110,7 +120,7 @@ export async function POST(req: NextRequest) {
       sheet_id: sheetId ?? null,
       organization_id: organizationId,
       action: "created share link",
-      target: sheet?.title ?? (inviterMember as any).organizations?.name ?? "Organization",
+      target: inviterOrgName,
     });
 
     const origin =

@@ -59,47 +59,73 @@ export async function POST(req: NextRequest) {
     let orgId = requestedOrgId;
     let sheetTitle = "";
 
-    if (!orgId && sheetId) {
+    if (sheetId) {
       const { data: sheet, error: sheetError } = await supabase
         .from("sheets")
-        .select("title, organization_id")
+        .select("title, organization_id, owner_id")
         .eq("id", sheetId)
         .maybeSingle();
 
-      if (sheetError || !sheet?.organization_id) {
+      if (sheetError || !sheet) {
         return NextResponse.json(
-          { error: "Organization sheet not found" },
+          { error: "Sheet not found" },
           { status: 404 },
         );
       }
 
-      orgId = sheet.organization_id;
       sheetTitle = sheet.title ?? "";
+
+      if (sheet.organization_id) {
+        if (orgId && orgId !== sheet.organization_id) {
+          return NextResponse.json(
+            { error: "Requested organization does not match the sheet's organization" },
+            { status: 400 },
+          );
+        }
+        orgId = sheet.organization_id;
+      }
     }
 
-    const { data: inviterMember, error: inviterMemberError } = await supabase
-      .from("organization_members")
-      .select("role, organizations(name)")
-      .eq("organization_id", orgId)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    let orgName = "your sheet";
 
-    if (inviterMemberError || !inviterMember) {
-      return NextResponse.json(
-        { error: "You are not a member of this organization" },
-        { status: 403 },
-      );
+    if (orgId) {
+      const { data: inviterMember, error: inviterMemberError } = await supabase
+        .from("organization_members")
+        .select("role, organizations(name)")
+        .eq("organization_id", orgId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (inviterMemberError || !inviterMember) {
+        return NextResponse.json(
+          { error: "You are not a member of this organization" },
+          { status: 403 },
+        );
+      }
+
+      if (inviterMember.role !== "owner") {
+        return NextResponse.json(
+          { error: "Only the organization owner can invite members" },
+          { status: 403 },
+        );
+      }
+
+      orgName = (inviterMember as any).organizations?.name ?? "your organization";
+    } else {
+      // No org — verify sheet ownership
+      const { data: sheetCheck } = await supabase
+        .from("sheets")
+        .select("owner_id")
+        .eq("id", sheetId)
+        .maybeSingle();
+
+      if (sheetCheck?.owner_id !== user.id) {
+        return NextResponse.json(
+          { error: "Only the sheet owner can invite collaborators" },
+          { status: 403 },
+        );
+      }
     }
-
-    if (inviterMember.role !== "owner") {
-      return NextResponse.json(
-        { error: "Only the organization owner can invite members" },
-        { status: 403 },
-      );
-    }
-
-    const orgName =
-      (inviterMember as any).organizations?.name ?? "your organization";
 
     const results: any[] = [];
 
@@ -210,9 +236,9 @@ export async function POST(req: NextRequest) {
 
       const inviteWrite = existingInvite
         ? await supabase
-            .from("organization_invites")
-            .update(invitePayload)
-            .eq("id", existingInvite.id)
+          .from("organization_invites")
+          .update(invitePayload)
+          .eq("id", existingInvite.id)
         : await supabase.from("organization_invites").insert(invitePayload);
 
       const insertError = inviteWrite.error;

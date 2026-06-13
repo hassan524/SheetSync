@@ -243,7 +243,7 @@ export function TitleBar({
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs sheet-tooltip">
               <p className="font-semibold">{currentUser.name}</p>
-              <p className="text-gray-400 text-[10px]">Personal sheet</p>
+              <p className="text-gray-400 text-[10px]">Sheet</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -298,7 +298,7 @@ export function TitleBar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {isOrgSheet && canShareSheet && (
+        {canShareSheet && (
           <button
             className="sheet-btn-primary flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-3 rounded-md text-[11.5px] font-semibold transition-all shrink-0"
             onClick={onShareClick}

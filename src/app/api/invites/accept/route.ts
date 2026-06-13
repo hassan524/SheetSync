@@ -76,19 +76,23 @@ export async function POST(req: NextRequest) {
       });
 
       if (!orgId) {
-        console.error(
-          "❌ [INVITE] Sheet has no organization_id. Sheet is personal:",
-          sheet.is_personal,
-        );
-        return NextResponse.json(
-          {
-            error:
-              "This sheet does not belong to an organization. Only org sheets can be shared via invite link.",
-          },
-          { status: 400 },
-        );
-      }
+        // Sheet has no org — add user directly as sheet collaborator and return
+        const { error: collabError } = await admin
+          .from("sheet_members")
+          .upsert({
+            sheet_id: sheetId,
+            user_id: user.id,
+            role: role || "viewer",
+            joined_at: new Date().toISOString(),
+          }, { onConflict: "sheet_id,user_id" });
 
+        if (collabError) {
+          console.error("❌ [INVITE] Failed to add sheet member:", collabError);
+          return NextResponse.json({ error: "Failed to join sheet" }, { status: 500 });
+        }
+
+        return NextResponse.json({ role: role || "viewer", inviterName: null });
+      }
       // ── Step 2: Verify org exists ────────────────────────────────────────
       const { data: org, error: orgError } = await admin
         .from("organizations")

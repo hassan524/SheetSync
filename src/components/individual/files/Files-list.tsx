@@ -81,7 +81,7 @@ const FilesList: React.FC<FilesListProps> = ({ sheets: initialSheets }) => {
               },
               {
                 key: "personal",
-                label: "Private",
+                label: "Sheets",
                 count: personalCount,
                 icon: User,
               },
@@ -119,7 +119,7 @@ const FilesList: React.FC<FilesListProps> = ({ sheets: initialSheets }) => {
         onDeleted={handleDeleted}
         onRenamed={handleRenamed}
         emptyText="No files found"
-        emptyDescription="Your personal and organization sheets will appear here."
+        emptyDescription="Your sheets and organization sheets will appear here."
       />
     </>
   );

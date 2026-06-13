@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import {
   Building2,
   FileSpreadsheet,
-  FolderPlus,
   Upload,
   Users,
 } from "lucide-react";
@@ -20,11 +19,6 @@ const GUIDE_COUNT_KEY = "sheetsync-dashboard-guide-count";
 const GUIDE_MAX_SHOWS = 2;
 
 const steps = [
-  {
-    icon: FolderPlus,
-    title: "Start with folders",
-    text: "Keep personal sheets grouped by project, client, class, or anything else you work on.",
-  },
   {
     icon: FileSpreadsheet,
     title: "Create or import sheets",
@@ -43,7 +37,7 @@ const steps = [
   {
     icon: Upload,
     title: "Recent keeps things handy",
-    text: "Imported sheets can stay outside folders at first. They still show in Recent so you can organize them later.",
+    text: "View recently edited spreadsheets or import files directly in one central view.",
   },
 ];
 

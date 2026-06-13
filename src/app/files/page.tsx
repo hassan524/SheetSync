@@ -12,7 +12,7 @@ import { Folder, Info, FileSpreadsheet, Star, Users } from "lucide-react";
 export const metadata = generateSEO({
   title: "All Files — Browse Spreadsheets",
   description:
-    "Browse every spreadsheet you own or collaborate on — personal and organizational — in one unified view.",
+    "Browse every spreadsheet you own or collaborate on — sheets and organizational — in one unified view.",
   path: "/files",
 });
 
@@ -59,7 +59,7 @@ export default async function AllFilesPage() {
           <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              All Files shows every spreadsheet you own or have access to, across your private sheets and organizations.
+              All Files shows every spreadsheet you own or have access to, across your sheets and organizations.
               Use the search to quickly find what you need.
             </p>
           </div>

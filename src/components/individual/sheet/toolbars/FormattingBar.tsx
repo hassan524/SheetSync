@@ -66,6 +66,7 @@ interface FormattingBarProps {
   isMergedSelection?: boolean;
   onMergeSelection?: (mode: "all" | "across" | "down" | "center") => void;
   onUnmergeSelection?: () => void;
+  selectedRows?: Set<string>;
 }
 
 const FONT_FAMILIES = [
@@ -87,6 +88,7 @@ export function FormattingBar({
   selectedColumnKey, selectedColumnWidth, onSetColumnWidth, onExpandAllColumns,
   onDragResizeAllColumns, onEndResizeAllColumns, onOpenValidation,
   canMergeSelection = false, isMergedSelection = false, onMergeSelection, onUnmergeSelection,
+  selectedRows,
 }: FormattingBarProps) {
   const selStyle = ddStyle(isDark);
 
@@ -194,7 +196,7 @@ export function FormattingBar({
         <ToolSep />
 
         {/* Font family */}
-        <Select value={fontFamily} onValueChange={onFontFamilyChange}>
+        <Select value={fontFamily} onValueChange={onFontFamilyChange} disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}>
           <SelectTrigger
             className="sheet-select h-[22px] w-[84px] text-[10px] rounded px-1.5 shrink-0"
             style={selStyle}
@@ -211,7 +213,7 @@ export function FormattingBar({
         </Select>
 
         {/* Font size */}
-        <Select value={fontSize} onValueChange={onFontSizeChange}>
+        <Select value={fontSize} onValueChange={onFontSizeChange} disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}>
           <SelectTrigger
             className="sheet-select h-[22px] w-[42px] text-[10px] rounded px-1.5 ml-0.5 shrink-0"
             style={selStyle}
@@ -240,7 +242,7 @@ export function FormattingBar({
         <FormattingToolbar
           currentFormat={currentFormat}
           onFormatChange={onFormatChange}
-          disabled={!selectedCell}
+          disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}
         />
         <ToolSep />
 
@@ -249,14 +251,14 @@ export function FormattingBar({
           icon={WrapText}
           tooltip="Text Wrap"
           onClick={onTextWrapToggle}
-          disabled={!selectedCell}
+          disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}
           active={isSelectedColumnWrapped}
         />
         <IconBtn
           icon={isProtected ? Lock : Unlock}
           tooltip={canProtectRows ? "Protect row" : "Owner only"}
           onClick={onProtectionToggle}
-          disabled={!selectedCell || !canProtectRows}
+          disabled={(!selectedCell && (!selectedRows || selectedRows.size === 0)) || !canProtectRows}
           active={isProtected}
         />
         <ToolSep />

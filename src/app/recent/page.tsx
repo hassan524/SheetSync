@@ -12,7 +12,7 @@ import { Clock, FileSpreadsheet, Info } from "lucide-react";
 export const metadata = generateSEO({
   title: "Recent — Activity",
   description:
-    "View your most recently opened and edited spreadsheets across all your organizations and personal folders.",
+    "View your most recently opened and edited spreadsheets across all your sheets and organizations.",
   path: "/recent",
 });
 
@@ -78,7 +78,7 @@ export default async function RecentPage() {
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 This page shows spreadsheets you&apos;ve opened or modified in
-                the last 30 days — across your private sheets and your
+                the last 30 days — across your sheets and
                 organizations. Sheets are sorted by most recently accessed.
               </p>
             </div>
