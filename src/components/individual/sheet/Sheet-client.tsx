@@ -4195,7 +4195,7 @@ export default function SheetClient() {
         const displayIdx = filteredRows.findIndex((r) => r.id === props.row.id);
         return (
           <div className="h-full w-full flex items-center justify-center sheet-row-num sheet-row-num--selected border-r">
-            <span className="sheet-row-num-text">{rowIdx + 1}</span>
+            <span className="sheet-row-num-text">{displayIdx + 1}</span>
           </div>
         );
       },
@@ -5368,7 +5368,7 @@ export default function SheetClient() {
           isImportingSheet={isImportingSheet}
           totalComments={totalComments}
           canEditSheet={canEditSheet}
-         canShareSheet={!!currentUser}
+          canShareSheet={!!currentUser}
           onTitleChange={handleTitleChange}
           onTitleBlur={handleTitleBlur}
           onStarredToggle={handleStarredToggle}
@@ -6086,7 +6086,7 @@ export default function SheetClient() {
         />
 
         {/* ── Modals ───────────────────────────────────────────────── */}
-       {currentUser && (
+        {currentUser && (
           <ShareDialog
             showShareDialog={showShareDialog}
             setShowShareDialog={setShowShareDialog}
