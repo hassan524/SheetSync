@@ -1,5 +1,5 @@
 "use client";
-
+import React from "react";
 import {
   useState, useCallback, useMemo, useRef, useEffect, startTransition,
 } from "react";
@@ -526,6 +526,71 @@ function getValidationDropdownOptions(rules: any): string[] {
   const dropdownRule = getValidationRuleList(rules).find((rule) => rule.type === "dropdown");
   return dropdownRule?.options ?? [];
 }
+
+const UncontrolledInput = React.forwardRef<HTMLInputElement, any>(
+  ({ initialValue, onValueChange, ...props }, ref) => {
+    return (
+      <input
+        {...props}
+        ref={ref}
+        defaultValue={initialValue}
+        onChange={(e) => {
+          if (onValueChange) onValueChange(e);
+        }}
+      />
+    );
+  }
+);
+UncontrolledInput.displayName = "UncontrolledInput";
+
+const EditCellWrapper: React.FC<{
+  children: React.ReactNode;
+  isTall?: boolean;
+  isMergeMaster?: boolean;
+  editWidth?: number;
+  editHeight?: number;
+  cellStyle: React.CSSProperties;
+  isDark: boolean;
+}> = ({ children, isTall, isMergeMaster, editWidth, editHeight, cellStyle, isDark }) => (
+  <div
+    className={isMergeMaster ? "sheet-cell-merge-master sheet-cell-active-selected" : ""}
+    style={{
+      position: isMergeMaster ? "absolute" : "relative",
+      top: 0,
+      left: 0,
+      width: isMergeMaster ? editWidth ?? "100%" : "100%",
+      height: isMergeMaster ? editHeight ?? "100%" : "100%",
+      zIndex: isMergeMaster ? 9 : 1,
+      boxSizing: "border-box",
+      background:
+        cellStyle.backgroundColor && cellStyle.backgroundColor !== "transparent"
+          ? cellStyle.backgroundColor
+          : isDark
+            ? "#131620"
+            : "#ffffff",
+      overflow: isTall ? "hidden" : "visible",
+      border: isMergeMaster ? "1px solid var(--sh-border, #e8eaed)" : "none",
+    }}
+  >
+    {children}
+  </div>
+);
+
+const UncontrolledTextarea = React.forwardRef<HTMLTextAreaElement, any>(
+  ({ initialValue, onValueChange, ...props }, ref) => {
+    return (
+      <textarea
+        {...props}
+        ref={ref}
+        defaultValue={initialValue}
+        onChange={(e) => {
+          if (onValueChange) onValueChange(e);
+        }}
+      />
+    );
+  }
+);
+UncontrolledTextarea.displayName = "UncontrolledTextarea";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main client-side sheet editor component
@@ -4839,34 +4904,6 @@ export default function SheetClient() {
             else await deleteFormula(sheetId, cellKey).catch(() => { });
           };
 
-          // ── UNIFIED EDITOR WRAPPER ────────────────────────────────────────
-          const EditorWrapper: React.FC<{ children: React.ReactNode; isTall?: boolean }> = ({
-            children,
-            isTall,
-          }) => (
-            <div
-              className={isMergeMaster ? "sheet-cell-merge-master sheet-cell-active-selected" : ""}
-              style={{
-                position: isMergeMaster ? "absolute" : "relative",
-                top: 0,
-                left: 0,
-                width: isMergeMaster ? editWidth ?? "100%" : "100%",
-                height: isMergeMaster ? editHeight ?? "100%" : "100%",
-                zIndex: isMergeMaster ? 9 : 1,
-                boxSizing: "border-box",
-                background:
-                  cellStyle.backgroundColor && cellStyle.backgroundColor !== "transparent"
-                    ? cellStyle.backgroundColor
-                    : isDark
-                      ? "#131620"
-                      : "#ffffff",
-                overflow: isTall ? "hidden" : "visible",
-                border: isMergeMaster ? "1px solid var(--sh-border, #e8eaed)" : "none",
-              }}
-            >
-              {children}
-            </div>
-          );
 
           const inputStyle: React.CSSProperties = {
             ...cellStyle,
@@ -4877,7 +4914,7 @@ export default function SheetClient() {
           // ── IMAGE ─────────────────────────────────────────────────────
           if (cellType === "image") {
             return (
-              <EditorWrapper>
+              <EditCellWrapper isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
                 <div
                   className="w-full h-full flex items-center justify-center cursor-pointer"
                   onClick={() => {
@@ -4896,14 +4933,14 @@ export default function SheetClient() {
                     <span className="text-xs text-gray-400">Upload Image</span>
                   )}
                 </div>
-              </EditorWrapper>
+              </EditCellWrapper>
             );
           }
 
           // ── CHECKBOX ──────────────────────────────────────────────────
           if (cellType === "checkbox") {
             return (
-              <EditorWrapper>
+              <EditCellWrapper isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
                 <div
                   className="h-full w-full flex items-center justify-center cursor-pointer"
                   onClick={() => {
@@ -4920,7 +4957,7 @@ export default function SheetClient() {
                     <span className="h-5 w-5 rounded border border-gray-400/80 bg-white" />
                   )}
                 </div>
-              </EditorWrapper>
+              </EditCellWrapper>
             );
           }
 
@@ -4928,7 +4965,7 @@ export default function SheetClient() {
           if (cellType === "priority" || cellType === "status") {
             const opts = getChoiceOptionsForColumn({ ...colDef, type: cellType });
             return (
-              <EditorWrapper>
+              <EditCellWrapper isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
                 <Select
                   value={String(row[column.key] ?? "")}
                   onValueChange={(v) => {
@@ -4969,7 +5006,7 @@ export default function SheetClient() {
                     })}
                   </SelectContent>
                 </Select>
-              </EditorWrapper>
+              </EditCellWrapper>
             );
           }
 
@@ -4980,7 +5017,7 @@ export default function SheetClient() {
               cellSelectOptions[cellKey] ?? [],
             );
             return (
-              <EditorWrapper>
+              <EditCellWrapper isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
                 <Select
                   value={String(row[column.key] ?? "")}
                   onValueChange={(v) => {
@@ -5022,7 +5059,7 @@ export default function SheetClient() {
                     )}
                   </SelectContent>
                 </Select>
-              </EditorWrapper>
+              </EditCellWrapper>
             );
           }
 
@@ -5033,57 +5070,57 @@ export default function SheetClient() {
             cellType === "progress"
           ) {
             return (
-              <EditorWrapper>
-                <input
+              <EditCellWrapper isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
+                <UncontrolledInput
                   className="w-full h-full px-2.5 text-xs outline-none border-0 text-right tabular-nums font-mono bg-transparent"
                   style={inputStyle}
                   type="text"
                   autoFocus
-                  value={editVal}
-                  onChange={(e) =>
+                  initialValue={editVal}
+                  onValueChange={(e: any) =>
                     cellType === "progress"
                       ? onProgressChange(e.target.value)
                       : onNumChange(e.target.value)
                   }
                   onBlur={onBlurSave}
                 />
-              </EditorWrapper>
+              </EditCellWrapper>
             );
           }
 
           // ── DATE ──────────────────────────────────────────────────────
           if (cellType === "date") {
             return (
-              <EditorWrapper>
-                <input
+              <EditCellWrapper isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
+                <UncontrolledInput
                   className="w-full h-full px-2.5 text-xs outline-none border-0 bg-transparent"
                   style={inputStyle}
                   type={formulas.formulas[cellKey] ? "text" : "date"}
                   autoFocus
-                  value={editVal}
-                  onChange={(e) => onTextChange(e.target.value)}
+                  initialValue={editVal}
+                  onValueChange={(e: any) => onTextChange(e.target.value)}
                   onBlur={onBlurSave}
                 />
-              </EditorWrapper>
+              </EditCellWrapper>
             );
           }
 
           // ── TEXT WRAP textarea ────────────────────────────────────────
           if (textWrap.textWrapColumns.has(`${rowIdx}-${column.key}`)) {
             return (
-              <EditorWrapper isTall>
-                <textarea
+             <EditCellWrapper isTall isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
+                <UncontrolledTextarea
                   className="w-full h-full px-2.5 py-2 text-xs outline-none border-0 resize-none bg-transparent"
                   style={inputStyle}
                   autoFocus
-                  value={editVal}
-                  onChange={(e) => onTextChange(e.target.value)}
+                  initialValue={editVal}
+                  onValueChange={(e: any) => onTextChange(e.target.value)}
                   onBlur={onBlurSave}
-                  onKeyDown={(e) => {
+                  onKeyDown={(e: any) => {
                     if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
                   }}
                 />
-              </EditorWrapper>
+              </EditCellWrapper>
             );
           }
 
@@ -5093,17 +5130,18 @@ export default function SheetClient() {
             mentionState.active && mentionState.cellKey === mentionCellKey;
 
           // Tall merged cell — use a textarea so the text wraps nicely
+          // Tall merged cell — use a textarea so the text wraps nicely
           if (isMergeMaster && (editHeight ?? 0) > 40) {
             const mergeMode = mergeInfo?.mode;
             return (
-              <EditorWrapper isTall>
-                <textarea
+            <EditCellWrapper isTall isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
+                <UncontrolledTextarea
                   className="bg-transparent"
                   autoFocus
-                  value={editVal}
-                  onChange={(e) => onTextChange(e.target.value)}
+                  initialValue={editVal}
+                  onValueChange={(e: any) => onTextChange(e.target.value)}
                   onBlur={onBlurSave}
-                  onKeyDown={(e) => {
+                  onKeyDown={(e: any) => {
                     if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
                     if (e.key === "Escape") e.currentTarget.blur();
                   }}
@@ -5133,14 +5171,15 @@ export default function SheetClient() {
                     background: "transparent",
                   }}
                 />
-              </EditorWrapper>
+              </EditCellWrapper>
             );
           }
 
           // Standard single-row input (non-merged or single-row merged)
+          // Standard single-row input (non-merged or single-row merged)
           return (
-            <EditorWrapper>
-              <input
+            <EditCellWrapper isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
+              <UncontrolledInput
                 className="w-full h-full px-2.5 text-xs outline-none border-0 bg-transparent"
                 style={{
                   ...inputStyle,
@@ -5150,8 +5189,8 @@ export default function SheetClient() {
                       : (cellStyle.textAlign as React.CSSProperties["textAlign"]) ?? undefined,
                 }}
                 autoFocus
-                value={editVal}
-                onChange={(e) => {
+                initialValue={editVal}
+                onValueChange={(e: any) => {
                   const val = e.target.value;
                   const cursor = e.target.selectionStart ?? val.length;
                   const textBeforeCursor = val.slice(0, cursor);
@@ -5175,7 +5214,7 @@ export default function SheetClient() {
                   }
                   onTextChange(val);
                 }}
-                onKeyDown={(e) => {
+                onKeyDown={(e: any) => {
                   if (isMentionActive) {
                     if (e.key === "Escape") {
                       e.stopPropagation();
@@ -5247,7 +5286,7 @@ export default function SheetClient() {
                       }}
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        const currentVal = String(row[column.key] ?? "");
+                        const currentVal = mentionState.inputRef?.value ?? String(row[column.key] ?? "");
                         const cursor =
                           mentionState.inputRef?.selectionStart ?? currentVal.length;
                         const before = currentVal.slice(0, cursor);
@@ -5257,9 +5296,18 @@ export default function SheetClient() {
                             /@([\w][\w\s]*)?$/,
                             `@${member.name} `,
                           ) + after;
+                        if (mentionState.inputRef) {
+                          mentionState.inputRef.value = replaced;
+                        }
                         onTextChange(replaced);
                         setMentionState((s) => ({ ...s, active: false }));
-                        setTimeout(() => mentionState.inputRef?.focus(), 10);
+                        setTimeout(() => {
+                          if (mentionState.inputRef) {
+                            mentionState.inputRef.focus();
+                            const newPos = before.replace(/@([\w][\w\s]*)?$/, `@${member.name} `).length;
+                            mentionState.inputRef.setSelectionRange(newPos, newPos);
+                          }
+                        }, 10);
                       }}
                     >
                       <div
@@ -5322,7 +5370,7 @@ export default function SheetClient() {
                   ))}
                 </div>
               )}
-            </EditorWrapper>
+            </EditCellWrapper>
           );
         }
       }),
@@ -5332,7 +5380,7 @@ export default function SheetClient() {
   }, [
     columns, rows, selectedRows, selectedColumnKey,
     textWrap.textWrapColumns, cellTypes.getCellType,
-    getEffectiveCellStyle, formulas.formulas, formulas.columnFormulas,
+    getEffectiveCellStyle,
     formulas.setFormulas, formulas.getFormula, cellSelectOptions,
     protection.getCellKey, protection.isCellProtected, protection.isRowProtected,
     sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, rowsHistory,

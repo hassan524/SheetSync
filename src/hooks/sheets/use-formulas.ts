@@ -512,7 +512,7 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     Math.round(
       (Math.log(Number(args[0]?.value ?? 1)) /
         Math.log(Number(args[1]?.value ?? 10))) *
-        1e6,
+      1e6,
     ) / 1e6,
   LOG10: (args) =>
     Math.round(Math.log10(Number(args[0]?.value ?? 1)) * 1e6) / 1e6,
@@ -613,7 +613,7 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     ),
   SPLIT: (args) =>
     String(args[0]?.value ?? "").split(String(args[1]?.value ?? " "))[
-      Number(args[2]?.value ?? 0)
+    Number(args[2]?.value ?? 0)
     ] ?? "",
   CONTAINS: (args) =>
     String(args[0]?.value ?? "")
@@ -734,8 +734,8 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   },
   IFEMPTY: (args) =>
     args[0]?.value === null ||
-    args[0]?.value === undefined ||
-    args[0]?.value === ""
+      args[0]?.value === undefined ||
+      args[0]?.value === ""
       ? args[1]?.value
       : args[0]?.value,
   SWITCH: (args) => {
@@ -760,12 +760,12 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     Number(args[0]?.value ?? 0) <= Number(args[1]?.value ?? 0) ? "✓" : "✗",
   EQ: (args) =>
     String(args[0]?.value ?? "").toLowerCase() ===
-    String(args[1]?.value ?? "").toLowerCase()
+      String(args[1]?.value ?? "").toLowerCase()
       ? "✓"
       : "✗",
   NEQ: (args) =>
     String(args[0]?.value ?? "").toLowerCase() !==
-    String(args[1]?.value ?? "").toLowerCase()
+      String(args[1]?.value ?? "").toLowerCase()
       ? "✓"
       : "✗",
   BETWEEN: (args) => {
@@ -825,7 +825,7 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   MINUTE: (args) => new Date(String(args[0]?.value ?? "")).getMinutes(),
   WEEKDAY: (args) =>
     ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-      new Date(String(args[0]?.value ?? "")).getDay()
+    new Date(String(args[0]?.value ?? "")).getDay()
     ],
   WEEKNUM: (args) => {
     const d = new Date(String(args[0]?.value ?? ""));
@@ -840,7 +840,7 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     Math.round(
       (new Date(String(args[1]?.value ?? "")).getTime() -
         new Date(String(args[0]?.value ?? "")).getTime()) /
-        86400000,
+      86400000,
     ),
   DATEADD: (args) => {
     const d = new Date(String(args[0]?.value ?? ""));
@@ -1197,8 +1197,8 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
   AFTERTAX: (args) =>
     Math.round(
       Number(args[0]?.value ?? 0) *
-        (1 - Number(args[1]?.value ?? 0) / 100) *
-        100,
+      (1 - Number(args[1]?.value ?? 0) / 100) *
+      100,
     ) / 100,
 
   // ── UTILITY ───────────────────────────────────────────────
@@ -1690,8 +1690,8 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
 
   const getFormula = useCallback(
     (rowIdx: number, colKey: string): string | undefined =>
-      formulas[`${rowIdx}-${colKey}`] ?? columnFormulas[colKey],
-    [formulas, columnFormulas],
+      formulasRef.current[`${rowIdx}-${colKey}`] ?? columnFormulasRef.current[colKey],
+    [],
   );
 
   return {
