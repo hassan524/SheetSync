@@ -61,8 +61,8 @@ export function FormulaBar({
 
   const storedFormula = cellKey
     ? formulas.formulas[cellKey] ??
-      formulas.columnFormulas[selectedCell!.col] ??
-      ""
+    formulas.columnFormulas[selectedCell!.col] ??
+    ""
     : "";
 
   const rawCellValue = selectedCell
@@ -120,7 +120,7 @@ export function FormulaBar({
       inputRef.current.value = displayValue;
       syncMirror(displayValue);
     }
-   
+
   }, [displayValue]);
 
   const handleChange = useCallback(
@@ -133,50 +133,41 @@ export function FormulaBar({
       // Update mirror width inline — NO state update, no re-render
       syncMirror(val);
 
-      if (val.startsWith("=")) {
-        formulas.setFormulas((p: any) => ({ ...p, [cellKey]: val }));
-      } else {
-        formulas.setFormulas((p: any) => {
-          const n = { ...p };
-          delete n[cellKey];
-          return n;
-        });
-        const nr = [...rows];
-        const num = Number(val);
-        nr[selectedCell.row] = {
-          ...nr[selectedCell.row],
-          [selectedCell.col]:
-            val === "" ? "" : !isNaN(num) && val !== "" ? num : val,
-        };
-        onRowsChange(nr);
-      }
+      // ALWAYS treat as normal text, regardless of "="
+      formulas.setFormulas((p: any) => {
+        const n = { ...p };
+        delete n[cellKey]; // Remove from formulas array if it existed
+        return n;
+      });
+
+      const nr = [...rows];
+      const num = Number(val);
+      nr[selectedCell.row] = {
+        ...nr[selectedCell.row],
+        [selectedCell.col]:
+          val === "" ? "" : !isNaN(num) && val !== "" ? num : val,
+      };
+      onRowsChange(nr);
     },
-     
-    [isReadOnly, selectedCell, cellKey, rows, onRowsChange],
+    [isReadOnly, selectedCell, cellKey, rows, onRowsChange], // Keep original dependencies
   );
+
 
   const handleBlur = useCallback(async () => {
     isTypingRef.current = false;
 
     if (!selectedCell || !cellKey || !canEditSheet) return;
 
-    // Read directly from the input DOM — not from stale closure
-    const currentVal = inputRef.current?.value ?? "";
+    // ALWAYS treat it as a standard text blur
+    formulas.setFormulas((p: any) => {
+      const n = { ...p };
+      delete n[cellKey];
+      return n;
+    });
 
-    if (currentVal.startsWith("=")) {
-      // Save the formula that's actually in the input right now
-      formulas.setFormulas((p: any) => ({ ...p, [cellKey]: currentVal }));
-      await onSaveFormula(sheetId, cellKey, currentVal);
-    } else {
-      formulas.setFormulas((p: any) => {
-        const n = { ...p };
-        delete n[cellKey];
-        return n;
-      });
-      await onDeleteFormula(sheetId, cellKey).catch(() => {});
-    }
-   
-  }, [selectedCell, cellKey, canEditSheet, sheetId, onSaveFormula, onDeleteFormula]);
+    await onDeleteFormula(sheetId, cellKey).catch(() => { });
+
+  }, [selectedCell, cellKey, canEditSheet, sheetId, onDeleteFormula]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -199,7 +190,7 @@ export function FormulaBar({
         inputRef.current?.blur();
       }
     },
-     
+
     [displayValue, storedFormula, cellKey],
   );
 

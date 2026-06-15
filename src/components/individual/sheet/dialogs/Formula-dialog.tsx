@@ -27,6 +27,7 @@ export default function FormulaDialog({
 }: FormulaDialogProps) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<(typeof FORMULA_REFERENCE)[0] | null>(null);
+  const [editableExample, setEditableExample] = useState("");
 
   const filtered = FORMULA_REFERENCE.filter(
     (f) =>
@@ -99,7 +100,7 @@ export default function FormulaDialog({
                   .map((f) => (
                     <button
                       key={f.name}
-                      onClick={() => setSelected(f)}
+                      onClick={() => { setSelected(f); setEditableExample(f.example); }}
                       style={{
                         background: selected?.name === f.name ? undefined : "transparent",
                         color:
@@ -148,16 +149,23 @@ export default function FormulaDialog({
                   <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: d ? "#4a5568" : "#9ca3af" }}>
                     Example
                   </p>
-                  <code
-                    className="block text-xs px-3 py-2 rounded font-mono border break-all"
+                  <textarea
+                    value={editableExample}
+                    onChange={(e) => setEditableExample(e.target.value)}
+                    rows={3}
+                    className="block w-full text-xs px-3 py-2 rounded font-mono border break-all outline-none resize-none"
                     style={{
                       background: d ? "rgba(37,99,235,0.1)" : "#eff6ff",
                       color: d ? "#93c5fd" : "#1d4ed8",
                       borderColor: d ? "rgba(59,130,246,0.2)" : "#bfdbfe",
                     }}
-                  >
-                    {selected.example}
-                  </code>
+                    ref={(el) => {
+                      if (el && editableExample.toLowerCase().includes(' or ')) {
+                        const firstOr = editableExample.toLowerCase().indexOf(' or ');
+                        setTimeout(() => el.setSelectionRange(firstOr, editableExample.length), 50);
+                      }
+                    }}
+                  />
                 </div>
 
                 <div
@@ -205,7 +213,7 @@ export default function FormulaDialog({
           </button>
           {selected && (
             <button
-              onClick={() => { onInsert(selected.example); onClose(); }}
+              onClick={() => { onInsert(editableExample); onClose(); }}
               className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-90 transition-opacity font-medium"
             >
               Insert example
