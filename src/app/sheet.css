@@ -734,6 +734,14 @@
   --rdg-color: #e2e8f0;
 }
 
+.sheet-cell-has-formula {
+  background: linear-gradient(
+    155deg,
+    transparent 50%,
+    rgba(0, 140, 49, 0.15) 100%
+  ) !important;
+}
+
 .rdg-cell {
   border-right: 1px solid var(--rdg-border-color);
   border-bottom: 1px solid var(--rdg-border-color) !important;

@@ -1690,8 +1690,8 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
 
   const getFormula = useCallback(
     (rowIdx: number, colKey: string): string | undefined =>
-      formulasRef.current[`${rowIdx}-${colKey}`] ?? columnFormulasRef.current[colKey],
-    [],
+      formulas[`${rowIdx}-${colKey}`] ?? columnFormulas[colKey],
+    [formulas, columnFormulas],
   );
 
   return {

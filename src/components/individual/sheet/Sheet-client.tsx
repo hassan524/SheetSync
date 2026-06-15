@@ -2931,26 +2931,54 @@ export default function SheetClient() {
         toast.error("This row is protected");
         return;
       }
+
+      // Extract the formula the user actually typed — grab last valid =FUNC() segment
+      // was this whole extractFormula function — DELETE IT ALL:
+      const extractFormula = (input: string): string => {
+        const trimmed = input.trim();
+        if (!trimmed.toLowerCase().includes(' or ')) return trimmed;
+        const parts = trimmed.split(/\s+or\s+/i).map((p) => p.trim());
+        const valid = parts.filter((p) => p.startsWith('=') && p.includes('('));
+        return valid[valid.length - 1] ?? parts[0];
+      };
+      const cleanFormula = example.trim();
+
+      // REPLACE WITH just:
+
       const cellKey = `${selectedCell.row}-${selectedCell.col}`;
-      const nextFormulas = { ...formulas.formulas, [cellKey]: example };
+      const nextFormulas = { ...formulas.formulas, [cellKey]: cleanFormula };
       formulas.setFormulas(nextFormulas);
       markSaving();
-      await saveFormula(sheetId, cellKey, example);
+      await saveFormula(sheetId, cellKey, cleanFormula);
       if (isOrgSheet) {
         const cl = String.fromCharCode(
           65 + columns.findIndex((c) => c.key === selectedCell.col),
         );
-        logFormulaSet(sheetId, `${cl}${selectedCell.row + 1}`, example);
+        logFormulaSet(sheetId, `${cl}${selectedCell.row + 1}`, cleanFormula);
       }
       markSaved();
       setShowFormulaDialog(false);
       broadcastSheetSnapshot({ formulas: nextFormulas });
-      toast.success("Formula inserted — edit as needed");
+
+      // Auto-resize the column to fit the formula text width
+      const estimatedWidth = Math.max(160, cleanFormula.length * 8 + 32);
+      const currentCol = columns.find((c) => c.key === selectedCell.col);
+      if (currentCol && estimatedWidth > (currentCol.width ?? 160)) {
+        const updatedColumns = columns.map((c) =>
+          c.key === selectedCell.col ? { ...c, width: estimatedWidth } : c
+        );
+        columnsHistory.pushState(updatedColumns);
+        setSheetState((p) => ({ ...p, columns: updatedColumns }));
+        saveAllColumns(sheetId, updatedColumns).catch(console.error);
+      }
+
+      toast.success("Formula inserted");
     },
     [
       canEditSheet, showViewerEditMessage, selectedCell, rows,
       protection.isRowProtected, formulas.formulas, formulas.setFormulas,
-      sheetId, markSaving, markSaved, isOrgSheet, columns,
+      sheetId, markSaving, markSaved, isOrgSheet, columns, columnsHistory,
+      setSheetState, broadcastSheetSnapshot,
     ],
   );
 
@@ -5108,7 +5136,7 @@ export default function SheetClient() {
           // ── TEXT WRAP textarea ────────────────────────────────────────
           if (textWrap.textWrapColumns.has(`${rowIdx}-${column.key}`)) {
             return (
-             <EditCellWrapper isTall isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
+              <EditCellWrapper isTall isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
                 <UncontrolledTextarea
                   className="w-full h-full px-2.5 py-2 text-xs outline-none border-0 resize-none bg-transparent"
                   style={inputStyle}
@@ -5134,7 +5162,7 @@ export default function SheetClient() {
           if (isMergeMaster && (editHeight ?? 0) > 40) {
             const mergeMode = mergeInfo?.mode;
             return (
-            <EditCellWrapper isTall isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
+              <EditCellWrapper isTall isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
                 <UncontrolledTextarea
                   className="bg-transparent"
                   autoFocus
@@ -5381,7 +5409,7 @@ export default function SheetClient() {
     columns, rows, selectedRows, selectedColumnKey,
     textWrap.textWrapColumns, cellTypes.getCellType,
     getEffectiveCellStyle,
-    formulas.setFormulas, formulas.getFormula, cellSelectOptions,
+    formulas.setFormulas, formulas.getFormula, formulas.evaluateFormula, formulas.formulas, formulas.columnFormulas, cellSelectOptions,
     protection.getCellKey, protection.isCellProtected, protection.isRowProtected,
     sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, rowsHistory,
     colOps, markSaving, markSaved, handleApplyFormulaToColumn,

@@ -421,6 +421,7 @@ export function CellRenderer({
     !isMergeMaster && isSelected ? "bg-primary/10" : "",
     !isMergeMaster && isActiveSelected ? "sheet-cell-active-selected" : "",
     validationWarning ? "sheet-cell-validation-warning" : "",
+    rawFormula ? "sheet-cell-has-formula" : "",
   ]
     .filter(Boolean)
     .join(" ");
