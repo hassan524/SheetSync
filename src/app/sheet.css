@@ -207,7 +207,8 @@
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  isolation: isolate; /* ← add this */
+  isolation: isolate;
+  /* ← add this */
 }
 
 .rdg-sheet .rdg-cell[aria-colindex="1"] {
@@ -727,9 +728,9 @@
 }
 
 .rdg-dark {
-  --rdg-background-color: #0f1117;
-  --rdg-header-background-color: #131620;
-  --rdg-row-hover-background-color: #0f1a17;
+  --rdg-background-color: #0b0e14;
+  --rdg-header-background-color: #111521;
+  --rdg-row-hover-background-color: #101a18;
   --rdg-border-color: #1e2330;
   --rdg-color: #e2e8f0;
 }
@@ -744,23 +745,23 @@
 
 .rdg-cell {
   border-right: 1px solid var(--rdg-border-color);
-  border-bottom: 1px solid var(--rdg-border-color) !important;
+  border-bottom: 1px solid var(--rdg-border-color);
   border-top: none !important;
   padding: 0 !important;
   background-color: var(--rdg-background-color);
   cursor: cell;
   overflow: hidden;
-  contain: strict;
+  /* contain: strict; */
   transition: background-color 0.06s ease;
 }
 
 .rdg-sheet .rdg-row .rdg-cell {
-  border-bottom: 1px solid var(--rdg-border-color) !important;
+  border-bottom: 1px solid var(--rdg-border-color);
   border-top: none !important;
 }
 
 .rdg-dark .rdg-sheet .rdg-row .rdg-cell {
-  border-bottom-color: #1e2330 !important;
+  border-bottom-color: #1e2330;
 }
 
 .sheet-mention {
@@ -772,7 +773,7 @@
 
 .rdg-cell:hover {
   cursor: cell;
-  background: var(--rdg-row-hover-background-color) !important;
+  background: var(--rdg-row-hover-background-color);
 }
 
 .rdg-cell:hover:not([aria-selected="true"]) {
@@ -818,7 +819,7 @@
 }
 
 .rdg-row:hover .rdg-cell {
-  background: var(--rdg-row-hover-background-color) !important;
+  background: var(--rdg-row-hover-background-color);
 }
 
 .rdg-row.sheet-row-selected .rdg-cell {
@@ -839,7 +840,7 @@
 
 /* ── Dark mode cell backgrounds ─────────────────────────────────────────── */
 .rdg-dark .rdg-cell {
-  background-color: #0f1117 !important;
+  background-color: #0b0e14 !important;
   color: #e2e8f0;
   border-right-color: #1e2330 !important;
   border-bottom-color: #1e2330 !important;
@@ -856,19 +857,19 @@
 }
 
 .rdg-dark .rdg-header-row {
-  background-color: #131620 !important;
+  background-color: #111521 !important;
   border-bottom-color: #1e2330 !important;
 }
 
 .rdg-dark .rdg-header-cell {
-  background-color: #131620 !important;
+  background-color: #111521 !important;
   color: #8892a4 !important;
   border-right-color: #1e2330 !important;
 }
 
 .rdg-dark .rdg-cell:first-child,
 .rdg-dark .rdg-header-cell:first-child {
-  background-color: #131620 !important;
+  background-color: #111521 !important;
 }
 
 .rdg-dark .rdg-row:hover .rdg-cell {
@@ -886,7 +887,7 @@
 .rdg-dark .rdg-viewport,
 .rdg-dark .rdg-cell[role="gridcell"],
 .rdg-dark .rdg-cell[role="columnheader"] {
-  background-color: #0f1117 !important;
+  background-color: #0b0e14 !important;
 }
 
 .rdg-dark .rdg-cell input,
@@ -899,7 +900,56 @@
 }
 
 .rdg-dark .rdg-cell .bg-white {
-  background-color: #0f1117 !important;
+  background-color: #0b0e14 !important;
+}
+
+.rdg-sheet.sheet-borderless,
+.rdg-sheet.sheet-borderless * {
+  --rdg-border-color: transparent !important;
+  border-color: transparent !important;
+}
+
+.rdg-sheet.sheet-borderless .rdg-cell,
+.rdg-sheet.sheet-borderless .rdg-header-cell,
+.rdg-sheet.sheet-borderless .rdg-row .rdg-cell,
+.rdg-sheet.sheet-borderless .rdg-row:hover .rdg-cell,
+.rdg-sheet.sheet-borderless .rdg-cell:hover,
+.rdg-sheet.sheet-borderless .rdg-cell:hover:not([aria-selected="true"]) {
+  border: none !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-image: none !important;
+}
+
+.rdg-sheet.sheet-borderless .rdg-header-row {
+  border: none !important;
+  border-bottom: none !important;
+}
+
+.rdg-sheet.sheet-borderless .sheet-cell-merge-master {
+  border: none !important;
+}
+
+.rdg-sheet.sheet-borderless .rdg-cell[aria-selected="true"] {
+  outline: 2px solid var(--primary, #0d7c5f) !important;
+  box-shadow: none !important;
+}
+
+.rdg-sheet.sheet-borderless .rdg-cell:first-child,
+.rdg-sheet.sheet-borderless .rdg-header-cell:first-child {
+  border: none !important;
+  border-right: none !important;
+}
+
+/* When a cell has a background color applied, hide its borders so the color fills fully */
+.rdg-sheet .rdg-cell:has([data-has-bg="true"]) {
+  border-right-color: transparent !important;
+  border-bottom-color: transparent !important;
 }
 
 .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
@@ -1115,6 +1165,7 @@ body[data-sheet-dark="true"] [role="dialog"] .bg-gray-900 {
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.6;
   }

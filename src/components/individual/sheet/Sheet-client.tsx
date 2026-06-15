@@ -1695,6 +1695,31 @@ export default function SheetClient() {
     [isDark],
   );
 
+  const getDarkLayoutBackground = useCallback(
+    (rowIdx: number, format: CellFormat): string | undefined => {
+      if (!isDark || !(rowIdx <= 1 || format.isLayoutRow)) return undefined;
+      const bg = String(format.bgColor ?? "").trim().toLowerCase();
+      const accent = String(format.textColor ?? "").trim().toLowerCase();
+      if (!bg || !accent || !/^#[0-9a-f]{6}$/i.test(bg) || !/^#[0-9a-f]{6}$/i.test(accent)) {
+        return undefined;
+      }
+
+      const blendToWhite = (hex: string, ratio: number) => {
+        const clean = hex.replace("#", "");
+        const rgb = [0, 2, 4].map((offset) => parseInt(clean.slice(offset, offset + 2), 16));
+        return `#${rgb
+          .map((c) => Math.round(c + (255 - c) * ratio).toString(16).padStart(2, "0"))
+          .join("")}`.toLowerCase();
+      };
+      const defaultLayoutBg =
+        rowIdx === 0 ? blendToWhite(accent, 0.9) : blendToWhite(accent, 0.94);
+
+      if (bg !== defaultLayoutBg) return undefined;
+      return rowIdx === 0 ? "#13201d" : "#182126";
+    },
+    [isDark],
+  );
+
   const getEffectiveCellStyle = useCallback(
     (rowIdx: number, colKey: string, row: SheetRow): React.CSSProperties => {
       const cellFormatKey = `${rowIdx}-${colKey}`;
@@ -1709,6 +1734,10 @@ export default function SheetClient() {
         overflow: isWrapEnabled ? "visible" : "hidden",
         textOverflow: isWrapEnabled ? "clip" : "ellipsis",
         backgroundColor: format.bgColor || undefined,
+        ...(format.bgColor ? {
+          borderRightColor: format.bgColor,
+          borderBottomColor: format.bgColor,
+        } : {}),
         textAlign: (format.align as any) || undefined,
         fontFamily: format.fontFamily || "inherit",
         fontWeight: format.bold ? 700 : "inherit",
@@ -1765,15 +1794,19 @@ export default function SheetClient() {
         backgroundColor: columnFormat.bgColor ?? base.backgroundColor,
         ...conditionalFormat,
       };
+      const darkLayoutBackground = getDarkLayoutBackground(rowIdx, format);
       return {
         ...resolved,
-        backgroundColor: normalizeDarkCellBackground(resolved.backgroundColor),
+        backgroundColor:
+          darkLayoutBackground ??
+          normalizeDarkCellBackground(resolved.backgroundColor),
       };
     },
     [
       columns,
       conditionalRules,
       formatting.cellFormats,
+      getDarkLayoutBackground,
       normalizeDarkCellBackground,
       textWrap.textWrapColumns,
     ],
@@ -2495,11 +2528,22 @@ export default function SheetClient() {
         const updatedFormats = { ...formatting.cellFormats };
 
         for (const rowId of Array.from(selectedRows)) {
+          const rowIdx = rows.findIndex((row) => row.id === rowId);
           const rowKey = `row:${rowId}`;
           const currentFormat = formatting.cellFormats[rowKey] || {};
           const merged = { ...currentFormat, ...format };
           updatedFormats[rowKey] = merged;
           ops.push(saveCellFormat(sheetId, rowKey, merged));
+
+          if (rowIdx >= 0) {
+            for (const col of columns) {
+              const cellKey = `${rowIdx}-${col.key}`;
+              const cellFormat = formatting.cellFormats[cellKey] || {};
+              const nextCellFormat = { ...cellFormat, ...format };
+              updatedFormats[cellKey] = nextCellFormat;
+              ops.push(saveCellFormat(sheetId, cellKey, nextCellFormat));
+            }
+          }
         }
 
         formatting.setCellFormats(updatedFormats);
@@ -2567,6 +2611,46 @@ export default function SheetClient() {
       selectedRows, rows, formatting.cellFormats, saveCellFormat, broadcastSheetSnapshot,
     ],
   );
+
+ const handleMakeSheetBorderless = useCallback(async () => {
+    if (!canEditSheet) {
+      showViewerEditMessage();
+      return;
+    }
+
+    const isBorderless = formatting.cellFormats["sheet:all"]?.borderStyle === "none";
+
+    const sheetFormat: CellFormat = {
+      ...(formatting.cellFormats["sheet:all"] || {}),
+      borderStyle: isBorderless ? "solid" : "none",
+    };
+    const updatedFormats = {
+      ...formatting.cellFormats,
+      "sheet:all": sheetFormat,
+    };
+
+    formatting.setCellFormats(updatedFormats);
+    markSaving();
+    try {
+      await saveCellFormat(sheetId, "sheet:all", sheetFormat);
+      broadcastSheetSnapshot({ cellFormats: updatedFormats });
+      toast.success(isBorderless ? "Sheet borders restored" : "Sheet borders hidden");
+      markSaved();
+    } catch {
+      toast.error("Failed to save borderless sheet setting.");
+      setSaveStatus("saved");
+    }
+  }, [
+    canEditSheet,
+    showViewerEditMessage,
+    formatting,
+    markSaving,
+    markSaved,
+    saveCellFormat,
+    sheetId,
+    broadcastSheetSnapshot,
+    setSaveStatus,
+  ]);
 
   const handleSmartCopy = useCallback(() => {
     if (!selectedCell) return;
@@ -5184,9 +5268,8 @@ export default function SheetClient() {
                     lineHeight: 1.5,
                     fontFamily: "inherit",
                     textAlign:
-                      mergeMode === "center"
-                        ? "center"
-                        : ((cellStyle.textAlign as React.CSSProperties["textAlign"]) ?? "left"),
+                      (cellStyle.textAlign as React.CSSProperties["textAlign"]) ??
+                      (mergeMode === "center" ? "center" : "left"),
                     whiteSpace: "pre-wrap",
                     wordBreak: "break-word",
                     overflowWrap: "break-word",
@@ -5212,9 +5295,8 @@ export default function SheetClient() {
                 style={{
                   ...inputStyle,
                   textAlign:
-                    mergeInfo?.mode === "center"
-                      ? "center"
-                      : (cellStyle.textAlign as React.CSSProperties["textAlign"]) ?? undefined,
+                    (cellStyle.textAlign as React.CSSProperties["textAlign"]) ??
+                    (mergeInfo?.mode === "center" ? "center" : undefined),
                 }}
                 autoFocus
                 initialValue={editVal}
@@ -5608,6 +5690,7 @@ export default function SheetClient() {
           isMergedSelection={Boolean(selectedMergeInfo)}
           onMergeSelection={handleMergeSelection}
           onUnmergeSelection={handleUnmergeSelection}
+          onMakeSheetBorderless={handleMakeSheetBorderless}
         />
 
         <FormulaBar
@@ -5961,6 +6044,7 @@ export default function SheetClient() {
                 }}
                 headerRowHeight={33}
                 className={`rdg-sheet fill-grid ${isDark ? "rdg-dark" : "rdg-light"
+                  } ${formatting.cellFormats["sheet:all"]?.borderStyle === "none" ? "sheet-borderless" : ""
                   }`}
               />
               <input
@@ -6427,6 +6511,38 @@ export default function SheetClient() {
 .rdg-cell:has(.sheet-merge-covered-cell) input,
 .rdg-cell:has(.sheet-merge-covered-cell) textarea {
   display: none !important;
+}
+
+/* ── Borderless mode — force remove ALL borders and outlines ── */
+.rdg-sheet.sheet-borderless .rdg-cell,
+.rdg-sheet.sheet-borderless .rdg-row .rdg-cell,
+.rdg-sheet.sheet-borderless .rdg-row:hover .rdg-cell,
+.rdg-sheet.sheet-borderless .rdg-cell:hover,
+.rdg-sheet.sheet-borderless .rdg-cell:hover:not([aria-selected="true"]),
+.rdg-sheet.sheet-borderless .rdg-header-cell,
+.rdg-sheet.sheet-borderless .rdg-cell:first-child,
+.rdg-sheet.sheet-borderless .rdg-header-cell:first-child {
+  border: none !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.rdg-sheet.sheet-borderless .rdg-header-row {
+  border: none !important;
+  border-bottom: none !important;
+}
+
+.rdg-sheet.sheet-borderless .sheet-cell-merge-master {
+  border: none !important;
+}
+
+.rdg-sheet.sheet-borderless .rdg-cell[aria-selected="true"] {
+  outline: 2px solid var(--primary, #0d7c5f) !important;
+  box-shadow: none !important;
 }
         `}</style>
       </div>

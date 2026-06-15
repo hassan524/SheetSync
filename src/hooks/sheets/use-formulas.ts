@@ -126,6 +126,10 @@ function isNumericLiteral(s: string): boolean {
   return s.trim() !== "" && !isNaN(Number(s));
 }
 
+function normalizeFormulaResult(value: any): any {
+  return typeof value === "number" && Number.isNaN(value) ? "#VALUE!" : value;
+}
+
 // ─────────────────────────────────────────────────────────────
 //  RESOLVED ARG
 // ─────────────────────────────────────────────────────────────
@@ -138,6 +142,69 @@ interface ResolvedArg {
   colKey: string; // valid when isCol=true OR isA1=true
   isA1: boolean; // true = was an A1-style ref
   a1Row: number; // 0-based row when isA1=true
+}
+
+function parseA1Range(
+  token: string,
+): { start: { colIdx: number; rowIdx: number }; end: { colIdx: number; rowIdx: number } } | null {
+  const [startRaw, endRaw] = token.split(":").map((part) => part.trim());
+  if (!startRaw || !endRaw) return null;
+  const start = parseA1Ref(startRaw);
+  const end = parseA1Ref(endRaw);
+  if (!start || !end) return null;
+  return { start, end };
+}
+
+function compareCriteria(value: any, criteria: string): boolean {
+  const text = String(criteria ?? "").trim();
+  const match = text.match(/^(>=|<=|<>|>|<|=)\s*(.*)$/);
+  if (!match) {
+    return String(value ?? "").toLowerCase() === text.toLowerCase();
+  }
+
+  const [, op, targetRaw] = match;
+  const target = stripQuotes(targetRaw.trim());
+  const valueNum = Number(value);
+  const targetNum = Number(target);
+  const numeric = value !== "" && target !== "" && !isNaN(valueNum) && !isNaN(targetNum);
+
+  const left = numeric ? valueNum : String(value ?? "").toLowerCase();
+  const right = numeric ? targetNum : String(target).toLowerCase();
+
+  switch (op) {
+    case ">":
+      return left > right;
+    case "<":
+      return left < right;
+    case ">=":
+      return left >= right;
+    case "<=":
+      return left <= right;
+    case "<>":
+      return left !== right;
+    case "=":
+      return left === right;
+    default:
+      return false;
+  }
+}
+
+function getRangeRawValues(raw: string, ctx: FormulaContext): any[] {
+  const range = parseA1Range(raw);
+  if (!range) return [];
+  const startRow = Math.min(range.start.rowIdx, range.end.rowIdx);
+  const endRow = Math.max(range.start.rowIdx, range.end.rowIdx);
+  const startCol = Math.min(range.start.colIdx, range.end.colIdx);
+  const endCol = Math.max(range.start.colIdx, range.end.colIdx);
+  const values: any[] = [];
+
+  for (let r = startRow; r <= Math.min(endRow, ctx.rows.length - 1); r++) {
+    for (let c = startCol; c <= Math.min(endCol, ctx.columns.length - 1); c++) {
+      values.push(ctx.rows[r]?.[ctx.columns[c]?.key]);
+    }
+  }
+
+  return values;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -351,15 +418,20 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     return total;
   },
   COUNTIF: (args, ctx) => {
+    const criteria = String(args[1]?.value ?? args[1]?.raw ?? "");
+    const rangeValues = getRangeRawValues(args[0]?.raw ?? "", ctx);
+    if (rangeValues.length) {
+      return rangeValues.filter((value) => compareCriteria(value, criteria)).length;
+    }
+
     const ci = resolveAggCol(args[0], ctx);
-    const val = String(args[1]?.value ?? "").toLowerCase();
     const start = resolveAggStart(args[2], ctx);
     const end = resolveAggEnd(args[3], ctx);
     if (ci === -1) return 0;
     const key = ctx.columns[ci].key;
     let count = 0;
     for (let r = start; r <= Math.min(end, ctx.rows.length - 1); r++) {
-      if (String(ctx.rows[r]?.[key] ?? "").toLowerCase() === val) count++;
+      if (compareCriteria(ctx.rows[r]?.[key], criteria)) count++;
     }
     return count;
   },
@@ -728,6 +800,9 @@ const FORMULA_IMPL: Record<string, FormulaFn> = {
     return v === null ||
       v === undefined ||
       v === "" ||
+      Number.isNaN(v) ||
+      v === Infinity ||
+      v === -Infinity ||
       String(v).startsWith("#")
       ? args[1]?.value
       : v;
@@ -1578,7 +1653,9 @@ function parseAndEval(
   }
 
   // Arithmetic expression  e.g. B1*C1, price*1.1, B1+revenue
-  return evaluateArithmetic(expr, rowIdx, rows, columns, findColumnIndex);
+  return normalizeFormulaResult(
+    evaluateArithmetic(expr, rowIdx, rows, columns, findColumnIndex),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1672,9 +1749,11 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
       // Let hot-formula-parser handle standard Excel formulas first.
       // If it cannot parse a SheetSync column-name formula, fall back below.
       const { error, result } = parser.parse(expr);
-      if (!error) return result;
+      if (!error && !(typeof result === "number" && Number.isNaN(result))) {
+        return result;
+      }
 
-      return parseAndEval(
+      return normalizeFormulaResult(parseAndEval(
         expr,
         currentRowIdx,
         rowsRef.current,
@@ -1683,7 +1762,7 @@ export function useFormulas(rows: SheetRow[], columns: ColumnDef[]) {
         columnFormulasRef.current,
         evaluatingRef.current,
         findColumnIndex,
-      );
+      ));
     },
     [parser, findColumnIndex],
   );

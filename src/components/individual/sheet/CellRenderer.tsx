@@ -78,6 +78,9 @@ export function CellRenderer({
 
   // ── Resolve mergeMode once so both cellContent and outer div can use it ──
   const mergeMode = (mergeStyle as any)?.__mergeMode as string | undefined;
+  const mergeTextAlign =
+    (cellStyle.textAlign as React.CSSProperties["textAlign"]) ??
+    (mergeMode === "center" ? "center" : "left");
 
   // ── If this is a layout/header row cell, force plain text rendering ──
   const effectiveType: ColumnDef["type"] =
@@ -85,13 +88,13 @@ export function CellRenderer({
 
   // ── Cell content by type ───────────────────────────────────────────────
   const cellContent = (() => {
-    // if (isActiveSelected && rawFormula) {
-    //   return (
-    //     <span className="sheet-cell-text break-words whitespace-pre-wrap w-full font-mono">
-    //       {rawFormula}
-    //     </span>
-    //   );
-    // }
+    if (isActiveSelected && rawFormula) {
+      return (
+        <span className="sheet-cell-text break-words whitespace-pre-wrap w-full font-mono">
+          {rawFormula}
+        </span>
+      );
+    }
 
     switch (effectiveType) {
       case "status":
@@ -269,7 +272,7 @@ export function CellRenderer({
                 wordBreak: isWrapped ? "break-word" : mergeMode === "across" ? "normal" : "break-word",
                 overflow: "hidden",
                 textOverflow: isWrapped ? "clip" : mergeMode === "across" ? "ellipsis" : "clip",
-                textAlign: mergeMode === "center" ? "center" : "left",
+                textAlign: mergeTextAlign,
                 lineHeight: 1.5,
               }}
             >
