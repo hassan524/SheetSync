@@ -133,10 +133,14 @@ export function FormulaBar({
       // Update mirror width inline — NO state update, no re-render
       syncMirror(val);
 
-      // ALWAYS treat as normal text, regardless of "="
+      if (val.startsWith("=")) {
+        formulas.setFormulas((p: any) => ({ ...p, [cellKey]: val }));
+        return;
+      }
+
       formulas.setFormulas((p: any) => {
         const n = { ...p };
-        delete n[cellKey]; // Remove from formulas array if it existed
+        delete n[cellKey];
         return n;
       });
 
@@ -149,7 +153,7 @@ export function FormulaBar({
       };
       onRowsChange(nr);
     },
-    [isReadOnly, selectedCell, cellKey, rows, onRowsChange], // Keep original dependencies
+    [isReadOnly, selectedCell, cellKey, rows, formulas, onRowsChange],
   );
 
 
@@ -158,7 +162,14 @@ export function FormulaBar({
 
     if (!selectedCell || !cellKey || !canEditSheet) return;
 
-    // ALWAYS treat it as a standard text blur
+    const val = inputRef.current?.value ?? "";
+
+    if (val.startsWith("=")) {
+      formulas.setFormulas((p: any) => ({ ...p, [cellKey]: val }));
+      await onSaveFormula(sheetId, cellKey, val);
+      return;
+    }
+
     formulas.setFormulas((p: any) => {
       const n = { ...p };
       delete n[cellKey];
@@ -167,7 +178,7 @@ export function FormulaBar({
 
     await onDeleteFormula(sheetId, cellKey).catch(() => { });
 
-  }, [selectedCell, cellKey, canEditSheet, sheetId, onDeleteFormula]);
+  }, [selectedCell, cellKey, canEditSheet, formulas, sheetId, onSaveFormula, onDeleteFormula]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {

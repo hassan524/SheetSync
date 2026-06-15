@@ -4,7 +4,7 @@ import React from "react";
 import {
   Undo2, Redo2, Copy, Scissors, Clipboard, WrapText, Lock, Unlock,
   Sigma, SlidersHorizontal, Search, X, ChevronsLeftRight, ChevronsRightLeft,
-  Maximize2, Merge, Split,
+  Maximize2, Merge, Split, Table2,
 } from "lucide-react";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -67,6 +67,7 @@ interface FormattingBarProps {
   onMergeSelection?: (mode: "all" | "across" | "down" | "center") => void;
   onUnmergeSelection?: () => void;
   selectedRows?: Set<string>;
+  onMakeSheetBorderless?: () => void;
 }
 
 const FONT_FAMILIES = [
@@ -88,7 +89,7 @@ export function FormattingBar({
   selectedColumnKey, selectedColumnWidth, onSetColumnWidth, onExpandAllColumns,
   onDragResizeAllColumns, onEndResizeAllColumns, onOpenValidation,
   canMergeSelection = false, isMergedSelection = false, onMergeSelection, onUnmergeSelection,
-  selectedRows,
+  selectedRows, onMakeSheetBorderless,
 }: FormattingBarProps) {
   const selStyle = ddStyle(isDark);
 
@@ -246,13 +247,18 @@ export function FormattingBar({
         />
         <ToolSep />
 
-        {/* Wrap + Protect */}
+        {/* Wrap + Borderless + Protect */}
         <IconBtn
           icon={WrapText}
           tooltip="Text Wrap"
           onClick={onTextWrapToggle}
           disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}
           active={isSelectedColumnWrapped}
+        />
+        <IconBtn
+          icon={Table2}
+          tooltip="Toggle borderless sheet"
+          onClick={onMakeSheetBorderless ?? (() => {})}
         />
         <IconBtn
           icon={isProtected ? Lock : Unlock}
@@ -369,7 +375,7 @@ export function FormattingBar({
           <DropdownMenuTrigger asChild>
             <button
               className="sheet-icon-btn h-[22px] px-1.5 rounded flex items-center gap-1 shrink-0 text-[10px]"
-              disabled={!selectedCell}
+              disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}
             >
               <SlidersHorizontal className="h-3 w-3" />
               <span>More</span>
