@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import GlobalLoader from "@/components/common/Global-loader"; 
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function AuthCallback() {
       } = await supabase.auth.getSession();
 
       if (session) {
-        router.replace("/dashboard"); // ✅ only redirect AFTER session exists
+        router.replace("/dashboard");
       } else {
         router.replace("/login");
       }
@@ -23,5 +24,5 @@ export default function AuthCallback() {
     handleAuth();
   }, [router]);
 
-  return <div>Signing you in...</div>;
+  return <GlobalLoader />;
 }
