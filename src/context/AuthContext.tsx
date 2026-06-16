@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Google login
   // -----------------------
   const loginWithGoogle = async (
-    redirectPath = "/dashboard",
+    redirectPath = "/auth/callback",
   ): Promise<AuthError | null> => {
     const appUrl = getCurrentAppOrigin();
     const safeRedirectPath = redirectPath.startsWith("/")
