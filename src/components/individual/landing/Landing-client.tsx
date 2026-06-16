@@ -6,7 +6,6 @@ import { useScrollReveal } from "@/hooks/use-scroll-reveal";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
 import Navigation from "@/components/Navigation";
-import DemoModal from "./Demo-modal";
 import HeroSection from "./Hero-section";
 import ValuePropsBar from "./Value-props-bar";
 import FeaturesSection from "./Features-section";
@@ -20,7 +19,6 @@ import FooterSection from "./Footer-section";
 const LandingClient = () => {
   const router = useRouter();
   const { user, loading, loginWithGoogle } = useAuth();
-  const [demoOpen, setDemoOpen] = useState(false);
   const [nextPath, setNextPath] = useState("/dashboard");
   useScrollReveal(!loading && !user);
 
@@ -36,10 +34,7 @@ const LandingClient = () => {
   }, [loading, nextPath, router, user]);
 
   const handleGetStarted = async () => {
-    if (user) {
-      router.push("/dashboard");
-      return;
-    }
+    if (user) { router.push("/dashboard"); return; }
     const error = await loginWithGoogle(nextPath);
     if (error) return;
     const session = await supabase.auth.getSession();
@@ -51,20 +46,13 @@ const LandingClient = () => {
   return (
     <div className="bg-white overflow-x-hidden">
       <Navigation />
-      <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
-      <HeroSection
-        onDemoOpen={() => setDemoOpen(true)}
-        onGetStarted={handleGetStarted}
-      />
+      <HeroSection onDemoOpen={handleGetStarted} onGetStarted={handleGetStarted} />
       <ValuePropsBar />
-      <FeaturesSection onDemoOpen={() => setDemoOpen(true)} />
+      <FeaturesSection onDemoOpen={handleGetStarted} />
       <HowItWorksSection onGetStarted={handleGetStarted} />
       <WhatsIncludedSection />
       <FeatureTilesSection />
-      <CtaBannerSection
-        onDemoOpen={() => setDemoOpen(true)}
-        onGetStarted={handleGetStarted}
-      />
+      <CtaBannerSection onDemoOpen={handleGetStarted} onGetStarted={handleGetStarted} />
       <FaqSection />
       <FooterSection />
     </div>

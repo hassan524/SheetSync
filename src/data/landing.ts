@@ -19,7 +19,7 @@ import {
   Shield,
 } from "lucide-react";
 
-// ─── App features with inline video player ────────────────────────────────────
+// ─── App features with inline images ────────────────────────────────────
 export const appFeatures = [
   {
     icon: Users,
@@ -37,6 +37,7 @@ export const appFeatures = [
       "Comment threads on cells",
       "Version history per edit",
     ],
+    image: "/hero-collaboration.png",
   },
   {
     icon: FunctionSquare,
@@ -53,6 +54,7 @@ export const appFeatures = [
       "Formula autocomplete",
       "Cross-sheet references",
     ],
+    image: "/feature-formulas.png",
   },
   {
     icon: LayoutTemplate,
@@ -71,6 +73,7 @@ export const appFeatures = [
       "CRM & sales pipeline",
       "Inventory & stock control",
     ],
+    image: "/feature-templates.png",
   },
   {
     icon: Building2,
@@ -88,6 +91,7 @@ export const appFeatures = [
       "Role-based permissions",
       "Shared sheet library",
     ],
+    image: "/feature-organizations.png",
   },
   {
     icon: Upload,
@@ -105,6 +109,7 @@ export const appFeatures = [
       "Export to PDF",
       "Preserve formatting",
     ],
+    image: "/feature-import.png",
   },
   {
     icon: History,
@@ -122,6 +127,7 @@ export const appFeatures = [
       "Comment history",
       "Restore previous state",
     ],
+    image: "/hero-dashboard.png",
   },
 ];
 
@@ -268,4 +274,3 @@ export const valueProps = [
     color: "text-cyan-600",
   },
 ];
-

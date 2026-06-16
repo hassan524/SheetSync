@@ -4,8 +4,11 @@ import { featureTiles } from "@/data/landing";
 
 const FeatureTilesSection = () => {
   return (
-    <section className="py-24 sm:py-32 bg-gray-50 border-y border-gray-100">
-      <div className="max-w-6xl mx-auto px-5 sm:px-6 lg:px-8">
+    <section className="relative py-24 sm:py-32 bg-gray-50 border-y border-gray-100 overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-gradient-to-tl from-primary/3 to-transparent rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-6xl mx-auto px-5 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center mb-14 scroll-reveal">
           <p className="text-sm font-semibold text-primary uppercase tracking-widest mb-3">
             Built for the long run
@@ -14,7 +17,7 @@ const FeatureTilesSection = () => {
             A Complete Spreadsheet Platform
           </h2>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-            Every feature you'd expect — and several you wouldn't.
+            Every feature you&apos;d expect — and several you wouldn&apos;t.
           </p>
         </div>
 
@@ -22,13 +25,13 @@ const FeatureTilesSection = () => {
           {featureTiles.map(({ icon: Icon, title, desc, color }, i) => (
             <div
               key={title}
-              className={`group rounded-2xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-md transition-all duration-200 p-5 flex gap-4 items-start scroll-reveal reveal-delay-${(i % 4) + 1}`}
+              className={`group rounded-2xl border border-gray-100 bg-white hover:border-primary/20 hover:shadow-lg transition-all duration-300 p-5 flex gap-4 items-start scroll-reveal reveal-delay-${(i % 4) + 1}`}
             >
-              <div className="h-10 w-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+              <div className="h-11 w-11 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-primary/5 group-hover:border-primary/20 transition-all duration-300">
                 <Icon className={`h-5 w-5 ${color}`} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-900">{title}</p>
+                <p className="text-sm font-bold text-gray-900">{title}</p>
                 <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
                   {desc}
                 </p>
@@ -42,4 +45,3 @@ const FeatureTilesSection = () => {
 };
 
 export default FeatureTilesSection;
-
