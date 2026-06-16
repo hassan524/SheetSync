@@ -19,7 +19,7 @@ import {
   Shield,
 } from "lucide-react";
 
-// ─── App features with inline video player ────────────────────────────────────
+// ─── App features with inline images ────────────────────────────────────
 export const appFeatures = [
   {
     icon: Users,
@@ -27,16 +27,17 @@ export const appFeatures = [
     bg: "bg-blue-50",
     gradientFrom: "from-blue-600",
     gradientTo: "to-blue-800",
-    title: "Real-Time Collaboration",
-    subtitle: "Work together, live",
+    title: "Real Time Collaboration",
+    subtitle: "Work together live",
     description:
-      "See live cursors, edits, and presence from teammates as they happen. Multiple users can work on the same sheet simultaneously — changes sync instantly with zero conflicts or page refreshes.",
+      "Work on the same sheet with your team at the same time. Changes appear instantly so everyone stays in sync without refreshing or dealing with conflicts.",
     bullets: [
-      "Live cursor presence per user",
-      "Instant cell-level sync",
-      "Comment threads on cells",
-      "Version history per edit",
+      "Multiple users editing together",
+      "Instant cell updates",
+      "Comments on cells",
+      "Edit history tracking",
     ],
+    image: "/hero-collaboration.png",
   },
   {
     icon: FunctionSquare,
@@ -44,15 +45,16 @@ export const appFeatures = [
     bg: "bg-orange-50",
     gradientFrom: "from-orange-500",
     gradientTo: "to-red-600",
-    title: "Formulas & Functions",
+    title: "Formulas and Functions",
     subtitle: "Powerful calculations",
     description:
-      "Use 100+ built-in spreadsheet formulas — SUM, AVERAGE, IF, VLOOKUP, COUNTIF, and more. Type = in any cell to trigger autocomplete. Formulas update automatically when source data changes.",
+      "Use built in formulas like SUM, AVERAGE, IF, VLOOKUP and more. Just type equals in a cell to start. Everything updates automatically when data changes.",
     bullets: [
-      "100+ built-in functions",
+      "100 plus built in functions",
       "Formula autocomplete",
-      "Cross-sheet references",
+      "Cross sheet references",
     ],
+    image: "/feature-formulas.png",
   },
   {
     icon: LayoutTemplate,
@@ -60,17 +62,18 @@ export const appFeatures = [
     bg: "bg-green-50",
     gradientFrom: "from-green-600",
     gradientTo: "to-teal-700",
-    title: "Ready-to-Use Templates",
+    title: "Ready to Use Templates",
     subtitle: "Start in seconds",
     description:
-      "Choose from professionally designed spreadsheet templates for budgets, project tracking, QA testing, CRM, inventory, and more. One click to create and customize.",
+      "Pick from pre built templates for budgets, projects, testing, CRM, inventory and more. Create and customize in one click.",
     bullets: [
-      "Budget & expense tracking",
-      "QA testing & bug tracking",
+      "Budget tracking",
+      "QA and bug tracking",
       "Project management",
-      "CRM & sales pipeline",
-      "Inventory & stock control",
+      "CRM pipeline",
+      "Inventory control",
     ],
+    image: "/feature-templates.png",
   },
   {
     icon: Building2,
@@ -78,16 +81,17 @@ export const appFeatures = [
     bg: "bg-indigo-50",
     gradientFrom: "from-indigo-500",
     gradientTo: "to-purple-700",
-    title: "Organizations & Teams",
+    title: "Organizations and Teams",
     subtitle: "Built for teams",
     description:
-      "Create organizations, invite members, and collaborate on shared sheets. Control exactly who can view, edit, or manage each sheet with role-based permissions across your entire organization.",
+      "Create teams, invite members and manage shared sheets. Control who can view or edit with simple role based permissions.",
     bullets: [
-      "Create & manage orgs",
-      "Invite members by email",
-      "Role-based permissions",
-      "Shared sheet library",
+      "Create and manage teams",
+      "Invite by email",
+      "Role based access",
+      "Shared sheets",
     ],
+    image: "/feature-organizations.png",
   },
   {
     icon: Upload,
@@ -95,16 +99,17 @@ export const appFeatures = [
     bg: "bg-teal-50",
     gradientFrom: "from-teal-500",
     gradientTo: "to-cyan-700",
-    title: "Import & Export",
+    title: "Import and Export",
     subtitle: "Bring your data in",
     description:
-      "Import existing spreadsheets from Excel (.xlsx, .xls) or CSV files and pick up right where you left off. Export back to Excel, CSV, or PDF at any time — your data, your format.",
+      "Import Excel or CSV files and continue your work. Export anytime to Excel, CSV or PDF while keeping formatting intact.",
     bullets: [
-      "Excel .xlsx / .xls import",
-      "CSV file support",
+      "Excel import support",
+      "CSV files",
       "Export to PDF",
-      "Preserve formatting",
+      "Keep formatting",
     ],
+    image: "/feature-import.png",
   },
   {
     icon: History,
@@ -112,16 +117,17 @@ export const appFeatures = [
     bg: "bg-pink-50",
     gradientFrom: "from-pink-500",
     gradientTo: "to-rose-700",
-    title: "Activity & History",
+    title: "Activity and History",
     subtitle: "Nothing gets lost",
     description:
-      "Every edit, comment, and share event is logged in a detailed activity feed. Review your sheet's full history, see exactly who did what and when, and restore previous states.",
+      "Track every change, comment and action in one place. See who did what and restore previous versions when needed.",
     bullets: [
-      "Full per-sheet edit log",
-      "Live activity feed",
+      "Full edit history",
+      "Activity feed",
       "Comment history",
-      "Restore previous state",
+      "Restore past versions",
     ],
+    image: "/hero-dashboard.png",
   },
 ];
 
@@ -168,14 +174,13 @@ export const includedFeatures = [
   },
   {
     icon: LayoutTemplate,
-    label: "50+ ready-made templates",
+    label: "10+ ready-made templates",
     color: "text-primary",
   },
   { icon: Building2, label: "Team organizations", color: "text-indigo-600" },
   { icon: Upload, label: "Excel & CSV import", color: "text-teal-600" },
   { icon: Download, label: "PDF & CSV export", color: "text-pink-600" },
   { icon: History, label: "Full activity history", color: "text-rose-600" },
-  { icon: FolderOpen, label: "Folder organization", color: "text-amber-600" },
   { icon: Star, label: "Star & pin sheets", color: "text-yellow-600" },
   { icon: GitBranch, label: "Version tracking", color: "text-violet-600" },
   { icon: Lock, label: "Role-based permissions", color: "text-gray-600" },
@@ -268,4 +273,3 @@ export const valueProps = [
     color: "text-cyan-600",
   },
 ];
-

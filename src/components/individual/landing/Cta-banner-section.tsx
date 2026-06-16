@@ -8,46 +8,29 @@ interface CtaBannerSectionProps {
   onGetStarted: () => void;
 }
 
-const CtaBannerSection = ({
-  onDemoOpen,
-  onGetStarted,
-}: CtaBannerSectionProps) => {
+const CtaBannerSection = ({ onDemoOpen, onGetStarted }: CtaBannerSectionProps) => {
   return (
-    <section className="py-24 sm:py-32 bg-white">
-      <div className="max-w-4xl mx-auto px-5 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-br from-primary via-green-600 to-teal-700 text-white px-8 sm:px-14 py-14 sm:py-16 rounded-3xl text-center flex flex-col items-center gap-6 shadow-2xl shadow-primary/20 scroll-reveal-scale">
-          <div className="h-16 w-16 rounded-2xl bg-white/10 flex items-center justify-center">
-            <Rocket className="h-8 w-8 text-white" />
+    <section className="py-24 sm:py-32 bg-gray-50/60 border-t border-gray-100 px-5 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm px-8 sm:px-16 py-14 text-center">
+          <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+            <Rocket className="h-7 w-7 text-primary" />
           </div>
-          <div>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-3">
-              Ready to get started?
-            </h2>
-            <p className="text-base sm:text-lg opacity-85 max-w-xl">
-              Create your free account and have your team collaborating on
-              spreadsheets in under a minute.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button
-              onClick={onGetStarted}
-              className="bg-white text-primary px-8 py-3.5 text-base font-semibold hover:bg-gray-100 h-auto"
-            >
-              Get Started Free
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={onDemoOpen}
-              className="text-white hover:bg-white/10 px-8 py-3.5 text-base font-semibold h-auto border border-white/30"
-            >
-              <Play className="mr-2 h-5 w-5" />
-              Watch Demo
-            </Button>
-          </div>
-          <p className="text-white/60 text-sm">
-            No credit card required · Free forever plan
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3 tracking-tight">
+            Ready to get started?
+          </h2>
+          <p className="text-base sm:text-lg text-gray-500 max-w-md mx-auto mb-8">
+            Create your free account and have your team collaborating on spreadsheets in under a minute.
           </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-5">
+            <Button onClick={onGetStarted} className="btn-primary text-white px-8 py-3.5 text-base font-semibold h-auto">
+              Get Started Free <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+            <Button variant="outline" onClick={onDemoOpen} className="px-8 py-3.5 text-base font-semibold border-2 border-gray-200 text-gray-600 hover:border-primary hover:text-primary h-auto transition-colors">
+              <Play className="mr-2 h-4 w-4" /> Watch Demo
+            </Button>
+          </div>
+          <p className="text-sm text-gray-400">No credit card required · Free forever plan</p>
         </div>
       </div>
     </section>
@@ -55,4 +38,3 @@ const CtaBannerSection = ({
 };
 
 export default CtaBannerSection;
-

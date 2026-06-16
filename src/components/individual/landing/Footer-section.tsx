@@ -1,132 +1,74 @@
 "use client";
 
-import {
-  Table,
-  Shield,
-  Twitter,
-  Github,
-  Linkedin,
-  Mail,
-  Heart,
-} from "lucide-react";
+import { Table, Mail, Heart } from "lucide-react";
+import Link from "next/link";
 
 const FooterSection = () => {
   return (
-    <footer className="bg-gray-950 text-white py-16 sm:py-20">
-      <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-10">
-          <div className="col-span-2">
-            <div className="flex items-center mb-4">
-              <Table className="h-7 w-7 text-primary mr-2" />
-              <span className="text-xl font-bold">SheetSync</span>
+    <footer className="bg-gray-50 border-t border-gray-200 pt-12 pb-8 px-5 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-10 mb-8">
+
+          {/* Brand + tagline */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Table className="h-5 w-5 text-primary" />
+              <span className="text-lg font-bold text-gray-900">SheetSync</span>
             </div>
-            <p className="text-gray-400 text-sm mb-6 max-w-xs leading-relaxed">
-              Cloud spreadsheets built for real-time collaboration. Formulas,
-              templates, organizations — all in one beautiful workspace.
-            </p>
-            <div className="flex items-center gap-2 mb-6">
-              <Shield className="h-4 w-4 text-primary" />
-              <span className="text-xs text-gray-500">
-                Bank-level data encryption
-              </span>
-            </div>
-            {/* Social icons */}
-            <div className="flex items-center gap-3">
-              <a
-                href="#"
-                aria-label="Twitter"
-                className="h-9 w-9 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors"
-              >
-                <Twitter className="h-4 w-4 text-gray-400 hover:text-white" />
-              </a>
-              <a
-                href="#"
-                aria-label="GitHub"
-                className="h-9 w-9 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors"
-              >
-                <Github className="h-4 w-4 text-gray-400 hover:text-white" />
-              </a>
-              <a
-                href="#"
-                aria-label="LinkedIn"
-                className="h-9 w-9 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors"
-              >
-                <Linkedin className="h-4 w-4 text-gray-400 hover:text-white" />
-              </a>
-              <a
-                href="mailto:support@sheetsync.app"
-                aria-label="Email"
-                className="h-9 w-9 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors"
-              >
-                <Mail className="h-4 w-4 text-gray-400 hover:text-white" />
-              </a>
-            </div>
+            <p className="text-xs text-gray-400">Spreadsheets built for teams.</p>
+            <p className="text-xs text-gray-400 mt-0.5">Inspired by Google Sheets.</p>
+            <Link
+              href="mailto:support@sheetsync.app"
+              aria-label="Email"
+              className="mt-3 h-9 w-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-400 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-all duration-200"
+            >
+              <Mail className="h-3.5 w-3.5" />
+            </Link>
           </div>
 
+          {/* Product links */}
           <div>
-            <h4 className="text-xs font-semibold text-gray-400 mb-5 uppercase tracking-widest">
-              Product
-            </h4>
-            <ul className="space-y-3">
-              {[
-                "Features",
-                "Templates",
-                "Import / Export",
-                "Organizations",
-                "Activity Log",
-              ].map((l) => (
-                <li key={l}>
-                  <a
-                    href="#"
-                    className="text-gray-500 hover:text-white transition-colors text-sm"
-                  >
-                    {l}
-                  </a>
+            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Product</p>
+            <ul className="space-y-2">
+              {["Features", "How it works", "What's included", "FAQ"].map((item) => (
+                <li key={item}>
+                  <a href="#" className="text-xs text-gray-400 hover:text-gray-700 transition-colors">{item}</a>
                 </li>
               ))}
             </ul>
           </div>
 
+          {/* Legal links */}
           <div>
-            <h4 className="text-xs font-semibold text-gray-400 mb-5 uppercase tracking-widest">
-              Company
-            </h4>
-            <ul className="space-y-3">
-              {["About", "Blog", "Changelog", "Contact", "Status"].map((l) => (
-                <li key={l}>
-                  <a
-                    href="#"
-                    className="text-gray-500 hover:text-white transition-colors text-sm"
-                  >
-                    {l}
-                  </a>
+            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Legal</p>
+            <ul className="space-y-2">
+              {["Privacy Policy", "Terms of Service", "Security"].map((item) => (
+                <li key={item}>
+                  <a href="#" className="text-xs text-gray-400 hover:text-gray-700 transition-colors">{item}</a>
                 </li>
               ))}
             </ul>
           </div>
+
+          {/* Contact */}
+          <div>
+            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Contact</p>
+            <ul className="space-y-2">
+              <li><a href="mailto:support@sheetsync.app" className="text-xs text-gray-400 hover:text-gray-700 transition-colors">support@sheetsync.app</a></li>
+              <li><span className="text-xs text-gray-400">Early access product</span></li>
+              <li><span className="text-xs text-gray-400">Actively being built</span></li>
+            </ul>
+          </div>
+
         </div>
 
-        <div className="border-t border-gray-800 mt-14 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-gray-600 text-sm">
-            © {new Date().getFullYear()} SheetSync. All rights reserved.
-          </p>
-          {/* Made with love */}
-          <p className="text-gray-600 text-sm flex items-center gap-1.5">
-            Made with{" "}
-            <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500" /> by{" "}
-            <span className="text-gray-400 font-medium">Hassan Rehan</span>
-          </p>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-            {["Privacy Policy", "Terms of Service", "Security"].map((l) => (
-              <a
-                key={l}
-                href="#"
-                className="text-gray-600 hover:text-white text-xs transition-colors"
-              >
-                {l}
-              </a>
-            ))}
-          </div>
+        {/* Bottom bar */}
+        <div className="border-t border-gray-200 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-400">
+          <span>© {new Date().getFullYear()} SheetSync, Inc. All rights reserved.</span>
+          <span className="flex items-center gap-1">
+            Made with <Heart className="h-3 w-3 text-red-400 fill-red-400" /> by Hassan Rehan
+          </span>
+          <span>Early access — features are actively being built.</span>
         </div>
       </div>
     </footer>
@@ -134,4 +76,3 @@ const FooterSection = () => {
 };
 
 export default FooterSection;
-

@@ -68,6 +68,7 @@ interface FormattingBarProps {
   onUnmergeSelection?: () => void;
   selectedRows?: Set<string>;
   onMakeSheetBorderless?: () => void;
+  selectionRange?: { start: { row: number; colIndex: number }; end: { row: number; colIndex: number } } | null;
 }
 
 const FONT_FAMILIES = [
@@ -89,8 +90,9 @@ export function FormattingBar({
   selectedColumnKey, selectedColumnWidth, onSetColumnWidth, onExpandAllColumns,
   onDragResizeAllColumns, onEndResizeAllColumns, onOpenValidation,
   canMergeSelection = false, isMergedSelection = false, onMergeSelection, onUnmergeSelection,
-  selectedRows, onMakeSheetBorderless,
+  selectedRows, onMakeSheetBorderless, selectionRange,
 }: FormattingBarProps) {
+  const hasSelection = !!selectedCell || (!!selectedRows && selectedRows.size > 0) || !!selectionRange;
   const selStyle = ddStyle(isDark);
 
   const dragResizeStartX = React.useRef<number | null>(null);
@@ -197,7 +199,7 @@ export function FormattingBar({
         <ToolSep />
 
         {/* Font family */}
-        <Select value={fontFamily} onValueChange={onFontFamilyChange} disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}>
+        <Select value={fontFamily} onValueChange={onFontFamilyChange} disabled={!hasSelection}>
           <SelectTrigger
             className="sheet-select h-[22px] w-[84px] text-[10px] rounded px-1.5 shrink-0"
             style={selStyle}
@@ -214,7 +216,7 @@ export function FormattingBar({
         </Select>
 
         {/* Font size */}
-        <Select value={fontSize} onValueChange={onFontSizeChange} disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}>
+        <Select value={fontSize} onValueChange={onFontSizeChange} disabled={!hasSelection}>
           <SelectTrigger
             className="sheet-select h-[22px] w-[42px] text-[10px] rounded px-1.5 ml-0.5 shrink-0"
             style={selStyle}
@@ -243,7 +245,7 @@ export function FormattingBar({
         <FormattingToolbar
           currentFormat={currentFormat}
           onFormatChange={onFormatChange}
-          disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}
+          disabled={!hasSelection}
         />
         <ToolSep />
 
@@ -252,7 +254,7 @@ export function FormattingBar({
           icon={WrapText}
           tooltip="Text Wrap"
           onClick={onTextWrapToggle}
-          disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}
+          disabled={!hasSelection}
           active={isSelectedColumnWrapped}
         />
         <IconBtn
@@ -264,7 +266,7 @@ export function FormattingBar({
           icon={isProtected ? Lock : Unlock}
           tooltip={canProtectRows ? "Protect row" : "Owner only"}
           onClick={onProtectionToggle}
-          disabled={(!selectedCell && (!selectedRows || selectedRows.size === 0)) || !canProtectRows}
+          disabled={!hasSelection || !canProtectRows}
           active={isProtected}
         />
         <ToolSep />
@@ -375,7 +377,7 @@ export function FormattingBar({
           <DropdownMenuTrigger asChild>
             <button
               className="sheet-icon-btn h-[22px] px-1.5 rounded flex items-center gap-1 shrink-0 text-[10px]"
-              disabled={!selectedCell && (!selectedRows || selectedRows.size === 0)}
+              disabled={!hasSelection}
             >
               <SlidersHorizontal className="h-3 w-3" />
               <span>More</span>
