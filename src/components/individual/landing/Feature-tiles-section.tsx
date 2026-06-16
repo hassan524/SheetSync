@@ -4,7 +4,7 @@ import { featureTiles } from "@/data/landing";
 
 const FeatureTilesSection = () => {
   return (
-    <section className="relative py-24 sm:py-32 bg-gray-50 border-y border-gray-100 overflow-hidden">
+    <section className="relative py-24 bg-gray-50 border-y border-gray-100 overflow-hidden">
       {/* Background decoration */}
       <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-gradient-to-tl from-primary/3 to-transparent rounded-full blur-3xl pointer-events-none" />
 

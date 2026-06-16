@@ -14,6 +14,7 @@ const navLinks = [
   { label: "What's included", id: "pricing" },
   { label: "FAQ", id: "contact" },
 ];
+import Image from "next/image";
 
 export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -75,9 +76,15 @@ export default function Navigation() {
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
               className="flex items-center gap-2.5 group"
             >
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                <Table className="h-4.5 w-4.5 text-primary" />
-              </div>
+              <div className="h-7 w-7 rounded-lg overflow-hidden bg-primary flex items-center justify-center">
+            <Image
+              src="/icon.png"
+              alt="SheetSync"
+              className="h-full w-full object-cover"
+              width={40}
+              height={40}
+            />
+          </div>
               <span className="text-[17px] font-bold text-gray-900 tracking-tight">
                 SheetSync
               </span>
@@ -89,7 +96,7 @@ export default function Navigation() {
                 <button
                   key={id}
                   onClick={() => scrollToSection(id)}
-                  className="px-3.5 py-2 text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-3.5 py-2 text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   {label}
                 </button>
@@ -102,7 +109,7 @@ export default function Navigation() {
                 onClick={handleGetStarted}
                 disabled={isNavigating}
                 size="sm"
-                className="h-8 px-4 text-[13px] font-semibold gap-1.5 bg-primary hover:bg-primary/90"
+                className="h-8 px-4 text-[13px] font-semibold gap-1.5 bg-primary hover:bg-primary/90 cursor-pointer"
               >
                 {isNavigating
                   ? "Redirecting..."
@@ -144,7 +151,7 @@ export default function Navigation() {
               <button
                 key={id}
                 onClick={() => scrollToSection(id)}
-                className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-primary hover:bg-primary/5 rounded-xl transition-colors cursor-pointer"
               >
                 {label}
                 <ChevronRight className="h-4 w-4 opacity-40" />
@@ -154,7 +161,7 @@ export default function Navigation() {
             <div className="pt-3 space-y-2 border-t border-gray-100 mt-2">
               <Button
                 disabled={isNavigating}
-                className="w-full gap-2 font-semibold bg-primary hover:bg-primary/90"
+                className="w-full gap-2 font-semibold bg-primary hover:bg-primary/90 cursor-pointer"
                 onClick={() => {
                   handleGetStarted();
                 }}
@@ -173,4 +180,3 @@ export default function Navigation() {
     </>
   );
 }
-

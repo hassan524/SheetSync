@@ -2,12 +2,35 @@
 
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Rocket, ArrowRight } from "lucide-react";
-import { steps } from "@/data/landing";
+import { Rocket, ArrowRight, LayoutTemplate, Users, FileDown } from "lucide-react";
 
 interface HowItWorksSectionProps {
   onGetStarted: () => void;
 }
+
+const steps = [
+  {
+    step: 1,
+    icon: LayoutTemplate,
+    title: "Pick a Template",
+    description:
+      "Choose from ready-made templates like budgets, invoices, and project plans — or start from a blank sheet.",
+  },
+  {
+    step: 2,
+    icon: Users,
+    title: "Invite & Edit Together",
+    description:
+      "Share a link with your team and collaborate in real time. See live cursors, use formulas, and merge cells together.",
+  },
+  {
+    step: 3,
+    icon: FileDown,
+    title: "Export as PDF",
+    description:
+      "When you're done, export a pixel-perfect PDF in one click. Layouts, merged cells, and charts all transfer faithfully.",
+  },
+];
 
 function StepCard({
   step,
@@ -25,7 +48,6 @@ function StepCard({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -35,7 +57,6 @@ function StepCard({
       },
       { threshold: 0.2 }
     );
-
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
@@ -59,18 +80,10 @@ function StepCard({
       {/* Step circle */}
       <div
         className={`relative z-10 h-16 w-16 rounded-2xl flex items-center justify-center mb-6 transition-all duration-600 ease-out ${
-          isVisible
-            ? "opacity-100 scale-100"
-            : "opacity-0 scale-75"
+          isVisible ? "opacity-100 scale-100" : "opacity-0 scale-75"
         }`}
         style={{
-          background: `linear-gradient(135deg, ${
-            index === 0
-              ? "#3b82f6, #6366f1"
-              : index === 1
-              ? "#0d7c5f, #10b981"
-              : "#f59e0b, #ef4444"
-          })`,
+          background: "linear-gradient(135deg, #0d7c5f, #10b981)",
           transitionDelay: `${index * 150}ms`,
         }}
       >
@@ -114,13 +127,12 @@ const HowItWorksSection = ({ onGetStarted }: HowItWorksSectionProps) => {
   return (
     <section
       id="how-it-works"
-      className="relative py-24 sm:py-32 bg-gray-50/60 border-y border-gray-100 px-5 sm:px-6 lg:px-8 overflow-hidden"
+      className="relative py-24 bg-gray-50/60 border-y border-gray-100 px-5 sm:px-6 lg:px-8 overflow-hidden"
     >
-      {/* Background decoration */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-br from-primary/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-5xl mx-auto relative z-10">
-        <div className="text-center mb-16 scroll-reveal">
+        <div className="text-center mb-16">
           <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
             Simple by design
           </p>
@@ -128,27 +140,22 @@ const HowItWorksSection = ({ onGetStarted }: HowItWorksSectionProps) => {
             How SheetSync Works
           </h2>
           <p className="text-lg text-gray-500 max-w-xl mx-auto">
-            From zero to collaborating with your team in under two minutes.
+            From template to exported PDF in three simple steps.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-6 mb-14">
           {steps.map((step, i) => (
-            <StepCard
-              key={step.step}
-              step={step}
-              index={i}
-              total={steps.length}
-            />
+            <StepCard key={step.step} step={step} index={i} total={steps.length} />
           ))}
         </div>
 
-        <div className="text-center scroll-reveal">
+        <div className="text-center">
           <Button
             onClick={onGetStarted}
             className="btn-primary text-white px-8 py-4 text-base font-semibold h-auto rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl transition-all duration-300 group"
           >
-            <Rocket className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />{" "}
+            <Rocket className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
             Get Started Free
             <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
           </Button>

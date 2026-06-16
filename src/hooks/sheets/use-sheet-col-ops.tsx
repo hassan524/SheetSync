@@ -1,12 +1,15 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
+// Add to imports at top
 import { SheetRow, ColumnDef, SaveStatus, SelectOption } from "@/types/index";
 import { saveAllRows } from "@/lib/querys/sheet/rows";
 import { saveAllColumns, deleteColumn } from "@/lib/querys/sheet/columns";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { logColAdd, logColDelete, logColumnRename } from "@/lib/querys/sheet/firebase-realtime";
-import { normalizeGeneratedColumnNames, columnIndexToName, getDefaultValueForType } from "@/utils/SheetUtils";
+import { normalizeGeneratedColumnNames, columnIndexToName } from "@/utils/SheetUtils";
 import { SelectSetupDialogState } from "@/types/index";
+
+import { updateColumnType } from "@/lib/querys/sheet/columns";
 
 interface UseColOpsProps {
   sheetId: string;
@@ -21,7 +24,7 @@ interface UseColOpsProps {
   colOps: {
     insertColumn: (type: ColumnDef["type"]) => void;
     deleteColumn: (key: string) => void;
-    changeColumnType: (key: string, type: ColumnDef["type"]) => { updatedColumns: ColumnDef[]; updatedRows: SheetRow[] };
+    changeColumnType: (key: string, type: ColumnDef["type"]) => void;
     renameColumn: (key: string, name: string) => void;
     handleColumnDragStart: (key: string) => void;
     handleColumnDragOver: (e: any, key: string, setter: any) => void;
@@ -32,9 +35,9 @@ interface UseColOpsProps {
   rowsHistory: { currentState: SheetRow[]; pushState: (rows: SheetRow[]) => void };
   markSaving: () => void;
   markSaved: () => void;
-  broadcastSheetSnapshot?: (patch: Record<string, any>) => void;
   currentUser: { id: string } | null;
   selectedCell: { row: number; col: string } | null;
+  broadcastSheetSnapshot: any;
 }
 
 export function useSheetColOps({
@@ -54,7 +57,6 @@ export function useSheetColOps({
   markSaved,
   currentUser,
   selectedCell,
-  broadcastSheetSnapshot,
 }: UseColOpsProps) {
   const persistColumns = useCallback(
     async (nextColumns: ColumnDef[]) => {
@@ -67,31 +69,21 @@ export function useSheetColOps({
     [columnsHistory, markSaved, markSaving, sheetId, setSheetState],
   );
 
-
   const handleInsertColumn = useCallback(
     async (type: ColumnDef["type"]) => {
+      if (type === "select") {
+        setSelectSetupDialog({ open: true, colKey: "__new__", row: null, mode: "insert" });
+        return;
+      }
       colOps.insertColumn(type);
       setTimeout(async () => {
         markSaving();
         const normalizedCols = normalizeGeneratedColumnNames(columnsHistory.currentState);
         columnsHistory.pushState(normalizedCols);
         setSheetState((p: any) => ({ ...p, columns: normalizedCols }));
-
-        // Find the newly added column key and apply default values
-        const newCol = normalizedCols[normalizedCols.length - 1];
-        const defaultVal = getDefaultValueForType(type);
-        const rowsWithDefaults = rowsHistory.currentState.map((row) => {
-          if (!newCol) return row;
-          const current = row[newCol.key];
-          const isEmpty = current === "" || current === null || current === undefined;
-          return isEmpty ? { ...row, [newCol.key]: defaultVal } : row;
-        });
-        rowsHistory.pushState(rowsWithDefaults);
-        setSheetState((p: any) => ({ ...p, rows: rowsWithDefaults }));
-
         await Promise.all([
           saveAllColumns(sheetId, normalizedCols),
-          saveAllRows(sheetId, rowsWithDefaults),
+          saveAllRows(sheetId, rowsHistory.currentState),
         ]);
         markSaved();
         if (isOrgSheet) {
@@ -106,7 +98,7 @@ export function useSheetColOps({
         }).catch(() => { });
       }, 50);
     },
-    [colOps, sheetId, columnsHistory, rowsHistory, markSaving, markSaved, isOrgSheet, organizationId, title, setSheetState],
+    [colOps, sheetId, columnsHistory, rowsHistory, markSaving, markSaved, isOrgSheet, organizationId, title, setSelectSetupDialog, setSheetState],
   );
 
   const handleDeleteColumn = useCallback(
@@ -135,35 +127,28 @@ export function useSheetColOps({
 
   const handleChangeColumnType = useCallback(
     async (colKey: string, newType: ColumnDef["type"]) => {
-      if (!newType) return;
+      if (!newType) return; 
+
+      if (newType === "select") {
+        setSelectSetupDialog({
+          open: true,
+          colKey,
+          row: null,
+          mode: "change",
+        });
+        return;
+      }
 
       try {
         markSaving();
 
-        const { updatedColumns, updatedRows } = colOps.changeColumnType(
-          colKey,
-          newType,
-        );
+        colOps.changeColumnType(colKey, newType);
 
-        // Apply default values for the new type to every row that is empty
-        const defaultVal = getDefaultValueForType(newType);
-        const rowsWithDefaults = updatedRows.map((row) => {
-          const current = row[colKey];
-          const isEmpty = current === "" || current === null || current === undefined;
-          return isEmpty ? { ...row, [colKey]: defaultVal } : row;
-        });
-
-        columnsHistory.pushState(updatedColumns);
-        rowsHistory.pushState(rowsWithDefaults);
-        setSheetState((p: any) => ({
-          ...p,
-          columns: updatedColumns,
-          rows: rowsWithDefaults,
-        }));
+        await updateColumnType(sheetId, colKey, newType);
 
         await Promise.all([
-          saveAllColumns(sheetId, updatedColumns),
-          saveAllRows(sheetId, rowsWithDefaults),
+          saveAllColumns(sheetId, columnsHistory.currentState),
+          saveAllRows(sheetId, rowsHistory.currentState),
         ]);
 
         markSaved();
@@ -171,7 +156,7 @@ export function useSheetColOps({
         console.error(err);
       }
     },
-    [colOps, sheetId, columnsHistory, rowsHistory, setSheetState, markSaving, markSaved]
+    [colOps, sheetId, columnsHistory, rowsHistory]
   );
   const handleColumnDragEnd = useCallback(async () => {
     colOps.handleColumnDragEnd();
@@ -254,15 +239,9 @@ export function useSheetColOps({
       };
       const nextCols = [...columns];
       nextCols.splice(Math.max(0, Math.min(nextCols.length, index)), 0, newCol);
-      // Normalize position for all columns
-      const positionedCols = nextCols.map((col, idx) => ({
-        ...col,
-        position: idx,
-      }));
-      const namedCols = mode === "duplicate" ? positionedCols : normalizeGeneratedColumnNames(positionedCols);
+      const namedCols = mode === "duplicate" ? nextCols : normalizeGeneratedColumnNames(nextCols);
       columnsHistory.pushState(namedCols);
       setSheetState((p: any) => ({ ...p, columns: namedCols }));
-      
       const nextRows = rows.map((r) => {
         const nr: any = { ...r };
         if (mode === "duplicate" && base) {
@@ -279,44 +258,8 @@ export function useSheetColOps({
         return nr;
       });
       rowsHistory.pushState(nextRows);
-      setSheetState((p: any) => ({ ...p, rows: nextRows }));
-
-      // Save immediately to DB to prevent stale closures
-      setTimeout(async () => {
-        markSaving();
-        try {
-          await Promise.all([
-            saveAllColumns(sheetId, namedCols),
-            saveAllRows(sheetId, nextRows),
-          ]);
-          markSaved();
-          if (broadcastSheetSnapshot) {
-            broadcastSheetSnapshot({ columns: namedCols, rows: nextRows });
-          }
-          toast.success(
-            mode === "duplicate"
-              ? `Column "${base?.name}" duplicated`
-              : `Column inserted`
-          );
-          if (isOrgSheet) {
-            logColAdd(sheetId, newCol.name, type);
-          }
-          logActivity({
-            sheetId,
-            organizationId: organizationId ?? undefined,
-            action: mode === "duplicate"
-              ? `duplicated column "${base?.name}"`
-              : `inserted column "${newCol.name}"`,
-            target: title,
-          }).catch(() => {});
-        } catch (error) {
-          console.error("Failed to save column at:", error);
-          toast.error("Failed to persist column.");
-          setSaveStatus("saved");
-        }
-      }, 50);
     },
-    [columns, rows, columnsHistory, rowsHistory, setSheetState, markSaving, markSaved, broadcastSheetSnapshot, sheetId, isOrgSheet, organizationId, title, setSaveStatus],
+    [columns, rows, columnsHistory, rowsHistory, setSheetState],
   );
 
   const clearColumnValues = useCallback(

@@ -16,7 +16,7 @@ function MeshGradientBG() {
         className="absolute inset-0 opacity-50"
         style={{
           backgroundImage:
-            "linear-gradient(to right, rgba(13,124,95,0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(13,124,95,0.07) 1px, transparent 1px)",
+            "linear-gradient(to right, rgba(0, 167, 64, 0.09) 3px, transparent 5px), linear-gradient(to bottom, rgba(0, 115, 23, 0.07) 2px, transparent 1px)",
           backgroundSize: "44px 44px",
         }}
       />
@@ -126,7 +126,7 @@ const HeroSection = ({ onDemoOpen, onGetStarted }: HeroSectionProps) => {
           </p>
 
           {/* CTA */}
-          <div className="h-cta flex justify-start md:justify-center" style={{ marginBottom: "28px" }}>
+          <div className="h-cta cursor-pointer flex justify-start md:justify-center" style={{ marginBottom: "28px" }}>
             <Button
               onClick={onGetStarted}
               className="text-white font-semibold rounded-2xl transition-all duration-300 group"
@@ -162,7 +162,7 @@ const HeroSection = ({ onDemoOpen, onGetStarted }: HeroSectionProps) => {
                 gap: "10px 12px",
               }}
             >
-              {TRUST_ITEMS.map((t) => (
+              {/* {TRUST_ITEMS.map((t) => (
                 <span
                   key={t}
                   className="flex items-center justify-start md:justify-center gap-2"
@@ -180,13 +180,13 @@ const HeroSection = ({ onDemoOpen, onGetStarted }: HeroSectionProps) => {
                   </span>
                   {t}
                 </span>
-              ))}
+              ))} */}
             </div>
           </div>
         </div>
 
         {/* ── Video — simple, big, no browser chrome ──────────────────────── */}
-        <div className="h-video relative mx-auto" style={{ maxWidth: "1100px" }}>
+        <div className="h-video cursor-pointer relative mx-auto" style={{ maxWidth: "1200px" }}>
           {/* Soft glow */}
           <div
             style={{

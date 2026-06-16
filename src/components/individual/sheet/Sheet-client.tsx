@@ -1751,22 +1751,19 @@ export default function SheetClient() {
           ]
             .filter(Boolean)
             .join(" ") || "inherit",
-        borderBottom: format.borderBottom || undefined,
-        borderTop: format.borderTop || undefined,
-        borderLeft: format.borderLeft || undefined,
-        borderRight: format.borderRight || undefined,
-        borderStyle:
-          format.borderStyle && format.borderStyle !== "none"
-            ? format.borderStyle
-            : undefined,
-        borderColor:
-          format.borderStyle && format.borderStyle !== "none"
-            ? format.borderColor || "#d1d5db"
-            : undefined,
-        borderWidth:
-          format.borderStyle && format.borderStyle !== "none"
-            ? `${format.borderWidth ?? 1}px`
-            : undefined,
+        ...(format.borderStyle && format.borderStyle !== "none"
+          ? {
+            borderTop: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+            borderLeft: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+            borderRight: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+            borderBottom: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+          }
+          : {
+            borderBottom: format.borderBottom || undefined,
+            borderTop: format.borderTop || undefined,
+            borderLeft: format.borderLeft || undefined,
+            borderRight: format.borderRight || undefined,
+          }),
       };
 
       const colIdx = columns.findIndex((col) => col.key === colKey);
@@ -2612,7 +2609,7 @@ export default function SheetClient() {
     ],
   );
 
- const handleMakeSheetBorderless = useCallback(async () => {
+  const handleMakeSheetBorderless = useCallback(async () => {
     if (!canEditSheet) {
       showViewerEditMessage();
       return;
@@ -5691,6 +5688,7 @@ export default function SheetClient() {
           onMergeSelection={handleMergeSelection}
           onUnmergeSelection={handleUnmergeSelection}
           onMakeSheetBorderless={handleMakeSheetBorderless}
+          selectionRange={selectionRange}
         />
 
         <FormulaBar
@@ -6519,7 +6517,7 @@ export default function SheetClient() {
 .rdg-sheet.sheet-borderless .rdg-row:hover .rdg-cell,
 .rdg-sheet.sheet-borderless .rdg-cell:hover,
 .rdg-sheet.sheet-borderless .rdg-cell:hover:not([aria-selected="true"]),
-.rdg-sheet.sheet-borderless .rdg-header-cell,
+// .rdg-sheet.sheet-borderless .rdg-header-cell,
 .rdg-sheet.sheet-borderless .rdg-cell:first-child,
 .rdg-sheet.sheet-borderless .rdg-header-cell:first-child {
   border: none !important;

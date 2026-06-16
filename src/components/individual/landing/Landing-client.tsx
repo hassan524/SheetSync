@@ -50,9 +50,9 @@ const LandingClient = () => {
       <ValuePropsBar />
       <FeaturesSection onDemoOpen={handleGetStarted} />
       <HowItWorksSection onGetStarted={handleGetStarted} />
-      <WhatsIncludedSection />
+      {/* <WhatsIncludedSection /> */}
       <FeatureTilesSection />
-      <CtaBannerSection onDemoOpen={handleGetStarted} onGetStarted={handleGetStarted} />
+      {/* <CtaBannerSection onDemoOpen={handleGetStarted} onGetStarted={handleGetStarted} /> */}
       <FaqSection />
       <FooterSection />
     </div>
