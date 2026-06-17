@@ -43,7 +43,6 @@ interface CellRendererProps {
   isLayoutRow?: boolean;
 }
 
-
 export function CellRenderer({
   type,
   colKey,
@@ -76,17 +75,15 @@ export function CellRenderer({
   isLayoutRow,
 }: CellRendererProps) {
 
-  // ── Resolve mergeMode once so both cellContent and outer div can use it ──
   const mergeMode = (mergeStyle as any)?.__mergeMode as string | undefined;
   const mergeTextAlign =
     (cellStyle.textAlign as React.CSSProperties["textAlign"]) ??
     (mergeMode === "center" ? "center" : "left");
 
-  // ── If this is a layout/header row cell, force plain text rendering ──
   const effectiveType: ColumnDef["type"] =
     (isLayoutRow || (cellStyle as any)?.isLayoutRow) ? "text" : type;
 
-  // ── Cell content by type ───────────────────────────────────────────────
+  // ── Cell content engine ────────────────────────────────────────────────
   const cellContent = (() => {
     if (isActiveSelected && rawFormula) {
       return (
@@ -240,7 +237,6 @@ export function CellRenderer({
         if (displayValue === undefined) return "";
         const text = String(displayValue);
 
-        // ── Merge master: respect isWrapped + mergeMode for text behaviour ──
         if (isMergeMaster) {
           const hasMention = text.includes("@");
           const content = hasMention
@@ -264,9 +260,6 @@ export function CellRenderer({
               style={{
                 display: "block",
                 width: "100%",
-                // If text wrap enabled → wrap regardless of merge mode.
-                // merge-across without wrap → truncate like a normal cell.
-                // merge-down / merge-all without wrap → still wrap (multi-row).
                 whiteSpace: isWrapped ? "pre-wrap" : mergeMode === "across" ? "nowrap" : "pre-wrap",
                 overflowWrap: isWrapped ? "break-word" : mergeMode === "across" ? "normal" : "break-word",
                 wordBreak: isWrapped ? "break-word" : mergeMode === "across" ? "normal" : "break-word",
@@ -281,7 +274,6 @@ export function CellRenderer({
           );
         }
 
-        // ── Normal (non-merge) text cell ──────────────────────────────────
         const hasMention = text.includes("@");
         const spanClass = isWrapped
           ? "sheet-cell-text break-words whitespace-pre-wrap w-full"
@@ -313,7 +305,6 @@ export function CellRenderer({
     }
   })();
 
-  // ── Alignment (non-merge cells only) ──────────────────────────────────
   const justifyClass =
     horizontalAlign === "center"
       ? "justify-center"
@@ -347,7 +338,6 @@ export function CellRenderer({
       .slice(0, 2)
     : "";
 
-  // ── Merge master background (paints over covered cells) ───────────────
   const isDarkMode = typeof document !== "undefined" && document.body.dataset.sheetDark === "true";
   const rawBg = cellStyle.backgroundColor;
   const isTransparent = !rawBg ||
@@ -358,69 +348,68 @@ export function CellRenderer({
     ? (isDarkMode ? "#131620" : "#ffffff")
     : rawBg;
 
-  // ── Merge master absolute-positioning override ────────────────────────
-  // react-data-grid has no native colspan/rowspan; we fake it by making the
-  // master cell position:absolute and sizing it to cover all sibling cells.
-  // The bottom border is drawn explicitly so merge-across rows always show
-  // the horizontal grid line regardless of the cell's own border being stripped.
-  // Always apply absolute overlay for merge masters so the div can
-  // visually span beyond the single rdg-cell boundary into sibling cells.
-  // The parent rdg-cell must have overflow:visible (handled in sheet.css).
-  // ── Merge master absolute-positioning override ────────────────────────
-  // Always applied for merge masters. The absolute div escapes the rdg-cell
-  // boundary (which must have overflow:visible in CSS) to visually span
-  // all merged rows/columns.
-  // In CellRenderer.tsx, change mergeOverrideStyle:
   const mergeOverrideStyle: React.CSSProperties = isMergeMaster
     ? {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      width: (() => {
-        if (mergeMode === "across" || mergeMode === "all" || mergeMode === "center") {
-          return autoOverflowWidth ? `${autoOverflowWidth}px` : "100%";
-        }
-        return "100%";
-      })(),
-      height: (() => {
-        if (mergeMode === "down" || mergeMode === "all" || mergeMode === "center") {
-          return mergedHeight ? `${mergedHeight}px` : "100%";
-        }
-        return "100%";
-      })(),
-      zIndex: 8,
-      backgroundColor: mergeBg,
-      border: `1px solid var(--rdg-border-color, #e8eaed)`,
-      boxSizing: "border-box" as const,
-      overflow: "hidden",
-      clipPath: "inset(0 0 0 0)",
-      willChange: "transform",
-      transform: "translateZ(0)",
-      transition: "background-color 0.1s ease",
-      outline: "none",
-    }
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: (() => {
+          if (mergeMode === "across" || mergeMode === "all" || mergeMode === "center") {
+            return autoOverflowWidth ? `${autoOverflowWidth}px` : "100%";
+          }
+          return "100%";
+        })(),
+        height: (() => {
+          if (mergeMode === "down" || mergeMode === "all" || mergeMode === "center") {
+            return mergedHeight ? `${mergedHeight}px` : "100%";
+          }
+          return "100%";
+        })(),
+        zIndex: 8,
+        backgroundColor: mergeBg,
+        boxSizing: "border-box" as const,
+        overflow: "hidden",
+        clipPath: "inset(0 0 0 0)",
+        willChange: "transform",
+        transform: "translateZ(0)",
+        transition: "background-color 0.1s ease",
+        outline: "none",
+      }
     : {};
 
-  // ── Class list ────────────────────────────────────────────────────────
+  // ── FIX CONDITIONS: Isolate explicit user custom borders ──────────────────
+  const hasExplicitBorder = Boolean(
+    (cellStyle.borderStyle && cellStyle.borderStyle !== "none") ||
+    (cellStyle.borderTop && cellStyle.borderTop !== "none") ||
+    (cellStyle.borderBottom && cellStyle.borderBottom !== "none") ||
+    (cellStyle.borderLeft && cellStyle.borderLeft !== "none") ||
+    (cellStyle.borderRight && cellStyle.borderRight !== "none")
+  );
+  
+  const explicitBorderStyle: React.CSSProperties = (cellStyle.borderStyle && cellStyle.borderStyle !== "none")
+    ? {
+        borderStyle: cellStyle.borderStyle,
+        borderWidth: cellStyle.borderWidth ?? "1px",
+        borderColor: cellStyle.borderColor ?? (isDarkMode ? "#374151" : "#e5e7eb"),
+      }
+    : {};
+
   const rootClass = [
     "h-full w-full flex relative group/cell",
-    // Overflow — merge masters need visible so the absolute overlay can bleed out
     isMergeMaster ? "overflow-visible" : (activeCollab || shouldAutoOverflow ? "overflow-visible" : "overflow-hidden"),
     shouldAutoOverflow ? "sheet-cell-auto-overflow-master" : "",
     isAutoOverflowCovered ? "sheet-cell-auto-overflow-covered" : "",
-    // Vertical + horizontal alignment
     isMergeMaster
       ? [
-        "items-start pt-1.5 pb-1.5 sheet-cell-merge-master",
-        mergeMode === "center" ? "justify-center" : "justify-start",
-      ].join(" ")
+          "items-start pt-1.5 pb-1.5 sheet-cell-merge-master",
+          mergeMode === "center" ? "justify-center" : "justify-start",
+        ].join(" ")
       : [
-        isWrapped ? "items-start pt-1.5" : "items-center",
-        justifyClass,
-      ].join(" "),
+          isWrapped ? "items-start pt-1.5" : "items-center",
+          justifyClass,
+        ].join(" "),
     type === "checkbox" ? "justify-center" : "",
     "px-2.5 gap-1.5",
-    // Selection highlight — skip on merge master to avoid fighting mergeOverrideStyle's bg
     !isMergeMaster && isSelected ? "bg-primary/10" : "",
     !isMergeMaster && isActiveSelected ? "sheet-cell-active-selected" : "",
     validationWarning ? "sheet-cell-validation-warning" : "",
@@ -429,25 +418,27 @@ export function CellRenderer({
     .filter(Boolean)
     .join(" ");
 
-  // ── Render ────────────────────────────────────────────────────────────
   return (
     <div
       data-fill-row={rowIdx}
+      // ── Explicit structural tags passed straight up to parents via inline CSS variable hooks ──
+      data-explicit-border={hasExplicitBorder ? "true" : "false"}
       className={rootClass}
       style={{
         color: "inherit",
         ...cellStyle,
         ...mergeStyle,
         ...mergeOverrideStyle,
-        // Merge master: clip content within the overlay bounds
+        ...explicitBorderStyle, 
+        // Force an internal custom variable that bypasses the universal root color override
+        ...((hasExplicitBorder && cellStyle.borderColor) ? { "--local-border-color": cellStyle.borderColor } : {}),
         ...(isMergeMaster ? { overflow: "hidden" } : {}),
-        // Collaborator presence highlight (overrides merge bg for collab)
         ...(activeCollab
           ? {
-            outline: `2px solid ${activeCollab.color}`,
-            outlineOffset: "-2px",
-            backgroundColor: `${activeCollab.color}18`,
-          }
+              outline: `2px solid ${activeCollab.color}`,
+              outlineOffset: "-2px",
+              backgroundColor: `${activeCollab.color}18`,
+            }
           : {}),
       }}
       onClick={(e) => {
@@ -467,78 +458,44 @@ export function CellRenderer({
           : validationWarning ?? undefined
       }
     >
-      {/* ── Collaborator name tag floating above cell ──────────────────── */}
       {activeCollab && (
-        <div
-          className="absolute left-0 z-50 pointer-events-none select-none"
-          style={{ top: "-24px" }}
-        >
+        <div className="absolute left-0 z-50 pointer-events-none select-none" style={{ top: "-24px" }}>
           <div
             className="flex items-center gap-1 pl-1 pr-2 py-[3px] rounded-sm shadow-lg whitespace-nowrap"
-            style={{
-              backgroundColor: activeCollab.color,
-              boxShadow: `0 2px 10px ${activeCollab.color}66`,
-            }}
+            style={{ backgroundColor: activeCollab.color, boxShadow: `0 2px 10px ${activeCollab.color}66` }}
           >
             <div
               className="h-4 w-4 rounded-full flex items-center justify-center shrink-0"
-              style={{
-                backgroundColor: "rgba(255,255,255,0.3)",
-                fontSize: "8px",
-                fontWeight: 800,
-                color: "#fff",
-                lineHeight: 1,
-              }}
+              style={{ backgroundColor: "rgba(255,255,255,0.3)", fontSize: "8px", fontWeight: 800, color: "#fff", lineHeight: 1 }}
             >
               {collabInitials}
             </div>
-            <span
-              style={{ fontSize: "10px", fontWeight: 600, color: "#fff", lineHeight: 1 }}
-            >
+            <span style={{ fontSize: "10px", fontWeight: 600, color: "#fff", lineHeight: 1 }}>
               {activeCollab.name}
             </span>
           </div>
-          <div
-            style={{
-              width: 0,
-              height: 0,
-              borderLeft: "4px solid transparent",
-              borderRight: "4px solid transparent",
-              borderTop: `4px solid ${activeCollab.color}`,
-              marginLeft: "8px",
-            }}
-          />
+          <div style={{ width: 0, height: 0, borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderTop: `4px solid ${activeCollab.color}`, marginLeft: "8px" }} />
         </div>
       )}
 
-      {/* ── Validation warning icon ────────────────────────────────────── */}
       {validationWarning && (
         <span className="sheet-validation-marker" aria-label={validationWarning}>
           <AlertTriangle className="h-3 w-3" />
         </span>
       )}
 
-      {/* ── Row lock icon ──────────────────────────────────────────────── */}
       {isProtected && (
         <Lock className="absolute top-1 right-1 h-2 w-2 text-gray-300 opacity-0 group-hover/cell:opacity-60 transition-opacity" />
       )}
 
-      {/* ── Comment dot ───────────────────────────────────────────────── */}
       {isOrgSheet && cellComments.length > 0 && (
         <CommentDot count={cellComments.length} />
       )}
 
-      {/* ── Main cell content ──────────────────────────────────────────── */}
-      <span
-        className={
-          shouldAutoOverflow ? "sheet-cell-auto-overflow-content" : "contents"
-        }
-        style={contentStyle}
-      >
+      <span className={shouldAutoOverflow ? "sheet-cell-auto-overflow-content" : "contents"} style={contentStyle}>
         {cellContent}
       </span>
 
-      {/* ── Fill handle drag button ────────────────────────────────────── */}
       {isSelected && onFillStart && (
         <button
           type="button"
@@ -552,7 +509,6 @@ export function CellRenderer({
         />
       )}
 
-      {/* ── Comment button (org sheets) ───────────────────────────────── */}
       {isOrgSheet && (
         <button
           className="absolute bottom-0.5 right-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity duration-100"

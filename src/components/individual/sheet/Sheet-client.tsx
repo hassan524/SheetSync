@@ -1753,17 +1753,21 @@ export default function SheetClient() {
             .join(" ") || "inherit",
         ...(format.borderStyle && format.borderStyle !== "none"
           ? {
-            borderTop: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
-            borderLeft: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
-            borderRight: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
-            borderBottom: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
-          }
+              borderStyle: format.borderStyle,
+              borderWidth: `${format.borderWidth ?? 1}px`,
+              borderColor: format.borderColor || "#d1d5db",
+              borderTop: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+              borderLeft: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+              borderRight: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+              borderBottom: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+            }
           : {
-            borderBottom: format.borderBottom || undefined,
-            borderTop: format.borderTop || undefined,
-            borderLeft: format.borderLeft || undefined,
-            borderRight: format.borderRight || undefined,
-          }),
+              borderStyle: format.borderStyle || undefined,
+              borderBottom: format.borderBottom || undefined,
+              borderTop: format.borderTop || undefined,
+              borderLeft: format.borderLeft || undefined,
+              borderRight: format.borderRight || undefined,
+            }),
       };
 
       const colIdx = columns.findIndex((col) => col.key === colKey);
@@ -6359,190 +6363,326 @@ export default function SheetClient() {
 
         {/* ── Global styles ─────────────────────────────────────────── */}
         <style jsx global>{`
-          /* Scrollbars */
-          .sheet-root * {
-            scrollbar-width: thin;
-            scrollbar-color: #c7cdd8 transparent;
-          }
-          .sheet-root *::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-          }
-          .sheet-root *::-webkit-scrollbar-thumb {
-            background: #c7cdd8;
-            border-radius: 999px;
-          }
-          .sheet-root *::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          .no-scrollbar {
-            -ms-overflow-style: auto;
-            scrollbar-width: thin;
-          }
+  /* Scrollbars */
+  .sheet-root * {
+    scrollbar-width: thin;
+    scrollbar-color: #c7cdd8 transparent;
+  }
+  .sheet-root *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .sheet-root *::-webkit-scrollbar-thumb {
+    background: #c7cdd8;
+    border-radius: 999px;
+  }
+  .sheet-root *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: auto;
+    scrollbar-width: thin;
+  }
 
-          /*
-           * ── Merge master cell ─────────────────────────────────────
-           * The grid cell wrapper must overflow so the absolutely-
-           * positioned master box can paint across its siblings.
-           */
-.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
-  overflow: visible !important;
-  contain: none !important;
-  z-index: 6;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-  isolation: isolate;          /* ← add this */
-}
-          .rdg-sheet
-            .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
-          .rdg-sheet
-            .rdg-row:hover
-            .rdg-cell:has(.sheet-cell-merge-master) {
-            outline: none !important;
-            background: transparent !important;
-          }
-          /* Draw the 1px grid border on the master element itself */
-          .sheet-cell-merge-master {
-            border: 1px solid var(--rdg-border-color, #e8eaed) !important;
-          }
-          /* Selection / edit highlight for master */
-          .sheet-cell-merge-master.sheet-cell-active-selected,
-          .sheet-cell-merge-master:has(input:focus),
-          .sheet-cell-merge-master:has(textarea:focus) {
-            outline: 2px solid var(--primary, #0d7c5f) !important;
-            outline-offset: -2px !important;
-          }
+  /* ── Merge master cell ───────────────────────────────────── */
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
+    overflow: visible !important;
+    contain: none !important;
+    z-index: 6;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    isolation: isolate;
+  }
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
+    outline: none !important;
+    background: transparent !important;
+  }
+  
+  .sheet-cell-merge-master {
+    border: 1px solid var(--rdg-border-color, #e8eaed) !important;
+  }
+  
+  .sheet-cell-merge-master.sheet-cell-active-selected,
+  .sheet-cell-merge-master:has(input:focus),
+  .sheet-cell-merge-master:has(textarea:focus) {
+    outline: 2px solid var(--primary, #0d7c5f) !important;
+    outline-offset: -2px !important;
+  }
 
-          /* Suppress rdg-cell row hover highlight bleeding into merge master */
-.rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
-  background: transparent !important;
-  outline: none !important;
-  box-shadow: none !important;
-}
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
+    background: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
 
-/* Suppress the selection outline on the rdg-cell wrapper — 
-   the master div draws its own outline */
-.rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
-  outline: none !important;
-  background: transparent !important;
-}
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
+    outline: none !important;
+    background: transparent !important;
+  }
 
-          /*
-           * ── Covered (slave) cells ─────────────────────────────────
-           * Strip all visual chrome; let clicks fall through to our
-           * invisible overlay div which calls selectMergeBlock().
-           */
-          .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
-            border-top: none !important;
-            border-left: none !important;
-            outline: none !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            overflow: visible !important;
-            contain: none !important;
-          }
-          .rdg-sheet
-            .rdg-cell:has(.sheet-merge-covered-cell)[aria-selected="true"],
-          .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell):hover,
-          .rdg-sheet
-            .rdg-row:hover
-            .rdg-cell:has(.sheet-merge-covered-cell) {
-            outline: none !important;
-            background: transparent !important;
-            box-shadow: none !important;
-          }
-          .sheet-merge-covered-cell {
-            background: transparent !important;
-            pointer-events: auto;
-            cursor: cell;
-          }
-          /*
-           * FIX 4 — If a ghost editor ever opens inside a covered cell
-           * (shouldn't happen after fix 2, but kept as a safety net),
-           * hide its inputs so the user doesn't see a floating text field.
-           */
-          .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) input,
-          .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) textarea {
-            display: none !important;
-          }
+  /* ── Covered (slave) cells ───────────────────────────────── */
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
+    border-top: none !important;
+    border-left: none !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    contain: none !important;
+  }
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell)[aria-selected="true"],
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell):hover,
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-merge-covered-cell) {
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .sheet-merge-covered-cell {
+    background: transparent !important;
+    pointer-events: auto;
+    cursor: cell;
+  }
+  
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) input,
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) textarea {
+    display: none !important;
+  }
 
-          /* ── Selection outline at all zoom levels ─────────────────── */
-          .rdg-sheet .rdg-cell[aria-selected="true"] {
-            outline: 2px solid var(--primary, #0d7c5f) !important;
-            outline-offset: -2px !important;
-          }
-          .rdg-sheet .rdg-header-row .rdg-cell {
-            outline: 1px solid var(--rdg-border-color, #e2e8f0) !important;
-            outline-offset: -1px !important;
-            border: none !important;
-          }
-          .sheet-dark .rdg-sheet .rdg-cell {
-            outline-color: #2a3045 !important;
-          }
+  /* ── Selection outline ────────────────────────────────────── */
+  .rdg-sheet .rdg-cell[aria-selected="true"] {
+    outline: 2px solid var(--primary, #0d7c5f) !important;
+    outline-offset: -2px !important;
+    z-index: 9 !important;
+  }
+  .rdg-sheet .rdg-header-row .rdg-cell {
+    outline: 1px solid var(--rdg-border-color, #e2e8f0) !important;
+    outline-offset: -1px !important;
+    border: none !important;
+  }
+  .sheet-dark .rdg-sheet .rdg-cell {
+    outline-color: #2a3045 !important;
+  }
 
-          /* ── Mobile tweaks ────────────────────────────────────────── */
-          @media (max-width: 640px) {
-            .rdg-sheet {
-              font-size: 11px !important;
-            }
-            .sheet-column-type-submenu {
-              transform: translate3d(0, 6px, 0) !important;
-              max-width: calc(100vw - 24px);
-            }
-          }
+  @media (max-width: 640px) {
+    .rdg-sheet { font-size: 11px !important; }
+    .sheet-column-type-submenu {
+      transform: translate3d(0, 6px, 0) !important;
+      max-width: calc(100vw - 24px);
+    }
+  }
 
-          /* Restore border + overflow on merge master editors */
-.sheet-cell-merge-master {
-  border: 1px solid var(--sh-border, #e8eaed) !important;
-  overflow: visible !important;
-}
+  .sheet-cell-merge-master {
+    border: 1px solid var(--sh-border, #e8eaed) !important;
+    overflow: visible !important;
+  }
 
-/* Cyan outline when focused */
-.sheet-cell-merge-master.sheet-cell-active-selected {
-  outline: 2px solid var(--primary, #0d7c5f) !important;
-  outline-offset: -2px !important;
-}
+  .sheet-cell-merge-master.sheet-cell-active-selected {
+    outline: 2px solid var(--primary, #0d7c5f) !important;
+    outline-offset: -2px !important;
+  }
 
-/* Hide any stray inputs in covered cells */
-.rdg-cell:has(.sheet-merge-covered-cell) input,
-.rdg-cell:has(.sheet-merge-covered-cell) textarea {
-  display: none !important;
-}
+  .rdg-cell:has(.sheet-merge-covered-cell) input,
+  .rdg-cell:has(.sheet-merge-covered-cell) textarea {
+    display: none !important;
+  }
 
-/* ── Borderless mode — force remove ALL borders and outlines ── */
-.rdg-sheet.sheet-borderless .rdg-cell,
-.rdg-sheet.sheet-borderless .rdg-row .rdg-cell,
-.rdg-sheet.sheet-borderless .rdg-row:hover .rdg-cell,
-.rdg-sheet.sheet-borderless .rdg-cell:hover,
-.rdg-sheet.sheet-borderless .rdg-cell:hover:not([aria-selected="true"]),
-// .rdg-sheet.sheet-borderless .rdg-header-cell,
-.rdg-sheet.sheet-borderless .rdg-cell:first-child,
-.rdg-sheet.sheet-borderless .rdg-header-cell:first-child {
-  border: none !important;
-  border-top: none !important;
-  border-right: none !important;
-  border-bottom: none !important;
-  border-left: none !important;
-  outline: none !important;
-  box-shadow: none !important;
-}
+  /* ── Borderless Mode Conditional Injections ── */
+  
+  /* Strip gridlines ONLY if cell DOES NOT contain a custom explicit border node */
+  .rdg-sheet.sheet-borderless .rdg-cell:not(:has([data-explicit-border="true"])),
+  .rdg-sheet.sheet-borderless .rdg-row .rdg-cell:not(:has([data-explicit-border="true"])),
+  .rdg-sheet.sheet-borderless .rdg-row:hover .rdg-cell:not(:has([data-explicit-border="true"])),
+  .rdg-sheet.sheet-borderless .rdg-cell:hover:not(:has([data-explicit-border="true"])),
+  .rdg-sheet.sheet-borderless .rdg-cell:first-child:not(:has([data-explicit-border="true"])) {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
 
-.rdg-sheet.sheet-borderless .rdg-header-row {
-  border: none !important;
-  border-bottom: none !important;
-}
+  /* Condition: If cell contains a custom explicit border, force cell view wrapper to show it */
+  .rdg-sheet.sheet-borderless .rdg-cell:has([data-explicit-border="true"]) {
+    border: none !important;
+    overflow: visible !important;
+    contain: none !important;
+  }
 
-.rdg-sheet.sheet-borderless .sheet-cell-merge-master {
-  border: none !important;
-}
+  .rdg-sheet.sheet-borderless .rdg-header-row {
+    border: none !important;
+    border-bottom: none !important;
+  }
 
-.rdg-sheet.sheet-borderless .rdg-cell[aria-selected="true"] {
-  outline: 2px solid var(--primary, #0d7c5f) !important;
-  box-shadow: none !important;
-}
-        `}</style>
+  .rdg-sheet.sheet-borderless .sheet-cell-merge-master:not([data-explicit-border="true"]) {
+    border: none !important;
+  }
+
+  .rdg-sheet.sheet-borderless .rdg-cell[aria-selected="true"] {
+    outline: 2px solid var(--primary, #0d7c5f) !important;
+    box-shadow: none !important;
+  }
+`}</style><style jsx global>{`
+  /* Scrollbars */
+  .sheet-root * {
+    scrollbar-width: thin;
+    scrollbar-color: #c7cdd8 transparent;
+  }
+  .sheet-root *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .sheet-root *::-webkit-scrollbar-thumb {
+    background: #c7cdd8;
+    border-radius: 999px;
+  }
+  .sheet-root *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: auto;
+    scrollbar-width: thin;
+  }
+
+  /* ── Merge master cell ───────────────────────────────────── */
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master) {
+    overflow: visible !important;
+    contain: none !important;
+    z-index: 6;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    isolation: isolate;
+  }
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"],
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
+    outline: none !important;
+    background: transparent !important;
+  }
+  
+  .sheet-cell-merge-master {
+    border: 1px solid var(--rdg-border-color, #e8eaed) !important;
+  }
+  
+  .sheet-cell-merge-master.sheet-cell-active-selected,
+  .sheet-cell-merge-master:has(input:focus),
+  .sheet-cell-merge-master:has(textarea:focus) {
+    outline: 2px solid var(--primary, #0d7c5f) !important;
+    outline-offset: -2px !important;
+  }
+
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-merge-master) {
+    background: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  .rdg-sheet .rdg-cell:has(.sheet-cell-merge-master)[aria-selected="true"] {
+    outline: none !important;
+    background: transparent !important;
+  }
+
+  /* ── Covered (slave) cells ───────────────────────────────── */
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) {
+    border-top: none !important;
+    border-left: none !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    contain: none !important;
+  }
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell)[aria-selected="true"],
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell):hover,
+  .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-merge-covered-cell) {
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .sheet-merge-covered-cell {
+    background: transparent !important;
+    pointer-events: auto;
+    cursor: cell;
+  }
+  
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) input,
+  .rdg-sheet .rdg-cell:has(.sheet-merge-covered-cell) textarea {
+    display: none !important;
+  }
+
+  /* ── Selection outline ────────────────────────────────────── */
+  .rdg-sheet .rdg-cell[aria-selected="true"] {
+    outline: 2px solid var(--primary, #0d7c5f) !important;
+    outline-offset: -2px !important;
+    z-index: 9 !important;
+  }
+  .rdg-sheet .rdg-header-row .rdg-cell {
+    outline: 1px solid var(--rdg-border-color, #e2e8f0) !important;
+    outline-offset: -1px !important;
+    border: none !important;
+  }
+  .sheet-dark .rdg-sheet .rdg-cell {
+    outline-color: #2a3045 !important;
+  }
+
+  @media (max-width: 640px) {
+    .rdg-sheet { font-size: 11px !important; }
+    .sheet-column-type-submenu {
+      transform: translate3d(0, 6px, 0) !important;
+      max-width: calc(100vw - 24px);
+    }
+  }
+
+  .sheet-cell-merge-master {
+    border: 1px solid var(--sh-border, #e8eaed) !important;
+    overflow: visible !important;
+  }
+
+  .sheet-cell-merge-master.sheet-cell-active-selected {
+    outline: 2px solid var(--primary, #0d7c5f) !important;
+    outline-offset: -2px !important;
+  }
+
+  .rdg-cell:has(.sheet-merge-covered-cell) input,
+  .rdg-cell:has(.sheet-merge-covered-cell) textarea {
+    display: none !important;
+  }
+
+  /* ── Borderless Mode Conditional Injections ── */
+  
+  /* Strip gridlines ONLY if cell DOES NOT contain a custom explicit border node */
+  .rdg-sheet.sheet-borderless .rdg-cell:not(:has([data-explicit-border="true"])),
+  .rdg-sheet.sheet-borderless .rdg-row .rdg-cell:not(:has([data-explicit-border="true"])),
+  .rdg-sheet.sheet-borderless .rdg-row:hover .rdg-cell:not(:has([data-explicit-border="true"])),
+  .rdg-sheet.sheet-borderless .rdg-cell:hover:not(:has([data-explicit-border="true"])),
+  .rdg-sheet.sheet-borderless .rdg-cell:first-child:not(:has([data-explicit-border="true"])) {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Condition: If cell contains a custom explicit border, force cell view wrapper to show it */
+  .rdg-sheet.sheet-borderless .rdg-cell:has([data-explicit-border="true"]) {
+    border: none !important;
+    overflow: visible !important;
+    contain: none !important;
+  }
+
+  .rdg-sheet.sheet-borderless .rdg-header-row {
+    border: none !important;
+    border-bottom: none !important;
+  }
+
+  .rdg-sheet.sheet-borderless .sheet-cell-merge-master:not([data-explicit-border="true"]) {
+    border: none !important;
+  }
+
+  .rdg-sheet.sheet-borderless .rdg-cell[aria-selected="true"] {
+    outline: 2px solid var(--primary, #0d7c5f) !important;
+    box-shadow: none !important;
+  }
+`}</style>
       </div>
     </TooltipProvider>
   );
