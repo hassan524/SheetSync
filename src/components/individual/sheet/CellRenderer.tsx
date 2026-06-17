@@ -2,7 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
-import { AlertTriangle, Check, Calendar, Lock, MessageSquare } from "lucide-react";
+import { AlertTriangle, Check, Calendar, Lock, MessageSquare, ChevronDown } from "lucide-react";
 import { RenderCellProps } from "react-data-grid";
 import { SheetRow, ColumnDef } from "@/types/index";
 import { getStatusOptionStyle } from "@/lib/sheet-formatting-helpers";
@@ -495,6 +495,10 @@ export function CellRenderer({
       <span className={shouldAutoOverflow ? "sheet-cell-auto-overflow-content" : "contents"} style={contentStyle}>
         {cellContent}
       </span>
+
+      {(effectiveType === "priority" || effectiveType === "status" || effectiveType === "select") && (
+        <ChevronDown className="h-3.5 w-3.5 text-gray-400/60 group-hover/cell:text-gray-400 transition-colors ml-auto shrink-0 pointer-events-none" />
+      )}
 
       {isSelected && onFillStart && (
         <button

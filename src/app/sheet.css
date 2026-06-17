@@ -924,7 +924,6 @@
 
 /* Drop cell layout borders ONLY if the cell doesn't have custom properties */
 .rdg-sheet.sheet-borderless .rdg-cell:not(:has([data-explicit-border="true"])),
-.rdg-sheet.sheet-borderless .rdg-header-cell,
 .rdg-sheet.sheet-borderless
   .rdg-row
   .rdg-cell:not(:has([data-explicit-border="true"])),
@@ -955,10 +954,7 @@
   contain: none !important;
 }
 
-.rdg-sheet.sheet-borderless .rdg-header-row {
-  border: none !important;
-  border-bottom: none !important;
-}
+/* Header row retains borders in borderless mode */
 
 .rdg-sheet.sheet-borderless
   .sheet-cell-merge-master:not([data-explicit-border="true"]) {
@@ -971,8 +967,7 @@
 }
 
 .rdg-sheet.sheet-borderless
-  .rdg-cell:first-child:not(:has([data-explicit-border="true"])),
-.rdg-sheet.sheet-borderless .rdg-header-cell:first-child {
+  .rdg-cell:first-child:not(:has([data-explicit-border="true"])) {
   border: none !important;
   border-right: none !important;
 }

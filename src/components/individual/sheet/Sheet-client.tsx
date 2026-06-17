@@ -4318,15 +4318,15 @@ export default function SheetClient() {
             className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer"
             style={{ accentColor: "var(--primary)" }}
             checked={
-              selectedRows.size === activeRows.length && activeRows.length > 0
+              activeRows.length > 0 && selectedRows.has(activeRows[0]?.id)
             }
-            onChange={(e) =>
-              setSelectedRows(
-                e.target.checked
-                  ? new Set(activeRows.map((r) => r.id))
-                  : new Set(),
-              )
-            }
+            onChange={(e) => {
+              if (e.target.checked && activeRows.length > 0) {
+                setSelectedRows(new Set([activeRows[0].id]));
+              } else {
+                setSelectedRows(new Set());
+              }
+            }}
           />
         </div>
       ),
@@ -4812,12 +4812,35 @@ export default function SheetClient() {
               onCellClick={() => {
                 if (mergeInfo && isMergeMaster) {
                   selectMergeBlock(mergeInfo);
+                  if (type === "priority" || type === "status" || type === "select") {
+                    queueMicrotask(() => {
+                      if (gridRef.current) {
+                        const colIdx = columns.findIndex((c) => c.key === col.key);
+                        gridRef.current.startEditingCell({
+                          rowIdx: mergeInfo.masterRow,
+                          idx: colIdx + 1,
+                        });
+                      }
+                    });
+                  }
                   return;
                 }
                 setSelectedColumnKey(null);
                 setSelectedCell({ row: rowIdx, col: col.key });
                 if (rightPanel === "validation") setFocusedColumnKey(col.key);
                 setActiveCommentCell(`${rowIdx}-${col.key}`);
+                
+                if (type === "priority" || type === "status" || type === "select") {
+                  queueMicrotask(() => {
+                    if (gridRef.current) {
+                      const colIdx = columns.findIndex((c) => c.key === col.key);
+                      gridRef.current.startEditingCell({
+                        rowIdx,
+                        idx: colIdx + 1,
+                      });
+                    }
+                  });
+                }
               }}
               onCommentClick={(e) => {
                 e.stopPropagation();
@@ -5080,6 +5103,7 @@ export default function SheetClient() {
             return (
               <EditCellWrapper isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
                 <Select
+                  defaultOpen={true}
                   value={String(row[column.key] ?? "")}
                   onValueChange={(v) => {
                     const nextRow = { ...row, [column.key]: v };
@@ -5132,6 +5156,7 @@ export default function SheetClient() {
             return (
               <EditCellWrapper isMergeMaster={isMergeMaster} editWidth={editWidth} editHeight={editHeight} cellStyle={cellStyle} isDark={isDark}>
                 <Select
+                  defaultOpen={true}
                   value={String(row[column.key] ?? "")}
                   onValueChange={(v) => {
                     const nextRow = { ...row, [column.key]: v };
@@ -5693,6 +5718,7 @@ export default function SheetClient() {
           onUnmergeSelection={handleUnmergeSelection}
           onMakeSheetBorderless={handleMakeSheetBorderless}
           selectionRange={selectionRange}
+          onSelectAllRows={() => setSelectedRows(new Set(filteredRows.map((r) => r.id)))}
         />
 
         <FormulaBar
@@ -6509,10 +6535,7 @@ export default function SheetClient() {
     contain: none !important;
   }
 
-  .rdg-sheet.sheet-borderless .rdg-header-row {
-    border: none !important;
-    border-bottom: none !important;
-  }
+  /* Header row retains borders in borderless mode */
 
   .rdg-sheet.sheet-borderless .sheet-cell-merge-master:not([data-explicit-border="true"]) {
     border: none !important;
@@ -6669,10 +6692,7 @@ export default function SheetClient() {
     contain: none !important;
   }
 
-  .rdg-sheet.sheet-borderless .rdg-header-row {
-    border: none !important;
-    border-bottom: none !important;
-  }
+  /* Header row retains borders in borderless mode */
 
   .rdg-sheet.sheet-borderless .sheet-cell-merge-master:not([data-explicit-border="true"]) {
     border: none !important;
