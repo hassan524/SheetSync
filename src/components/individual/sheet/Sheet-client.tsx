@@ -710,6 +710,8 @@ export default function SheetClient() {
     startH: number;
     pointerId: number;
   } | null>(null);
+  const colResizeStartRef = useRef<ColumnDef[] | null>(null);
+  const colResizeRef = useRef<{ colKey: string; startX: number; startW: number } | null>(null);
   const fillDragRef = useRef<{ row: number; colKey: string; pointerId: number } | null>(null);
   const fillTargetRowRef = useRef<number | null>(null);
   const smartClipboardRef = useRef<{
@@ -1753,21 +1755,21 @@ export default function SheetClient() {
             .join(" ") || "inherit",
         ...(format.borderStyle && format.borderStyle !== "none"
           ? {
-              borderStyle: format.borderStyle,
-              borderWidth: `${format.borderWidth ?? 1}px`,
-              borderColor: format.borderColor || "#d1d5db",
-              borderTop: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
-              borderLeft: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
-              borderRight: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
-              borderBottom: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
-            }
+            borderStyle: format.borderStyle,
+            borderWidth: `${format.borderWidth ?? 1}px`,
+            borderColor: format.borderColor || "#d1d5db",
+            borderTop: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+            borderLeft: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+            borderRight: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+            borderBottom: `${format.borderWidth ?? 1}px ${format.borderStyle} ${format.borderColor || "#d1d5db"}`,
+          }
           : {
-              borderStyle: format.borderStyle || undefined,
-              borderBottom: format.borderBottom || undefined,
-              borderTop: format.borderTop || undefined,
-              borderLeft: format.borderLeft || undefined,
-              borderRight: format.borderRight || undefined,
-            }),
+            borderStyle: format.borderStyle || undefined,
+            borderBottom: format.borderBottom || undefined,
+            borderTop: format.borderTop || undefined,
+            borderLeft: format.borderLeft || undefined,
+            borderRight: format.borderRight || undefined,
+          }),
       };
 
       const colIdx = columns.findIndex((col) => col.key === colKey);
@@ -2551,7 +2553,7 @@ export default function SheetClient() {
         markSaving();
         try {
           await Promise.all(ops);
-          toast.success("Applied format to selected row(s)");
+          // toast.success("Applied format to selected row(s)");
         } catch {
           toast.error("Failed to persist some formats.");
         }
@@ -2562,7 +2564,7 @@ export default function SheetClient() {
 
       if (selectedColumnKey) {
         await handleApplyColumnFormat(selectedColumnKey, format);
-        toast.success("Applied format to entire column");
+        // toast.success("Applied format to entire column");
         return;
       }
 
@@ -2635,7 +2637,7 @@ export default function SheetClient() {
     try {
       await saveCellFormat(sheetId, "sheet:all", sheetFormat);
       broadcastSheetSnapshot({ cellFormats: updatedFormats });
-      toast.success(isBorderless ? "Sheet borders restored" : "Sheet borders hidden");
+      // toast.success(isBorderless ? "Sheet borders restored" : "Sheet borders hidden");
       markSaved();
     } catch {
       toast.error("Failed to save borderless sheet setting.");
@@ -4235,6 +4237,48 @@ export default function SheetClient() {
     cutCellOrRange: clipboard.cutCellOrRange,
   });
 
+  // column resize 
+  const beginColResize = useCallback(
+    (colKey: string, e: React.PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const col = columns.find((c) => c.key === colKey);
+      colResizeRef.current = { colKey, startX: e.clientX, startW: col?.width ?? 160 };
+
+      const onMove = (ev: PointerEvent) => {
+        const st = colResizeRef.current;
+        if (!st) return;
+        const next = Math.max(48, Math.min(800, st.startW + (ev.clientX - st.startX)));
+        setSheetState((p) => ({
+          ...p,
+          columns: p.columns.map((c) => c.key === st.colKey ? { ...c, width: next } : c),
+        }));
+      };
+
+      const onUp = () => {
+        colResizeRef.current = null;
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        setSheetState((p) => {
+          const finalCols = p.columns;
+          columnsHistory.pushState(finalCols);
+          markSaving();
+          saveAllColumns(sheetId, finalCols)
+            .then(markSaved)
+            .catch(() => {
+              toast.error("Failed to save column width.");
+              setSaveStatus("saved");
+            });
+          return p;
+        });
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [columns, columnsHistory, sheetId, markSaving, markSaved, setSaveStatus, setSheetState],
+  );
+
   // ── Row resize ─────────────────────────────────────────────────────────
   const beginRowResize = useCallback(
     (rowId: string, e: React.PointerEvent) => {
@@ -4311,25 +4355,45 @@ export default function SheetClient() {
       width: 46,
       frozen: true,
       resizable: false,
-      renderHeaderCell: () => (
-        <div className="h-full w-full flex items-center justify-center sheet-header-cell border-r">
-          <input
-            type="checkbox"
-            className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer"
-            style={{ accentColor: "var(--primary)" }}
-            checked={
-              activeRows.length > 0 && selectedRows.has(activeRows[0]?.id)
+      renderHeaderCell() {
+        const allSelected = activeRows.length > 0 && selectedRows.size === activeRows.length;
+        const handleSelectAll = (checked: boolean) => {
+          if (checked && activeRows.length > 0) {
+            setSelectedRows(new Set(activeRows.map((r) => r.id)));
+            const dataCols = columns.filter((col) => !col.hidden);
+            const firstCol = dataCols[0];
+            if (firstCol) {
+              setSelectedCell({ row: 0, col: firstCol.key });
+              setSelectionRange({
+                start: { row: 0, colIndex: 0 },
+                end: { row: activeRows.length - 1, colIndex: dataCols.length - 1 },
+              });
             }
-            onChange={(e) => {
-              if (e.target.checked && activeRows.length > 0) {
-                setSelectedRows(new Set([activeRows[0].id]));
-              } else {
-                setSelectedRows(new Set());
-              }
-            }}
-          />
-        </div>
-      ),
+          } else {
+            setSelectedRows(new Set());
+            setSelectedCell(null);
+            setSelectionRange(null);
+          }
+        };
+
+        return (
+          <div
+            className="h-full w-full flex items-center justify-center sheet-header-cell border-r cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 select-none"
+            onClick={() => handleSelectAll(!allSelected)}
+          >
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer"
+              style={{ accentColor: "var(--primary)" }}
+              checked={allSelected}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleSelectAll(e.target.checked);
+              }}
+            />
+          </div>
+        );
+      },
       renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
         const rowIdx = activeRows.findIndex((r) => r.id === props.row.id);
         const isSel = selectedRows.has(props.row.id);
@@ -4337,7 +4401,23 @@ export default function SheetClient() {
         return (
           <div
             className={`h-full w-full flex items-center justify-center sheet-row-num border-r group/rownum ${isSel ? "sheet-row-num--selected" : ""
-              } relative`}
+              } relative cursor-pointer select-none`}
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("input[type='checkbox']")) return;
+              if ((e.target as HTMLElement).closest(".sheet-row-resize-handle")) return;
+
+              // Select the entire row
+              const dataCols = columns.filter((col) => !col.hidden);
+              const firstCol = dataCols[0];
+              if (firstCol) {
+                setSelectedCell({ row: rowIdx, col: firstCol.key });
+                setSelectionRange({
+                  start: { row: rowIdx, colIndex: 0 },
+                  end: { row: rowIdx, colIndex: dataCols.length - 1 },
+                });
+              }
+              setSelectedRows(new Set([props.row.id]));
+            }}
           >
             <span
               className={`${isSel ? "hidden" : "group-hover/rownum:hidden"
@@ -4359,8 +4439,7 @@ export default function SheetClient() {
             />
             {/* Row resize handle */}
             <div
-              className="absolute left-0 right-0 bottom-0 h-1.5 opacity-0 group-hover/rownum:opacity-100"
-              style={{ cursor: "row-resize", touchAction: "none" }}
+              className="sheet-row-resize-handle"
               onPointerDown={(e) => beginRowResize(props.row.id, e)}
               onPointerMove={onRowResizeMove}
               onPointerUp={endRowResize}
@@ -4572,42 +4651,12 @@ export default function SheetClient() {
                 }}
               />
 
-              {/* Bottom-right column resize handle */}
+              {/* Column resize handle */}
               <div
-                data-col-resize="true"
-                className="absolute bottom-0 right-0 w-4 h-4 opacity-0 group-hover/header:opacity-100 transition-opacity flex items-end justify-end pb-0.5 pr-0.5"
-                style={{ cursor: "col-resize", touchAction: "none" }}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const startX = e.clientX;
-                  const startWidth = col.width ?? 160;
-                  const pointerId = e.pointerId;
-                  (e.currentTarget as HTMLElement).setPointerCapture(pointerId);
-                  const onMove = (ev: PointerEvent) => {
-                    if (ev.pointerId !== pointerId) return;
-                    const newWidth = Math.max(40, Math.min(600, startWidth + (ev.clientX - startX)));
-                    sheetColOps.handleColumnResize(col.key, newWidth);
-                  };
-                  const onUp = (ev: PointerEvent) => {
-                    if (ev.pointerId !== pointerId) return;
-                    setTimeout(async () => {
-                      markSaving();
-                      await saveAllColumns(sheetId, columnsHistory.currentState).catch(console.error);
-                      markSaved();
-                    }, 50);
-                    window.removeEventListener("pointermove", onMove);
-                    window.removeEventListener("pointerup", onUp);
-                  };
-                  window.addEventListener("pointermove", onMove);
-                  window.addEventListener("pointerup", onUp);
-                }}
-              >
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                  <path d="M1 7L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-gray-400" />
-                  <path d="M4 7L7 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-gray-400" />
-                </svg>
-              </div>
+                className="sheet-col-resize-handle"
+                onPointerDown={(e) => { e.stopPropagation(); beginColResize(col.key, e); }}
+              />
+
             </div>
           );
         },
@@ -4829,7 +4878,7 @@ export default function SheetClient() {
                 setSelectedCell({ row: rowIdx, col: col.key });
                 if (rightPanel === "validation") setFocusedColumnKey(col.key);
                 setActiveCommentCell(`${rowIdx}-${col.key}`);
-                
+
                 if (type === "priority" || type === "status" || type === "select") {
                   queueMicrotask(() => {
                     if (gridRef.current) {
@@ -5529,7 +5578,7 @@ export default function SheetClient() {
     setFocusedColumnKey, setRightPanel, setActiveCell, saveAllRows, saveAllColumns,
     saveFormula, deleteFormula, mentionState, mentionableMembers, setMentionState,
     mergeByCell, autoOverflowByCell, selectMergeBlock, rowHeights,
-    timeTravelState.previewRows,
+    timeTravelState.previewRows, beginColResize,
   ]);
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -5968,15 +6017,25 @@ export default function SheetClient() {
                 onSelectedRowsChange={setSelectedRows}
                 onColumnResize={(idx, width) => {
                   const col = columns[idx - 1];
-                  console.log('RESIZE — col:', col?.name, 'new width:', width, 'db width before save:', col?.width);
-                  if (col) {
-                    sheetColOps.handleColumnResize(col.key, width);
-                    // ensure it persists
+                  if (!col) return;
+                  setSheetState((p) => {
+                    const updatedColumns = p.columns.map((c) =>
+                      c.key === col.key ? { ...c, width } : c
+                    );
                     clearTimeout((window as any).__colResizeTimer);
                     (window as any).__colResizeTimer = setTimeout(() => {
-                      saveAllColumns(sheetId, columnsHistory.currentState).catch(console.error);
-                    }, 600);
-                  }
+                      columnsHistory.pushState(updatedColumns);
+                      markSaving();
+                      saveAllColumns(sheetId, updatedColumns)
+                        .then(markSaved)
+                        .catch((err) => {
+                          toast.error("Failed to save column widths", err);
+                          console.log("error to save column width", err)
+                          setSaveStatus("saved");
+                        });
+                    }, 800);
+                    return { ...p, columns: updatedColumns };
+                  });
                 }}
                 onCellDoubleClick={handleCellDoubleClick}
                 rowHeight={(row) => {
@@ -6541,9 +6600,35 @@ export default function SheetClient() {
     border: none !important;
   }
 
-  .rdg-sheet.sheet-borderless .rdg-cell[aria-selected="true"] {
+.rdg-sheet.sheet-borderless .rdg-cell[aria-selected="true"] {
     outline: 2px solid var(--primary, #0d7c5f) !important;
     box-shadow: none !important;
+  }
+  .sheet-col-resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    z-index: 20;
+    user-select: none;
+    touch-action: none;
+  }
+  .sheet-col-resize-handle::after {
+    content: '';
+    position: absolute;
+    right: 1px;
+    top: 20%;
+    bottom: 20%;
+    width: 2px;
+    border-radius: 1px;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .sheet-col-resize-handle:hover::after,
+  .sheet-col-resize-handle:active::after {
+    background: var(--primary, #0d7c5f);
   }
 `}</style><style jsx global>{`
   /* Scrollbars */

@@ -51,6 +51,7 @@ export interface SheetChart {
   id: string;
   title: string;
   kind: ChartKind;
+  labelRowIndex: number;
 
   // ── data source ─────────────────────────────────────────
   dataMode: "sheet" | "manual";
@@ -240,6 +241,7 @@ const DEFAULT_CHART: Omit<SheetChart, "id" | "title" | "kind" | "x" | "y"> = {
   width: 540,
   height: 360,
   minimized: false,
+  labelRowIndex: 0,
 };
 
 // ─────────────────────────────────────────────────────────────
