@@ -248,7 +248,7 @@ export function TitleBar({
           </Tooltip>
         )}
 
-        <button
+        {/* <button
           className="sheet-btn-secondary flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-2.5 rounded-md text-[11.5px] font-medium transition-all shrink-0 disabled:opacity-60"
           onClick={onImportClick}
           disabled={isImportingSheet}
@@ -259,7 +259,7 @@ export function TitleBar({
             <Upload className="h-3.5 w-3.5 shrink-0" />
           )}
           <span className="hidden sm:inline">{isImportingSheet ? "Importing" : "Import"}</span>
-        </button>
+        </button> */}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

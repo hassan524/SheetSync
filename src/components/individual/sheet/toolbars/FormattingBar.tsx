@@ -123,14 +123,17 @@ export function FormattingBar({
   };
 
   const [widthVal, setWidthVal] = React.useState(String(selectedColumnWidth ?? 160));
+  const isEditingWidth = React.useRef(false);
   React.useEffect(() => {
-    setWidthVal(String(selectedColumnWidth ?? 160));
+    if (!isEditingWidth.current) {
+      setWidthVal(String(selectedColumnWidth ?? 160));
+    }
   }, [selectedColumnWidth]);
 
   return (
     <div
       className="sheet-toolbar sheet-formatting-bar border-b shrink-0"
-      style={{ height: "36px" }}
+      style={{ height: "49px" }}
     >
       {/* Single scrollable row */}
       <div
@@ -193,7 +196,7 @@ export function FormattingBar({
         <IconBtn
           icon={Split}
           tooltip="Unmerge cells"
-          onClick={onUnmergeSelection ?? (() => {})}
+          onClick={onUnmergeSelection ?? (() => { })}
           disabled={!isMergedSelection}
           active={isMergedSelection}
         />
@@ -261,7 +264,7 @@ export function FormattingBar({
         <IconBtn
           icon={Table2}
           tooltip="Toggle borderless sheet"
-          onClick={onMakeSheetBorderless ?? (() => {})}
+          onClick={onMakeSheetBorderless ?? (() => { })}
         />
         <IconBtn
           icon={isProtected ? Lock : Unlock}
@@ -324,7 +327,9 @@ export function FormattingBar({
               className="h-[22px] w-10 rounded border border-border bg-background px-1 text-[10px] text-center outline-none focus:ring-1 focus:ring-primary/30 font-mono ml-0.5 shrink-0"
               value={widthVal}
               onChange={(e) => setWidthVal(e.target.value)}
+              onFocus={() => { isEditingWidth.current = true; }}
               onBlur={() => {
+                isEditingWidth.current = false;
                 const val = Number(widthVal.replace(/[^\d]/g, ""));
                 if (!Number.isNaN(val) && val >= 30 && val <= 600) {
                   onSetColumnWidth?.(val);

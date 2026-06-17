@@ -127,7 +127,7 @@ export function useSheetColOps({
 
   const handleChangeColumnType = useCallback(
     async (colKey: string, newType: ColumnDef["type"]) => {
-      if (!newType) return; 
+      if (!newType) return;
 
       if (newType === "select") {
         setSelectSetupDialog({
@@ -175,13 +175,8 @@ export function useSheetColOps({
           columns: typeof updater === "function" ? updater(p.columns) : updater,
         }));
       });
-      setTimeout(async () => {
-        markSaving();
-        await saveAllColumns(sheetId, columnsHistory.currentState);
-        markSaved();
-      }, 500);
     },
-    [colOps, sheetId, columnsHistory, markSaving, markSaved, setSheetState],
+    [],
   );
 
   const handleHideColumn = useCallback(async () => {
