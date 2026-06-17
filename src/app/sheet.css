@@ -903,18 +903,39 @@
   background-color: #0b0e14 !important;
 }
 
+/* ── Borderless mode structural adjustments ── */
+
+/* * Target the sheet container and elements EXCEPT those that have 
+ * been assigned manual formatting attributes by the CellRenderer.
+ */
 .rdg-sheet.sheet-borderless,
-.rdg-sheet.sheet-borderless * {
+.rdg-sheet.sheet-borderless
+  *:not(:has([data-explicit-border="true"])):not(
+    [data-explicit-border="true"]
+  ):not([data-explicit-border="true"] *) {
   --rdg-border-color: transparent !important;
   border-color: transparent !important;
 }
 
-.rdg-sheet.sheet-borderless .rdg-cell,
-.rdg-sheet.sheet-borderless .rdg-header-cell,
-.rdg-sheet.sheet-borderless .rdg-row .rdg-cell,
-.rdg-sheet.sheet-borderless .rdg-row:hover .rdg-cell,
-.rdg-sheet.sheet-borderless .rdg-cell:hover,
-.rdg-sheet.sheet-borderless .rdg-cell:hover:not([aria-selected="true"]) {
+/* Force custom dynamic colors to stick via our CSS variable backup hook */
+.rdg-sheet.sheet-borderless [data-explicit-border="true"] {
+  border-color: var(--local-border-color) !important;
+}
+
+/* Drop cell layout borders ONLY if the cell doesn't have custom properties */
+.rdg-sheet.sheet-borderless .rdg-cell:not(:has([data-explicit-border="true"])),
+.rdg-sheet.sheet-borderless
+  .rdg-row
+  .rdg-cell:not(:has([data-explicit-border="true"])),
+.rdg-sheet.sheet-borderless
+  .rdg-row:hover
+  .rdg-cell:not(:has([data-explicit-border="true"])),
+.rdg-sheet.sheet-borderless
+  .rdg-cell:hover:not(:has([data-explicit-border="true"])),
+.rdg-sheet.sheet-borderless
+  .rdg-cell:hover:not([aria-selected="true"]):not(
+    :has([data-explicit-border="true"])
+  ) {
   border: none !important;
   border-top: none !important;
   border-right: none !important;
@@ -926,12 +947,17 @@
   background-image: none !important;
 }
 
-.rdg-sheet.sheet-borderless .rdg-header-row {
+/* Ensure data-grid cell layer stays visible and doesn't clip custom borders */
+.rdg-sheet.sheet-borderless .rdg-cell:has([data-explicit-border="true"]) {
   border: none !important;
-  border-bottom: none !important;
+  overflow: visible !important;
+  contain: none !important;
 }
 
-.rdg-sheet.sheet-borderless .sheet-cell-merge-master {
+/* Header row retains borders in borderless mode */
+
+.rdg-sheet.sheet-borderless
+  .sheet-cell-merge-master:not([data-explicit-border="true"]) {
   border: none !important;
 }
 
@@ -940,18 +966,22 @@
   box-shadow: none !important;
 }
 
-.rdg-sheet.sheet-borderless .rdg-cell:first-child,
-.rdg-sheet.sheet-borderless .rdg-header-cell:first-child {
+.rdg-sheet.sheet-borderless
+  .rdg-cell:first-child:not(:has([data-explicit-border="true"])) {
   border: none !important;
   border-right: none !important;
 }
 
-/* When a cell has a background color applied, hide its borders so the color fills fully */
-.rdg-sheet .rdg-cell:has([data-has-bg="true"]) {
+/* * FIX CONDITION: When a cell has a background color applied, hide default layout lines 
+  * ONLY if the user hasn't drawn an explicit manual border on it.
+  */
+.rdg-sheet
+  .rdg-cell:has([data-has-bg="true"]):not(:has([data-explicit-border="true"])) {
   border-right-color: transparent !important;
   border-bottom-color: transparent !important;
 }
 
+/* ── Covered (slave) auto-overflow cells ── */
 .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
 .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-auto-overflow-covered),
 .rdg-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),

@@ -69,6 +69,7 @@ interface FormattingBarProps {
   selectedRows?: Set<string>;
   onMakeSheetBorderless?: () => void;
   selectionRange?: { start: { row: number; colIndex: number }; end: { row: number; colIndex: number } } | null;
+  onSelectAllRows?: () => void;
 }
 
 const FONT_FAMILIES = [
@@ -90,7 +91,7 @@ export function FormattingBar({
   selectedColumnKey, selectedColumnWidth, onSetColumnWidth, onExpandAllColumns,
   onDragResizeAllColumns, onEndResizeAllColumns, onOpenValidation,
   canMergeSelection = false, isMergedSelection = false, onMergeSelection, onUnmergeSelection,
-  selectedRows, onMakeSheetBorderless, selectionRange,
+  selectedRows, onMakeSheetBorderless, selectionRange, onSelectAllRows,
 }: FormattingBarProps) {
   const hasSelection = !!selectedCell || (!!selectedRows && selectedRows.size > 0) || !!selectionRange;
   const selStyle = ddStyle(isDark);
