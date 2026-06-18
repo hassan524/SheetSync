@@ -18,6 +18,19 @@
 /* Optional third-party animate classes */
 @import "tw-animate-css";
 
+button,
+[role="button"],
+[data-slot="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"],
+[data-slot="button"]:disabled,
+[data-slot="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 /* -----------------------------
    Theme Variables
 ------------------------------ */

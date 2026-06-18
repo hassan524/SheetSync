@@ -9,12 +9,23 @@ import {
   PRIORITY_OPTIONS,
   STATUS_OPTIONS,
 } from "@/types/index";
+import { STATUS_COLORS } from "@/lib/sheet-templates";
+import { ROW_CELL_TYPES_KEY } from "@/utils/SheetUtils";
 
 export type ExportFormat = "csv" | "xlsx" | "pdf" | "json";
 
 interface ExportOptions {
   format: ExportFormat;
   sheetId: string;
+  range?: ExportRange | null;
+  data?: Partial<SheetExportData>;
+}
+
+export interface ExportRange {
+  startRow: number;
+  endRow: number;
+  startCol: number;
+  endCol: number;
 }
 
 interface SheetExportData {
@@ -23,6 +34,8 @@ interface SheetExportData {
   columns: ColumnDef[];
   cellFormats: Record<string, any>;
   formulas: Record<string, string>;
+  cellTypeOverrides?: Record<string, ColumnDef["type"]>;
+  range?: ExportRange | null;
 }
 
 const PRIORITY_COLOR_MAP: Record<string, { hex: string; label: string }> = {
@@ -94,6 +107,51 @@ function parseSelectOptions(
     .filter((o) => o.label);
 }
 
+function normalizeChoice(value: any): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function resolveChoiceStyle(
+  raw: any,
+  col: ColumnDef,
+): { label: string; color: string; bgColor: string } | null {
+  const normalized = normalizeChoice(raw);
+  if (!normalized) return null;
+
+  const localOption = parseSelectOptions(col.selectOptions).find(
+    (option) => normalizeChoice(option.label) === normalized,
+  );
+  if (localOption) {
+    return {
+      label: localOption.label,
+      color: localOption.color ?? "#374151",
+      bgColor: localOption.bgColor ?? "#e5e7eb",
+    };
+  }
+
+  const templateOption = Object.values(STATUS_COLORS).find(
+    (option) => normalizeChoice(option.label) === normalized,
+  );
+  if (templateOption) {
+    return templateOption;
+  }
+
+  const builtInOption = [...PRIORITY_OPTIONS, ...STATUS_OPTIONS].find(
+    (option) =>
+      normalizeChoice(option.value) === normalized ||
+      normalizeChoice(option.label) === normalized,
+  );
+  if (builtInOption) {
+    return builtInOption;
+  }
+
+  return null;
+}
+
 function safeExportFilename(title: string, extension: ExportFormat): string {
   const name = title
     .replace(/[\\/:*?"<>|]/g, "-")
@@ -102,7 +160,26 @@ function safeExportFilename(title: string, extension: ExportFormat): string {
   return `${name || "SheetSync Export"}.${extension}`;
 }
 
-function resolveDisplayValue(raw: any, colType: ColumnDef["type"]): string {
+function getEffectiveExportType(
+  row: SheetRow,
+  rowIdx: number,
+  col: ColumnDef,
+  cellTypeOverrides?: Record<string, ColumnDef["type"]>,
+): ColumnDef["type"] {
+  const override = cellTypeOverrides?.[`${rowIdx}-${col.key}`];
+  const rowTypes = row?.[ROW_CELL_TYPES_KEY];
+  const rowType =
+    rowTypes && typeof rowTypes === "object"
+      ? (rowTypes[col.key] as ColumnDef["type"] | undefined)
+      : undefined;
+  return override ?? rowType ?? col.type ?? "text";
+}
+
+function withEffectiveType(col: ColumnDef, type: ColumnDef["type"]): ColumnDef {
+  return type === col.type ? col : { ...col, type };
+}
+
+function resolveDisplayValue(raw: any, colType: ColumnDef["type"], col?: ColumnDef): string {
   if (raw === null || raw === undefined || raw === "") return "";
 
   switch (colType) {
@@ -112,10 +189,20 @@ function resolveDisplayValue(raw: any, colType: ColumnDef["type"]): string {
     case "currency": {
       const n = Number(raw);
       if (Number.isNaN(n)) return String(raw);
-      return `$${n.toLocaleString("en-US", {
+      const currencyCode = col?.currencyCode || "USD";
+      try {
+        return new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: currencyCode,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(n);
+      } catch {
+        return `$${n.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      })}`;
+        })}`;
+      }
     }
 
     case "progress": {
@@ -140,15 +227,15 @@ function resolveDisplayValue(raw: any, colType: ColumnDef["type"]): string {
 
     case "priority": {
       const match = PRIORITY_OPTIONS?.find(
-        (p) => p.value === String(raw).toLowerCase(),
+        (p) =>
+          normalizeChoice(p.value) === normalizeChoice(raw) ||
+          normalizeChoice(p.label) === normalizeChoice(raw),
       );
       return match?.label ?? String(raw);
     }
 
     case "status": {
-      const match = STATUS_OPTIONS?.find(
-        (s) => s.value === String(raw).toLowerCase(),
-      );
+      const match = resolveChoiceStyle(raw, { key: "", name: "", type: "status" });
       return match?.label ?? String(raw);
     }
 
@@ -223,23 +310,55 @@ function isCustomRenderType(colType: ColumnDef["type"]): boolean {
   );
 }
 
+function isBlankExportValue(raw: any): boolean {
+  return raw === null || raw === undefined || raw === "";
+}
+
+type ExportMergeInfo = {
+  masterRow: number;
+  masterCol: string;
+  rowSpan: number;
+  colSpan: number;
+  mode?: "center" | "normal";
+  hidden?: boolean;
+};
+
+function getExportMergeInfo(
+  cellFormats: Record<string, any>,
+  rowIdx: number,
+  colKey: string,
+): ExportMergeInfo | null {
+  const merge = cellFormats[`${rowIdx}-${colKey}`]?.merge;
+  if (
+    merge &&
+    typeof merge.masterRow === "number" &&
+    typeof merge.masterCol === "string" &&
+    typeof merge.rowSpan === "number" &&
+    typeof merge.colSpan === "number"
+  ) {
+    return merge;
+  }
+  return null;
+}
+
 function buildBodyText(raw: any, col: ColumnDef): string {
-  if (raw === null || raw === undefined || raw === "") return "";
+  if (isBlankExportValue(raw)) return "";
 
   const type = col.type ?? "text";
+
   const str = String(raw);
   const lower = str.toLowerCase();
 
   switch (type) {
     case "priority":
-      return PRIORITY_COLOR_MAP[lower]?.label ?? str;
+      return resolveChoiceStyle(raw, col)?.label ?? PRIORITY_COLOR_MAP[lower]?.label ?? str;
 
     case "status":
-      return STATUS_COLOR_MAP[lower]?.label ?? str;
+      return resolveChoiceStyle(raw, col)?.label ?? STATUS_COLOR_MAP[lower]?.label ?? str;
 
     case "select": {
       const opts = parseSelectOptions(col.selectOptions);
-      const matched = opts.find((o) => o.label.toLowerCase() === lower);
+      const matched = opts.find((o) => normalizeChoice(o.label) === normalizeChoice(raw));
       return matched?.label ?? str;
     }
 
@@ -268,10 +387,7 @@ function buildBodyText(raw: any, col: ColumnDef): string {
     case "currency": {
       const n = Number(raw);
       if (Number.isNaN(n)) return str;
-      return `$${n.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`;
+      return resolveDisplayValue(raw, "currency", col);
     }
 
     default:
@@ -392,19 +508,10 @@ async function fetchSheetForExport(sheetId: string): Promise<SheetExportData> {
     };
   });
 
-  const colKeys = parsedColumns.map((c) => c.key);
-
   return {
     title: sheet.data.title ?? "Untitled",
     columns: parsedColumns,
-    rows: (rows.data ?? [])
-      .map((row) => ({ id: row.row_key, ...row.data }))
-      .filter((row) =>
-        colKeys.some((key) => {
-          const val = row[key];
-          return val !== null && val !== undefined && val !== "";
-        }),
-      ),
+    rows: (rows.data ?? []).map((row) => ({ id: row.row_key, ...row.data })),
     cellFormats: Object.fromEntries(
       (formats.data ?? []).map((f) => [
         f.cell_key,
@@ -721,6 +828,8 @@ function exportPDF({
   columns,
   title,
   cellFormats,
+  cellTypeOverrides,
+  range,
 }: SheetExportData): void {
   const doc = new jsPDF({
     orientation: "landscape",
@@ -737,13 +846,48 @@ function exportPDF({
   const TABLE_TOP = 34;
   const FOOTER_Y = PAGE_H - 5;
 
-  // Filter out empty columns
-  const activeCols = columns.filter((col) =>
-    rows.some((row) => {
-      const val = getCellValue(row, col.key);
-      return val !== null && val !== undefined && val !== "";
-    })
-  );
+  const normalizedRange = range
+    ? {
+      startRow: Math.max(0, Math.min(range.startRow, range.endRow)),
+      endRow: Math.min(rows.length - 1, Math.max(range.startRow, range.endRow)),
+      startCol: Math.max(0, Math.min(range.startCol, range.endCol)),
+      endCol: Math.min(columns.length - 1, Math.max(range.startCol, range.endCol)),
+    }
+    : null;
+
+  const sourceRowEntries = normalizedRange
+    ? rows
+      .slice(normalizedRange.startRow, normalizedRange.endRow + 1)
+      .map((row, index) => ({ row, rowIdx: normalizedRange.startRow + index }))
+    : rows
+      .map((row, rowIdx) => ({ row, rowIdx }))
+      .filter(({ row, rowIdx }) =>
+        columns.some((col) => {
+          const type = getEffectiveExportType(row, rowIdx, col, cellTypeOverrides);
+          const merge = getExportMergeInfo(cellFormats, rowIdx, col.key);
+          return (
+            buildBodyText(getCellValue(row, col.key), withEffectiveType(col, type)) !== "" ||
+            Boolean(merge)
+          );
+        }),
+      );
+  const sourceRows = sourceRowEntries.map(({ row }) => row);
+  const sourceCols = normalizedRange
+    ? columns.slice(normalizedRange.startCol, normalizedRange.endCol + 1)
+    : columns;
+
+  const activeCols = normalizedRange
+    ? sourceCols
+    : sourceCols.filter((col) =>
+      sourceRowEntries.some(({ row, rowIdx }) => {
+        const type = getEffectiveExportType(row, rowIdx, col, cellTypeOverrides);
+        const merge = getExportMergeInfo(cellFormats, rowIdx, col.key);
+        return (
+          buildBodyText(getCellValue(row, col.key), withEffectiveType(col, type)) !== "" ||
+          Boolean(merge)
+        );
+      }),
+    );
 
   const dateStr = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -763,7 +907,7 @@ function exportPDF({
   doc.setFontSize(7.5);
   doc.setTextColor(100, 100, 100);
   doc.text(
-    `Exported on ${dateStr}   ·   ${rows.length.toLocaleString()} rows   ·   ${activeCols.length} columns`,
+    `Exported on ${dateStr}   ·   ${sourceRows.length.toLocaleString()} rows   ·   ${activeCols.length} columns`,
     10,
     29,
   );
@@ -780,8 +924,53 @@ function exportPDF({
   const scale = totalRaw > PRINTABLE_W ? PRINTABLE_W / totalRaw : 1;
   const colWidths = rawWidthsMm.map(w => Math.max(8, w * scale));
 
-  const bodyData: string[][] = rows.map((row) =>
-    activeCols.map((col) => buildBodyText(getCellValue(row, col.key), col)),
+  const activeColIndexByKey = new Map(
+    activeCols.map((col, index) => [col.key, index]),
+  );
+
+  const bodyData: any[][] = sourceRowEntries.map(({ row, rowIdx }, visualRowIdx) =>
+    activeCols.map((col, visualColIdx) => {
+      const type = getEffectiveExportType(row, rowIdx, col, cellTypeOverrides);
+      const effectiveCol = withEffectiveType(col, type);
+      const text = buildBodyText(getCellValue(row, col.key), effectiveCol);
+      const merge = getExportMergeInfo(cellFormats, rowIdx, col.key);
+
+      if (merge?.hidden) {
+        return {
+          content: "",
+          styles: { fillColor: false, lineWidth: 0, cellPadding: 0 },
+        };
+      }
+
+      if (merge && merge.masterRow === rowIdx && merge.masterCol === col.key) {
+        const maxSourceRow = merge.masterRow + merge.rowSpan - 1;
+        const rowSpan = sourceRowEntries
+          .slice(visualRowIdx, visualRowIdx + merge.rowSpan)
+          .filter((entry) => entry.rowIdx >= merge.masterRow && entry.rowIdx <= maxSourceRow)
+          .length;
+
+        const masterColIdx = columns.findIndex((item) => item.key === merge.masterCol);
+        const mergeColKeys = columns
+          .slice(masterColIdx, masterColIdx + merge.colSpan)
+          .map((item) => item.key);
+        const colSpan = mergeColKeys.filter((key) => {
+          const activeIndex = activeColIndexByKey.get(key);
+          return activeIndex !== undefined && activeIndex >= visualColIdx;
+        }).length;
+
+        return {
+          content: text,
+          ...(rowSpan > 1 ? { rowSpan } : {}),
+          ...(colSpan > 1 ? { colSpan } : {}),
+          styles: {
+            halign: merge.mode === "center" ? "center" : undefined,
+            valign: "middle",
+          },
+        };
+      }
+
+      return text;
+    }),
   );
 
   const columnStylesMap: Record<number, any> = {};
@@ -835,9 +1024,10 @@ function exportPDF({
       const col = activeCols[hook.column.index];
       if (!col) return;
 
-      const rowIdx = hook.row.index;
+      const { row, rowIdx } = sourceRowEntries[hook.row.index];
       const cellKey = `${rowIdx}-${col.key}`;
-      const type = col.type ?? "text";
+      const type = getEffectiveExportType(row, rowIdx, col, cellTypeOverrides);
+      const effectiveCol = withEffectiveType(col, type);
       const fmt = cellFormats[cellKey] ?? {};
       const isWrapped = fmt.textWrap === true;
 
@@ -849,6 +1039,13 @@ function exportPDF({
 
       if (fmt.align === "center" || fmt.align === "right" || fmt.align === "left") {
         hook.cell.styles.halign = fmt.align;
+      } else {
+        hook.cell.styles.halign =
+          type === "number" || type === "currency"
+            ? "right"
+            : isCustomRenderType(type)
+              ? "center"
+              : "left";
       }
 
       if (isWrapped && !isCustomRenderType(type)) {
@@ -856,7 +1053,7 @@ function exportPDF({
         hook.cell.styles.valign = "top";
         hook.cell.styles.cellPadding = { top: 3, right: 4, bottom: 3, left: 4 };
         hook.cell.styles.minCellHeight = 12;
-        hook.cell.text = [buildBodyText(getCellValue(rows[rowIdx], col.key), col)];
+        hook.cell.text = [buildBodyText(getCellValue(row, col.key), effectiveCol)];
         return;
       }
 
@@ -870,9 +1067,10 @@ function exportPDF({
       const col = activeCols[hook.column.index];
       if (!col) return;
 
-      const cellKey = `${hook.row.index}-${col.key}`;
+      const { row, rowIdx } = sourceRowEntries[hook.row.index];
+      const cellKey = `${rowIdx}-${col.key}`;
       const fmt = cellFormats[cellKey] ?? {};
-      const type = col.type ?? "text";
+      const type = getEffectiveExportType(row, rowIdx, col, cellTypeOverrides);
 
       if (!isCustomRenderType(type)) {
         if (fmt.textColor) {
@@ -898,36 +1096,56 @@ function exportPDF({
       const col = activeCols[hook.column.index];
       if (!col) return;
 
-      const rowIdx = hook.row.index;
-      const cellKey = `${rowIdx}-${col.key}`;
-      const raw = getCellValue(rows[rowIdx], col.key);
+      const { row, rowIdx } = sourceRowEntries[hook.row.index];
+      const raw = getCellValue(row, col.key);
       const valStr = String(raw ?? "").toLowerCase();
       const { x: cx, y: cy, width: cw, height: ch } = hook.cell;
-      const type = col.type ?? "text";
-      const fmt = cellFormats[cellKey] ?? {};
+      const type = getEffectiveExportType(row, rowIdx, col, cellTypeOverrides);
+      const effectiveCol = withEffectiveType(col, type);
 
       if (!isCustomRenderType(type)) return;
 
-      if (type === "priority" && PRIORITY_COLOR_MAP[valStr]) {
-        const [r, g, b] = hexToRgb(PRIORITY_COLOR_MAP[valStr].hex);
-        const label = PRIORITY_COLOR_MAP[valStr].label;
+      if (type === "priority") {
+        const option = resolveChoiceStyle(raw, effectiveCol) ?? (
+          PRIORITY_COLOR_MAP[valStr]
+            ? {
+              label: PRIORITY_COLOR_MAP[valStr].label,
+              color: "#ffffff",
+              bgColor: `#${PRIORITY_COLOR_MAP[valStr].hex}`,
+            }
+            : null
+        );
+        if (!option) return;
+        const [r, g, b] = hexToRgb(option.bgColor);
+        const [fr, fg, fb] = hexToRgb(option.color);
+        const label = option.label;
         const pH = Math.max(5, ch - 4);
         const pY = cy + (ch - pH) / 2;
         doc.setFillColor(r, g, b);
         doc.roundedRect(cx + 3, pY, cw - 6, pH, 1.5, 1.5, "F");
         doc.setFontSize(7);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(255, 255, 255);
+        doc.setTextColor(fr, fg, fb);
         doc.text(label, cx + cw / 2, cy + ch / 2, { align: "center", baseline: "middle" });
         doc.setFont("helvetica", "normal");
         doc.setTextColor(26, 29, 35);
         return;
       }
 
-      if (type === "status" && STATUS_COLOR_MAP[valStr]) {
-        const { hex, bgHex, label } = STATUS_COLOR_MAP[valStr];
-        const [br, bg, bb] = hexToRgb(bgHex);
-        const [fr, fg, fb] = hexToRgb(hex);
+      if (type === "status") {
+        const option = resolveChoiceStyle(raw, effectiveCol) ?? (
+          STATUS_COLOR_MAP[valStr]
+            ? {
+              label: STATUS_COLOR_MAP[valStr].label,
+              color: `#${STATUS_COLOR_MAP[valStr].hex}`,
+              bgColor: `#${STATUS_COLOR_MAP[valStr].bgHex}`,
+            }
+            : null
+        );
+        if (!option) return;
+        const [br, bg, bb] = hexToRgb(option.bgColor);
+        const [fr, fg, fb] = hexToRgb(option.color);
+        const { label } = option;
         const pH = Math.max(5, ch - 4);
         const pY = cy + (ch - pH) / 2;
         doc.setFillColor(br, bg, bb);
@@ -943,7 +1161,7 @@ function exportPDF({
 
       if (type === "select" && raw && raw !== "") {
         const opts = parseSelectOptions(col.selectOptions);
-        const matched = opts.find((o) => o.label.toLowerCase() === valStr);
+        const matched = opts.find((o) => normalizeChoice(o.label) === normalizeChoice(raw));
         const bgColor = matched?.bgColor ?? "#e5e7eb";
         const textColor = matched?.color ?? "#374151";
         const [br, bg, bb] = hexToRgb(bgColor);
@@ -1083,8 +1301,20 @@ function exportJSON({
 export async function exportSheet({
   format,
   sheetId,
+  range,
+  data: overrideData,
 }: ExportOptions): Promise<void> {
-  const data = await fetchSheetForExport(sheetId);
+  const hasCompleteOverride =
+    overrideData?.title !== undefined &&
+    overrideData.rows !== undefined &&
+    overrideData.columns !== undefined &&
+    overrideData.cellFormats !== undefined;
+  const data = {
+    ...(hasCompleteOverride ? {} : await fetchSheetForExport(sheetId)),
+    ...overrideData,
+  } as SheetExportData;
+  data.formulas ??= {};
+  data.range = range ?? null;
 
   switch (format) {
     case "csv":
