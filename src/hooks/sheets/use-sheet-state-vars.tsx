@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { SheetRow, ColumnDef, SaveStatus, ConditionalFormatRule } from "@/types/index";
+import { SheetRow, ColumnDef, SaveStatus, ConditionalFormatRule, SelectOption } from "@/types/index";
 import { SheetState, AdvancedFilterRule, SelectSetupDialogState, FilterOperator } from "@/types/index";
 import type { RightPanelType } from "@/components/individual/sheet/Right-panel";
 import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
@@ -55,7 +55,7 @@ export function useSheetStateVars(isOrganizationSheet: boolean, importedFrom: st
   const [newCommentText, setNewCommentText] = useState("");
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [forks, setForks] = useState<{ id: string; title: string; forked_at: string | null }[]>([]);
-  const [cellSelectOptions, setCellSelectOptions] = useState<Record<string, string[]>>({});
+  const [cellSelectOptions, setCellSelectOptions] = useState<Record<string, SelectOption[]>>({});
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
   const [showDesktopTip, setShowDesktopTip] = useState(false);
   const [isImportingSheet, setIsImportingSheet] = useState(false);

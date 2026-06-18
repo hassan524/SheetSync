@@ -237,8 +237,8 @@ export function FormattingBar({
         </Select>
         <ToolSep />
 
-        {/* Cell type (only when cell selected, no column) */}
-        {selectedCell && selectedCellType && !selectedColumnKey && (
+        {/* Cell type selector - visible whenever cells are selected */}
+        {(selectedCell || selectionRange) && selectedCellType && !selectedColumnKey && (
           <>
             <CellTypeSelector currentType={selectedCellType} onChangeType={onCellTypeChange} />
             <ToolSep />
