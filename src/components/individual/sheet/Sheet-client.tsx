@@ -4655,28 +4655,6 @@ export default function SheetClient() {
                 onChangeType={(t) => {
                   if (!canEditSheet) { showViewerEditMessage(); return; }
                   sheetColOps.handleChangeColumnType(col.key, t);
-                  setTimeout(() => {
-                    const clearedRows = rowsHistory.currentState.map((row) => {
-                      const rowTypes = { ...(row[ROW_CELL_TYPES_KEY] ?? {}) };
-                      delete rowTypes[col.key];
-                      const rowSelects = { ...(row[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}) };
-                      delete rowSelects[col.key];
-                      const defaultVal = getDefaultValueForType(t);
-                      const currentVal = row[col.key];
-                      const shouldApplyDefault =
-                        currentVal === "" || currentVal === null || currentVal === undefined;
-                      return {
-                        ...row,
-                        ...(shouldApplyDefault ? { [col.key]: defaultVal } : {}),
-                        [ROW_CELL_TYPES_KEY]: rowTypes,
-                        [ROW_CELL_SELECT_OPTIONS_KEY]: rowSelects,
-                      };
-                    });
-                    rowsHistory.pushState(clearedRows);
-                    setSheetState((p) => ({ ...p, rows: clearedRows }));
-                    saveAllRows(sheetId, clearedRows).catch(console.error);
-                    broadcastSheetSnapshot({ rows: clearedRows });
-                  }, 60);
                   if (t === "select") {
                     setFocusedColumnKey(col.key);
                     setRightPanel("select-options");

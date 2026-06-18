@@ -2,6 +2,7 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { SheetRow, ColumnDef } from "@/types";
+import { ROW_CELL_TYPES_KEY, ROW_CELL_SELECT_OPTIONS_KEY } from "@/utils/SheetUtils";
 
 function columnIndexToName(index: number): string {
   let n = index + 1;
@@ -98,9 +99,17 @@ export function useColumnOperations(
           : col
       );
 
-      // 1. convert all rows safely
+      // 1. convert all rows safely and clear cell-level overrides for this column
       const updatedRows = rows.map((row) => {
         const updatedRow = { ...row };
+
+        const rowTypes = { ...(updatedRow[ROW_CELL_TYPES_KEY] as Record<string, any> ?? {}) };
+        delete rowTypes[colKey];
+        updatedRow[ROW_CELL_TYPES_KEY] = rowTypes;
+
+        const rowSelects = { ...(updatedRow[ROW_CELL_SELECT_OPTIONS_KEY] as Record<string, any> ?? {}) };
+        delete rowSelects[colKey];
+        updatedRow[ROW_CELL_SELECT_OPTIONS_KEY] = rowSelects;
 
         switch (newType) {
           case "checkbox":
