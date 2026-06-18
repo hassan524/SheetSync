@@ -1856,9 +1856,17 @@ export default function SheetClient() {
             return true;
           });
         });
+    // In the filteredRows useMemo, replace the final sort:
     const sourceIndex = new Map(activeRows.map((row, index) => [row.id, index]));
     return [...matchingRows].sort((a, b) => {
-      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+      const aPinned = !!a.pinned;
+      const bPinned = !!b.pinned;
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+      // Both pinned: sort by pin time ascending (first pinned = topmost)
+      if (aPinned && bPinned) {
+        return (a._pinnedAt ?? 0) - (b._pinnedAt ?? 0);
+      }
+      // Both unpinned: preserve original order
       return (sourceIndex.get(a.id) ?? 0) - (sourceIndex.get(b.id) ?? 0);
     });
   }, [
@@ -3368,24 +3376,45 @@ export default function SheetClient() {
   );
 
   const handleTogglePinRow = useCallback(async () => {
-    const targetRows: SheetRow[] = [];
+    const targetRowIds: string[] = [];
     if (selectedCell) {
       const row = rows[selectedCell.row];
-      if (row) targetRows.push(row);
+      if (row) targetRowIds.push(row.id);
     } else if (selectedRows && selectedRows.size > 0) {
-      targetRows.push(...rows.filter((r) => selectedRows.has(r.id)));
+      targetRowIds.push(...rows.filter((r) => selectedRows.has(r.id)).map((r) => r.id));
     }
 
-    if (targetRows.length === 0) {
+    if (targetRowIds.length === 0) {
       toast.info("Select a row first");
       return;
     }
 
-    const firstRow = targetRows[0];
-    const newPinned = !(firstRow.pinned ?? false);
-    const ops = targetRows.map((r) => handleUpdateRow(r.id, { pinned: newPinned }));
-    await Promise.all(ops);
-  }, [selectedCell, selectedRows, rows, handleUpdateRow]);
+    const targetIdSet = new Set(targetRowIds);
+    const firstRow = rows.find((r) => r.id === targetRowIds[0]);
+    const newPinned = !(firstRow?.pinned ?? false);
+    const pinnedAt = newPinned ? Date.now() : null;
+
+    const nextRows = rows.map((r) =>
+      targetIdSet.has(r.id)
+        ? { ...r, pinned: newPinned, _pinnedAt: pinnedAt }
+        : r,
+    );
+
+    rowsHistory.pushState(nextRows);
+    setSheetState((prev) => ({ ...prev, rows: nextRows }));
+    markSaving();
+    try {
+      await saveAllRows(sheetId, nextRows);
+      broadcastSheetSnapshot({ rows: nextRows });
+      toast.success(newPinned ? "Row pinned" : "Row unpinned");
+    } catch (err: any) {
+      toast.error("Failed to save pin change.");
+      setSaveStatus("saved");
+    } finally {
+      markSaved();
+    }
+  }, [selectedCell, selectedRows, rows, rowsHistory, setSheetState, sheetId,
+    markSaving, markSaved, setSaveStatus, broadcastSheetSnapshot]);
 
   const handleApplyFormulaToColumn = useCallback(
     async (columnKey: string, formula: string) => {
@@ -3792,10 +3821,8 @@ export default function SheetClient() {
         return;
       }
       const updatedById = new Map(updatedRows.map((row) => [row.id, row]));
-      const mergedRows =
-        updatedRows.length === rows.length
-          ? updatedRows
-          : rows.map((row) => updatedById.get(row.id) ?? row);
+      // Map back to original rows list to preserve the original database order
+      const mergedRows = rows.map((row) => updatedById.get(row.id) ?? row);
       let blocked = false;
       const guardedRows = mergedRows.map((row) => {
         if (!protection.isRowProtected(row.id)) return row;
@@ -4326,9 +4353,11 @@ export default function SheetClient() {
         queueMicrotask(() => {
           if (gridRef.current) {
             const masterColIdx = columns.findIndex((c) => c.key === mi.masterCol);
+            // Map the database masterRow to its visual index in gridRows for react-data-grid
+            const visualRowIdx = gridRows.findIndex((r) => r.id === rows[mi.masterRow]?.id);
             // +1 accounts for the row-number column at index 0 in gridColumns
             gridRef.current.startEditingCell({
-              rowIdx: mi.masterRow,
+              rowIdx: visualRowIdx >= 0 ? visualRowIdx : mi.masterRow,
               idx: masterColIdx + 1,
             });
           }
@@ -4339,7 +4368,7 @@ export default function SheetClient() {
       // Allow normal editing for all other cells
       return true;
     },
-    [rows, mergeByCell, selectMergeBlock, columns],
+    [rows, mergeByCell, selectMergeBlock, columns, gridRows],
   );
 
   // ── Grid column definitions ────────────────────────────────────────────
@@ -4865,8 +4894,9 @@ export default function SheetClient() {
                     queueMicrotask(() => {
                       if (gridRef.current) {
                         const colIdx = columns.findIndex((c) => c.key === col.key);
+                        const visualRowIdx = gridRows.findIndex((r) => r.id === rows[mergeInfo.masterRow]?.id);
                         gridRef.current.startEditingCell({
-                          rowIdx: mergeInfo.masterRow,
+                          rowIdx: visualRowIdx >= 0 ? visualRowIdx : mergeInfo.masterRow,
                           idx: colIdx + 1,
                         });
                       }
@@ -4883,8 +4913,9 @@ export default function SheetClient() {
                   queueMicrotask(() => {
                     if (gridRef.current) {
                       const colIdx = columns.findIndex((c) => c.key === col.key);
+                      const visualRowIdx = gridRows.findIndex((r) => r.id === props.row.id);
                       gridRef.current.startEditingCell({
-                        rowIdx,
+                        rowIdx: visualRowIdx >= 0 ? visualRowIdx : rowIdx,
                         idx: colIdx + 1,
                       });
                     }
@@ -5578,7 +5609,7 @@ export default function SheetClient() {
     setFocusedColumnKey, setRightPanel, setActiveCell, saveAllRows, saveAllColumns,
     saveFormula, deleteFormula, mentionState, mentionableMembers, setMentionState,
     mergeByCell, autoOverflowByCell, selectMergeBlock, rowHeights,
-    timeTravelState.previewRows, beginColResize,
+    timeTravelState.previewRows, beginColResize, gridRows,
   ]);
 
   // ── Render ─────────────────────────────────────────────────────────────

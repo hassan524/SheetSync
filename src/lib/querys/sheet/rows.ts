@@ -40,7 +40,9 @@ export async function saveRow(
   if (error) throw new Error(`Failed to save row: ${error.message}`);
 }
 
-// REPLACE WITH:
+const CHUNK = 500;
+const POSITION_OFFSET = 1_000_000;
+
 export async function saveAllRows(
   sheetId: string,
   rows: SheetRow[],
@@ -59,28 +61,48 @@ export async function saveAllRows(
     return;
   }
 
-  const rowsToUpsert = effectiveRows.map((row, idx) => {
+  const now = new Date().toISOString();
+
+  // Phase 1: write all rows with position + OFFSET so no two rows
+  // collide with each other's current (pre-update) positions mid-batch.
+  const phase1 = effectiveRows.map((row, idx) => {
+    const { id, ...data } = row;
+    return {
+      sheet_id: sheetId,
+      row_key: id,
+      position: idx + POSITION_OFFSET,
+      data,
+      updated_at: now,
+    };
+  });
+
+  for (let i = 0; i < phase1.length; i += CHUNK) {
+    const { error } = await client
+      .from("rows")
+      .upsert(phase1.slice(i, i + CHUNK), { onConflict: "sheet_id,row_key" });
+    if (error) throw new Error(`Failed to save rows (phase 1): ${error.message}`);
+  }
+
+  // Phase 2: write the real positions now that no conflicts exist.
+  const phase2 = effectiveRows.map((row, idx) => {
     const { id, ...data } = row;
     return {
       sheet_id: sheetId,
       row_key: id,
       position: idx,
       data,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     };
   });
 
-  // Upsert in chunks to stay under Supabase payload limits
-  const CHUNK = 500;
-  for (let i = 0; i < rowsToUpsert.length; i += CHUNK) {
-    const chunk = rowsToUpsert.slice(i, i + CHUNK);
+  for (let i = 0; i < phase2.length; i += CHUNK) {
     const { error } = await client
       .from("rows")
-      .upsert(chunk, { onConflict: "sheet_id,row_key" });
-    if (error) throw new Error(`Failed to save rows: ${error.message}`);
+      .upsert(phase2.slice(i, i + CHUNK), { onConflict: "sheet_id,row_key" });
+    if (error) throw new Error(`Failed to save rows (phase 2): ${error.message}`);
   }
 
-  // Delete rows that are no longer in the effective set
+  // Delete rows no longer in the effective set.
   const activeKeys = new Set(effectiveRows.map((r) => r.id));
   const { data: existingRows } = await client
     .from("rows")
@@ -115,4 +137,3 @@ export async function deleteRows(
 
   if (error) throw new Error(`Failed to delete rows: ${error.message}`);
 }
-
