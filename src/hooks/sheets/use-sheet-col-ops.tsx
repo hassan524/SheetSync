@@ -24,15 +24,26 @@ interface UseColOpsProps {
   colOps: {
     insertColumn: (type: ColumnDef["type"]) => void;
     deleteColumn: (key: string) => void;
-    changeColumnType: (key: string, type: ColumnDef["type"]) => void;
+    changeColumnType: (
+      key: string,
+      type: ColumnDef["type"],
+    ) => { updatedColumns: ColumnDef[]; updatedRows: SheetRow[] } | undefined;
     renameColumn: (key: string, name: string) => void;
     handleColumnDragStart: (key: string) => void;
     handleColumnDragOver: (e: any, key: string, setter: any) => void;
     handleColumnDragEnd: () => void;
     handleColumnResize: (key: string, width: number, setter: any) => void;
   };
-  columnsHistory: { currentState: ColumnDef[]; pushState: (cols: ColumnDef[]) => void };
-  rowsHistory: { currentState: SheetRow[]; pushState: (rows: SheetRow[]) => void };
+  columnsHistory: {
+    currentState: ColumnDef[];
+    pushState: (cols: ColumnDef[]) => void;
+    stateRef: React.RefObject<ColumnDef[]>;
+  };
+  rowsHistory: {
+    currentState: SheetRow[];
+    pushState: (rows: SheetRow[]) => void;
+    stateRef: React.RefObject<SheetRow[]>;
+  };
   markSaving: () => void;
   markSaved: () => void;
   currentUser: { id: string } | null;
@@ -57,6 +68,7 @@ export function useSheetColOps({
   markSaved,
   currentUser,
   selectedCell,
+  broadcastSheetSnapshot,
 }: UseColOpsProps) {
   const persistColumns = useCallback(
     async (nextColumns: ColumnDef[]) => {
@@ -142,21 +154,27 @@ export function useSheetColOps({
       try {
         markSaving();
 
-        colOps.changeColumnType(colKey, newType);
+        const result = colOps.changeColumnType(colKey, newType);
+        const nextCols = result?.updatedColumns || columnsHistory.stateRef.current;
+        const nextRows = result?.updatedRows || rowsHistory.stateRef.current;
 
         await updateColumnType(sheetId, colKey, newType);
 
         await Promise.all([
-          saveAllColumns(sheetId, columnsHistory.currentState),
-          saveAllRows(sheetId, rowsHistory.currentState),
+          saveAllColumns(sheetId, nextCols),
+          saveAllRows(sheetId, nextRows),
         ]);
+
+        if (broadcastSheetSnapshot) {
+          broadcastSheetSnapshot({ columns: nextCols, rows: nextRows });
+        }
 
         markSaved();
       } catch (err: any) {
         console.error(err);
       }
     },
-    [colOps, sheetId, columnsHistory, rowsHistory]
+    [colOps, sheetId, columnsHistory, rowsHistory, broadcastSheetSnapshot]
   );
   const handleColumnDragEnd = useCallback(async () => {
     colOps.handleColumnDragEnd();

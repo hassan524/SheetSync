@@ -210,7 +210,7 @@ export default function ShareDialog({
           <DialogDescription>{dialogDesc}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          {!currentOrg && (!organizations || organizations.length === 0) && (
+          {!sheetId && !currentOrg && (!organizations || organizations.length === 0) && (
             <div className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
               You must create an organization first from the dashboard to share sheets with team members.
             </div>
@@ -224,7 +224,7 @@ export default function ShareDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleInvite();
               }}
-              disabled={sending || (!currentOrg && (!organizations || organizations.length === 0))}
+              disabled={sending || (!sheetId && !currentOrg && (!organizations || organizations.length === 0))}
             />
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger className="w-28 text-sm">
@@ -239,7 +239,7 @@ export default function ShareDialog({
             <Button
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 text-sm"
               onClick={handleInvite}
-              disabled={sending || !email.trim() || !effectiveOrg}
+              disabled={sending || !email.trim() || (!effectiveOrg && !sheetId)}
             >
               {sending ? "Sending…" : "Invite"}
             </Button>
