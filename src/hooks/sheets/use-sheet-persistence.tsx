@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { SheetRow, ColumnDef, SaveStatus } from "@/types/index";
+import { SheetRow, ColumnDef, SaveStatus, CellFormat } from "@/types/index";
 import { saveRow, saveAllRows } from "@/lib/querys/sheet/rows";
 import { saveAllColumns } from "@/lib/querys/sheet/columns";
 import { saveAllCellFormats } from "@/lib/querys/sheet/format";
@@ -8,7 +8,7 @@ import { saveAllFormulas } from "@/lib/querys/sheet/formulas";
 import { logActivity } from "@/lib/querys/activity/activity";
 import { logCellEdit } from "@/lib/querys/sheet/firebase-realtime";
 import { maybeAutoSnapshot } from "@/lib/querys/sheet/snapshots";
-import { exportSheet, ExportFormat } from "@/lib/querys/export";
+import { exportSheet, ExportFormat, type ExportRange } from "@/lib/querys/export";
 import { getMemberColor } from "@/components/individual/sheet/sheet-ui-helpers";
 
 interface UsePersistenceProps {
@@ -18,6 +18,8 @@ interface UsePersistenceProps {
   title: string;
   rows: SheetRow[];
   columns: ColumnDef[];
+  cellFormats: Record<string, CellFormat>;
+  cellTypeOverrides?: Record<string, ColumnDef["type"]>;
   currentUserId?: string;
   currentUser?: { id: string; name: string } | null;
   setSaveStatus: (s: SaveStatus) => void;
@@ -31,6 +33,8 @@ export function useSheetPersistence({
   title,
   rows,
   columns,
+  cellFormats,
+  cellTypeOverrides,
   currentUserId,
   currentUser,
   setSaveStatus,
@@ -132,17 +136,28 @@ export function useSheetPersistence({
   );
 
   const handleExport = useCallback(
-    async (format: ExportFormat) => {
+    async (format: ExportFormat, options?: { range?: ExportRange | null }) => {
       const id = toast.loading(`Preparing ${format.toUpperCase()} export…`);
       try {
         await persistPendingRowsNow();
-        await exportSheet({ format, sheetId });
+        await exportSheet({
+          format,
+          sheetId,
+          range: options?.range ?? null,
+          data: {
+            title,
+            rows,
+            columns,
+            cellFormats,
+            cellTypeOverrides,
+          },
+        });
         toast.success(`Downloaded as ${format.toUpperCase()}`, { id });
       } catch (error: any) {
         toast.error(error?.message ?? "Export failed. Please try again.", { id });
       }
     },
-    [persistPendingRowsNow, sheetId],
+    [cellFormats, cellTypeOverrides, columns, persistPendingRowsNow, rows, sheetId, title],
   );
 
   return {

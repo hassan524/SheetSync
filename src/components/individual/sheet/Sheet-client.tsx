@@ -95,7 +95,7 @@ import {
 } from "@/lib/querys/sheet/formulas";
 import { protectRow, unprotectRow } from "@/lib/querys/sheet/protection";
 import { logActivity } from "@/lib/querys/activity/activity";
-import { exportSheet } from "@/lib/querys/export";
+import type { ExportFormat, ExportRange } from "@/lib/querys/export";
 import {
   buildImportedSheetData,
   getImportedSheetTitle,
@@ -124,7 +124,6 @@ import {
   columnIndexToName,
   ROW_CELL_TYPES_KEY,
   ROW_CELL_SELECT_OPTIONS_KEY,
-  getDefaultValueForType,
   getOptionBgStyle,
   getSelectOptionLabel,
   getChoiceOptionsForColumn,
@@ -173,6 +172,50 @@ type ValidationApplyRange = {
   startRow: number;
   endRow: number;
 };
+
+function columnNameToIndex(name: string): number {
+  return name
+    .toUpperCase()
+    .split("")
+    .reduce((total, char) => total * 26 + char.charCodeAt(0) - 64, 0) - 1;
+}
+
+function rangeToA1(range: ExportRange): string {
+  return `${columnIndexToName(range.startCol)}${range.startRow + 1}:${columnIndexToName(range.endCol)}${range.endRow + 1}`;
+}
+
+function parsePdfA1Range(input: string, columns: ColumnDef[], rowCount: number): ExportRange | null {
+  const cleaned = input.trim().replace(/\s+/g, "");
+  if (!cleaned) return null;
+
+  const match = cleaned.match(/^([A-Za-z]+)(\d+)(?::([A-Za-z]+)(\d+))?$/);
+  if (!match) return null;
+
+  const startCol = columnNameToIndex(match[1]);
+  const startRow = Number(match[2]) - 1;
+  const endCol = match[3] ? columnNameToIndex(match[3]) : startCol;
+  const endRow = match[4] ? Number(match[4]) - 1 : startRow;
+
+  if (
+    startCol < 0 ||
+    endCol < 0 ||
+    startRow < 0 ||
+    endRow < 0 ||
+    startCol >= columns.length ||
+    endCol >= columns.length ||
+    startRow >= rowCount ||
+    endRow >= rowCount
+  ) {
+    return null;
+  }
+
+  return {
+    startRow: Math.min(startRow, endRow),
+    endRow: Math.max(startRow, endRow),
+    startCol: Math.min(startCol, endCol),
+    endCol: Math.max(startCol, endCol),
+  };
+}
 
 type SheetPresence = {
   name: string;
@@ -692,6 +735,8 @@ export default function SheetClient() {
     start: { row: number; colIndex: number };
     end: { row: number; colIndex: number };
   } | null>(null);
+  const [pdfExportOpen, setPdfExportOpen] = useState(false);
+  const [pdfRangeInput, setPdfRangeInput] = useState("");
 
   const rowsHistory = useHistory<SheetRow[]>([]);
   const columnsHistory = useHistory<ColumnDef[]>([]);
@@ -976,6 +1021,8 @@ export default function SheetClient() {
     title,
     rows,
     columns,
+    cellFormats: formatting.cellFormats,
+    cellTypeOverrides: cellTypes.cellTypeOverrides,
     currentUserId: currentUser?.id,
     currentUser,
     setSaveStatus,
@@ -4150,7 +4197,7 @@ export default function SheetClient() {
           const selectOptions = selectOptionsMap[colKey] || [];
           updatedRow = {
             ...updatedRow,
-            [colKey]: getDefaultValueForType(type),
+            [colKey]: type === "text" ? String(updatedRow[colKey] || "") : (updatedRow[colKey] ?? ""),
             [ROW_CELL_TYPES_KEY]: {
               ...(updatedRow[ROW_CELL_TYPES_KEY] ?? {}),
               [colKey]: type,
@@ -4213,6 +4260,11 @@ export default function SheetClient() {
         }, 50);
       } else if (mode === "change" && colKey) {
         colOps.changeColumnType(colKey, "select");
+        cellTypes.setCellTypeOverrides((prev: Record<string, ColumnDef["type"]>) =>
+          Object.fromEntries(
+            Object.entries(prev).filter(([cellKey]) => !cellKey.endsWith(`-${colKey}`)),
+          ),
+        );
         setTimeout(async () => {
           markSaving();
           const updatedCols = columnsHistory.currentState.map((c) =>
@@ -4655,6 +4707,11 @@ export default function SheetClient() {
                 onChangeType={(t) => {
                   if (!canEditSheet) { showViewerEditMessage(); return; }
                   sheetColOps.handleChangeColumnType(col.key, t);
+                  cellTypes.setCellTypeOverrides((prev: Record<string, ColumnDef["type"]>) =>
+                    Object.fromEntries(
+                      Object.entries(prev).filter(([cellKey]) => !cellKey.endsWith(`-${col.key}`)),
+                    ),
+                  );
                   if (t === "select") {
                     setFocusedColumnKey(col.key);
                     setRightPanel("select-options");
@@ -5704,6 +5761,91 @@ export default function SheetClient() {
   ]);
 
   // ── Render ─────────────────────────────────────────────────────────────
+  const getCurrentPdfExportRange = useCallback((): ExportRange | null => {
+    if (selectionRange) {
+      return {
+        startRow: Math.min(selectionRange.start.row, selectionRange.end.row),
+        endRow: Math.max(selectionRange.start.row, selectionRange.end.row),
+        startCol: Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex),
+        endCol: Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex),
+      };
+    }
+
+    if (selectedRows.size > 0) {
+      const rowIndexes = Array.from(selectedRows)
+        .map((rowId) => rows.findIndex((row) => row.id === rowId))
+        .filter((rowIdx) => rowIdx >= 0);
+      if (rowIndexes.length > 0) {
+        return {
+          startRow: Math.min(...rowIndexes),
+          endRow: Math.max(...rowIndexes),
+          startCol: 0,
+          endCol: Math.max(0, columns.length - 1),
+        };
+      }
+    }
+
+    if (selectedColumnKey) {
+      const colIndex = columns.findIndex((col) => col.key === selectedColumnKey);
+      if (colIndex >= 0) {
+        return {
+          startRow: 0,
+          endRow: Math.max(0, rows.length - 1),
+          startCol: colIndex,
+          endCol: colIndex,
+        };
+      }
+    }
+
+    if (selectedCell) {
+      const colIndex = columns.findIndex((col) => col.key === selectedCell.col);
+      if (colIndex >= 0) {
+        return {
+          startRow: selectedCell.row,
+          endRow: selectedCell.row,
+          startCol: colIndex,
+          endCol: colIndex,
+        };
+      }
+    }
+
+    return null;
+  }, [columns, rows, selectedCell, selectedColumnKey, selectedRows, selectionRange]);
+
+  const handleExport = useCallback(
+    (format: ExportFormat) => {
+      if (format !== "pdf") {
+        persistence.handleExport(format);
+        return;
+      }
+
+      const selectedRange = getCurrentPdfExportRange();
+      setPdfRangeInput(selectedRange ? rangeToA1(selectedRange) : "");
+      setPdfExportOpen(true);
+    },
+    [getCurrentPdfExportRange, persistence],
+  );
+
+  useEffect(() => {
+    if (!pdfExportOpen) return;
+    const selectedRange = getCurrentPdfExportRange();
+    if (selectedRange) setPdfRangeInput(rangeToA1(selectedRange));
+  }, [getCurrentPdfExportRange, pdfExportOpen]);
+
+  const executePdfExport = useCallback(() => {
+      const trimmed = pdfRangeInput.trim();
+      const range = trimmed ? parsePdfA1Range(trimmed, columns, rows.length) : null;
+      if (trimmed && !range) {
+        toast.error("Invalid PDF range. Use a range like A1:D20.");
+        return;
+      }
+
+      setPdfExportOpen(false);
+      persistence.handleExport("pdf", { range });
+    },
+    [columns, pdfRangeInput, persistence, rows.length],
+  );
+
   return (
     <TooltipProvider delayDuration={250}>
       <div
@@ -5728,7 +5870,7 @@ export default function SheetClient() {
           onTitleBlur={handleTitleBlur}
           onStarredToggle={handleStarredToggle}
           onImportClick={() => importInputRef.current?.click()}
-          onExport={persistence.handleExport}
+          onExport={handleExport}
           onShareClick={() => setShowShareDialog(true)}
           onNotificationsClick={() => toggleRightPanel("comments")}
         />
@@ -5747,6 +5889,87 @@ export default function SheetClient() {
           className="hidden"
           onChange={handleFloatingImageChange}
         />
+        {pdfExportOpen && (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/20 p-4"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setPdfExportOpen(false);
+            }}
+          >
+            <div
+              className="w-[min(360px,calc(100vw-2rem))] rounded-lg border bg-white p-3 shadow-xl"
+            style={{
+              borderColor: isDark ? "#263241" : "#e5e7eb",
+              background: isDark ? "#111827" : "#ffffff",
+              color: isDark ? "#e5e7eb" : "#111827",
+            }}
+          >
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">PDF range</div>
+                <div className="text-[11px] opacity-70">
+                  Drag cells on the sheet or type a range like A1:D20.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded opacity-70 hover:opacity-100"
+                onClick={() => setPdfExportOpen(false)}
+                aria-label="Close PDF export"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <input
+              value={pdfRangeInput}
+              onChange={(e) => setPdfRangeInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") executePdfExport();
+                if (e.key === "Escape") setPdfExportOpen(false);
+              }}
+              placeholder="Blank = full sheet"
+              className="h-9 w-full rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+              style={{
+                borderColor: isDark ? "#334155" : "#d1d5db",
+                background: isDark ? "#0f172a" : "#ffffff",
+                color: isDark ? "#f8fafc" : "#111827",
+              }}
+            />
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                className="h-8 cursor-pointer rounded-md border px-2.5 text-xs font-medium"
+                style={{ borderColor: isDark ? "#334155" : "#d1d5db" }}
+                onClick={() => {
+                  const selectedRange = getCurrentPdfExportRange();
+                  if (!selectedRange) {
+                    toast.info("Select cells first or type a PDF range.");
+                    return;
+                  }
+                  setPdfRangeInput(rangeToA1(selectedRange));
+                }}
+              >
+                Use selection
+              </button>
+              <button
+                type="button"
+                className="h-8 cursor-pointer rounded-md border px-2.5 text-xs font-medium"
+                style={{ borderColor: isDark ? "#334155" : "#d1d5db" }}
+                onClick={() => setPdfRangeInput("")}
+              >
+                Full sheet
+              </button>
+              <button
+                type="button"
+                className="h-8 cursor-pointer rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground"
+                onClick={executePdfExport}
+              >
+                Export PDF
+              </button>
+            </div>
+          </div>
+          </div>
+        )}
 
         <FormattingBar
           isDark={isDark}

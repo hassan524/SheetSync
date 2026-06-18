@@ -33,19 +33,7 @@ export function useCellTypes(
 
       const newRows = [...rows];
       const row = newRows[rowIdx];
-      if (newType === "checkbox") row[colKey] = false;
-      else if (newType === "priority") row[colKey] = "low";
-      else if (newType === "status") row[colKey] = "todo";
-      else if (newType === "select") row[colKey] = "";
-      else if (newType === "date")
-        row[colKey] = new Date().toISOString().split("T")[0];
-      else if (
-        newType === "number" ||
-        newType === "currency" ||
-        newType === "progress"
-      )
-        row[colKey] = 0;
-      else row[colKey] = String(row[colKey] || "");
+      row[colKey] = newType === "text" ? String(row[colKey] || "") : (row[colKey] ?? "");
 
       rowsHistory.pushState(newRows);
       onSave();

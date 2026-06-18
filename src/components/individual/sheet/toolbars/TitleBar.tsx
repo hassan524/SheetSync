@@ -35,7 +35,7 @@ import {
 import { SaveStatus } from "@/types/index";
 import type { OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import { IconBtn, SheetAvatar, ddStyle, ddItemStyle, getMemberColor } from "@/components/individual/sheet/sheet-ui-helpers";
-import { ExportFormat } from "@/lib/querys/export";
+import { ExportFormat, type ExportRange } from "@/lib/querys/export";
 
 interface TitleBarProps {
   title: string;
@@ -54,7 +54,7 @@ interface TitleBarProps {
   onTitleChange: (t: string) => void;
   onStarredToggle: () => void;
   onImportClick: () => void;
-  onExport: (format: ExportFormat) => void;
+  onExport: (format: ExportFormat, options?: { range?: ExportRange | null }) => void;
   onShareClick: () => void;
   onNotificationsClick: () => void;
   onTitleBlur: (t: string) => void;
