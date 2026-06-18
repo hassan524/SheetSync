@@ -6,7 +6,7 @@ import { AlertTriangle, Check, Calendar, Lock, MessageSquare, ChevronDown } from
 import { RenderCellProps } from "react-data-grid";
 import { SheetRow, ColumnDef } from "@/types/index";
 import { getStatusOptionStyle } from "@/lib/sheet-formatting-helpers";
-import { getOptionBgStyle, formatSheetDate } from "@/utils/SheetUtils";
+import { getOptionBgStyle, formatSheetDate, ROW_CELL_SELECT_OPTIONS_KEY } from "@/utils/SheetUtils";
 import { CommentDot } from "@/components/individual/sheet/sheet-ui-helpers";
 import type { SheetComment } from "@/lib/querys/sheet/firebase-realtime";
 
@@ -216,9 +216,28 @@ export function CellRenderer({
 
       case "select": {
         const val = String(displayValue ?? "");
-        const optionStyle = getOptionBgStyle(val);
         if (!val)
           return <span className="text-gray-300 text-[10px] italic">Select…</span>;
+
+        // Try to find custom options first in row's cell-specific options
+        const rowSelects = row[ROW_CELL_SELECT_OPTIONS_KEY as any];
+        let selectOpts: any[] = [];
+        if (rowSelects && typeof rowSelects === "object") {
+          selectOpts = rowSelects[colKey] ?? [];
+        }
+        // Fallback to column-level select options
+        if (selectOpts.length === 0 && colDef?.selectOptions) {
+          selectOpts = colDef.selectOptions;
+        }
+
+        // Find the option by label
+        const matchedOpt = selectOpts.find(
+          (opt) => (typeof opt === "object" ? opt.label : opt) === val
+        );
+
+        // Get style using the matched option (or fallback to hashing value)
+        const optionStyle = matchedOpt ? getOptionBgStyle(matchedOpt) : getOptionBgStyle(val);
+
         return (
           <span className="sheet-badge-pill" style={optionStyle}>
             {val}

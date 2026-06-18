@@ -223,6 +223,7 @@ export interface CellFormat {
     mode?: "all" | "across" | "down" | "center";
   };
   isLayoutRow?: boolean; // Special formatting for layout/header rows
+  noAutoMerge?: boolean;
 }
 
 export interface FloatingImage {

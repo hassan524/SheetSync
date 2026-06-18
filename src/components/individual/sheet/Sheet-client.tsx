@@ -14,7 +14,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { Check, Loader2, GripVertical, WrapText, Lock, MessageSquare, X } from "lucide-react";
+import { Check, Loader2, GripVertical, WrapText, Lock, MessageSquare, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -57,6 +57,7 @@ import ShareDialog from "./dialogs/Share-dialog";
 import RightPanel from "./Right-panel";
 import type { RightPanelType } from "./Right-panel";
 import FormulaDialog from "./dialogs/Formula-dialog";
+import SelectOptionsDialog from "./dialogs/Select-options-dialog";
 import {
   ddStyle, ddItemStyle, getMemberColor, CommentDot, SheetAvatar,
 } from "@/components/individual/sheet/sheet-ui-helpers";
@@ -1045,7 +1046,7 @@ export default function SheetClient() {
                 .map(([k]) => k),
             );
             formatting.setCellFormats(savedFormats);
-            const selectByCell: Record<string, string[]> = {};
+            const selectByCell: Record<string, SelectOption[]> = {};
             Object.entries(savedFormats).forEach(([key, fmt]) => {
               const opts = (fmt as any)?.selectOptions;
               if (Array.isArray(opts) && opts.length > 0) selectByCell[key] = opts;
@@ -1062,8 +1063,8 @@ export default function SheetClient() {
           if (wrapSet.size > 0) textWrap.setTextWrapColumns(wrapSet);
 
           const bufferedRows = ensureWorkingRowBuffer(data.rows, data.columns);
-          const typeOverrides: Record<string, ColumnDef["type"]> = {};
-          const rowSelectOptions: Record<string, string[]> = {};
+           const typeOverrides: Record<string, ColumnDef["type"]> = {};
+          const rowSelectOptions: Record<string, SelectOption[]> = {};
           bufferedRows.forEach((row, rowIdx) => {
             const rowTypes = row[ROW_CELL_TYPES_KEY];
             if (rowTypes && typeof rowTypes === "object") {
@@ -1075,7 +1076,7 @@ export default function SheetClient() {
             if (rowSelects && typeof rowSelects === "object") {
               Object.entries(rowSelects).forEach(([colKey, options]) => {
                 if (Array.isArray(options) && options.length > 0)
-                  rowSelectOptions[`${rowIdx}-${colKey}`] = options.map(String);
+                  rowSelectOptions[`${rowIdx}-${colKey}`] = options;
               });
             }
           });
@@ -2125,7 +2126,7 @@ export default function SheetClient() {
         visibleColumns.forEach((column, visibleColIdx) => {
           const cellKey = `${rowIdx}-${column.key}`;
           if (textWrap.textWrapColumns.has(cellKey) || manualMergeKeys.has(cellKey)) return;
-          if (textWrap.textWrapColumns.has(cellKey) || manualMergeKeys.has(cellKey)) return;
+          if (nextFormats[cellKey]?.noAutoMerge) return;
           const value = row[column.key];
           if (!shouldAutoOverflowValue(value)) return;
           const ownWidth = column.width ?? 160;
@@ -2191,9 +2192,10 @@ export default function SheetClient() {
   ]);
 
   const selectedMergeInfo = useMemo(() => {
-    if (!selectedCell) return null;
-    const direct = mergeByCell.get(`${selectedCell.row}-${selectedCell.col}`);
-    if (direct) return direct;
+    if (selectedCell) {
+      const direct = mergeByCell.get(`${selectedCell.row}-${selectedCell.col}`);
+      if (direct) return direct;
+    }
     if (!selectionRange) return null;
     const startRow = Math.min(selectionRange.start.row, selectionRange.end.row);
     const endRow = Math.max(selectionRange.start.row, selectionRange.end.row);
@@ -2264,8 +2266,8 @@ export default function SheetClient() {
       }
       mergeKeys.forEach((cellKey) => {
         const { merge: _merge, ...rest } = nextFormats[cellKey] ?? {};
-        if (Object.keys(rest).length > 0) nextFormats[cellKey] = rest;
-        else delete nextFormats[cellKey];
+        if (Object.keys(rest).length > 0) nextFormats[cellKey] = { ...rest, noAutoMerge: true };
+        else nextFormats[cellKey] = { noAutoMerge: true };
       });
     },
     [columnIndexByKey, columns, mergeByCell],
@@ -2417,10 +2419,15 @@ export default function SheetClient() {
       }
     }
     await persistCellFormatMap(nextFormats);
+    setSelectionRange({
+      start: { row: merge.masterRow, colIndex: masterColIndex },
+      end: { row: merge.masterRow + merge.rowSpan - 1, colIndex: masterColIndex + merge.colSpan - 1 },
+    });
+    setSelectedCell({ row: merge.masterRow, col: merge.masterCol });
     toast.success("Cells unmerged");
   }, [
     canEditSheet, showViewerEditMessage, selectedMergeInfo, columnIndexByKey,
-    formatting.cellFormats, columns, persistCellFormatMap,
+    formatting.cellFormats, columns, persistCellFormatMap, setSelectionRange, setSelectedCell,
   ]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
@@ -2770,6 +2777,7 @@ export default function SheetClient() {
       setSelectedColumnKey(null);
       const colIndex = columns.findIndex((c) => c.key === colKey);
       if (colIndex === -1) return;
+      setSelectedCell({ row: rowIdx, col: colKey });
       selectionAnchorRef.current = { row: rowIdx, colIndex };
       setSelectionRange({ start: { row: rowIdx, colIndex }, end: { row: rowIdx, colIndex } });
       isDraggingRef.current = true;
@@ -2780,7 +2788,7 @@ export default function SheetClient() {
       };
       window.addEventListener("pointerup", onUp);
     },
-    [columns],
+    [columns, setSelectedCell],
   );
 
   const onCellPointerEnter = useCallback(
@@ -4047,39 +4055,119 @@ export default function SheetClient() {
         showViewerEditMessage();
         return;
       }
-      if (!selectedCell) return;
-      const rowId = rows[selectedCell.row]?.id;
-      if (rowId && protection.isRowProtected(rowId)) {
-        toast.error("This row is protected");
+
+      // Determine which cells are targeted for the type change
+      const targetCells: { row: number; col: string }[] = [];
+
+      if (selectionRange) {
+        const startRow = Math.min(selectionRange.start.row, selectionRange.end.row);
+        const endRow = Math.max(selectionRange.start.row, selectionRange.end.row);
+        const startCol = Math.min(
+          selectionRange.start.colIndex,
+          selectionRange.end.colIndex,
+        );
+        const endCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+        for (let r = startRow; r <= endRow; r++) {
+          for (let c = startCol; c <= endCol; c++) {
+            const colKey = columns[c]?.key;
+            if (colKey) {
+              targetCells.push({ row: r, col: colKey });
+            }
+          }
+        }
+      } else if (selectedRows && selectedRows.size > 0) {
+        for (const rowId of Array.from(selectedRows)) {
+          const rowIdx = rows.findIndex((row) => row.id === rowId);
+          if (rowIdx >= 0) {
+            for (const col of columns) {
+              targetCells.push({ row: rowIdx, col: col.key });
+            }
+          }
+        }
+      } else if (selectedColumnKey) {
+        for (let r = 0; r < rows.length; r++) {
+          targetCells.push({ row: r, col: selectedColumnKey });
+        }
+      } else if (selectedCell) {
+        targetCells.push(selectedCell);
+      }
+
+      if (targetCells.length === 0) return;
+
+      // Filter out cells in protected rows
+      const unprotectedCells = targetCells.filter((cell) => {
+        const rowId = rows[cell.row]?.id;
+        return !(rowId && protection.isRowProtected(rowId));
+      });
+
+      if (unprotectedCells.length === 0) {
+        toast.error("Selected cells are in protected rows");
         return;
       }
-      const cellKey = `${selectedCell.row}-${selectedCell.col}`;
-      cellTypes.setCellTypeOverrides((prev: any) => ({ ...prev, [cellKey]: type }));
-      const selectOptions =
-        columns.find((column) => column.key === selectedCell.col)?.selectOptions ?? [];
-      const selectOptionLabels = selectOptions.map(getSelectOptionLabel);
-      if (type === "select") {
-        setCellSelectOptions((prev) => ({ ...prev, [cellKey]: selectOptionLabels }));
+
+      // Pre-compute select options for any column that needs it
+      const selectOptionsMap: Record<string, SelectOption[]> = {};
+      for (const col of columns) {
+        selectOptionsMap[col.key] = col.selectOptions ?? [];
       }
-      const updatedRows = rows.map((row, idx) => {
-        if (idx !== selectedCell.row) return row;
-        return {
-          ...row,
-          [selectedCell.col]: getDefaultValueForType(type),
-          [ROW_CELL_TYPES_KEY]: {
-            ...(row[ROW_CELL_TYPES_KEY] ?? {}),
-            [selectedCell.col]: type,
-          },
-          ...(type === "select"
-            ? {
-              [ROW_CELL_SELECT_OPTIONS_KEY]: {
-                ...(row[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}),
-                [selectedCell.col]: selectOptionLabels,
-              },
-            }
-            : {}),
-        };
+
+      // 1. Update cellTypeOverrides state
+      cellTypes.setCellTypeOverrides((prev: any) => {
+        const next = { ...prev };
+        for (const cell of unprotectedCells) {
+          const cellKey = `${cell.row}-${cell.col}`;
+          next[cellKey] = type;
+        }
+        return next;
       });
+
+      // 2. Update cellSelectOptions state
+      if (type === "select") {
+        setCellSelectOptions((prev) => {
+          const next = { ...prev };
+          for (const cell of unprotectedCells) {
+            const cellKey = `${cell.row}-${cell.col}`;
+            next[cellKey] = selectOptionsMap[cell.col] || [];
+          }
+          return next;
+        });
+      }
+
+      // 3. Update rows array
+      const nextCellTypeOverrides = { ...cellTypes.cellTypeOverrides };
+      for (const cell of unprotectedCells) {
+        const cellKey = `${cell.row}-${cell.col}`;
+        nextCellTypeOverrides[cellKey] = type;
+      }
+
+      const updatedRows = rows.map((row, idx) => {
+        const cellsInThisRow = unprotectedCells.filter((cell) => cell.row === idx);
+        if (cellsInThisRow.length === 0) return row;
+
+        let updatedRow = { ...row };
+        for (const cell of cellsInThisRow) {
+          const colKey = cell.col;
+          const selectOptions = selectOptionsMap[colKey] || [];
+          updatedRow = {
+            ...updatedRow,
+            [colKey]: getDefaultValueForType(type),
+            [ROW_CELL_TYPES_KEY]: {
+              ...(updatedRow[ROW_CELL_TYPES_KEY] ?? {}),
+              [colKey]: type,
+            },
+            ...(type === "select"
+              ? {
+                [ROW_CELL_SELECT_OPTIONS_KEY]: {
+                  ...(updatedRow[ROW_CELL_SELECT_OPTIONS_KEY] ?? {}),
+                  [colKey]: selectOptions,
+                },
+              }
+              : {}),
+          };
+        }
+        return updatedRow;
+      });
+
       rowsHistory.pushState(updatedRows);
       setSheetState((p) => ({ ...p, rows: updatedRows }));
       saveAllRows(sheetId, updatedRows).catch(() => {
@@ -4087,18 +4175,20 @@ export default function SheetClient() {
       });
       broadcastSheetSnapshot({
         rows: updatedRows,
-        cellTypeOverrides: cellTypes.cellTypeOverrides,
+        cellTypeOverrides: nextCellTypeOverrides,
       });
-      toast.success(`Cell changed to ${type}`);
+      toast.success(`Changed selection to type: ${type}`);
     },
     [
-      canEditSheet, showViewerEditMessage, selectedCell, cellTypes, rows, rowsHistory,
-      sheetId, columns, setCellSelectOptions, protection.isRowProtected,
+      canEditSheet, showViewerEditMessage, selectedCell, selectionRange, selectedRows,
+      selectedColumnKey, cellTypes, rows, rowsHistory, sheetId, columns,
+      setCellSelectOptions, protection.isRowProtected, setSheetState, saveAllRows,
+      broadcastSheetSnapshot,
     ],
   );
 
   const handleSelectSetupConfirm = useCallback(
-    async (options: string[]) => {
+    async (options: SelectOption[]) => {
       const { colKey, mode, row } = selectSetupDialog;
       if (mode === "insert") {
         sheetColOps.handleInsertColumn("select");
@@ -4716,6 +4806,11 @@ export default function SheetClient() {
                   background: (effectiveCellStyle.backgroundColor as string) || "transparent",
                   zIndex: 5,
                 }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  selectMergeBlock(mergeInfo);
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
@@ -5275,6 +5370,24 @@ export default function SheetClient() {
                         No options — edit column to add some.
                       </div>
                     )}
+                    <div className="my-1 border-t border-border" />
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] font-medium text-primary hover:bg-muted/80 transition-colors cursor-pointer select-none outline-none"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setSelectSetupDialog({
+                          open: true,
+                          colKey: column.key,
+                          row: rowIdx,
+                          mode: "cell",
+                        });
+                      }}
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add/Edit Options
+                    </button>
                   </SelectContent>
                 </Select>
               </EditCellWrapper>
@@ -6402,6 +6515,22 @@ export default function SheetClient() {
             open={showFormulaDialog}
             onClose={() => setShowFormulaDialog(false)}
             onInsert={handleFormulaInsert}
+            isDark={isDark}
+          />
+        )}
+
+        {selectSetupDialog.open && (
+          <SelectOptionsDialog
+            open={selectSetupDialog.open}
+            onClose={() => setSelectSetupDialog({ open: false, colKey: null, row: null, mode: "insert" })}
+            onConfirm={handleSelectSetupConfirm}
+            initialOptions={
+              selectSetupDialog.mode === "cell"
+                ? (cellSelectOptions[`${selectSetupDialog.row}-${selectSetupDialog.colKey}`]?.length
+                  ? cellSelectOptions[`${selectSetupDialog.row}-${selectSetupDialog.colKey}`]
+                  : (columns.find((c) => c.key === selectSetupDialog.colKey)?.selectOptions ?? []))
+                : (columns.find((c) => c.key === selectSetupDialog.colKey)?.selectOptions ?? [])
+            }
             isDark={isDark}
           />
         )}
