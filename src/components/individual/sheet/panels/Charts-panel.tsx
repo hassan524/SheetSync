@@ -593,13 +593,6 @@ function YAxisSection({
                   onValueChange={(v) => {
                     const next = [...chart.seriesKeys];
                     next[idx] = v;
-                    // 🎯 SIDEBAR LINE/BAR SERIES CLICK LOG
-                    console.log("🎯 [ChartsPanel Y-Axis Multi-Series Column Changed]:", {
-                      indexUpdated: idx,
-                      newKeySelected: v,
-                      fullArrayBeforeUpdate: chart.seriesKeys,
-                      fullArrayAfterUpdate: next
-                    });
                     onUpdate({ seriesKeys: next });
                   }}
                 >

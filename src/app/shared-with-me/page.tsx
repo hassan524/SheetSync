@@ -18,7 +18,25 @@ export const metadata = generateSEO({
 });
 
 export default async function SharedWithMePage() {
-  const sharedSheets = await getSharedWithMeSheets();
+  let sharedSheets: any[] = [];
+
+  try {
+    // Attempt to grab database records
+    sharedSheets = await getSharedWithMeSheets() || [];
+  } catch (error: any) {
+    // 🚨 PRINTS THE EXACT DATABASE FAULT IN YOUR SERVER CONSOLE/TERMINAL
+    console.error("❌ [DATABASE EXCEPTION IN SHARED-WITH-ME PAGE]:", {
+      message: error?.message,
+      code: error?.code,
+      hint: error?.hint,
+      details: error?.details,
+      rawErrorObject: error
+    });
+
+    // Fallback to empty array to allow layout elements to render safely
+    sharedSheets = [];
+  }
+
   const editableCount = sharedSheets.filter(
     (sheet: any) => sheet.sharedRole === "editor" || sheet.sharedRole === "admin",
   ).length;
