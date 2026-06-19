@@ -4,7 +4,7 @@ import React from "react";
 import {
   Undo2, Redo2, Copy, Scissors, Clipboard, WrapText, Lock, Unlock,
   Sigma, SlidersHorizontal, Search, X, ChevronsLeftRight, ChevronsRightLeft,
-  Maximize2, Merge, Split, Table2,
+  Maximize2, Merge, Split, Table2, BadgeDollarSign,
 } from "lucide-react";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -18,6 +18,7 @@ import { CellFormat, ColumnDef } from "@/types/index";
 import FormattingToolbar from "@/components/individual/sheet/Formatting-toolbar";
 import CellTypeSelector from "@/components/individual/sheet/Cell-type-selector";
 import { IconBtn, ToolSep, ddStyle, ddItemStyle } from "@/components/individual/sheet/sheet-ui-helpers";
+import { CURRENCY_OPTIONS } from "@/constants/currencies";
 
 interface FormattingBarProps {
   isDark: boolean;
@@ -53,6 +54,8 @@ interface FormattingBarProps {
   onSearchToggle: () => void;
   onSearchChange: (q: string) => void;
   onSearchClose: () => void;
+  selectedCellCurrencyCode?: string;
+  onCellCurrencyChange?: (currencyCode: string) => void;
   onSort: (dir: "asc" | "desc") => void;
   onHideColumn: () => void;
   selectedColumnKey?: string | null;
@@ -86,6 +89,7 @@ export function FormattingBar({
   onUndo, onRedo, onZoomChange, onCopy, onCut, onPaste,
   onFontFamilyChange, onFontSizeChange, onFormatChange, onCellTypeChange,
   onTextWrapToggle, onProtectionToggle,
+  selectedCellCurrencyCode = "USD", onCellCurrencyChange,
   onFillColumnNumbers = () => { }, onFillColumnHashNumbers = () => { },
   onFormulaOpen, onSearchToggle, onSearchChange, onSearchClose, onSort, onHideColumn,
   selectedColumnKey, selectedColumnWidth, onSetColumnWidth, onExpandAllColumns,
@@ -123,6 +127,7 @@ export function FormattingBar({
   };
 
   const [widthVal, setWidthVal] = React.useState(String(selectedColumnWidth ?? 160));
+  const [currencySearch, setCurrencySearch] = React.useState("");
   const isEditingWidth = React.useRef(false);
   React.useEffect(() => {
     if (!isEditingWidth.current) {
@@ -252,6 +257,54 @@ export function FormattingBar({
           disabled={!hasSelection}
         />
         <ToolSep />
+
+        {selectedCell && selectedCellType === "currency" && !selectedColumnKey && (
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="sheet-icon-btn h-[24px] px-2 rounded flex items-center gap-1.5 shrink-0 text-[10px] font-semibold"
+                  disabled={!onCellCurrencyChange}
+                >
+                  <BadgeDollarSign className="h-3.5 w-3.5" />
+                  <span className="font-mono">{selectedCellCurrencyCode || "USD"}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                collisionPadding={10}
+                className="w-64 max-h-72 overflow-y-auto hide-scrollbar"
+                style={selStyle}
+              >
+                <div className="p-2">
+                  <input
+                    className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary/25"
+                    placeholder="Search currency..."
+                    value={currencySearch}
+                    onChange={(e) => setCurrencySearch(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+                {CURRENCY_OPTIONS.filter((currency) =>
+                  `${currency.code} ${currency.name}`
+                    .toLowerCase()
+                    .includes(currencySearch.toLowerCase()),
+                ).map((currency) => (
+                  <DropdownMenuItem
+                    key={currency.code}
+                    className="text-xs gap-2"
+                    style={ddItemStyle(isDark)}
+                    onClick={() => onCellCurrencyChange?.(currency.code)}
+                  >
+                    <span className="w-9 font-mono font-semibold">{currency.code}</span>
+                    <span className="truncate text-muted-foreground">{currency.name}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <ToolSep />
+          </>
+        )}
 
         {/* Wrap + Borderless + Protect */}
         <IconBtn

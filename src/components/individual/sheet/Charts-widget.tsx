@@ -24,139 +24,13 @@ import type { SheetChart } from "@/hooks/sheets/use-charts";
 import {
   SCHEME_COLORS,
   CATEGORICAL_KINDS,
-  getLabelCols,
   isChartableLabelColumn,
-  coerceChartNumber,
+  resolveChartData as sharedResolveChartData,
 } from "@/hooks/sheets/use-charts";
 import type { SheetRow, ColumnDef } from "@/types/index";
-import { formatSheetDate } from "@/utils/SheetUtils";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
-// ─────────────────────────────────────────────────────────────
-//  RESOLVE CHART DATA (self-contained, correct logic)
-// ─────────────────────────────────────────────────────────────
-
-
-function formatChartAxisDate(value: string): string {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function resolveChartData(
-  chart: SheetChart,
-  rows: SheetRow[],
-  columns: ColumnDef[],
-): { categories: string[]; series: { name: string; data: number[] }[] } {
-  if (chart.dataMode === "manual") {
-    return {
-      categories: chart.manualCategories,
-      series: chart.manualSeries.map((s) => ({ name: s.name, data: s.values })),
-    };
-  }
-
-  if (!chart.labelColumnKey) return { categories: [], series: [] };
-  const labelColumn = columns.find((c) => c.key === chart.labelColumnKey);
-  if (!isChartableLabelColumn(labelColumn)) return { categories: [], series: [] };
-  const isDateLabel = labelColumn?.type === "date";
-  const formatLabel = (raw: string) => (isDateLabel ? formatChartAxisDate(raw) : raw);
-
-  const start = Math.max(0, chart.startRow ?? 0);
-  const end = chart.endRow != null ? Math.min(rows.length - 1, chart.endRow) : rows.length - 1;
-
-  const sliced = rows.slice(start, end + 1).filter((r) => {
-    const labelVal = r[chart.labelColumnKey!];
-    if (labelVal === undefined || labelVal === null || String(labelVal).trim() === "") return false;
-    const labelStr = String(labelVal).trim();
-    if (/^[A-Z\s]{4,}$/.test(labelStr) && !/^\d/.test(labelStr)) return false;
-    if (isDateLabel) {
-      const d = new Date(labelStr);
-      if (Number.isNaN(d.getTime())) return false;
-    }
-    return true;
-  });
-
-  if (sliced.length === 0) return { categories: [], series: [] };
-
-  const isCat = CATEGORICAL_KINDS.has(chart.kind);
-  const noSeries = chart.seriesKeys.length === 0;
-  const isCountMode = (isCat && noSeries) || chart.aggregateMode === "count";
-
-  // Only keep rows that actually have data — skips the thousands of
-  // blank template rows so the chart doesn't span years of empty dates.
-  let dataRows = sliced;
-  if (!isCountMode) {
-    dataRows = sliced.filter((r) =>
-      chart.seriesKeys.some((key) => {
-        const v = coerceChartNumber(r[key]);
-        return v !== null && v !== 0;
-      }),
-    );
-    if (dataRows.length === 0) return { categories: [], series: [] };
-  }
-
-  // COUNT MODE
-  if (isCountMode) {
-    const countMap = new Map<string, number>();
-    sliced.forEach((r) => {
-      const label = formatLabel(String(r[chart.labelColumnKey!]).trim());
-      if (label) countMap.set(label, (countMap.get(label) ?? 0) + 1);
-    });
-    const categories = Array.from(countMap.keys());
-    return {
-      categories,
-      series: [{ name: "Count", data: categories.map((l) => countMap.get(l)!) }],
-    };
-  }
-
-  // NO GROUPING — each row is one data point
-  if (chart.aggregateMode === "none") {
-    const categories = dataRows.map((r) => formatLabel(String(r[chart.labelColumnKey!]).trim()));
-    const series = chart.seriesKeys.map((key) => {
-      const col = columns.find((c) => c.key === key);
-      return {
-        name: col?.name ?? key,
-        data: dataRows.map((r) => coerceChartNumber(r[key]) ?? 0),
-      };
-    });
-    return { categories, series };
-  }
-
-  // SUM / AVG per unique label, preserving first-seen order
-  const labelMap = new Map<string, { sums: number[]; counts: number[] }>();
-  const sc = chart.seriesKeys.length;
-  const order: string[] = [];
-  dataRows.forEach((r) => {
-    const label = formatLabel(String(r[chart.labelColumnKey!]).trim());
-    if (!labelMap.has(label)) {
-      labelMap.set(label, { sums: new Array(sc).fill(0), counts: new Array(sc).fill(0) });
-      order.push(label);
-    }
-    const entry = labelMap.get(label)!;
-    chart.seriesKeys.forEach((key, si) => {
-      const v = coerceChartNumber(r[key]);
-      if (v !== null) {
-        entry.sums[si] += v;
-        entry.counts[si]++;
-      }
-    });
-  });
-
-  const series = chart.seriesKeys.map((key, si) => {
-    const col = columns.find((c) => c.key === key);
-    return {
-      name: col?.name ?? key,
-      data: order.map((label) => {
-        const e = labelMap.get(label);
-        if (!e || e.counts[si] === 0) return 0;
-        return chart.aggregateMode === "avg" ? e.sums[si] / e.counts[si] : e.sums[si];
-      }),
-    };
-  });
-
-  return { categories: order, series };
-}
 
 // ─────────────────────────────────────────────────────────────
 //  BUILD APEX OPTIONS
@@ -567,7 +441,7 @@ export default function ChartWidget({
 
   // ── Data ──
   const { categories, series } = useMemo(
-    () => resolveChartData(chart, rows, columns),
+    () => sharedResolveChartData(chart, rows, columns),
     [chart, rows, columns],
   );
 
@@ -602,8 +476,6 @@ export default function ChartWidget({
   const scrollChartHeight = categories.length * PX_PER_BAR_ROW;
 
   // ── CORRECT isUnconfigured check ──
-  // Categorical charts (pie/donut/radar) only need labelColumnKey
-  // Other charts need labelColumnKey + at least one seriesKey
   const isCat = CATEGORICAL_KINDS.has(chart.kind);
   const labelColumn = columns.find((c) => c.key === chart.labelColumnKey);
   const invalidLabelColumn =
@@ -611,13 +483,29 @@ export default function ChartWidget({
     !!chart.labelColumnKey &&
     !isChartableLabelColumn(labelColumn);
 
+  // Filter out any accidentally empty strings like "" inside seriesKeys
+  const activeSeriesKeys = (chart.seriesKeys || []).filter(Boolean);
+
   const isUnconfigured =
     chart.dataMode === "sheet"
-      ? !chart.labelColumnKey ||
-      invalidLabelColumn ||
-      (!isCat && chart.seriesKeys.length === 0)
+      ? !chart.labelColumnKey || (!isCat && activeSeriesKeys.length === 0)
       : chart.manualCategories.length === 0 ||
-      chart.manualSeries.every((s) => s.values.length === 0);
+        chart.manualSeries.every((s) => s.values.length === 0);
+
+  // 🚨 WIDGET STATE DEEP DEBUG LOG
+  console.log("📊 [ChartWidget Debug State]:", {
+    chartId: chart.id,
+    kind: chart.kind,
+    dataMode: chart.dataMode,
+    labelColumnKey: chart.labelColumnKey,
+    seriesKeysFromState: chart.seriesKeys,
+    filteredSeriesKeysLength: activeSeriesKeys.length,
+    isUnconfiguredEvaluatedTo: isUnconfigured,
+    categoriesCount: categories?.length || 0,
+    seriesCount: series?.length || 0,
+    hasDataChecked: hasData,
+    columnsList: columns.map(c => ({ key: c.key, name: c.name }))
+  });
 
   // ── Theme ──
   const accent = "#1a7a4a";

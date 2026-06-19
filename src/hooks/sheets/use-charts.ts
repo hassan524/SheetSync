@@ -197,6 +197,19 @@ export function getLabelCols(columns: ColumnDef[]): ColumnDef[] {
   );
 }
 
+export function rowLooksLikeHeader(
+  row: SheetRow | undefined,
+  columns: ColumnDef[],
+): boolean {
+  if (!row) return false;
+  const checkCols = getLabelCols(columns);
+  if (checkCols.length === 0) return false;
+  const nonEmpty = checkCols.filter(
+    (c) => String(row[c.key] ?? "").trim().length > 0,
+  );
+  return nonEmpty.length >= Math.ceil(checkCols.length * 0.6);
+}
+
 export function isChartableLabelColumn(column: ColumnDef | undefined): boolean {
   if (!column) return false;
   return getLabelCols([column]).length === 1;
@@ -220,8 +233,61 @@ export function coerceChartNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function formatChartAxisDate(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function uid() {
   return Math.random().toString(36).slice(2, 9);
+}
+
+function getColumnNameFromHeaderRow(
+  column: ColumnDef | undefined,
+  rows: SheetRow[],
+  headerRowIndex: number,
+): string | null {
+  if (!column || headerRowIndex < 0) return null;
+  const headerValue = String(rows[headerRowIndex]?.[column.key] ?? "").trim();
+  return headerValue || column.name || column.key;
+}
+
+function getLikelyColumnHeaderValues(
+  column: ColumnDef | undefined,
+  rows: SheetRow[],
+): Set<string> {
+  const values = new Set<string>();
+  if (!column) return values;
+
+  [column.name, column.key].forEach((value) => {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    if (normalized) values.add(normalized);
+  });
+
+  rows.filter((row) => (row as any)._isHeaderRow).forEach((row) => {
+    const value = String(row[column.key] ?? "").trim();
+    if (value && value.length <= 80) values.add(value.toLowerCase());
+  });
+
+  return values;
+}
+
+function isColumnHeaderValue(
+  value: string,
+  column: ColumnDef | undefined,
+  rows: SheetRow[],
+  headerRowIndex: number,
+): boolean {
+  if (!column) return false;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return false;
+  const names = new Set(
+    [column.name, column.key, getColumnNameFromHeaderRow(column, rows, headerRowIndex)]
+      .filter(Boolean)
+      .map((name) => String(name).trim().toLowerCase()),
+  );
+  return names.has(normalized);
 }
 
 const DEFAULT_CHART: Omit<SheetChart, "id" | "title" | "kind" | "x" | "y"> = {
@@ -266,6 +332,13 @@ export function resolveChartData(
   if (!chart.labelColumnKey) return { categories: [], series: [] };
   const labelColumn = columns.find((c) => c.key === chart.labelColumnKey);
   if (!isChartableLabelColumn(labelColumn)) return { categories: [], series: [] };
+  const likelyLabelHeaders = getLikelyColumnHeaderValues(labelColumn, rows);
+  const isDateLabel =
+    labelColumn?.type === "date" ||
+    /(^|[\s_-])date([\s_-]|$)/i.test(
+      getColumnNameFromHeaderRow(labelColumn, rows, chart.labelRowIndex ?? -1) ?? "",
+    );
+  const formatLabel = (raw: string) => (isDateLabel ? formatChartAxisDate(raw) : raw);
 
   // Apply row range
   const start = Math.max(0, chart.startRow ?? 0);
@@ -274,44 +347,53 @@ export function resolveChartData(
       ? Math.min(rows.length - 1, chart.endRow)
       : rows.length - 1;
 
+  const isSingleSelectedRow = start === end;
+
   const sliced = rows
     .slice(start, end + 1)
-    .filter(
-      (r) => {
-        const labelVal = r[chart.labelColumnKey!];
-        if (labelVal === undefined || labelVal === null || String(labelVal).trim() === "") return false;
-        // Skip layout rows (title banner, column header row)
-        const labelStr = String(labelVal).trim();
-        if (/^[A-Z\s]{4,}$/.test(labelStr) && !/^\d/.test(labelStr)) return false;
-        // For date columns, skip non-date values
-        if (labelColumn?.type === "date") {
-          const d = new Date(labelStr);
-          if (isNaN(d.getTime())) return false;
-        }
-        return true;
+    .filter((row, index) => {
+      // 1. Properly skip the exact header row by its absolute layout index
+      const absoluteRowIndex = start + index;
+      if (absoluteRowIndex === chart.labelRowIndex) return false;
+
+      // 2. Skip explicitly marked virtual header rows
+      if ((row as any)._isHeaderRow) return false;
+
+      const labelVal = row[chart.labelColumnKey!];
+      if (labelVal === undefined || labelVal === null || String(labelVal).trim() === "") return false;
+
+      const labelStr = String(labelVal).trim();
+
+      // 3. Optional Date Validation
+      if (isDateLabel) {
+        const d = new Date(labelStr);
+        if (isNaN(d.getTime())) return false;
       }
-    );
+      return true;
+    });
 
   if (sliced.length === 0) return { categories: [], series: [] };
 
-  // For sum/avg mode, skip rows where ALL series values are 0 or empty
-  const hasAnyData = sliced.some((r) =>
-    chart.seriesKeys.some((key) => {
-      const v = coerceChartNumber(r[key]);
-      return v !== null && v !== 0;
-    })
-  );
-  if (!hasAnyData && chart.aggregateMode !== "count") return { categories: [], series: [] };
-
-
   const isCategorical = CATEGORICAL_KINDS.has(chart.kind);
   const noSeriesKeys = chart.seriesKeys.length === 0;
+  const isCountMode = (isCategorical && noSeriesKeys) || chart.aggregateMode === "count";
+
+  let dataRows = sliced;
+  if (!isCountMode) {
+    dataRows = sliced.filter((r) =>
+      chart.seriesKeys.some((key) => {
+        const v = coerceChartNumber(r[key]);
+        return v !== null;
+      }),
+    );
+    if (dataRows.length === 0) return { categories: [], series: [] };
+  }
 
   // ── COUNT MODE (pie / donut / radar with no Y column, or aggregateMode=count) ──
-  if ((isCategorical && noSeriesKeys) || chart.aggregateMode === "count") {
+  if (isCountMode) {
     const countMap = new Map<string, number>();
     sliced.forEach((r) => {
-      const label = String(r[chart.labelColumnKey!]).trim();
+      const label = formatLabel(String(r[chart.labelColumnKey!]).trim());
       if (label) countMap.set(label, (countMap.get(label) ?? 0) + 1);
     });
 
@@ -327,20 +409,20 @@ export function resolveChartData(
   // ── WITH Y SERIES (sum / avg / none) ─────────────────────
   if (chart.aggregateMode === "none") {
     // Each row = one data point, no grouping
-    let displayRows = sliced;
+    let displayRows = dataRows;
     const max = chart.maxXLabels ?? 12;
-    if (sliced.length > max) {
-      const step = Math.ceil(sliced.length / max);
-      displayRows = sliced.filter((_, i) => i % step === 0);
+    if (dataRows.length > max) {
+      const step = Math.ceil(dataRows.length / max);
+      displayRows = dataRows.filter((_, i) => i % step === 0);
     }
 
     const categories = displayRows.map((r) =>
-      String(r[chart.labelColumnKey!]).trim(),
+      formatLabel(String(r[chart.labelColumnKey!]).trim()),
     );
     const series = chart.seriesKeys.map((key) => {
       const col = columns.find((c) => c.key === key);
       return {
-        name: col?.name ?? key,
+        name: getColumnNameFromHeaderRow(col, rows, chart.labelRowIndex) ?? key,
         data: displayRows.map((r) => {
           return coerceChartNumber(r[key]) ?? 0;
         }),
@@ -354,8 +436,8 @@ export function resolveChartData(
   const labelMap = new Map<string, { sums: number[]; counts: number[] }>();
   const seriesCount = chart.seriesKeys.length;
 
-  sliced.forEach((r) => {
-    const label = String(r[chart.labelColumnKey!]).trim();
+  dataRows.forEach((r) => {
+    const label = formatLabel(String(r[chart.labelColumnKey!]).trim());
     if (!labelMap.has(label)) {
       labelMap.set(label, {
         sums: new Array(seriesCount).fill(0),
@@ -383,7 +465,7 @@ export function resolveChartData(
   const series = chart.seriesKeys.map((key, si) => {
     const col = columns.find((c) => c.key === key);
     return {
-      name: col?.name ?? key,
+      name: getColumnNameFromHeaderRow(col, rows, chart.labelRowIndex) ?? key,
       data: allLabels.map((label) => {
         const entry = labelMap.get(label);
         if (!entry || entry.counts[si] === 0) return 0;
@@ -549,6 +631,8 @@ export function useCharts(opts?: UseChartsOptions): UseChartsReturn {
     );
     setShowPicker(false);
   }, []);
+
+
 
   return {
     charts,

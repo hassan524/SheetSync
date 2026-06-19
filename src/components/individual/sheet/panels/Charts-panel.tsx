@@ -3,14 +3,18 @@
 import { useEffect, useState } from "react";
 import {
   BarChart3, Plus, Trash2, Database, Palette, Settings2,
-  Check, GripVertical, Info, Sparkles,
+  Check, GripVertical, Sparkles,
 } from "lucide-react";
 import type { SheetChart, ChartKind, ColorScheme, ChartPanelTab } from "@/hooks/sheets/use-charts";
 import {
   SCHEME_COLORS, SCHEME_LABELS, getLabelCols, getNumericCols,
-  CATEGORICAL_KINDS, requiresNumericY,
+  CATEGORICAL_KINDS, requiresNumericY, coerceChartNumber,
 } from "@/hooks/sheets/use-charts";
 import type { SheetRow, ColumnDef } from "@/types/index";
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from "@/components/ui/select";
+import { ddStyle, ddItemStyle } from "@/components/individual/sheet/sheet-ui-helpers";
 
 // ─────────────────────────────────────────────────────────────
 //  CHART KIND OPTIONS
@@ -83,8 +87,8 @@ const KIND_OPTIONS: { kind: ChartKind; label: string; svg: React.ReactNode }[] =
     kind: "scatter", label: "Scatter",
     svg: (
       <svg viewBox="0 0 28 22" fill="none" className="w-full h-full">
-        {([[4,16],[8,8],[10,14],[14,5],[17,12],[20,8],[23,17]] as [number,number][]).map(([cx,cy],i) => (
-          <circle key={i} cx={cx} cy={cy} r="2" fill="currentColor" opacity={0.4+(i%3)*0.2} />
+        {([[4, 16], [8, 8], [10, 14], [14, 5], [17, 12], [20, 8], [23, 17]] as [number, number][]).map(([cx, cy], i) => (
+          <circle key={i} cx={cx} cy={cy} r="2" fill="currentColor" opacity={0.4 + (i % 3) * 0.2} />
         ))}
       </svg>
     ),
@@ -101,11 +105,11 @@ const KIND_OPTIONS: { kind: ChartKind; label: string; svg: React.ReactNode }[] =
   },
 ];
 
+const ACCENT = "#1a7a4a";
+
 // ─────────────────────────────────────────────────────────────
 //  MICRO-COMPONENTS
 // ─────────────────────────────────────────────────────────────
-
-const ACCENT = "#1a7a4a";
 
 function Toggle({ value, onChange, label, isDark }: { value: boolean; onChange: (v: boolean) => void; label: string; isDark: boolean }) {
   return (
@@ -130,32 +134,15 @@ function Divider({ isDark }: { isDark: boolean }) {
   return <div className="my-4" style={{ borderTop: `1px solid ${isDark ? "#1e2330" : "#f1f5f9"}` }} />;
 }
 
-function InfoBadge({ text, isDark, variant = "info" }: { text: string; isDark: boolean; variant?: "info" | "success" | "warn" }) {
-  const colors = {
-    info: { bg: isDark ? "#0f172a" : "#eff6ff", border: isDark ? "#1e3a5f" : "#bfdbfe", text: isDark ? "#93c5fd" : "#1e40af" },
-    success: { bg: isDark ? "#052e16" : "#f0fdf4", border: isDark ? "#14532d" : "#bbf7d0", text: isDark ? "#86efac" : "#166534" },
-    warn: { bg: isDark ? "#2d1b00" : "#fffbeb", border: isDark ? "#78350f" : "#fcd34d", text: isDark ? "#fcd34d" : "#92400e" },
-  }[variant];
-  return (
-    <div className="flex items-start gap-1.5 px-3 py-2 rounded-lg mt-1.5" style={{ background: colors.bg, border: `1px solid ${colors.border}` }}>
-      <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: colors.text }} />
-      <p className="text-[11px] leading-snug" style={{ color: colors.text }}>{text}</p>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-//  ROW PREVIEW HELPER
-// ─────────────────────────────────────────────────────────────
-
-function getRowPreview(row: SheetRow, columns: ColumnDef[], maxChars = 45): string {
-  const vals = columns
-    .filter(c => !c.isExtra)
-    .slice(0, 5)
-    .map(c => String(row[c.key] ?? "").trim())
-    .filter(Boolean)
-    .join(", ");
-  return vals.length > maxChars ? vals.slice(0, maxChars) + "…" : vals;
+// Shared dropdown content/item props so every Select in this file looks/behaves the same
+function ddContentProps(isDark: boolean) {
+  return {
+    side: "bottom" as const,
+    align: "start" as const,
+    avoidCollisions: false,
+    className: "max-h-56 overflow-y-auto",
+    style: ddStyle(isDark),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -210,7 +197,6 @@ export default function ChartsPanel({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Tabs */}
       <div className="flex items-center px-3 pt-2 pb-0 gap-0.5 shrink-0 border-b" style={{ borderColor: border }}>
         {TABS.map((tab) => (
           <button
@@ -230,7 +216,6 @@ export default function ChartsPanel({
         ))}
       </div>
 
-      {/* Tab body */}
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {panelTab === "data" && (
           <DataTab
@@ -242,7 +227,7 @@ export default function ChartsPanel({
         {panelTab === "design" && (
           <DesignTab
             chart={activeChart} isDark={isDark} onUpdate={onUpdateChart}
-            text={text} muted={muted} sub={sub} border={border}
+            text={text} muted={muted} border={border}
           />
         )}
         {panelTab === "format" && (
@@ -258,7 +243,7 @@ export default function ChartsPanel({
 }
 
 // ─────────────────────────────────────────────────────────────
-//  DATA TAB
+//  DATA TAB — literal row reading, names-only dropdowns
 // ─────────────────────────────────────────────────────────────
 
 function DataTab({
@@ -273,32 +258,30 @@ function DataTab({
   const isCat = CATEGORICAL_KINDS.has(chart.kind);
   const needsY = requiresNumericY(chart.kind);
 
-  // ── Header-aware column name resolution ──────────────────────
-  const headerRow = (() => {
-    for (const row of rows.slice(0, 3)) {
-      const vals = columns.filter(c => !c.isExtra).map(c => String(row[c.key] ?? "").trim());
-      const filled = vals.filter(v => v && !/^\d+$/.test(v));
-      if (filled.length >= Math.max(1, Math.floor(vals.length * 0.5))) return row;
-    }
-    return null;
-  })();
-
-  const colDisplayName = (col: ColumnDef): string => {
-    if (headerRow) {
-      const val = String(headerRow[col.key] ?? "").trim();
-      if (val && val !== col.name) return val;
-    }
-    return col.name;
-  };
-
-  const allCols = getLabelCols(columns).map(c => ({ ...c, name: colDisplayName(c) }));
-  const numericCols = getNumericCols(columns).map(c => ({ ...c, name: colDisplayName(c) }));
-
   const startRow = chart.startRow ?? 0;
   const endRow = chart.endRow ?? totalRows - 1;
   const labelRowIndex = chart.labelRowIndex ?? 0;
 
-  const selectStyle: React.CSSProperties = {
+  // Whatever row is picked, its cell value IS the column name. Blank cell → fallback to default column name.
+  const headerRow = rows[labelRowIndex];
+  const colDisplayName = (col: ColumnDef): string => {
+    const val = headerRow ? String(headerRow[col.key] ?? "").trim() : "";
+    return val || col.name;
+  };
+
+  const allCols = getLabelCols(columns).map(c => ({ ...c, name: colDisplayName(c) }));
+  const typedNumericKeys = new Set(getNumericCols(columns).map(c => c.key));
+  const numericCols = columns
+    .filter((c) => {
+      if (c.isExtra || c.hidden) return false;
+      if (typedNumericKeys.has(c.key)) return true;
+      return rows
+        .slice(startRow, endRow + 1)
+        .some((row) => coerceChartNumber(row[c.key]) !== null);
+    })
+    .map(c => ({ ...c, name: colDisplayName(c) }));
+
+  const triggerStyle: React.CSSProperties = {
     background: inputBg,
     border: `1px solid ${inputBorder}`,
     color: text,
@@ -306,12 +289,11 @@ function DataTab({
     padding: "6px 10px",
     fontSize: "12px",
     width: "100%",
-    outline: "none",
   };
 
   return (
     <div className="space-y-4">
-      {/* ── Data source mode ─── */}
+      {/* Data source mode */}
       <div>
         <SectionLabel isDark={isDark}>Data Source</SectionLabel>
         <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: border }}>
@@ -333,7 +315,6 @@ function DataTab({
 
       <Divider isDark={isDark} />
 
-      {/* ── MANUAL MODE ─── */}
       {chart.dataMode === "manual" && (
         <ManualDataEditor
           chart={chart} isDark={isDark} onUpdate={onUpdate}
@@ -342,53 +323,50 @@ function DataTab({
         />
       )}
 
-      {/* ── SHEET MODE ─── */}
       {chart.dataMode === "sheet" && (
         <>
-          {/* ── X-Axis Row (label row picker) ─── */}
+          {/* Row picker — whatever you pick is used as-is */}
           <div>
-            <SectionLabel isDark={isDark}>X-Axis Labels Row</SectionLabel>
-            <InfoBadge
-              isDark={isDark}
-              variant="info"
-              text="Select which row contains the labels shown on the X-axis (e.g. Row 1 for headers, Row 2 for dates)."
-            />
-            <div className="mt-2">
-              <select
-                style={selectStyle}
-                value={labelRowIndex}
-                onChange={(e) => onUpdate({ labelRowIndex: Number(e.target.value) })}
-              >
-                {rows.slice(0, Math.min(totalRows, 30)).map((row, idx) => {
-                  const preview = getRowPreview(row, columns);
-                  return (
-                    <option key={idx} value={idx}>
-                      Row {idx + 1}{preview ? ` — ${preview}` : ""}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-            {/* Preview of selected label row */}
-            {rows[labelRowIndex] && (
+            <SectionLabel isDark={isDark}>Pick the Row With Column Names</SectionLabel>
+            <Select
+              value={String(labelRowIndex)}
+              onValueChange={(v) => {
+                const next = Number(v);
+                onUpdate({
+                  labelRowIndex: next,
+                  startRow: startRow <= next ? next + 1 : startRow,
+                });
+              }}
+            >
+              <SelectTrigger style={triggerStyle} className="h-auto transition-colors hover:opacity-90">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent {...ddContentProps(isDark)}>
+                {rows.slice(0, Math.min(totalRows, 30)).map((_, idx) => (
+                  <SelectItem key={idx} value={String(idx)} style={ddItemStyle(isDark)}>
+                    Row {idx + 1}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Direct preview of exactly what's in that row, per column */}
+            {headerRow && (
               <div
                 className="mt-2 px-3 py-2 rounded-lg text-[11px]"
                 style={{ background: isDark ? "#0f1117" : "#f8fafc", border: `1px solid ${border}` }}
               >
-                <p className="font-semibold mb-1" style={{ color: muted }}>Preview labels:</p>
+                <p className="font-semibold mb-1" style={{ color: muted }}>Using row {labelRowIndex + 1} as column names:</p>
                 <div className="flex flex-wrap gap-1">
-                  {columns.filter(c => !c.isExtra).slice(0, 8).map(col => {
-                    const val = String(rows[labelRowIndex]?.[col.key] ?? "").trim();
-                    return val ? (
-                      <span
-                        key={col.key}
-                        className="px-1.5 py-0.5 rounded text-[10px] font-medium"
-                        style={{ background: `${ACCENT}20`, color: ACCENT }}
-                      >
-                        {val}
-                      </span>
-                    ) : null;
-                  })}
+                  {columns.filter(c => !c.isExtra && !c.hidden).slice(0, 10).map(col => (
+                    <span
+                      key={col.key}
+                      className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                      style={{ background: `${ACCENT}20`, color: ACCENT }}
+                    >
+                      {colDisplayName(col)}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
@@ -396,15 +374,10 @@ function DataTab({
 
           <Divider isDark={isDark} />
 
-          {/* ── Y-Axis Data Rows ─── */}
+          {/* Row range */}
           <div>
-            <SectionLabel isDark={isDark}>Y-Axis Data Rows</SectionLabel>
-            <InfoBadge
-              isDark={isDark}
-              variant="info"
-              text="Select the range of rows containing the actual data values to plot."
-            />
-            <div className="grid grid-cols-2 gap-2 mt-2">
+            <SectionLabel isDark={isDark}>Rows to Chart</SectionLabel>
+            <div className="grid grid-cols-2 gap-2">
               {([
                 ["From Row", startRow + 1, (v: number) => onUpdate({ startRow: v - 1 })],
                 ["To Row", endRow + 1, (v: number) => onUpdate({ endRow: v - 1 })],
@@ -412,7 +385,7 @@ function DataTab({
                 <div key={label}>
                   <label className="text-[10.5px] block mb-1" style={{ color: muted }}>{label}</label>
                   <input
-                    style={selectStyle}
+                    style={triggerStyle}
                     type="number"
                     min={1}
                     max={totalRows}
@@ -422,31 +395,10 @@ function DataTab({
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-between mt-1.5">
-              <p className="text-[10px]" style={{ color: muted }}>
-                {totalRows} total · rows {startRow + 1}–{endRow + 1} ({endRow - startRow + 1} rows)
-              </p>
-              <button
-                onClick={() => onUpdate({ startRow: 0, endRow: null })}
-                className="text-[10px] font-bold"
-                style={{ color: ACCENT }}
-              >
-                All rows
-              </button>
-            </div>
-            {/* Visual bar */}
-            <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: isDark ? "#1e2330" : "#f1f5f9" }}>
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  background: ACCENT,
-                  marginLeft: `${(startRow / Math.max(totalRows, 1)) * 100}%`,
-                  width: `${((endRow - startRow + 1) / Math.max(totalRows, 1)) * 100}%`,
-                }}
-              />
-            </div>
+            <p className="text-[10px] mt-1.5" style={{ color: muted }}>
+              {totalRows} total rows · charting rows {startRow + 1}–{endRow + 1}
+            </p>
 
-            {/* Row preview for data range */}
             {rows.slice(startRow, Math.min(endRow + 1, startRow + 3)).length > 0 && (
               <div
                 className="mt-2 px-3 py-2 rounded-lg text-[11px]"
@@ -455,85 +407,71 @@ function DataTab({
                 <p className="font-semibold mb-1" style={{ color: muted }}>Data preview:</p>
                 {rows.slice(startRow, Math.min(endRow + 1, startRow + 3)).map((row, i) => (
                   <p key={i} className="text-[10px] truncate" style={{ color: sub }}>
-                    Row {startRow + i + 1}: {getRowPreview(row, columns, 50)}
+                    Row {startRow + i + 1}: {columns.filter(c => !c.isExtra && !c.hidden).slice(0, 4)
+                      .map(c => `${colDisplayName(c)}: ${row[c.key] ?? ""}`).join(" | ")}
                   </p>
                 ))}
-                {endRow - startRow + 1 > 3 && (
-                  <p className="text-[10px] mt-0.5" style={{ color: muted }}>
-                    +{endRow - startRow + 1 - 3} more rows…
-                  </p>
-                )}
               </div>
             )}
           </div>
 
           <Divider isDark={isDark} />
 
-          {/* ── X-Axis column (which column to read labels from) ─── */}
+          {/* X-axis column */}
           <div>
-            <SectionLabel isDark={isDark}>
-              {isCat ? "Slice / Category Column" : "X-Axis Column"}
-            </SectionLabel>
-            <InfoBadge
-              isDark={isDark}
-              variant="info"
-              text={
-                isCat
-                  ? "Which column's values become the chart slices (status, assignee, category, etc.)"
-                  : "Which column's values label the horizontal axis."
-              }
-            />
-            <div className="mt-2">
-              <select
-                style={selectStyle}
-                value={chart.labelColumnKey ?? ""}
-                onChange={(e) => onUpdate({ labelColumnKey: e.target.value || null })}
-              >
-                <option value="">— Use selected label row —</option>
+            <SectionLabel isDark={isDark}>{isCat ? "Slice / Category Column" : "X-Axis Column"}</SectionLabel>
+            <Select
+              value={chart.labelColumnKey ?? "__none__"}
+              onValueChange={(v) => {
+                const nextValue = v === "__none__" ? null : v;
+                // 🎯 SIDEBAR X-AXIS CLICK LOG
+                console.log("🎯 [ChartsPanel X-Axis Dropdown Clicked]:", {
+                  selectedValue: nextValue,
+                  chartId: chart.id
+                });
+                onUpdate({ labelColumnKey: nextValue });
+              }}
+            >
+              <SelectTrigger style={triggerStyle} className="h-auto transition-colors hover:opacity-90">
+                <SelectValue placeholder="Select a column" />
+              </SelectTrigger>
+              <SelectContent {...ddContentProps(isDark)}>
+                <SelectItem value="__none__" style={ddItemStyle(isDark)}>Select a column</SelectItem>
                 {allCols.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.name} ({c.type ?? "text"})
-                  </option>
+                  <SelectItem key={c.key} value={c.key} style={ddItemStyle(isDark)}>
+                    {c.name}
+                  </SelectItem>
                 ))}
-              </select>
-            </div>
+              </SelectContent>
+            </Select>
           </div>
 
           <Divider isDark={isDark} />
 
-          {/* ── Aggregate mode ─── */}
+          {/* Aggregate mode */}
           <div>
             <SectionLabel isDark={isDark}>{isCat ? "Value to Plot" : "Group Duplicate Labels"}</SectionLabel>
             {isCat ? (
-              <>
-                <InfoBadge
-                  isDark={isDark}
-                  variant="success"
-                  text={chart.aggregateMode === "count"
-                    ? "Counting rows — each unique value becomes one segment."
-                    : "Summing / averaging a numeric column per slice group."}
-                />
-                <div className="grid grid-cols-2 gap-1.5 mt-2">
-                  {(["count", "sum", "avg"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => onUpdate({ aggregateMode: mode })}
-                      className="col-span-1 text-left px-3 py-2.5 rounded-xl border-2 transition-all"
-                      style={{
-                        borderColor: chart.aggregateMode === mode ? ACCENT : border,
-                        background: chart.aggregateMode === mode ? `${ACCENT}15` : inputBg,
-                        color: chart.aggregateMode === mode ? ACCENT : sub,
-                      }}
-                    >
-                      <p className="text-[11.5px] font-bold">
-                        {mode === "count" ? "Count rows" : mode === "sum" ? "Sum column" : "Average"}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(["count", "sum", "avg"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => onUpdate({ aggregateMode: mode })}
+                    className="text-left px-3 py-2.5 rounded-xl border-2 transition-all"
+                    style={{
+                      borderColor: chart.aggregateMode === mode ? ACCENT : border,
+                      background: chart.aggregateMode === mode ? `${ACCENT}15` : inputBg,
+                      color: chart.aggregateMode === mode ? ACCENT : sub,
+                    }}
+                  >
+                    <p className="text-[11.5px] font-bold">
+                      {mode === "count" ? "Count rows" : mode === "sum" ? "Sum column" : "Average"}
+                    </p>
+                  </button>
+                ))}
+              </div>
             ) : (
-              <div className="grid grid-cols-2 gap-1.5 mt-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 {(["none", "sum", "avg", "count"] as const).map((mode) => (
                   <button
                     key={mode}
@@ -552,44 +490,21 @@ function DataTab({
             )}
           </div>
 
-          {/* ── Y-Axis series ─── */}
           {(needsY || (isCat && chart.aggregateMode !== "count")) && (
             <>
               <Divider isDark={isDark} />
               <YAxisSection
                 chart={chart} isDark={isDark} numericCols={numericCols}
                 onUpdate={onUpdate} isCat={isCat} text={text} muted={muted}
-                sub={sub} border={border} inputBg={inputBg}
+                border={border} inputBg={inputBg}
               />
             </>
           )}
 
-          <Divider isDark={isDark} />
-
-          {/* ── Max X labels ─── */}
-          {!isCat && (
-            <div>
-              <SectionLabel isDark={isDark}>Max X-Axis Labels</SectionLabel>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range" min={4} max={50} step={1}
-                  value={chart.maxXLabels ?? 12}
-                  onChange={(e) => onUpdate({ maxXLabels: Number(e.target.value) })}
-                  className="flex-1"
-                  style={{ accentColor: ACCENT }}
-                />
-                <span className="text-[12px] font-bold w-8 text-right shrink-0" style={{ color: text }}>
-                  {chart.maxXLabels ?? 12}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* ── Config summary ─── */}
-          {(chart.labelColumnKey || labelRowIndex >= 0) && (
+          {(chart.labelColumnKey) && (
             <>
               <Divider isDark={isDark} />
-              <ConfigSummary chart={chart} columns={allCols} rows={rows} isDark={isDark} text={text} sub={sub} />
+              <ConfigSummary chart={chart} columns={allCols} isDark={isDark} text={text} sub={sub} />
             </>
           )}
         </>
@@ -604,18 +519,21 @@ function DataTab({
 
 function YAxisSection({
   chart, isDark, numericCols, onUpdate, isCat,
-  text, muted, sub, border, inputBg,
+  text, muted, border, inputBg,
 }: {
   chart: SheetChart; isDark: boolean; numericCols: ColumnDef[]; isCat: boolean;
   onUpdate: (p: Partial<SheetChart>) => void;
-  text: string; muted: string; sub: string; border: string; inputBg: string;
+  text: string; muted: string; border: string; inputBg: string;
 }) {
+  const triggerStyle: React.CSSProperties = {
+    background: inputBg, border: `1px solid ${border}`, color: text,
+    borderRadius: "8px", padding: "6px 10px", fontSize: "12px", width: "100%",
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <SectionLabel isDark={isDark}>
-          {isCat ? "Value Column (optional)" : "Y-Axis (Values / Series)"}
-        </SectionLabel>
+        <SectionLabel isDark={isDark}>{isCat ? "Value Column (optional)" : "Y-Axis (Values / Series)"}</SectionLabel>
         {!isCat && (
           <button
             onClick={() => {
@@ -631,55 +549,80 @@ function YAxisSection({
       </div>
 
       {numericCols.length === 0 ? (
-        <InfoBadge isDark={isDark} variant="warn" text="No numeric columns found. Add a Number or Currency column to use as values." />
+        <p className="text-[11px]" style={{ color: muted }}>No numeric columns found in this row range.</p>
+      ) : isCat ? (
+        <Select
+          value={chart.seriesKeys[0] ?? "__auto__"}
+          onValueChange={(v) => {
+            const nextKeys = v === "__auto__" ? [] : [v];
+            // 🎯 SIDEBAR PIE/DONUT DATA PLOT CLICK LOG
+            console.log("🎯 [ChartsPanel Categorical Value Column Clicked]:", {
+              selectedKey: v,
+              resultingSeriesKeysArray: nextKeys
+            });
+            onUpdate({ seriesKeys: nextKeys });
+          }}
+        >
+          <SelectTrigger style={triggerStyle} className="h-auto transition-colors hover:opacity-90">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent {...ddContentProps(isDark)}>
+            <SelectItem value="__auto__" style={ddItemStyle(isDark)}>— Auto-count —</SelectItem>
+            {numericCols.map((c) => (
+              <SelectItem key={c.key} value={c.key} style={ddItemStyle(isDark)}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : chart.seriesKeys.length === 0 ? (
+        <button
+          onClick={() => numericCols[0] && onUpdate({ seriesKeys: [numericCols[0].key] })}
+          className="w-full flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-dashed text-[11.5px] font-semibold"
+          style={{ borderColor: `${ACCENT}60`, color: ACCENT }}
+        >
+          <Plus className="h-3.5 w-3.5" /> Add Y-axis column
+        </button>
       ) : (
-        <>
-          {isCat ? (
-            <select
-              style={{ background: inputBg, border: `1px solid ${isDark ? "#1e2330" : "#e2e8f0"}`, color: text, borderRadius: "8px", padding: "6px 10px", fontSize: "12px", width: "100%", outline: "none" }}
-              value={chart.seriesKeys[0] ?? ""}
-              onChange={(e) => onUpdate({ seriesKeys: e.target.value ? [e.target.value] : [] })}
-            >
-              <option value="">— Auto-count (no column needed) —</option>
-              {numericCols.map((c) => <option key={c.key} value={c.key}>{c.name} ({c.type})</option>)}
-            </select>
-          ) : (
-            <>
-              {chart.seriesKeys.length === 0 ? (
-                <button
-                  onClick={() => numericCols[0] && onUpdate({ seriesKeys: [numericCols[0].key] })}
-                  className="w-full flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-dashed text-[11.5px] font-semibold"
-                  style={{ borderColor: `${ACCENT}60`, color: ACCENT }}
+        <div className="space-y-2">
+          {chart.seriesKeys.map((key, idx) => (
+            <div key={key} className="flex items-center gap-2 px-2 py-2 rounded-lg border" style={{ borderColor: border, background: isDark ? "#0f1117" : "#f8fafc" }}>
+              <GripVertical className="h-3.5 w-3.5 shrink-0" style={{ color: muted }} />
+              <div className="h-3 w-3 rounded-full shrink-0" style={{ background: SCHEME_COLORS[chart.colorScheme]?.[idx] ?? ACCENT }} />
+              <div className="flex-1">
+                <Select
+                  value={key}
+                  onValueChange={(v) => {
+                    const next = [...chart.seriesKeys];
+                    next[idx] = v;
+                    // 🎯 SIDEBAR LINE/BAR SERIES CLICK LOG
+                    console.log("🎯 [ChartsPanel Y-Axis Multi-Series Column Changed]:", {
+                      indexUpdated: idx,
+                      newKeySelected: v,
+                      fullArrayBeforeUpdate: chart.seriesKeys,
+                      fullArrayAfterUpdate: next
+                    });
+                    onUpdate({ seriesKeys: next });
+                  }}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Add Y-axis column
-                </button>
-              ) : (
-                <div className="space-y-2">
-                  {chart.seriesKeys.map((key, idx) => (
-                    <div key={key} className="flex items-center gap-2 px-2 py-2 rounded-lg border" style={{ borderColor: border, background: isDark ? "#0f1117" : "#f8fafc" }}>
-                      <GripVertical className="h-3.5 w-3.5 shrink-0" style={{ color: muted }} />
-                      <div className="h-3 w-3 rounded-full shrink-0" style={{ background: SCHEME_COLORS[chart.colorScheme]?.[idx] ?? ACCENT }} />
-                      <select
-                        style={{ background: "transparent", border: "none", color: text, padding: "0", flex: 1, fontSize: "12px", outline: "none" }}
-                        value={key}
-                        onChange={(e) => { const next = [...chart.seriesKeys]; next[idx] = e.target.value; onUpdate({ seriesKeys: next }); }}
-                      >
-                        {numericCols.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
-                      </select>
-                      <button
-                        onClick={() => onUpdate({ seriesKeys: chart.seriesKeys.filter((_, i) => i !== idx) })}
-                        className="shrink-0 p-0.5 rounded hover:text-red-400 transition-colors"
-                        style={{ color: muted }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </>
+                  <SelectTrigger style={{ background: "transparent", border: "none", color: text, padding: "0", fontSize: "12px" }} className="h-auto">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent {...ddContentProps(isDark)}>
+                    {numericCols.map((c) => (
+                      <SelectItem key={c.key} value={c.key} style={ddItemStyle(isDark)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <button
+                onClick={() => onUpdate({ seriesKeys: chart.seriesKeys.filter((_, i) => i !== idx) })}
+                className="shrink-0 p-0.5 rounded hover:text-red-400 transition-colors"
+                style={{ color: muted }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -689,19 +632,13 @@ function YAxisSection({
 //  CONFIG SUMMARY
 // ─────────────────────────────────────────────────────────────
 
-function ConfigSummary({ chart, columns, rows, isDark, text, sub }: {
-  chart: SheetChart; columns: ColumnDef[]; rows: SheetRow[]; isDark: boolean; text: string; sub: string;
+function ConfigSummary({ chart, columns, isDark, text, sub }: {
+  chart: SheetChart; columns: ColumnDef[]; isDark: boolean; text: string; sub: string;
 }) {
   void isDark;
-  const isCat = CATEGORICAL_KINDS.has(chart.kind);
   const xCol = columns.find(c => c.key === chart.labelColumnKey);
   const yColNames = chart.seriesKeys.map(k => columns.find(c => c.key === k)?.name ?? k).join(", ");
-  const labelRow = rows[chart.labelRowIndex ?? 0];
-  const labelPreview = labelRow ? getRowPreview(labelRow, columns as any, 30) : "";
-  const isReady = isCat ? !!chart.labelColumnKey : !!chart.labelColumnKey && chart.seriesKeys.length > 0;
-  const hasRowConfig = (chart.labelRowIndex ?? 0) >= 0;
-
-  if (!isReady && !hasRowConfig) return null;
+  const isCat = CATEGORICAL_KINDS.has(chart.kind);
 
   return (
     <div className="px-3 py-2.5 rounded-xl text-[11px]" style={{ background: `${ACCENT}12`, border: `1px solid ${ACCENT}30` }}>
@@ -711,7 +648,6 @@ function ConfigSummary({ chart, columns, rows, isDark, text, sub }: {
       </div>
       <p style={{ color: sub }}>
         <strong style={{ color: text }}>{chart.kind.toUpperCase()}</strong>
-        {labelPreview && <span> · Labels from Row {(chart.labelRowIndex ?? 0) + 1}: <strong style={{ color: text }}>{labelPreview}</strong></span>}
         {xCol && <span> · X: <strong style={{ color: text }}>{xCol.name}</strong></span>}
         {isCat && chart.aggregateMode === "count" && <span style={{ color: ACCENT }}> (counting rows)</span>}
         {yColNames && <span> · Y: <strong style={{ color: text }}>{yColNames}</strong></span>}
@@ -739,11 +675,6 @@ function ManualDataEditor({
 
   return (
     <div className="space-y-4">
-      <InfoBadge isDark={isDark} variant="info" text={
-        isCat
-          ? "Enter category names and their values below."
-          : "Enter comma-separated labels for X, then numeric values for each series."
-      } />
       <div>
         <SectionLabel isDark={isDark}>{isCat ? "Slice Labels" : "Categories (X-Axis)"}</SectionLabel>
         <input
@@ -814,10 +745,10 @@ function ManualDataEditor({
 // ─────────────────────────────────────────────────────────────
 
 function DesignTab({
-  chart, isDark, onUpdate, text, muted, sub, border,
+  chart, isDark, onUpdate, text, muted, border,
 }: {
   chart: SheetChart; isDark: boolean; onUpdate: (p: Partial<SheetChart>) => void;
-  text: string; muted: string; sub: string; border: string;
+  text: string; muted: string; border: string;
 }) {
   return (
     <div className="space-y-4">
@@ -840,9 +771,6 @@ function DesignTab({
             </button>
           ))}
         </div>
-        {CATEGORICAL_KINDS.has(chart.kind) && (
-          <InfoBadge isDark={isDark} variant="success" text="Pie, Donut & Radar auto-count rows for you." />
-        )}
       </div>
       <Divider isDark={isDark} />
       <div>
@@ -925,20 +853,6 @@ function FormatTab({
             </div>
           ))}
         </div>
-      </div>
-      <Divider isDark={isDark} />
-      <div className="px-3 py-2.5 rounded-xl space-y-1" style={{ background: isDark ? "#0f1117" : "#f8fafc", border: `1px solid ${border}` }}>
-        {[
-          { label: "ID", render: () => <span className="font-mono text-[10px]">{chart.id}</span> },
-          { label: "Kind", render: () => <strong style={{ color: text }}>{chart.kind}</strong> },
-          { label: "Mode", render: () => <strong style={{ color: text }}>{chart.dataMode}</strong> },
-          { label: "Label Row", render: () => <strong style={{ color: text }}>Row {(chart.labelRowIndex ?? 0) + 1}</strong> },
-          { label: "Data Rows", render: () => <strong style={{ color: text }}>{(chart.startRow ?? 0) + 1}–{chart.endRow != null ? chart.endRow + 1 : "end"}</strong> },
-        ].map((item) => (
-          <p key={item.label} className="text-[11px]" style={{ color: sub }}>
-            {item.label}: {item.render()}
-          </p>
-        ))}
       </div>
       <Divider isDark={isDark} />
       <div>

@@ -19,6 +19,7 @@ interface CellRendererProps {
   displayValue: any;
   rawFormula?: string;
   colDef?: ColumnDef;
+  currencyCode?: string;
   isWrapped: boolean;
   isProtected: boolean;
   isOrgSheet: boolean;
@@ -51,6 +52,7 @@ export function CellRenderer({
   displayValue,
   rawFormula,
   colDef,
+  currencyCode,
   isWrapped,
   isProtected,
   isOrgSheet,
@@ -132,7 +134,7 @@ export function CellRenderer({
           <span className="tabular-nums sheet-cell-mono">
             {new Intl.NumberFormat("en-US", {
               style: "currency",
-              currency: colDef?.currencyCode || "USD",
+              currency: currencyCode || colDef?.currencyCode || "USD",
               minimumFractionDigits: 2,
             }).format(num)}
           </span>
