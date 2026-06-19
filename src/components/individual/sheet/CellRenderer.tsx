@@ -87,14 +87,6 @@ export function CellRenderer({
 
   // ── Cell content engine ────────────────────────────────────────────────
   const cellContent = (() => {
-    if (isActiveSelected && rawFormula) {
-      return (
-        <span className="sheet-cell-text break-words whitespace-pre-wrap w-full font-mono">
-          {rawFormula}
-        </span>
-      );
-    }
-
     switch (effectiveType) {
       case "status":
       case "priority": {
