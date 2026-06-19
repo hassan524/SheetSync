@@ -747,6 +747,8 @@ export default function SheetClient() {
   const localSaveRef = useRef(false);
   const remoteRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoMergeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formatSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingFormatSavesRef = useRef<Map<string, CellFormat>>(new Map());
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const chartBtnRef = useRef<HTMLButtonElement | null>(null);
   const chartsHydratedRef = useRef(false);
@@ -783,6 +785,22 @@ export default function SheetClient() {
   const cellTypes = useCellTypes(rows, rowsHistory, () => { });
   const formulas = useFormulas(rows, columns);
   const charts = useCharts({ storageKey: sheetId ? `sheetsync:${sheetId}:charts` : null });
+
+  const chartRows = useMemo(
+    () =>
+      rows.map((row, rowIdx) => {
+        let nextRow = row;
+        columns.forEach((col) => {
+          const formula = formulas.getFormula(rowIdx, col.key);
+          if (!formula?.startsWith("=")) return;
+          const value = formulas.evaluateFormula(formula, rowIdx);
+          if (nextRow === row) nextRow = { ...row };
+          nextRow[col.key] = value;
+        });
+        return nextRow;
+      }),
+    [rows, columns, formulas.getFormula, formulas.evaluateFormula, formulas.formulas, formulas.columnFormulas],
+  );
 
   const markSaving = useCallback(() => {
     localSaveRef.current = true;
@@ -2640,8 +2658,35 @@ export default function SheetClient() {
     [formatting.cellFormats, rows, selectedRows],
   );
 
+  const queueCellFormatSaves = useCallback(
+    (updates: Record<string, CellFormat>, snapshot: Record<string, CellFormat>) => {
+      Object.entries(updates).forEach(([key, value]) => {
+        pendingFormatSavesRef.current.set(key, value);
+      });
+      if (pendingFormatSavesRef.current.size === 0) return;
+
+      markSaving();
+      if (formatSaveTimeoutRef.current) clearTimeout(formatSaveTimeoutRef.current);
+      formatSaveTimeoutRef.current = setTimeout(async () => {
+        const pending = Array.from(pendingFormatSavesRef.current.entries());
+        pendingFormatSavesRef.current.clear();
+        try {
+          await Promise.all(
+            pending.map(([key, value]) => saveCellFormat(sheetId, key, value)),
+          );
+          broadcastSheetSnapshot({ cellFormats: snapshot });
+        } catch {
+          toast.error("Failed to persist some formats.");
+        } finally {
+          markSaved();
+        }
+      }, 450);
+    },
+    [broadcastSheetSnapshot, markSaved, markSaving, sheetId],
+  );
+
   const handleFormatChange = useCallback(
-    async (format: any) => {
+    (format: any) => {
       if (!canEditSheet) {
         showViewerEditMessage();
         return;
@@ -2649,8 +2694,8 @@ export default function SheetClient() {
 
       // If we have selected rows, format all cells in those rows
       if (selectedRows && selectedRows.size > 0) {
-        const ops: Promise<any>[] = [];
         const updatedFormats = { ...formatting.cellFormats };
+        const pendingUpdates: Record<string, CellFormat> = {};
 
         for (const rowId of Array.from(selectedRows)) {
           const rowIdx = rows.findIndex((row) => row.id === rowId);
@@ -2658,7 +2703,7 @@ export default function SheetClient() {
           const currentFormat = formatting.cellFormats[rowKey] || {};
           const merged = { ...currentFormat, ...format };
           updatedFormats[rowKey] = merged;
-          ops.push(saveCellFormat(sheetId, rowKey, merged));
+          pendingUpdates[rowKey] = merged;
 
           if (rowIdx >= 0) {
             for (const col of columns) {
@@ -2666,26 +2711,18 @@ export default function SheetClient() {
               const cellFormat = formatting.cellFormats[cellKey] || {};
               const nextCellFormat = { ...cellFormat, ...format };
               updatedFormats[cellKey] = nextCellFormat;
-              ops.push(saveCellFormat(sheetId, cellKey, nextCellFormat));
+              pendingUpdates[cellKey] = nextCellFormat;
             }
           }
         }
 
         formatting.setCellFormats(updatedFormats);
-        markSaving();
-        try {
-          await Promise.all(ops);
-          // toast.success("Applied format to selected row(s)");
-        } catch {
-          toast.error("Failed to persist some formats.");
-        }
-        broadcastSheetSnapshot({ cellFormats: updatedFormats });
-        markSaved();
+        queueCellFormatSaves(pendingUpdates, updatedFormats);
         return;
       }
 
       if (selectedColumnKey) {
-        await handleApplyColumnFormat(selectedColumnKey, format);
+        handleApplyColumnFormat(selectedColumnKey, format);
         // toast.success("Applied format to entire column");
         return;
       }
@@ -2698,42 +2735,37 @@ export default function SheetClient() {
           selectionRange.end.colIndex,
         );
         const endCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
-        const ops: Promise<any>[] = [];
+        const updatedFormats = { ...formatting.cellFormats };
+        const pendingUpdates: Record<string, CellFormat> = {};
         for (let r = startRow; r <= endRow; r++) {
           for (let c = startCol; c <= endCol; c++) {
             const colKey = columns[c]?.key;
             if (!colKey) continue;
-            const cellPos = { row: r, col: colKey } as any;
-            formatting.applyFormat(cellPos, format);
-            const merged = { ...formatting.getCurrentCellFormat(cellPos), ...format };
             const cellKey = `${r}-${colKey}`;
-            ops.push(saveCellFormat(sheetId, cellKey, merged));
+            const merged = { ...(updatedFormats[cellKey] || {}), ...format };
+            updatedFormats[cellKey] = merged;
+            pendingUpdates[cellKey] = merged;
           }
         }
-        markSaving();
-        try {
-          await Promise.all(ops);
-        } catch {
-          toast.error("Failed to persist some formats.");
-        }
-        markSaved();
+        formatting.setCellFormats(updatedFormats);
+        queueCellFormatSaves(pendingUpdates, updatedFormats);
         return;
       }
 
       if (!selectedCell) return;
-      formatting.applyFormat(selectedCell, format);
-      const merged = { ...formatting.getCurrentCellFormat(selectedCell), ...format };
       const cellKey = `${selectedCell.row}-${selectedCell.col}`;
-      markSaving();
-      await saveCellFormat(sheetId, cellKey, merged);
-      broadcastSheetSnapshot({ cellFormats: formatting.cellFormats });
-      markSaved();
+      const merged = { ...(formatting.cellFormats[cellKey] || {}), ...format };
+      const updatedFormats = {
+        ...formatting.cellFormats,
+        [cellKey]: merged,
+      };
+      formatting.setCellFormats(updatedFormats);
+      queueCellFormatSaves({ [cellKey]: merged }, updatedFormats);
     },
     [
       canEditSheet, showViewerEditMessage, selectedCell, selectionRange, sheetId,
-      markSaving, markSaved, formatting.applyFormat, formatting.getCurrentCellFormat,
       formatting.setCellFormats, columns, selectedColumnKey, handleApplyColumnFormat,
-      selectedRows, rows, formatting.cellFormats, saveCellFormat, broadcastSheetSnapshot,
+      selectedRows, rows, formatting.cellFormats, queueCellFormatSaves,
     ],
   );
 
@@ -5083,7 +5115,7 @@ export default function SheetClient() {
                   if (type === "priority" || type === "status" || type === "select") {
                     queueMicrotask(() => {
                       if (gridRef.current) {
-                        const colIdx = columns.findIndex((c) => c.key === col.key);
+                        const colIdx = columns.filter((c) => !c.hidden).findIndex((c) => c.key === col.key);
                         const visualRowIdx = gridRows.findIndex((r) => r.id === rows[mergeInfo.masterRow]?.id);
                         gridRef.current.startEditingCell({
                           rowIdx: visualRowIdx >= 0 ? visualRowIdx : mergeInfo.masterRow,
@@ -5102,7 +5134,7 @@ export default function SheetClient() {
                 if (type === "priority" || type === "status" || type === "select") {
                   queueMicrotask(() => {
                     if (gridRef.current) {
-                      const colIdx = columns.findIndex((c) => c.key === col.key);
+                      const colIdx = columns.filter((c) => !c.hidden).findIndex((c) => c.key === col.key);
                       const visualRowIdx = gridRows.findIndex((r) => r.id === props.row.id);
                       gridRef.current.startEditingCell({
                         rowIdx: visualRowIdx >= 0 ? visualRowIdx : rowIdx,
@@ -5245,8 +5277,11 @@ export default function SheetClient() {
             nextRow: SheetRow,
             nextFormulas = formulas.formulas,
           ) => {
+            const nextRows = rows.map((item) => (item.id === row.id ? nextRow : item));
+            setSheetState((prev) => ({ ...prev, rows: nextRows }));
+            persistence.queueChangedRowsSave(nextRows, rows);
             broadcastSheetSnapshot({
-              rows: rows.map((item) => (item.id === row.id ? nextRow : item)),
+              rows: nextRows,
               formulas: nextFormulas,
               changedAt: Date.now(),
             });
@@ -5304,10 +5339,37 @@ export default function SheetClient() {
             }
           };
 
-          const onBlurSave = async () => {
-            const f = formulas.formulas[cellKey];
-            if (f) await saveFormula(sheetId, cellKey, f);
-            else await deleteFormula(sheetId, cellKey).catch(() => { });
+          const persistFormulaEdit = async (currentValue?: string) => {
+            const value =
+              currentValue !== undefined ? currentValue : formulas.formulas[cellKey];
+            const nextFormulas = { ...formulas.formulas };
+
+            if (value?.startsWith("=")) {
+              nextFormulas[cellKey] = value;
+              formulas.setFormulas(nextFormulas);
+              await saveFormula(sheetId, cellKey, value);
+              return;
+            }
+
+            delete nextFormulas[cellKey];
+            formulas.setFormulas(nextFormulas);
+            await deleteFormula(sheetId, cellKey).catch(() => { });
+          };
+
+          const onBlurSave = async (currentValue?: string) => {
+            await persistFormulaEdit(currentValue);
+          };
+
+          const commitFormulaOnEnter = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+            if (e.key !== "Enter" || e.shiftKey) return;
+            const value = e.currentTarget.value;
+            if (!value.startsWith("=")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            persistFormulaEdit(value).catch(() => {
+              toast.error("Formula saved locally but failed to persist.");
+            });
+            e.currentTarget.blur();
           };
 
 
@@ -5508,7 +5570,8 @@ export default function SheetClient() {
                       ? onProgressChange(e.target.value)
                       : onNumChange(e.target.value)
                   }
-                  onBlur={onBlurSave}
+                  onKeyDown={commitFormulaOnEnter}
+                  onBlur={(e: any) => onBlurSave(e.currentTarget.value)}
                 />
               </EditCellWrapper>
             );
@@ -5525,7 +5588,8 @@ export default function SheetClient() {
                   autoFocus
                   initialValue={editVal}
                   onValueChange={(e: any) => onTextChange(e.target.value)}
-                  onBlur={onBlurSave}
+                  onKeyDown={commitFormulaOnEnter}
+                  onBlur={(e: any) => onBlurSave(e.currentTarget.value)}
                 />
               </EditCellWrapper>
             );
@@ -5541,8 +5605,10 @@ export default function SheetClient() {
                   autoFocus
                   initialValue={editVal}
                   onValueChange={(e: any) => onTextChange(e.target.value)}
-                  onBlur={onBlurSave}
+                  onBlur={(e: any) => onBlurSave(e.currentTarget.value)}
                   onKeyDown={(e: any) => {
+                    commitFormulaOnEnter(e);
+                    if (e.defaultPrevented) return;
                     if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
                   }}
                 />
@@ -5566,8 +5632,10 @@ export default function SheetClient() {
                   autoFocus
                   initialValue={editVal}
                   onValueChange={(e: any) => onTextChange(e.target.value)}
-                  onBlur={onBlurSave}
+                  onBlur={(e: any) => onBlurSave(e.currentTarget.value)}
                   onKeyDown={(e: any) => {
+                    commitFormulaOnEnter(e);
+                    if (e.defaultPrevented) return;
                     if (e.key === "Enter" && !e.shiftKey) e.stopPropagation();
                     if (e.key === "Escape") e.currentTarget.blur();
                   }}
@@ -5639,6 +5707,8 @@ export default function SheetClient() {
                   onTextChange(val);
                 }}
                 onKeyDown={(e: any) => {
+                  commitFormulaOnEnter(e);
+                  if (e.defaultPrevented) return;
                   if (isMentionActive) {
                     if (e.key === "Escape") {
                       e.stopPropagation();
@@ -5650,10 +5720,11 @@ export default function SheetClient() {
                     }
                   }
                 }}
-                onBlur={() => {
+                onBlur={(e: any) => {
+                  const value = e.currentTarget.value;
                   setTimeout(() => {
                     setMentionState((s) => ({ ...s, active: false }));
-                    onBlurSave();
+                    onBlurSave(value);
                   }, 160);
                 }}
               />
@@ -5817,7 +5888,7 @@ export default function SheetClient() {
     setFocusedColumnKey, setRightPanel, setActiveCell, saveAllRows, saveAllColumns,
     saveFormula, deleteFormula, mentionState, mentionableMembers, setMentionState,
     mergeByCell, autoOverflowByCell, selectMergeBlock, rowHeights,
-    timeTravelState.previewRows, beginColResize, gridRows,
+    timeTravelState.previewRows, beginColResize, gridRows, persistence.queueChangedRowsSave,
   ]);
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -6607,7 +6678,7 @@ export default function SheetClient() {
                 chart={chart}
                 isActive={charts.activeChartId === chart.id}
                 isDark={isDark}
-                rows={rows}
+                rows={chartRows}
                 columns={columns}
                 onSelect={(id) => charts.setActiveChart(id)}
                 onOpenEditor={(id) => {
@@ -6668,7 +6739,7 @@ export default function SheetClient() {
                     }
                     setShowShareDialog={setShowShareDialog}
                     sheetId={sheetId}
-                    rows={rows}
+                    rows={chartRows}
                     columns={columns}
                     totalComments={totalComments}
                     historyCount={history.length}
@@ -6801,7 +6872,7 @@ export default function SheetClient() {
             isDark={isDark}
             anchorRef={chartBtnRef}
             onSelect={(kind, preset) => {
-              charts.insertChart(kind, rows, columns, {
+              charts.insertChart(kind, chartRows, columns, {
                 ...getSuggestedChartPreset(kind),
                 ...getSelectionChartPreset(kind),
                 ...preset,
