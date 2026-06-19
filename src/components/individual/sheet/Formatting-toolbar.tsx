@@ -106,7 +106,7 @@ const PRESET_COLORS = [
 ];
 
 const TOOL_GROUP_CLASS =
-  "flex items-center rounded-lg p-0.5 bg-transparent gap-0.5 shrink-0";
+  "flex items-center rounded-md border border-border/60 bg-background/70 p-0.5 gap-0.5 shrink-0 shadow-sm";
 
 export default function FormattingToolbar({
   currentFormat = {},

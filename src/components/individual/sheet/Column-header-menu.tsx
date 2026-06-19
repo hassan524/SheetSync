@@ -30,6 +30,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { CellFormat, ColumnDef, SelectOption } from "@/types";
+import { CURRENCY_OPTIONS } from "@/constants/currencies";
 
 interface ColumnHeaderMenuProps {
   column: ColumnDef;
@@ -71,13 +72,6 @@ const COLUMN_TYPES = [
   { type: "image" as const, label: "Image", icon: Link },
 ];
 
-const CURRENCY_CODES = [
-  "USD", "EUR", "GBP", "PKR", "INR", "AED", "JPY", "CAD", "AUD", "CHF", "CNY", "HKD",
-  "NZD", "SEK", "KRW", "SGD", "NOK", "MXN", "RUB", "ZAR", "BRL", "TRY", "TWD", "DKK",
-  "PLN", "THB", "IDR", "HUF", "CZK", "ILS", "CLP", "PHP", "MYR", "COP", "SAR", "RON",
-  "VND", "EGP", "NGN", "BDT", "KES", "GHS", "TZS", "UGX", "MAD",
-].sort();
-
 const ROW_CLS =
   "cursor-pointer w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md " +
   "hover:bg-accent hover:text-accent-foreground active:bg-accent/80 transition-colors select-none";
@@ -112,8 +106,8 @@ export default function ColumnHeaderMenu({
   const [currencyExpanded, setCurrencyExpanded] = useState(false);
   const [currencySearch, setCurrencySearch] = useState("");
 
-  const filteredCurrencies = CURRENCY_CODES.filter((c) =>
-    c.toLowerCase().includes(currencySearch.toLowerCase()),
+  const filteredCurrencies = CURRENCY_OPTIONS.filter((currency) =>
+    `${currency.code} ${currency.name}`.toLowerCase().includes(currencySearch.toLowerCase()),
   );
   const canSortColumn = column.type !== "image";
 
@@ -232,7 +226,7 @@ export default function ColumnHeaderMenu({
                       No results
                     </p>
                   ) : (
-                    filteredCurrencies.map((code) => {
+                    filteredCurrencies.map(({ code, name }) => {
                       const active = (column.currencyCode || "USD") === code;
                       return (
                         <button
@@ -247,7 +241,8 @@ export default function ColumnHeaderMenu({
                             setOpen(false);
                           }}
                         >
-                          {code}
+                          <span className="font-mono">{code}</span>
+                          <span className="truncate text-muted-foreground">{name}</span>
                           {active && <Check className="ml-auto h-3 w-3" />}
                         </button>
                       );

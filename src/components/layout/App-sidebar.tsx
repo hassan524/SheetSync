@@ -14,6 +14,7 @@ import {
   Star,
   Clock,
   Folder,
+  Share2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -48,6 +49,7 @@ const mainNavItems = [
 const quickAccessItems = [
   { title: "Recent", url: "/recent", icon: Clock },
   { title: "Starred", url: "/starred", icon: Star },
+  { title: "Shared", url: "/shared-with-me", icon: Share2 },
   { title: "All Files", url: "/files", icon: Folder },
 ];
 

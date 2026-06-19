@@ -124,6 +124,7 @@ import {
   columnIndexToName,
   ROW_CELL_TYPES_KEY,
   ROW_CELL_SELECT_OPTIONS_KEY,
+  ROW_CELL_CURRENCY_CODES_KEY,
   getOptionBgStyle,
   getSelectOptionLabel,
   getChoiceOptionsForColumn,
@@ -2035,6 +2036,13 @@ export default function SheetClient() {
       : null;
   }, [selectedCell, columns, cellTypes.getCellType]);
 
+  const selectedCellCurrencyCode = useMemo(() => {
+    if (!selectedCell) return "USD";
+    const row = rows[selectedCell.row];
+    const col = columns.find((c) => c.key === selectedCell.col);
+    return row?.[ROW_CELL_CURRENCY_CODES_KEY]?.[selectedCell.col] ?? col?.currencyCode ?? "USD";
+  }, [columns, rows, selectedCell]);
+
   const isSelectedColumnWrapped = useMemo(
     () =>
       selectedCell
@@ -2075,6 +2083,58 @@ export default function SheetClient() {
       return preset;
     },
     [columns],
+  );
+
+  const getSelectionChartPreset = useCallback(
+    (kind: any) => {
+      const preset: any = {};
+      const isCategorical = kind === "pie" || kind === "donut" || kind === "radar";
+      const isLabelCol = (col: ColumnDef | undefined) =>
+        !!col && ["text", "status", "priority", "select", "date"].includes(col.type ?? "text");
+      const isNumericCol = (col: ColumnDef | undefined) =>
+        !!col && ["number", "currency", "progress", "percent"].includes(col.type ?? "");
+      const applyRange = (startRow: number, endRow: number) => {
+        preset.startRow = Math.max(0, startRow);
+        preset.endRow = Math.max(preset.startRow, endRow);
+        if (preset.startRow > 0) preset.labelRowIndex = preset.startRow - 1;
+      };
+      const applyColumns = (startCol: number, endCol: number) => {
+        const selectedCols = columns.slice(
+          Math.max(0, Math.min(startCol, endCol)),
+          Math.min(columns.length - 1, Math.max(startCol, endCol)) + 1,
+        );
+        const labelCol = selectedCols.find(isLabelCol);
+        const numericCol = selectedCols.find(isNumericCol);
+        if (labelCol) preset.labelColumnKey = labelCol.key;
+        if (!isCategorical && numericCol) preset.seriesKeys = [numericCol.key];
+      };
+
+      if (selectionRange) {
+        const startRow = Math.min(selectionRange.start.row, selectionRange.end.row);
+        const endRow = Math.max(selectionRange.start.row, selectionRange.end.row);
+        const startCol = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
+        const endCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+        applyRange(startRow, endRow);
+        applyColumns(startCol, endCol);
+      } else if (selectedRows.size > 0) {
+        const rowIndexes = Array.from(selectedRows)
+          .map((rowId) => rows.findIndex((row) => row.id === rowId))
+          .filter((rowIdx) => rowIdx >= 0);
+        if (rowIndexes.length > 0) applyRange(Math.min(...rowIndexes), Math.max(...rowIndexes));
+      } else if (selectedColumnKey) {
+        const selectedCol = columns.find((col) => col.key === selectedColumnKey);
+        if (isLabelCol(selectedCol)) preset.labelColumnKey = selectedColumnKey;
+        if (!isCategorical && isNumericCol(selectedCol)) preset.seriesKeys = [selectedColumnKey];
+      } else if (selectedCell) {
+        applyRange(selectedCell.row, selectedCell.row);
+        const selectedCol = columns.find((col) => col.key === selectedCell.col);
+        if (isLabelCol(selectedCol)) preset.labelColumnKey = selectedCell.col;
+        if (!isCategorical && isNumericCol(selectedCol)) preset.seriesKeys = [selectedCell.col];
+      }
+
+      return preset;
+    },
+    [columns, rows, selectedCell, selectedColumnKey, selectedRows, selectionRange],
   );
 
   const columnIndexByKey = useMemo(
@@ -6743,6 +6803,7 @@ export default function SheetClient() {
             onSelect={(kind, preset) => {
               charts.insertChart(kind, rows, columns, {
                 ...getSuggestedChartPreset(kind),
+                ...getSelectionChartPreset(kind),
                 ...preset,
               });
               setTimeout(

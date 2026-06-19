@@ -166,3 +166,4 @@ export function ensureWorkingRowBuffer(
 
 export const ROW_CELL_TYPES_KEY = "__cellTypes";
 export const ROW_CELL_SELECT_OPTIONS_KEY = "__cellSelectOptions";
+export const ROW_CELL_CURRENCY_CODES_KEY = "__cellCurrencyCodes";

@@ -663,3 +663,81 @@ export async function getStarredSheets() {
     };
   });
 }
+
+export async function getSharedWithMeSheets() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from("sheet_members")
+    .select("sheet_id, role, joined_at")
+    .eq("user_id", user.id)
+    .order("joined_at", { ascending: false });
+
+  if (membershipError) throw membershipError;
+  const sheetIds = (memberships ?? [])
+    .map((membership: any) => membership.sheet_id)
+    .filter(Boolean);
+  if (sheetIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("sheets")
+    .select(
+      `
+      id, title, template_id, is_starred,
+      created_at, updated_at, last_opened_at,
+      organization_id, owner_id, size_mb,
+      owner:profiles!sheets_owner_id_fkey (
+        id,
+        name,
+        email,
+        avatar_url
+      ),
+      rows ( id ),
+      columns ( id )
+    `,
+    )
+    .in("id", sheetIds)
+    .is("organization_id", null);
+
+  if (error) throw error;
+  const membershipBySheetId = new Map(
+    (memberships ?? []).map((membership: any) => [membership.sheet_id, membership]),
+  );
+
+  return (data ?? [])
+    .map((sheet: any) => {
+      const membership: any = membershipBySheetId.get(sheet.id);
+      if (!sheet || sheet.organization_id || sheet.owner_id === user.id) return null;
+
+      return {
+        id: sheet.id,
+        title: sheet.title,
+        templateId: sheet.template_id,
+        lastEdited: sheet.last_opened_at ?? sheet.updated_at ?? membership.joined_at,
+        createdAt: sheet.created_at,
+        isOrganization: false,
+        organization: null,
+        owner: {
+          name: sheet.owner?.name ?? "Unknown",
+          email: sheet.owner?.email ?? "",
+          avatar: sheet.owner?.avatar_url ?? undefined,
+        },
+        folder: null,
+        rowsCount: sheet.rows?.length ?? 0,
+        colsCount: sheet.columns?.length ?? 0,
+        isStarred: !!sheet.is_starred,
+        sharedRole: membership?.role ?? "viewer",
+        sheet_members: [],
+      };
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => {
+      const aJoined = membershipBySheetId.get(a.id)?.joined_at ?? a.lastEdited;
+      const bJoined = membershipBySheetId.get(b.id)?.joined_at ?? b.lastEdited;
+      return new Date(bJoined).getTime() - new Date(aJoined).getTime();
+    });
+}
