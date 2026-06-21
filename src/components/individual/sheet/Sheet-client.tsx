@@ -4642,6 +4642,7 @@ export default function SheetClient() {
   const selStyle = ddStyle(isDark);
 
   interface GridContext {
+    [key: string]: any;
     rows: SheetRow[];
     selectedRows: Set<string>;
     selectedCell: { row: number; col: string } | null;
@@ -4759,7 +4760,7 @@ export default function SheetClient() {
         const allSelected = activeRows.length > 0 && selectedRows.size === activeRows.length;
         const handleSelectAll = (checked: boolean) => {
           if (checked && activeRows.length > 0) {
-            setSelectedRows(new Set(activeRows.map((r) => r.id)));
+            setSelectedRows(new Set(activeRows.map((r:any) => r.id)));
             const dataCols = columns.filter((col) => !col.hidden);
             const firstCol = dataCols[0];
             if (firstCol) {
@@ -4797,7 +4798,7 @@ export default function SheetClient() {
       renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
         const { rows, selectedRows, setSelectedRows, setSelectedCell, setSelectionRange, protection, timeTravelState, beginRowResize, onRowResizeMove, endRowResize } = contextRef;
         const activeRows = timeTravelState.previewRows || rows;
-        const rowIdx = activeRows.findIndex((r) => r.id === props.row.id);
+        const rowIdx = activeRows.findIndex((r: any) => r.id === props.row.id);
         const isSel = selectedRows.has(props.row.id);
         const isRowProtected = protection.isRowProtected(props.row.id);
         return (
@@ -5360,7 +5361,7 @@ export default function SheetClient() {
             persistence, broadcastSheetSnapshot, setSelectSetupDialog, orgMembers, isOrgSheet,
             mentionState, mentionableMembers, setMentionState, cellSelectOptions, rowHeights,
             gridRows, setActiveCell, selectMergeBlock, getEffectiveCellStyle
-          } = contextRef.current;
+          } = contextRef
           const { row, column, onRowChange } = props;
           const rowIdx = rows.findIndex((r) => r.id === row.id);
           const mergeInfo = mergeByCell.get(`${rowIdx}-${column.key}`);
@@ -5439,7 +5440,7 @@ export default function SheetClient() {
           ) => {
             markSaving();
             const nextRows = rows.map((item) => (item.id === row.id ? nextRow : item));
-            setSheetState((prev) => ({ ...prev, rows: nextRows }));
+            setSheetState((prev: any) => ({ ...prev, rows: nextRows }));
             persistence.queueChangedRowsSave(nextRows, rows);
             broadcastSheetSnapshot({
               rows: nextRows,
@@ -5862,7 +5863,7 @@ export default function SheetClient() {
                     });
                   } else {
                     if (mentionState.active)
-                      setMentionState((s) => ({ ...s, active: false }));
+                      setMentionState((s: any) => ({ ...s, active: false }));
                   }
                   onTextChange(val);
                 }}
@@ -5872,7 +5873,7 @@ export default function SheetClient() {
                   if (isMentionActive) {
                     if (e.key === "Escape") {
                       e.stopPropagation();
-                      setMentionState((s) => ({ ...s, active: false }));
+                      setMentionState((s: any) => ({ ...s, active: false }));
                     }
                     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                       e.stopPropagation();
@@ -5883,7 +5884,7 @@ export default function SheetClient() {
                 onBlur={(e: any) => {
                   const value = e.currentTarget.value;
                   setTimeout(() => {
-                    setMentionState((s) => ({ ...s, active: false }));
+                    setMentionState((s: any) => ({ ...s, active: false }));
                     onBlurSave(value);
                   }, 160);
                 }}
@@ -5955,7 +5956,7 @@ export default function SheetClient() {
                           mentionState.inputRef.value = replaced;
                         }
                         onTextChange(replaced);
-                        setMentionState((s) => ({ ...s, active: false }));
+                        setMentionState((s: any) => ({ ...s, active: false }));
                         setTimeout(() => {
                           if (mentionState.inputRef) {
                             mentionState.inputRef.focus();
