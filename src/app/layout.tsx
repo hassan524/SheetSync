@@ -16,11 +16,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: "SheetSync — Real-Time Collaborative Spreadsheets",
+    default: "SheetSync",
     template: "%s | SheetSync",
   },
   description:
-    "SheetSync is a cloud spreadsheet platform with real-time collaboration, 100+ formulas, templates, team organizations, and full import/export — all in one workspace.",
+    "SheetSync is a simple spreadsheet application to easily export sheets to PDF, work in organizations, and collaborate with your team.",
   keywords: [
     "spreadsheet",
     "collaborative spreadsheet",
@@ -43,23 +43,23 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: APP_URL,
     siteName: "SheetSync",
-    title: "SheetSync — Real-Time Collaborative Spreadsheets",
+    title: "SheetSync",
     description:
-      "Real-time collaboration, 100+ formulas, templates, and team workspaces. The smarter spreadsheet for modern teams.",
+      "A simple spreadsheet application to easily export sheets to PDF, work in organizations, and collaborate with your team.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "SheetSync — Collaborative Spreadsheets",
+        alt: "SheetSync",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SheetSync — Real-Time Collaborative Spreadsheets",
+    title: "SheetSync",
     description:
-      "Real-time collaboration, 100+ formulas, templates, and team workspaces.",
+      "A simple spreadsheet application to easily export sheets to PDF, work in organizations, and collaborate with your team.",
     images: ["/og-image.png"],
   },
   manifest: "/manifest.json",
