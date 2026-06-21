@@ -2,6 +2,9 @@ import { supabase as defaultSupabase } from "../../supabase/client";
 import type { ColumnDef } from "@/types";
 
 export async function saveAllColumns(sheetId: string, columns: ColumnDef[], client = defaultSupabase) {
+  console.log(
+    "save function running"
+  )
   if (columns.length === 0) return;
 
   const columnsToUpsert = columns.map((col, idx) => ({

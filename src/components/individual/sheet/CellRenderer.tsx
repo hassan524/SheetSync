@@ -363,31 +363,31 @@ export function CellRenderer({
 
   const mergeOverrideStyle: React.CSSProperties = isMergeMaster
     ? {
-        position: "absolute",
-        top: 0,
-        left: 0,
-        width: (() => {
-          if (mergeMode === "across" || mergeMode === "all" || mergeMode === "center") {
-            return autoOverflowWidth ? `${autoOverflowWidth}px` : "100%";
-          }
-          return "100%";
-        })(),
-        height: (() => {
-          if (mergeMode === "down" || mergeMode === "all" || mergeMode === "center") {
-            return mergedHeight ? `${mergedHeight}px` : "100%";
-          }
-          return "100%";
-        })(),
-        zIndex: 8,
-        backgroundColor: mergeBg,
-        boxSizing: "border-box" as const,
-        overflow: "hidden",
-        clipPath: "inset(0 0 0 0)",
-        willChange: "transform",
-        transform: "translateZ(0)",
-        transition: "background-color 0.1s ease",
-        outline: "none",
-      }
+      position: "absolute",
+      top: 0,
+      left: 0,
+      width: (() => {
+        if (mergeMode === "across" || mergeMode === "all" || mergeMode === "center") {
+          return autoOverflowWidth ? `${autoOverflowWidth}px` : "100%";
+        }
+        return "100%";
+      })(),
+      height: (() => {
+        if (mergeMode === "down" || mergeMode === "all" || mergeMode === "center") {
+          return mergedHeight ? `${mergedHeight}px` : "100%";
+        }
+        return "100%";
+      })(),
+      zIndex: 8,
+      backgroundColor: mergeBg,
+      boxSizing: "border-box" as const,
+      overflow: "hidden",
+      clipPath: "inset(0 0 0 0)",
+      willChange: "transform",
+      transform: "translateZ(0)",
+      transition: "background-color 0.1s ease",
+      outline: "none",
+    }
     : {};
 
   // ── FIX CONDITIONS: Isolate explicit user custom borders ──────────────────
@@ -398,29 +398,30 @@ export function CellRenderer({
     (cellStyle.borderLeft && cellStyle.borderLeft !== "none") ||
     (cellStyle.borderRight && cellStyle.borderRight !== "none")
   );
-  
+
   const explicitBorderStyle: React.CSSProperties = (cellStyle.borderStyle && cellStyle.borderStyle !== "none")
     ? {
-        borderStyle: cellStyle.borderStyle,
-        borderWidth: cellStyle.borderWidth ?? "1px",
-        borderColor: cellStyle.borderColor ?? (isDarkMode ? "#374151" : "#e5e7eb"),
-      }
+      borderStyle: cellStyle.borderStyle,
+      borderWidth: cellStyle.borderWidth ?? "1px",
+      borderColor: cellStyle.borderColor ?? (isDarkMode ? "#374151" : "#e5e7eb"),
+    }
     : {};
 
   const rootClass = [
     "h-full w-full flex relative group/cell",
+    activeCollab ? "sheet-cell-has-collab" : "",
     isMergeMaster ? "overflow-visible" : (activeCollab || shouldAutoOverflow ? "overflow-visible" : "overflow-hidden"),
     shouldAutoOverflow ? "sheet-cell-auto-overflow-master" : "",
     isAutoOverflowCovered ? "sheet-cell-auto-overflow-covered" : "",
     isMergeMaster
       ? [
-          "items-start pt-1.5 pb-1.5 sheet-cell-merge-master",
-          mergeMode === "center" ? "justify-center" : "justify-start",
-        ].join(" ")
+        "items-start pt-1.5 pb-1.5 sheet-cell-merge-master",
+        mergeMode === "center" ? "justify-center" : "justify-start",
+      ].join(" ")
       : [
-          isWrapped ? "items-start pt-1.5" : "items-center",
-          justifyClass,
-        ].join(" "),
+        isWrapped ? "items-start pt-1.5" : "items-center",
+        justifyClass,
+      ].join(" "),
     type === "checkbox" ? "justify-center" : "",
     "px-2.5 gap-1.5",
     !isMergeMaster && isSelected ? "bg-primary/10" : "",
@@ -442,16 +443,16 @@ export function CellRenderer({
         ...cellStyle,
         ...mergeStyle,
         ...mergeOverrideStyle,
-        ...explicitBorderStyle, 
+        ...explicitBorderStyle,
         // Force an internal custom variable that bypasses the universal root color override
         ...((hasExplicitBorder && cellStyle.borderColor) ? { "--local-border-color": cellStyle.borderColor } : {}),
         ...(isMergeMaster ? { overflow: "hidden" } : {}),
         ...(activeCollab
           ? {
-              outline: `2px solid ${activeCollab.color}`,
-              outlineOffset: "-2px",
-              backgroundColor: `${activeCollab.color}18`,
-            }
+            outline: `2px dashed ${activeCollab.color}`,
+            outlineOffset: "-2px",
+            backgroundColor: `${activeCollab.color}18`,
+          }
           : {}),
       }}
       onClick={(e) => {
@@ -472,22 +473,23 @@ export function CellRenderer({
       }
     >
       {activeCollab && (
-        <div className="absolute left-0 z-50 pointer-events-none select-none" style={{ top: "-24px" }}>
+        <div
+          className="absolute top-0 left-0 pointer-events-none select-none"
+          style={{ zIndex: 999 }}
+        >
           <div
-            className="flex items-center gap-1 pl-1 pr-2 py-[3px] rounded-sm shadow-lg whitespace-nowrap"
-            style={{ backgroundColor: activeCollab.color, boxShadow: `0 2px 10px ${activeCollab.color}66` }}
+            className="px-1.5 py-[1px] rounded-br-[4px]"
+            style={{
+              backgroundColor: activeCollab.color,
+              fontSize: "9px",
+              fontWeight: 700,
+              color: "#fff",
+              lineHeight: 1.4,
+              whiteSpace: "nowrap",
+            }}
           >
-            <div
-              className="h-4 w-4 rounded-full flex items-center justify-center shrink-0"
-              style={{ backgroundColor: "rgba(255,255,255,0.3)", fontSize: "8px", fontWeight: 800, color: "#fff", lineHeight: 1 }}
-            >
-              {collabInitials}
-            </div>
-            <span style={{ fontSize: "10px", fontWeight: 600, color: "#fff", lineHeight: 1 }}>
-              {activeCollab.name}
-            </span>
+            {activeCollab.name}
           </div>
-          <div style={{ width: 0, height: 0, borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderTop: `4px solid ${activeCollab.color}`, marginLeft: "8px" }} />
         </div>
       )}
 

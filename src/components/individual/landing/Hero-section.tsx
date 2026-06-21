@@ -73,6 +73,21 @@ const HeroSection = ({ onDemoOpen, onGetStarted }: HeroSectionProps) => {
             animation: none; opacity: 1; transform: none;
           }
         }
+
+        .video-deco-line {
+          position: absolute;
+          border-radius: 999px;
+          background: linear-gradient(90deg, rgba(13,124,95,0.45), rgba(16,185,129,0.1));
+        }
+
+        .video-wrap-mobile {
+          aspect-ratio: 16 / 9;
+        }
+        @media (max-width: 767px) {
+          .video-wrap-mobile {
+            aspect-ratio: 4 / 3;
+          }
+        }
       `}</style>
 
       <div className="relative z-10 mx-auto w-full" style={{ maxWidth: "1200px", padding: "0 16px" }}>
@@ -186,7 +201,7 @@ const HeroSection = ({ onDemoOpen, onGetStarted }: HeroSectionProps) => {
         </div>
 
         {/* ── Video — simple, big, no browser chrome ──────────────────────── */}
-        <div className="h-video cursor-pointer relative mx-auto" style={{ maxWidth: "1200px" }}>
+        <div className="h-video relative mx-auto" style={{ maxWidth: "1200px" }}>
           {/* Soft glow */}
           <div
             style={{
@@ -200,24 +215,38 @@ const HeroSection = ({ onDemoOpen, onGetStarted }: HeroSectionProps) => {
             }}
           />
 
+          {/* Decorative lines peeking from behind — mobile only */}
+          <div className="md:hidden">
+            <div
+              className="video-deco-line"
+              style={{ top: "-10px", left: "10%", width: "45%", height: "4px", transform: "rotate(-2deg)" }}
+            />
+            <div
+              className="video-deco-line"
+              style={{ bottom: "-10px", right: "10%", width: "45%", height: "4px", transform: "rotate(2deg)" }}
+            />
+          </div>
+
           <div
+            className="video-wrap-mobile"
             style={{
               borderRadius: "16px",
               overflow: "hidden",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(13,124,95,0.18)",
+              border: "2px solid #0d7c5f",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.12)",
               background: "#000",
-              aspectRatio: "16/9",
               width: "100%",
             }}
           >
             <video
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              controls
-              controlsList="nodownload noremoteplayback"
-              disablePictureInPicture
+              autoPlay
+              muted
+              loop
+              playsInline
               poster="/video-poster.png"
             >
-              <source src="/demo-video.mp4" type="video/mp4" />
+              <source src="/Demo.mp4" type="video/mp4" />
             </video>
           </div>
         </div>

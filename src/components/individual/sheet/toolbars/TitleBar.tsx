@@ -209,43 +209,42 @@ export function TitleBar({
 
       {/* Right: actions */}
       <div className="sheet-header-scrollbar flex items-center gap-0.5 sm:gap-1 shrink-0 ml-1 min-w-0 overflow-x-auto overflow-y-visible [&_[data-slot=dropdown-menu-trigger]]:shrink-0">
-        {isOrgSheet && (
-          <>
-            <div className="hidden sm:flex -space-x-2 shrink-0">
-              {visibleActiveMembers.map((c) => (
-                <Tooltip key={c.id}>
-                  <TooltipTrigger>
-                    <Avatar member={c} showOnline />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs sheet-tooltip">
-                    <p className="font-semibold">{c.name}</p>
-                    <p className="text-gray-400 text-[10px]">
-                      {c.role} · {c.email}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-              {hiddenActiveCount > 0 && (
-                <div
-                  className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold cursor-pointer border-2 bg-gray-200 text-gray-600 shrink-0"
-                  style={{ borderColor: "var(--sheet-titlebar-bg)" }}
-                >
-                  +{hiddenActiveCount}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-        {!isOrgSheet && currentUser && (
-          <Tooltip>
-            <TooltipTrigger>
-              <Avatar member={currentUser} />
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs sheet-tooltip">
-              <p className="font-semibold">{currentUser.name}</p>
-              <p className="text-gray-400 text-[10px]">Sheet</p>
-            </TooltipContent>
-          </Tooltip>
+        {activeMembers.length > 0 ? (
+          <div className="hidden sm:flex -space-x-2 shrink-0">
+            {visibleActiveMembers.map((c) => (
+              <Tooltip key={c.id}>
+                <TooltipTrigger>
+                  <Avatar member={c} showOnline />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs sheet-tooltip">
+                  <p className="font-semibold">{c.name}</p>
+                  <p className="text-gray-400 text-[10px]">
+                    {c.role} · {c.email}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+            {hiddenActiveCount > 0 && (
+              <div
+                className="sheet-avatar h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold cursor-pointer border-2 bg-gray-200 text-gray-600 shrink-0"
+                style={{ borderColor: "var(--sheet-titlebar-bg)" }}
+              >
+                +{hiddenActiveCount}
+              </div>
+            )}
+          </div>
+        ) : (
+          currentUser && (
+            <Tooltip>
+              <TooltipTrigger>
+                <Avatar member={currentUser} />
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs sheet-tooltip">
+                <p className="font-semibold">{currentUser.name}</p>
+                <p className="text-gray-400 text-[10px]">Sheet</p>
+              </TooltipContent>
+            </Tooltip>
+          )
         )}
 
         {/* <button

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import GlobalLoader from "@/components/common/Global-loader"; 
+import GlobalLoader from "@/components/common/Global-loader";
 
 export default function AuthCallback() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     const handleAuth = async () => {
@@ -14,15 +15,14 @@ export default function AuthCallback() {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (session) {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/login");
-      }
+      const next = searchParams?.get("next");
+      const safeNext = next && next.startsWith("/") ? next : null;
+
+      router.replace(session ? safeNext || "/dashboard" : "/login");
     };
 
     handleAuth();
-  }, [router]);
+  }, [router, searchParams]);
 
   return <GlobalLoader />;
 }

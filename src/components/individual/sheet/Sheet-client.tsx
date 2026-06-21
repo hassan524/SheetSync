@@ -17,6 +17,7 @@ import {
 import { Check, Loader2, GripVertical, WrapText, Lock, MessageSquare, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+// import { useSheetInviteAcceptance } from "@/hooks/use-sheet-invite";
 
 // ── Toolbar components ─────────────────────────────────────────────────────
 import { TitleBar } from "./toolbars/TitleBar";
@@ -46,6 +47,7 @@ import { useFormulas } from "@/hooks/sheets/use-formulas";
 import { useKeyboardShortcuts } from "@/hooks/sheets/use-keyboard-shortcuts";
 import { useCharts } from "@/hooks/sheets/use-charts";
 import { useTimeTravel } from "@/hooks/use-time-travel";
+
 
 // ── Existing sub-components ────────────────────────────────────────────────
 import ColumnHeaderMenu from "@/components/individual/sheet/Column-header-menu";
@@ -101,7 +103,7 @@ import {
   getImportedSheetTitle,
   MAX_IMPORT_BYTES,
 } from "@/lib/import-sheet";
-import { getSheetOrgMembers, type OrgMember } from "@/lib/querys/organization/get-sheet-members";
+import { getSheetOrgMembers, getSheetDirectMembers, type OrgMember } from "@/lib/querys/organization/get-sheet-members";
 import { getAllOrganizations } from "@/lib/querys/organization/organization";
 import { supabase } from "@/lib/supabase/client";
 import { api } from "@/lib/api/api-client";
@@ -651,6 +653,8 @@ export default function SheetClient() {
   const sheetId = params?.id ?? "";
   const { user: authUser, loading: authLoading, loginWithGoogle } = useAuth();
   const [inviteReady, setInviteReady] = useState(!inviteToken);
+  // useSheetInviteAcceptance(sheetId);
+
 
   // ── Ref for DataGrid instance (programmatic editing of master cells) ───
   const gridRef = useRef<any>(null);
@@ -717,6 +721,7 @@ export default function SheetClient() {
   } = sv;
 
   const { title, isOrgSheet, liveTracking, starred, rows, columns, organizationId } = sheetState;
+  const hasCollaborators = isOrgSheet || orgMembers.length > 0;
   const effectiveRole =
     sheetState.userRole ??
     (sheetState.ownerId && currentUser?.id === sheetState.ownerId ? "owner" : undefined);
@@ -1002,7 +1007,7 @@ export default function SheetClient() {
 
   const broadcastSheetSnapshot = useCallback(
     (patch: Record<string, any>) => {
-      if (!presenceChannelRef.current || !currentUser || !isOrgSheet) return;
+      if (!presenceChannelRef.current || !currentUser) return;
       presenceChannelRef.current.send({
         type: "broadcast",
         event: "sheet_snapshot",
@@ -1024,7 +1029,7 @@ export default function SheetClient() {
       });
     },
     [
-      currentUser, isOrgSheet, title, rows, columns,
+      currentUser, title, rows, columns,
       formulas.formulas, formulas.columnFormulas,
       formatting.cellFormats, textWrap.textWrapColumns,
       cellTypes.cellTypeOverrides, cellSelectOptions,
@@ -1129,7 +1134,7 @@ export default function SheetClient() {
           if (wrapSet.size > 0) textWrap.setTextWrapColumns(wrapSet);
 
           const bufferedRows = ensureWorkingRowBuffer(data.rows, data.columns);
-           const typeOverrides: Record<string, ColumnDef["type"]> = {};
+          const typeOverrides: Record<string, ColumnDef["type"]> = {};
           const rowSelectOptions: Record<string, SelectOption[]> = {};
           bufferedRows.forEach((row, rowIdx) => {
             const rowTypes = row[ROW_CELL_TYPES_KEY];
@@ -1156,7 +1161,7 @@ export default function SheetClient() {
           setSheetState({
             title: data.title,
             isOrgSheet: sheetIsOrg,
-            liveTracking: sheetIsOrg,
+            liveTracking: true,
             createdAt: data.created_at,
             updatedAt: data.updated_at,
             ownerId: data.ownerId,
@@ -1305,7 +1310,7 @@ export default function SheetClient() {
         await trackSheetOpen(sheetId);
       })
       .catch((err) => {
-        console.error(err);
+        console.error("error saving sheet: ", err);
         toast.error("Failed to load sheet. Please refresh.");
       })
       .finally(() => {
@@ -1356,27 +1361,40 @@ export default function SheetClient() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!sheetId || !isOrgSheet) {
+  const refreshMembers = useCallback(() => {
+    if (!sheetId) {
       setOrgMembers([]);
       return;
     }
-    getSheetOrgMembers(sheetId)
+    const fetchMembers = isOrgSheet ? getSheetOrgMembers(sheetId) : getSheetDirectMembers(sheetId);
+    fetchMembers
       .then((data) => {
         if (!data) return;
         setOrgMembers(data.members);
         const currentMember = currentUser
           ? data.members.find((member) => member.id === currentUser.id)
           : null;
-        setSheetState((prev) => ({
-          ...prev,
-          userRole: (currentMember?.role ?? prev.userRole) as SheetState["userRole"],
-          organizationId: data.orgId,
-          organizationName: data.orgName,
-        }));
+        setSheetState((prev) => {
+          const nextRole = (currentMember?.role ?? prev.userRole) as SheetState["userRole"];
+          const shouldUpdate =
+            prev.userRole !== nextRole ||
+            (isOrgSheet &&
+              (prev.organizationId !== data.orgId ||
+                prev.organizationName !== data.orgName));
+          if (!shouldUpdate) return prev;
+          return {
+            ...prev,
+            userRole: nextRole,
+            ...(isOrgSheet ? { organizationId: data.orgId, organizationName: data.orgName } : {}),
+          };
+        });
       })
       .catch(console.error);
   }, [sheetId, isOrgSheet, currentUser, setSheetState]);
+
+  useEffect(() => {
+    refreshMembers();
+  }, [refreshMembers]);
 
   useEffect(() => {
     if (!sheetId) return;
@@ -1453,8 +1471,9 @@ export default function SheetClient() {
 
   useEffect(() => {
     if (!sheetId || !inviteReady) return;
-    const channel = supabase
-      .channel(`sheet-data:${sheetId}`)
+    const channel = supabase.channel(`sheet-data:${sheetId}`);
+
+    channel
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "rows", filter: `sheet_id=eq.${sheetId}` },
@@ -1485,7 +1504,21 @@ export default function SheetClient() {
         { event: "*", schema: "public", table: "sheets", filter: `id=eq.${sheetId}` },
         scheduleRemoteSheetRefresh,
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "sheet_members", filter: `sheet_id=eq.${sheetId}` },
+        refreshMembers,
+      );
+
+    if (isOrgSheet && organizationId) {
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "organization_members", filter: `organization_id=eq.${organizationId}` },
+        refreshMembers,
+      );
+    }
+
+    channel.subscribe();
 
     return () => {
       if (remoteRefreshTimeoutRef.current) {
@@ -1494,7 +1527,14 @@ export default function SheetClient() {
       }
       supabase.removeChannel(channel);
     };
-  }, [sheetId, inviteReady, scheduleRemoteSheetRefresh]);
+  }, [
+    sheetId,
+    inviteReady,
+    isOrgSheet,
+    organizationId,
+    scheduleRemoteSheetRefresh,
+    refreshMembers,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1592,7 +1632,7 @@ export default function SheetClient() {
 
   // ── Collaborator presence ──────────────────────────────────────────────
   useEffect(() => {
-    if (!sheetId || !isOrgSheet || !currentUser) return;
+    if (!sheetId || !currentUser) return;
     if (presenceChannelRef.current) {
       supabase.removeChannel(presenceChannelRef.current);
       presenceChannelRef.current = null;
@@ -1650,11 +1690,11 @@ export default function SheetClient() {
       supabase.removeChannel(ch);
       presenceChannelRef.current = null;
     };
-  }, [sheetId, isOrgSheet, currentUser?.id]);
+  }, [sheetId, currentUser?.id]);
 
   // Track my cursor in presence
   useEffect(() => {
-    if (!presenceChannelRef.current || !currentUser || !selectedCell || !isOrgSheet) return;
+    if (!presenceChannelRef.current || !currentUser || !selectedCell) return;
     presenceChannelRef.current.track({
       name: currentUser.name,
       color: getMemberColor(currentUser.id),
@@ -1687,18 +1727,15 @@ export default function SheetClient() {
     currentUser?.name,
     currentUser?.email,
     currentUser?.avatar_url,
-    isOrgSheet,
     sheetState.userRole,
   ]);
 
   // ── Derived / computed ─────────────────────────────────────────────────
   const effectiveRightPanel = useMemo((): RightPanelType => {
-    if (!isOrgSheet && rightPanel === "collaborators") return null;
     return rightPanel;
-  }, [isOrgSheet, rightPanel]);
+  }, [rightPanel]);
 
   const activeSheetMembers = useMemo(() => {
-    if (!isOrgSheet) return [];
     const byId = new Map(orgMembers.map((member) => [member.id, member]));
     const members: OrgMember[] = [];
     const addMember = (id: string, fallback: Partial<OrgMember>) => {
@@ -4453,13 +4490,9 @@ export default function SheetClient() {
     [],
   );
 
-  const toggleRightPanel = useCallback(
-    (panel: RightPanelType) => {
-      if (!isOrgSheet && panel === "collaborators") return;
-      setRightPanel((p) => (p === panel ? null : panel));
-    },
-    [isOrgSheet],
-  );
+  const toggleRightPanel = useCallback((panel: RightPanelType) => {
+    setRightPanel((p) => (p === panel ? null : panel));
+  }, []);
 
   const groupedCommentsForPanel = useMemo(() => {
     const result: Record<string, any[]> = {};
@@ -5964,16 +5997,16 @@ export default function SheetClient() {
   }, [getCurrentPdfExportRange, pdfExportOpen]);
 
   const executePdfExport = useCallback(() => {
-      const trimmed = pdfRangeInput.trim();
-      const range = trimmed ? parsePdfA1Range(trimmed, columns, rows.length) : null;
-      if (trimmed && !range) {
-        toast.error("Invalid PDF range. Use a range like A1:D20.");
-        return;
-      }
+    const trimmed = pdfRangeInput.trim();
+    const range = trimmed ? parsePdfA1Range(trimmed, columns, rows.length) : null;
+    if (trimmed && !range) {
+      toast.error("Invalid PDF range. Use a range like A1:D20.");
+      return;
+    }
 
-      setPdfExportOpen(false);
-      persistence.handleExport("pdf", { range });
-    },
+    setPdfExportOpen(false);
+    persistence.handleExport("pdf", { range });
+  },
     [columns, pdfRangeInput, persistence, rows.length],
   );
 
@@ -6029,76 +6062,76 @@ export default function SheetClient() {
           >
             <div
               className="w-[min(360px,calc(100vw-2rem))] rounded-lg border bg-white p-3 shadow-xl"
-            style={{
-              borderColor: isDark ? "#263241" : "#e5e7eb",
-              background: isDark ? "#111827" : "#ffffff",
-              color: isDark ? "#e5e7eb" : "#111827",
-            }}
-          >
-            <div className="mb-2 flex items-start justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold">PDF range</div>
-                <div className="text-[11px] opacity-70">
-                  Drag cells on the sheet or type a range like A1:D20.
-                </div>
-              </div>
-              <button
-                type="button"
-                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded opacity-70 hover:opacity-100"
-                onClick={() => setPdfExportOpen(false)}
-                aria-label="Close PDF export"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <input
-              value={pdfRangeInput}
-              onChange={(e) => setPdfRangeInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") executePdfExport();
-                if (e.key === "Escape") setPdfExportOpen(false);
-              }}
-              placeholder="Blank = full sheet"
-              className="h-9 w-full rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-primary"
               style={{
-                borderColor: isDark ? "#334155" : "#d1d5db",
-                background: isDark ? "#0f172a" : "#ffffff",
-                color: isDark ? "#f8fafc" : "#111827",
+                borderColor: isDark ? "#263241" : "#e5e7eb",
+                background: isDark ? "#111827" : "#ffffff",
+                color: isDark ? "#e5e7eb" : "#111827",
               }}
-            />
-            <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                className="h-8 cursor-pointer rounded-md border px-2.5 text-xs font-medium"
-                style={{ borderColor: isDark ? "#334155" : "#d1d5db" }}
-                onClick={() => {
-                  const selectedRange = getCurrentPdfExportRange();
-                  if (!selectedRange) {
-                    toast.info("Select cells first or type a PDF range.");
-                    return;
-                  }
-                  setPdfRangeInput(rangeToA1(selectedRange));
+            >
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">PDF range</div>
+                  <div className="text-[11px] opacity-70">
+                    Drag cells on the sheet or type a range like A1:D20.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded opacity-70 hover:opacity-100"
+                  onClick={() => setPdfExportOpen(false)}
+                  aria-label="Close PDF export"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <input
+                value={pdfRangeInput}
+                onChange={(e) => setPdfRangeInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") executePdfExport();
+                  if (e.key === "Escape") setPdfExportOpen(false);
                 }}
-              >
-                Use selection
-              </button>
-              <button
-                type="button"
-                className="h-8 cursor-pointer rounded-md border px-2.5 text-xs font-medium"
-                style={{ borderColor: isDark ? "#334155" : "#d1d5db" }}
-                onClick={() => setPdfRangeInput("")}
-              >
-                Full sheet
-              </button>
-              <button
-                type="button"
-                className="h-8 cursor-pointer rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground"
-                onClick={executePdfExport}
-              >
-                Export PDF
-              </button>
+                placeholder="Blank = full sheet"
+                className="h-9 w-full rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                style={{
+                  borderColor: isDark ? "#334155" : "#d1d5db",
+                  background: isDark ? "#0f172a" : "#ffffff",
+                  color: isDark ? "#f8fafc" : "#111827",
+                }}
+              />
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="h-8 cursor-pointer rounded-md border px-2.5 text-xs font-medium"
+                  style={{ borderColor: isDark ? "#334155" : "#d1d5db" }}
+                  onClick={() => {
+                    const selectedRange = getCurrentPdfExportRange();
+                    if (!selectedRange) {
+                      toast.info("Select cells first or type a PDF range.");
+                      return;
+                    }
+                    setPdfRangeInput(rangeToA1(selectedRange));
+                  }}
+                >
+                  Use selection
+                </button>
+                <button
+                  type="button"
+                  className="h-8 cursor-pointer rounded-md border px-2.5 text-xs font-medium"
+                  style={{ borderColor: isDark ? "#334155" : "#d1d5db" }}
+                  onClick={() => setPdfRangeInput("")}
+                >
+                  Full sheet
+                </button>
+                <button
+                  type="button"
+                  className="h-8 cursor-pointer rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground"
+                  onClick={executePdfExport}
+                >
+                  Export PDF
+                </button>
+              </div>
             </div>
-          </div>
           </div>
         )}
 
@@ -6710,6 +6743,7 @@ export default function SheetClient() {
               rightPanel === "formulas" ||
               rightPanel === "automation" ||
               rightPanel === "aiassistant" ||
+              rightPanel === "collaborators" ||
               isOrgSheet) && (
               <>
                 {effectiveRightPanel !== "charts" && (

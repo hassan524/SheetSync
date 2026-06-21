@@ -1,3 +1,5 @@
+// app/api/invites/link/route.ts
+
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -54,7 +56,6 @@ export async function POST(req: NextRequest) {
     const organizationId = sheet?.organization_id ?? orgId;
 
     if (sheetId && !sheet?.organization_id) {
-      // No org — just check ownership, generate a direct sheet link
       if (!sheet || sheet.owner_id !== user.id) {
         return NextResponse.json(
           { error: "Only the sheet owner can share this sheet" },

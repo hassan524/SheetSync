@@ -413,6 +413,18 @@
   background: rgba(13, 124, 95, 0.12);
 }
 
+.sheet-tool-group {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  border: 1px solid var(--sh-border) !important;
+  background: var(--sh-bg) !important;
+  padding: 2px;
+  gap: 2px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
 /* ─── Icon buttons — Excel-like, no borders ──────────────────────────────── */
 .sheet-icon-btn {
   display: inline-flex;
@@ -851,6 +863,18 @@
   color: #e2e8f0 !important;
 }
 
+/* ─── Collaborator cell label ────────────────────────────────────────────── */
+.rdg-sheet .rdg-row:has(.sheet-cell-has-collab) {
+  overflow: visible !important;
+  contain: none !important;
+}
+
+.rdg-sheet .rdg-cell:has(.sheet-cell-has-collab) {
+  overflow: visible !important;
+  contain: none !important;
+  z-index: 50 !important;
+}
+
 .rdg-dark .rdg-cell input::placeholder,
 .rdg-dark .rdg-cell textarea::placeholder {
   color: #4a5568 !important;
@@ -910,31 +934,24 @@
  */
 .rdg-sheet.sheet-borderless,
 .rdg-sheet.sheet-borderless
-  *:not(:has([data-explicit-border="true"])):not(
-    [data-explicit-border="true"]
-  ):not([data-explicit-border="true"] *) {
+  *:not([data-explicit-border="true"]):not([data-explicit-border="true"] *) {
   --rdg-border-color: transparent !important;
   border-color: transparent !important;
 }
 
-/* Force custom dynamic colors to stick via our CSS variable backup hook */
-.rdg-sheet.sheet-borderless [data-explicit-border="true"] {
-  border-color: var(--local-border-color) !important;
-}
-
 /* Drop cell layout borders ONLY if the cell doesn't have custom properties */
-.rdg-sheet.sheet-borderless .rdg-cell:not(:has([data-explicit-border="true"])),
+.rdg-sheet.sheet-borderless .rdg-cell:not([data-explicit-border="true"]),
+.rdg-sheet.sheet-borderless .rdg-header-cell,
 .rdg-sheet.sheet-borderless
   .rdg-row
-  .rdg-cell:not(:has([data-explicit-border="true"])),
+  .rdg-cell:not([data-explicit-border="true"]),
 .rdg-sheet.sheet-borderless
   .rdg-row:hover
-  .rdg-cell:not(:has([data-explicit-border="true"])),
-.rdg-sheet.sheet-borderless
-  .rdg-cell:hover:not(:has([data-explicit-border="true"])),
+  .rdg-cell:not([data-explicit-border="true"]),
+.rdg-sheet.sheet-borderless .rdg-cell:hover:not([data-explicit-border="true"]),
 .rdg-sheet.sheet-borderless
   .rdg-cell:hover:not([aria-selected="true"]):not(
-    :has([data-explicit-border="true"])
+    [data-explicit-border="true"]
   ) {
   border: none !important;
   border-top: none !important;
@@ -948,13 +965,15 @@
 }
 
 /* Ensure data-grid cell layer stays visible and doesn't clip custom borders */
-.rdg-sheet.sheet-borderless .rdg-cell:has([data-explicit-border="true"]) {
+.rdg-sheet.sheet-borderless .rdg-cell[data-explicit-border="true"] {
   border: none !important;
   overflow: visible !important;
-  contain: none !important;
 }
 
-/* Header row retains borders in borderless mode */
+.rdg-sheet.sheet-borderless .rdg-header-row {
+  border: none !important;
+  border-bottom: none !important;
+}
 
 .rdg-sheet.sheet-borderless
   .sheet-cell-merge-master:not([data-explicit-border="true"]) {
@@ -967,21 +986,18 @@
 }
 
 .rdg-sheet.sheet-borderless
-  .rdg-cell:first-child:not(:has([data-explicit-border="true"])) {
+  .rdg-cell:first-child:not([data-explicit-border="true"]),
+.rdg-sheet.sheet-borderless .rdg-header-cell:first-child {
   border: none !important;
   border-right: none !important;
 }
 
-/* * FIX CONDITION: When a cell has a background color applied, hide default layout lines 
-  * ONLY if the user hasn't drawn an explicit manual border on it.
-  */
-.rdg-sheet
-  .rdg-cell:has([data-has-bg="true"]):not(:has([data-explicit-border="true"])) {
+/* When a cell has a background color applied, hide its borders so the color fills fully */
+.rdg-sheet .rdg-cell:has([data-has-bg="true"]) {
   border-right-color: transparent !important;
   border-bottom-color: transparent !important;
 }
 
-/* ── Covered (slave) auto-overflow cells ── */
 .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
 .rdg-sheet .rdg-row:hover .rdg-cell:has(.sheet-cell-auto-overflow-covered),
 .rdg-dark .rdg-sheet .rdg-row .rdg-cell:has(.sheet-cell-auto-overflow-covered),
@@ -1199,94 +1215,4 @@ body[data-sheet-dark="true"] [role="dialog"] .bg-gray-900 {
   50% {
     opacity: 0.6;
   }
-}
-
-/* ─── Premium Column/Row Resize Handles & Text Selection ─────────────────── */
-
-/* Disable browser-default text selection on headers to prevent blue selection highlights */
-.rdg-header-cell,
-.sheet-row-num,
-.sheet-header-cell,
-.rdg-header-row {
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-}
-
-/* Premium Column Resizer Styles */
-.rdg-header-cell {
-  position: relative;
-}
-
-.rdg-column-resize-handle {
-  width: 10px !important;
-  right: -5px !important;
-  cursor: col-resize !important;
-  background-color: transparent !important;
-  z-index: 10 !important;
-  transition: background-color 0.15s ease;
-  height: 100%;
-}
-
-.rdg-column-resize-handle:hover,
-.rdg-column-resize-handle:active {
-  background-color: rgba(13, 124, 95, 0.15) !important;
-}
-
-.rdg-column-resize-handle::after {
-  content: "";
-  position: absolute;
-  right: 4px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background-color: transparent;
-  transition: background-color 0.15s ease;
-}
-
-.rdg-column-resize-handle:hover::after,
-.rdg-column-resize-handle:active::after {
-  background-color: var(--primary) !important;
-}
-
-/* Premium Row Resizer Styles */
-.sheet-row-resize-handle {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -4px;
-  height: 8px;
-  z-index: 20;
-  cursor: row-resize;
-  touch-action: none;
-  background-color: transparent;
-}
-
-.sheet-row-resize-handle::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 3px;
-  height: 2px;
-  background-color: transparent;
-  transition: background-color 0.15s ease;
-}
-
-/* Clean up old row number ::after pseudo elements that conflict with the resize handle */
-.sheet-row-num::after,
-.sheet-row-num:hover::after {
-  display: none !important;
-}
-
-.sheet-row-num:hover .sheet-row-resize-handle::after {
-  background-color: rgba(13, 124, 95, 0.3);
-}
-
-.sheet-row-resize-handle:hover::after,
-.sheet-row-resize-handle:active::after {
-  background-color: var(--primary) !important;
-  height: 3px !important;
-  bottom: 2px !important;
 }
