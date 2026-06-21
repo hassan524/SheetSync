@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import {
-  useState, useCallback, useMemo, useRef, useEffect, startTransition,
+  useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect, startTransition,
 } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import DataGrid, { Column, RenderCellProps, RenderEditCellProps } from "react-data-grid";
@@ -4641,8 +4641,110 @@ export default function SheetClient() {
   // ── Grid column definitions ────────────────────────────────────────────
   const selStyle = ddStyle(isDark);
 
+  interface GridContext {
+    rows: SheetRow[];
+    selectedRows: Set<string>;
+    selectedCell: { row: number; col: string } | null;
+    selectionRange: any;
+    formulas: any;
+    comments: Record<string, any[]>;
+    activeCursors: Record<string, { name: string; color: string; row: number; col: string; x?: number; y?: number; selectedAt?: number; email?: string; avatar_url?: string | null; role?: string }>;
+    textWrap: any;
+    cellTypes: any;
+    protection: any;
+    sheetColOps: any;
+    colOps: any;
+    persistence: any;
+    rowHeights: Record<string, number>;
+    gridRows: SheetRow[];
+    filteredRows: SheetRow[];
+    mentionState: any;
+    mentionableMembers: any[];
+    cellSelectOptions: Record<string, any[]>;
+    mergeByCell: Map<string, any>;
+    autoOverflowByCell: Map<string, any>;
+    canEditSheet: boolean;
+    showViewerEditMessage: () => void;
+    broadcastSheetSnapshot: (payload: any) => void;
+    setSelectedRows: React.Dispatch<React.SetStateAction<Set<string>>>;
+    setSelectedCell: React.Dispatch<React.SetStateAction<{ row: number; col: string } | null>>;
+    setSelectionRange: React.Dispatch<React.SetStateAction<any>>;
+    setSheetState: React.Dispatch<React.SetStateAction<any>>;
+    setFocusedColumnKey: React.Dispatch<React.SetStateAction<string | null>>;
+    setRightPanel: React.Dispatch<React.SetStateAction<any>>;
+    setActiveCell: React.Dispatch<React.SetStateAction<any>>;
+    saveAllRows: any;
+    saveAllColumns: any;
+    saveFormula: any;
+    deleteFormula: any;
+    setMentionState: React.Dispatch<React.SetStateAction<any>>;
+    beginRowResize: any;
+    onRowResizeMove: any;
+    endRowResize: any;
+    beginColResize: any;
+    formatting: any;
+    timeTravelState: any;
+    isDark: boolean;
+    selectMergeBlock: any;
+    setActiveCommentCell: any;
+    getEffectiveCellStyle: any;
+    onFillStart: any;
+  }
+
+  const contextRef = useMemo(() => ({} as GridContext), []);
+  useEffect(() => {
+    Object.assign(contextRef, {
+      rows,
+      selectedRows,
+      selectedCell,
+      selectionRange,
+      formulas,
+      comments,
+      activeCursors,
+      textWrap,
+      cellTypes,
+      protection,
+      sheetColOps,
+      colOps,
+      persistence,
+      rowHeights,
+      gridRows,
+      filteredRows,
+      mentionState,
+      mentionableMembers,
+      cellSelectOptions,
+      mergeByCell,
+      autoOverflowByCell,
+      canEditSheet,
+      showViewerEditMessage,
+      broadcastSheetSnapshot,
+      setSelectedRows,
+      setSelectedCell,
+      setSelectionRange,
+      setSheetState,
+      setFocusedColumnKey,
+      setRightPanel,
+      setActiveCell,
+      saveAllRows,
+      saveAllColumns,
+      saveFormula,
+      deleteFormula,
+      setMentionState,
+      beginRowResize,
+      onRowResizeMove,
+      endRowResize,
+      beginColResize,
+      formatting,
+      timeTravelState,
+      isDark,
+      selectMergeBlock,
+      setActiveCommentCell,
+      getEffectiveCellStyle,
+      onFillStart,
+    });
+  });
+
   const gridColumns = useMemo<Column<SheetRow, SheetRow>[]>(() => {
-    const activeRows = timeTravelState.previewRows || rows;
 
     // ── Row-number / checkbox column ──────────────────────────────────
     const rowNumberCol: Column<SheetRow, SheetRow> = {
@@ -4652,6 +4754,8 @@ export default function SheetClient() {
       frozen: true,
       resizable: false,
       renderHeaderCell() {
+        const { rows, selectedRows, setSelectedRows, setSelectedCell, setSelectionRange, timeTravelState } = contextRef;
+        const activeRows = timeTravelState.previewRows || rows;
         const allSelected = activeRows.length > 0 && selectedRows.size === activeRows.length;
         const handleSelectAll = (checked: boolean) => {
           if (checked && activeRows.length > 0) {
@@ -4691,6 +4795,8 @@ export default function SheetClient() {
         );
       },
       renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
+        const { rows, selectedRows, setSelectedRows, setSelectedCell, setSelectionRange, protection, timeTravelState, beginRowResize, onRowResizeMove, endRowResize } = contextRef;
+        const activeRows = timeTravelState.previewRows || rows;
         const rowIdx = activeRows.findIndex((r) => r.id === props.row.id);
         const isSel = selectedRows.has(props.row.id);
         const isRowProtected = protection.isRowProtected(props.row.id);
@@ -4745,6 +4851,7 @@ export default function SheetClient() {
         );
       },
       renderSummaryCell(props: any) {
+        const { filteredRows } = contextRef;
         const displayIdx = filteredRows.findIndex((r) => r.id === props.row.id);
         return (
           <div className="h-full w-full flex items-center justify-center sheet-row-num sheet-row-num--selected border-r">
@@ -4767,6 +4874,7 @@ export default function SheetClient() {
         // Double-clicking them is intercepted by onCellDoubleClick which
         // redirects to the master cell. This prevents ghost editors.
         editable: (row: SheetRow) => {
+          const { canEditSheet, rows, mergeByCell } = contextRef;
           if (!canEditSheet) return false;
           const rowIdx = rows.findIndex((r) => r.id === row.id);
           const mi = mergeByCell.get(`${rowIdx}-${col.key}`);
@@ -4775,6 +4883,12 @@ export default function SheetClient() {
         },
 
         renderHeaderCell: () => {
+          const {
+            rows, selectedColumnKey, selectedCell, colOps, sheetColOps, cellTypes, textWrap, formulas,
+            handleTextWrapToggle, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat,
+            handleToggleFreezeColumn, canEditSheet, showViewerEditMessage, setSelectedColumnKey, setSelectedCell,
+            setSelectionRange, setFocusedColumnKey, setRightPanel, columnsHistory
+          } = contextRef;
           if (col.isExtra) {
             return <div className="h-full w-full border-r" style={{ background: 'var(--rdg-header-background-color)' }} />;
           }
@@ -4941,6 +5055,12 @@ export default function SheetClient() {
         },
 
         renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
+          const {
+            rows, mergeByCell, autoOverflowByCell, textWrap, cellTypes, formulas, protection, isOrgSheet,
+            comments, activeCursors, isDark, selectedCell, selectionRange, canEditSheet, showViewerEditMessage,
+            setRightPanel, setActiveCommentCell, setSelectedColumnKey, setSelectedCell, selectMergeBlock,
+            gridRows, getEffectiveCellStyle, onFillStart, formatting
+          } = contextRef
           const rowIdx = rows.findIndex((r) => r.id === props.row.id);
           const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
           const autoOverflowInfo = autoOverflowByCell.get(`${rowIdx}-${col.key}`);
@@ -5202,6 +5322,7 @@ export default function SheetClient() {
         },
 
         renderSummaryCell(props: any) {
+          const { rows, mergeByCell, formatting, cellTypes, formulas, filteredRows, getEffectiveCellStyle } = contextRef
           const rowIdx = rows.findIndex((r) => r.id === props.row.id);
           const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
           if (mergeInfo?.hidden)
@@ -5234,6 +5355,12 @@ export default function SheetClient() {
         },
 
         renderEditCell(props: RenderEditCellProps<SheetRow, SheetRow>) {
+          const {
+            rows, mergeByCell, canEditSheet, showViewerEditMessage, formulas, isDark, setSheetState,
+            persistence, broadcastSheetSnapshot, setSelectSetupDialog, orgMembers, isOrgSheet,
+            mentionState, mentionableMembers, setMentionState, cellSelectOptions, rowHeights,
+            gridRows, setActiveCell, selectMergeBlock, getEffectiveCellStyle
+          } = contextRef.current;
           const { row, column, onRowChange } = props;
           const rowIdx = rows.findIndex((r) => r.id === row.id);
           const mergeInfo = mergeByCell.get(`${rowIdx}-${column.key}`);
@@ -5310,6 +5437,7 @@ export default function SheetClient() {
             nextRow: SheetRow,
             nextFormulas = formulas.formulas,
           ) => {
+            markSaving();
             const nextRows = rows.map((item) => (item.id === row.id ? nextRow : item));
             setSheetState((prev) => ({ ...prev, rows: nextRows }));
             persistence.queueChangedRowsSave(nextRows, rows);
@@ -5324,14 +5452,12 @@ export default function SheetClient() {
             if (v.startsWith("=")) {
               const nextFormulas = { ...formulas.formulas, [cellKey]: v };
               formulas.setFormulas(nextFormulas);
-              publishLiveEdit(row, nextFormulas);
             } else {
               const nextFormulas = { ...formulas.formulas };
               delete nextFormulas[cellKey];
               const nextRow = { ...row, [column.key]: v };
               formulas.setFormulas(nextFormulas);
               onRowChange(nextRow);
-              publishLiveEdit(nextRow, nextFormulas);
             }
           };
 
@@ -5339,7 +5465,6 @@ export default function SheetClient() {
             if (v.startsWith("=")) {
               const nextFormulas = { ...formulas.formulas, [cellKey]: v };
               formulas.setFormulas(nextFormulas);
-              publishLiveEdit(row, nextFormulas);
             } else {
               const nextFormulas = { ...formulas.formulas };
               delete nextFormulas[cellKey];
@@ -5347,7 +5472,6 @@ export default function SheetClient() {
                 const nextRow = { ...row, [column.key]: v };
                 formulas.setFormulas(nextFormulas);
                 onRowChange(nextRow);
-                publishLiveEdit(nextRow, nextFormulas);
               }
             }
           };
@@ -5361,14 +5485,12 @@ export default function SheetClient() {
             if (v === "" || v === "." || v.endsWith(".")) {
               const nextRow = { ...row, [column.key]: v };
               onRowChange(nextRow);
-              publishLiveEdit(nextRow);
               return;
             }
             const n = Math.min(100, Math.max(0, Number(v)));
             if (!Number.isNaN(n)) {
               const nextRow = { ...row, [column.key]: String(n) };
               onRowChange(nextRow);
-              publishLiveEdit(nextRow);
             }
           };
 
@@ -5391,6 +5513,11 @@ export default function SheetClient() {
 
           const onBlurSave = async (currentValue?: string) => {
             await persistFormulaEdit(currentValue);
+            if (currentValue !== undefined && !currentValue.startsWith("=")) {
+              publishLiveEdit({ ...row, [column.key]: currentValue });
+            } else {
+              publishLiveEdit(row);
+            }
           };
 
           const commitFormulaOnEnter = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -5906,22 +6033,8 @@ export default function SheetClient() {
 
     return [rowNumberCol, ...dataCols];
   }, [
-    columns, rows, selectedRows, selectedColumnKey,
-    textWrap.textWrapColumns, cellTypes.getCellType,
-    getEffectiveCellStyle,
-    formulas.setFormulas, formulas.getFormula, formulas.evaluateFormula, formulas.formulas, formulas.columnFormulas, cellSelectOptions,
-    protection.getCellKey, protection.isCellProtected, protection.isRowProtected,
-    sheetColOps, handleTextWrapToggle, sheetId, columnsHistory, rowsHistory,
-    colOps, markSaving, markSaved, handleApplyFormulaToColumn,
-    handleRemoveColumnFormula, handleApplyColumnFormat, handleToggleFreezeColumn,
-    isOrgSheet, comments, activeCursors, isDark, beginRowResize, onRowResizeMove,
-    endRowResize, toggleRowProtectionById, onFillStart, rightPanel, canEditSheet,
-    showViewerEditMessage, broadcastSheetSnapshot, selectionRange, selectedCell,
-    setSheetState, setSelectedColumnKey, setSelectedCell, setSelectionRange,
-    setFocusedColumnKey, setRightPanel, setActiveCell, saveAllRows, saveAllColumns,
-    saveFormula, deleteFormula, mentionState, mentionableMembers, setMentionState,
-    mergeByCell, autoOverflowByCell, selectMergeBlock, rowHeights,
-    timeTravelState.previewRows, beginColResize, gridRows, persistence.queueChangedRowsSave,
+    columns,
+    columnsHistory,
   ]);
 
   // ── Render ─────────────────────────────────────────────────────────────

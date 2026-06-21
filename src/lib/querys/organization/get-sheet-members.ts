@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 export interface OrgMember {
   id: string;
@@ -106,6 +107,7 @@ export async function getSheetDirectMembers(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
+  // Query sheet using the user client to verify they have access to this sheet
   const { data: sheet, error: sheetError } = await supabase
     .from("sheets")
     .select("id, title, owner_id, organization_id")
@@ -115,7 +117,13 @@ export async function getSheetDirectMembers(
   if (sheetError) throw new Error(sheetError.message);
   if (!sheet || sheet.organization_id) return null;
 
-  const { data: members, error: membersError } = await supabase
+  // Use the admin/service role client to fetch all direct members of this sheet, bypassing RLS
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: members, error: membersError } = await admin
     .from("sheet_members")
     .select(`
       role,
@@ -144,7 +152,7 @@ export async function getSheetDirectMembers(
     }));
 
   if (sheet.owner_id && !mapped.some((member) => member.id === sheet.owner_id)) {
-    const { data: ownerProfile } = await supabase
+    const { data: ownerProfile } = await admin
       .from("profiles")
       .select("id, name, email, avatar_url")
       .eq("id", sheet.owner_id)

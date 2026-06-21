@@ -93,24 +93,24 @@ export const appFeatures = [
     ],
     image: "/feature-organizations.png",
   },
-  {
-    icon: Upload,
-    color: "text-teal-600",
-    bg: "bg-teal-50",
-    gradientFrom: "from-teal-500",
-    gradientTo: "to-cyan-700",
-    title: "Import and Export",
-    subtitle: "Bring your data in",
-    description:
-      "Import Excel or CSV files and continue your work. Export anytime to Excel, CSV or PDF while keeping formatting intact.",
-    bullets: [
-      "Excel import support",
-      "CSV files",
-      "Export to PDF",
-      "Keep formatting",
-    ],
-    image: "/feature-import.png",
-  },
+  // {
+  //   icon: Upload,
+  //   color: "text-teal-600",
+  //   bg: "bg-teal-50",
+  //   gradientFrom: "from-teal-500",
+  //   gradientTo: "to-cyan-700",
+  //   title: "Import and Export",
+  //   subtitle: "Bring your data in",
+  //   description:
+  //     "Import Excel or CSV files and continue your work. Export anytime to Excel, CSV or PDF while keeping formatting intact.",
+  //   bullets: [
+  //     "Excel import support",
+  //     "CSV files",
+  //     "Export to PDF",
+  //     "Keep formatting",
+  //   ],
+  //   image: "/feature-import.png",
+  // },
   {
     icon: History,
     color: "text-pink-600",
