@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     if (inviteByLink) {
+      console.log("MARKER_TEST_12345");
       console.log("🔗 [INVITE] Link invite flow started", {
         sheetId,
         userId: user.id,
@@ -38,10 +39,9 @@ export async function POST(req: NextRequest) {
           { status: 400 },
         );
       }
-
       const { data: sheet, error: sheetError } = await admin
         .from("sheets")
-        .select("id, organization_id, is_personal, owner_id")
+        .select("id, organization_id, owner_id")
         .eq("id", sheetId)
         .maybeSingle();
 
@@ -69,14 +69,7 @@ export async function POST(req: NextRequest) {
 
       const orgId = sheet.organization_id;
 
-      console.log("🏢 [INVITE] Org ID from sheet:", {
-        orgId,
-        isPersonal: sheet.is_personal,
-        ownerId: sheet.owner_id,
-      });
-
       if (!orgId) {
-        // Sheet has no org — add user directly as sheet collaborator and return
         const { error: collabError } = await admin
           .from("sheet_members")
           .upsert({

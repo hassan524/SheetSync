@@ -156,11 +156,25 @@ export function ensureWorkingRowBuffer(
   inputRows: SheetRow[],
   columns: ColumnDef[],
 ): SheetRow[] {
-  if (inputRows.length >= WORKING_MIN_ROWS) return inputRows;
-  const out = [...inputRows];
-  for (let i = inputRows.length; i < WORKING_MIN_ROWS; i++) {
-    out.push(buildEmptyRow(i, columns));
+  const maxPosition = inputRows.reduce((max, r) => Math.max(max, r.position ?? 0), 0);
+  const size = Math.max(WORKING_MIN_ROWS, maxPosition + 1);
+
+  const out: SheetRow[] = Array.from({ length: size });
+
+  for (let i = 0; i < size; i++) {
+    out[i] = buildEmptyRow(i, columns);
   }
+
+  inputRows.forEach((row, index) => {
+    const pos = row.position !== undefined ? row.position : index;
+    if (pos >= 0 && pos < size) {
+      out[pos] = {
+        ...out[pos],
+        ...row,
+      };
+    }
+  });
+
   return out;
 }
 

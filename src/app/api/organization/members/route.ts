@@ -19,26 +19,37 @@ async function getContext(sheetId: string) {
 
   const { data: sheet, error: sheetError } = await supabase
     .from("sheets")
-    .select("organization_id")
+    .select("organization_id, owner_id")
     .eq("id", sheetId)
     .maybeSingle();
 
-  if (sheetError || !sheet?.organization_id) {
-    return { error: NextResponse.json({ error: "Organization sheet not found" }, { status: 404 }) };
+  if (sheetError || !sheet) {
+    return { error: NextResponse.json({ error: "Sheet not found" }, { status: 404 }) };
   }
 
-  const { data: ownerMember, error: ownerError } = await supabase
-    .from("organization_members")
-    .select("role")
-    .eq("organization_id", sheet.organization_id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const orgId = sheet.organization_id;
+  const isOrg = !!orgId;
 
-  if (ownerError || ownerMember?.role !== "owner") {
-    return { error: NextResponse.json({ error: "Only the organization owner can manage members" }, { status: 403 }) };
+  if (isOrg) {
+    const { data: ownerMember, error: ownerError } = await supabase
+      .from("organization_members")
+      .select("role")
+      .eq("organization_id", orgId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (ownerError || ownerMember?.role !== "owner") {
+      return { error: NextResponse.json({ error: "Only the organization owner can manage members" }, { status: 403 }) };
+    }
+
+    return { supabase, user, organizationId: orgId, isOrg: true };
+  } else {
+    if (sheet.owner_id !== user.id) {
+      return { error: NextResponse.json({ error: "Only the sheet owner can manage members" }, { status: 403 }) };
+    }
+
+    return { supabase, user, sheetId, isOrg: false };
   }
-
-  return { supabase, user, organizationId: sheet.organization_id as string };
 }
 
 export async function PUT(req: NextRequest) {
@@ -54,31 +65,57 @@ export async function PUT(req: NextRequest) {
     const ctx = await getContext(sheetId);
     if ("error" in ctx) return ctx.error;
     if (ctx.user.id === userId) {
-      return NextResponse.json({ error: "You cannot change your own owner role" }, { status: 400 });
+      return NextResponse.json({ error: "You cannot change your own role" }, { status: 400 });
     }
 
-    const { data: target, error: targetError } = await ctx.supabase
-      .from("organization_members")
-      .select("role")
-      .eq("organization_id", ctx.organizationId)
-      .eq("user_id", userId)
-      .maybeSingle();
+    if (ctx.isOrg) {
+      const { data: target, error: targetError } = await ctx.supabase
+        .from("organization_members")
+        .select("role")
+        .eq("organization_id", ctx.organizationId)
+        .eq("user_id", userId)
+        .maybeSingle();
 
-    if (targetError || !target) {
-      return NextResponse.json({ error: "Member not found" }, { status: 404 });
-    }
-    if (target.role === "owner") {
-      return NextResponse.json({ error: "The owner role cannot be changed here" }, { status: 400 });
-    }
+      if (targetError || !target) {
+        return NextResponse.json({ error: "Member not found" }, { status: 404 });
+      }
+      if (target.role === "owner") {
+        return NextResponse.json({ error: "The owner role cannot be changed here" }, { status: 400 });
+      }
 
-    const { error: updateError } = await ctx.supabase
-      .from("organization_members")
-      .update({ role })
-      .eq("organization_id", ctx.organizationId)
-      .eq("user_id", userId);
+      const { error: updateError } = await ctx.supabase
+        .from("organization_members")
+        .update({ role })
+        .eq("organization_id", ctx.organizationId)
+        .eq("user_id", userId);
 
-    if (updateError) {
-      return NextResponse.json({ error: "Failed to update member role" }, { status: 500 });
+      if (updateError) {
+        return NextResponse.json({ error: "Failed to update member role" }, { status: 500 });
+      }
+    } else {
+      const { data: target, error: targetError } = await ctx.supabase
+        .from("sheet_members")
+        .select("role")
+        .eq("sheet_id", sheetId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (targetError || !target) {
+        return NextResponse.json({ error: "Member not found" }, { status: 404 });
+      }
+      if (target.role === "owner") {
+        return NextResponse.json({ error: "The owner role cannot be changed here" }, { status: 400 });
+      }
+
+      const { error: updateError } = await ctx.supabase
+        .from("sheet_members")
+        .update({ role })
+        .eq("sheet_id", sheetId)
+        .eq("user_id", userId);
+
+      if (updateError) {
+        return NextResponse.json({ error: "Failed to update member role" }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true, role });
@@ -101,28 +138,54 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "You cannot remove yourself" }, { status: 400 });
     }
 
-    const { data: target, error: targetError } = await ctx.supabase
-      .from("organization_members")
-      .select("role")
-      .eq("organization_id", ctx.organizationId)
-      .eq("user_id", userId)
-      .maybeSingle();
+    if (ctx.isOrg) {
+      const { data: target, error: targetError } = await ctx.supabase
+        .from("organization_members")
+        .select("role")
+        .eq("organization_id", ctx.organizationId)
+        .eq("user_id", userId)
+        .maybeSingle();
 
-    if (targetError || !target) {
-      return NextResponse.json({ error: "Member not found" }, { status: 404 });
-    }
-    if (target.role === "owner") {
-      return NextResponse.json({ error: "The organization owner cannot be removed" }, { status: 400 });
-    }
+      if (targetError || !target) {
+        return NextResponse.json({ error: "Member not found" }, { status: 404 });
+      }
+      if (target.role === "owner") {
+        return NextResponse.json({ error: "The organization owner cannot be removed" }, { status: 400 });
+      }
 
-    const { error: deleteError } = await ctx.supabase
-      .from("organization_members")
-      .delete()
-      .eq("organization_id", ctx.organizationId)
-      .eq("user_id", userId);
+      const { error: deleteError } = await ctx.supabase
+        .from("organization_members")
+        .delete()
+        .eq("organization_id", ctx.organizationId)
+        .eq("user_id", userId);
 
-    if (deleteError) {
-      return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
+      if (deleteError) {
+        return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
+      }
+    } else {
+      const { data: target, error: targetError } = await ctx.supabase
+        .from("sheet_members")
+        .select("role")
+        .eq("sheet_id", sheetId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (targetError || !target) {
+        return NextResponse.json({ error: "Member not found" }, { status: 404 });
+      }
+      if (target.role === "owner") {
+        return NextResponse.json({ error: "The sheet owner cannot be removed" }, { status: 400 });
+      }
+
+      const { error: deleteError } = await ctx.supabase
+        .from("sheet_members")
+        .delete()
+        .eq("sheet_id", sheetId)
+        .eq("user_id", userId);
+
+      if (deleteError) {
+        return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true });

@@ -78,6 +78,7 @@ export async function loadSheet(sheetId: string) {
     rows:
       rows.data?.map((row) => ({
         id: row.row_key,
+        position: row.position,
         ...(row.data ?? {}),
       })) ?? [],
 

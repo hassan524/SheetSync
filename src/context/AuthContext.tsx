@@ -27,7 +27,7 @@ interface AuthContextType {
   user: UserProfile | null;
   accessToken: string | null;
   loading: boolean;
-  loginWithGoogle: (redirectPath?: string) => Promise<AuthError | null>;
+  loginWithGoogle: (next?: string) => Promise<AuthError | null>;
   logout: () => Promise<void>;
 }
 
@@ -94,17 +94,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Google login
   // -----------------------
   const loginWithGoogle = async (
-    redirectPath = "/auth/callback",
+    next?: string,
   ): Promise<AuthError | null> => {
     const appUrl = getCurrentAppOrigin();
-    const safeRedirectPath = redirectPath.startsWith("/")
-      ? redirectPath
-      : "/dashboard";
-    const redirectUrl = `${appUrl}${safeRedirectPath}`;
+    const safeNext = next && next.startsWith("/") ? next : null;
+
+    const callbackUrl = new URL(`${appUrl}/auth/callback`);
+    if (safeNext) {
+      callbackUrl.searchParams.set("next", safeNext);
+    }
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: redirectUrl },
+      options: { redirectTo: callbackUrl.toString() },
     });
 
     if (error) console.error("Google sign-in error:", error.message);

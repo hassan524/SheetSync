@@ -278,7 +278,7 @@ const SheetTableRow = ({
       </div>
 
       {/* Three-dot container — normal (not sticky) on the right side */}
-      <div className="shrink-0 flex items-center justify-end w-10 pr-2 pl-2">
+      <div className="shrink-0 flex items-center justify-end w-10 pr-2 pl-2" onClick={(e) => e.stopPropagation()}>
         <RowMenu sheet={sheet} open={menuOpen} onOpenChange={setMenuOpen} onDeleted={onDeleted} onRenamed={onRenamed} onOpen={onClick} />
       </div>
     </div>

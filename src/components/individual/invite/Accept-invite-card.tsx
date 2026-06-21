@@ -3,23 +3,24 @@
 import { api } from "@/lib/api/api-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 const withInviteAcceptedFlag = (path: string) => {
   const [pathname, query = ""] = path.split("?");
   const params = new URLSearchParams(query);
   params.set("invite", "accepted");
   const nextQuery = params.toString();
-
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 };
 
 export default function AcceptInviteCard({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const hasStarted = useRef(false);
+  const { user, loading: authLoading, loginWithGoogle } = useAuth();
+
   const nextPath = searchParams?.get("next");
   const safeNextPath = nextPath?.startsWith("/") ? nextPath : null;
 
@@ -39,17 +40,9 @@ export default function AcceptInviteCard({ token }: { token: string }) {
         ? withInviteAcceptedFlag(baseDestination)
         : baseDestination;
 
-      setSuccess(true);
       router.replace(destination);
     } catch (err: any) {
       console.error(err);
-      const status = err?.response?.status;
-      if (status === 401 && typeof window !== "undefined") {
-        const next = `${window.location.pathname}${window.location.search}`;
-        router.replace(`/?next=${encodeURIComponent(next)}`);
-        return;
-      }
-
       setError(
         err?.response?.data?.error || err?.message || "Failed to accept invite",
       );
@@ -59,12 +52,37 @@ export default function AcceptInviteCard({ token }: { token: string }) {
   }, [router, safeNextPath, token]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (hasStarted.current) return;
+
+    if (!user) {
+      hasStarted.current = true;
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+      loginWithGoogle(currentPath);
+      return;
+    }
+
     hasStarted.current = true;
     acceptInvite();
-  }, [acceptInvite]);
+  }, [authLoading, user, loginWithGoogle, acceptInvite]);
 
-  if (!error || loading || success) return null;
+  if (authLoading || (!user && !error)) {
+    return (
+      <div className="bg-white shadow-xl rounded-2xl p-8 w-[360px] text-center border border-gray-100">
+        <p className="text-sm text-gray-500">Signing you in…</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white shadow-xl rounded-2xl p-8 w-[360px] text-center border border-gray-100">
+        <p className="text-sm text-gray-500">Joining…</p>
+      </div>
+    );
+  }
+
+  if (!error) return null;
 
   return (
     <div className="bg-white shadow-xl rounded-2xl p-8 w-[360px] text-center border border-gray-100">

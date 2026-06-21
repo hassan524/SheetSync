@@ -361,7 +361,6 @@ export function useTimeTravel({
         .insert({
           title: name,
           owner_id: uid,
-          is_personal: !isOrg,
           organization_id: isOrg ? organizationId : null,
           forked_from_sheet_id: sheetId,
           forked_from_snapshot_label: sourceSnapshot.label ?? null,

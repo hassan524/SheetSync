@@ -274,9 +274,9 @@ export function ActionBar({
         <IconBtn icon={PanelRight} tooltip="Row details" onClick={() => onTogglePanel("row-details")} active={effectiveRightPanel === "row-details"} disabled={!selectedCell} />
         <IconBtn icon={Pin} tooltip="Pin row" onClick={onTogglePinRow} active={!!selectedRowPinned} disabled={!canEdit || !selectedCell || !onTogglePinRow} />
         <IconBtn icon={Lock} tooltip={canProtectRows ? "Lock/unlock editing for the selected row" : "Row protection is owner-only"} onClick={onToggleRowProtection} disabled={!selectedCell || !onToggleRowProtection || !canProtectRows} />
-        {isOrgSheet && (
+        {/* {isOrgSheet && (  */}
           <IconBtn icon={Users} tooltip="Collaborators" onClick={() => onTogglePanel("collaborators")} active={effectiveRightPanel === "collaborators"} />
-        )}
+        {/* )} */}
         <IconBtn icon={Clock} tooltip="Time Travel — replay & branch" onClick={() => onTogglePanel("timetravel")} active={effectiveRightPanel === "timetravel"} />
         <IconBtn icon={Columns3} tooltip="Columns" onClick={() => onTogglePanel("columns")} active={effectiveRightPanel === "columns"} disabled={!canEdit} />
         <IconBtn icon={ListChecks} tooltip="Validation rules" onClick={() => onTogglePanel("validation")} active={effectiveRightPanel === "validation"} disabled={!canEdit} />

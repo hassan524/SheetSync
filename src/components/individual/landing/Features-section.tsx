@@ -122,21 +122,10 @@ function FeatureRow({
           }`}
         style={{ transitionDelay: "150ms" }}
       >
-        <div className="group relative w-full overflow-hidden rounded-2xl cursor-pointer">
-          {/* Image */}
-          <div className="relative w-full" style={{ aspectRatio: "16/10" }}>
-            <Image
-              src={feat.image}
-              alt={feat.title}
-              fill
-              className="object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-          </div>
-
-          {/* Header overlay */}
+        <div className="group relative w-full overflow-hidden rounded-2xl border-2 border-primary bg-white cursor-pointer">
+          {/* Header bar — normal flow, sits above the image instead of overlapping it */}
           <div
-            className={`absolute top-0 left-0 right-0 flex items-center gap-3 px-4 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r ${feat.gradientFrom} ${feat.gradientTo}`}
+            className={`relative z-10 flex items-center gap-3 px-4 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r ${feat.gradientFrom} ${feat.gradientTo}`}
           >
             <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-white/20 flex items-center justify-center">
               <Icon className="h-4 w-4 text-white" />
@@ -152,6 +141,17 @@ function FeatureRow({
                 Live
               </span>
             </div>
+          </div>
+
+          {/* Image */}
+          <div className="relative w-full" style={{ aspectRatio: "16/10" }}>
+            <Image
+              src={feat.image}
+              alt={feat.title}
+              fill
+              className="object-contain transition-transform duration-700 ease-out group-hover:scale-105"
+              sizes="(max-width: 768px) 100vw, 50vw"
+            />
           </div>
         </div>
       </div>

@@ -1,3 +1,5 @@
+// send
+
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -112,7 +114,6 @@ export async function POST(req: NextRequest) {
 
       orgName = (inviterMember as any).organizations?.name ?? "your organization";
     } else {
-      // No org — verify sheet ownership
       const { data: sheetCheck } = await supabase
         .from("sheets")
         .select("owner_id")

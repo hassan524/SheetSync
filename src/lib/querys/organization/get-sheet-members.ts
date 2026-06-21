@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 export interface OrgMember {
   id: string;
@@ -90,3 +91,88 @@ export async function getSheetOrgMembers(
   };
 }
 
+/**
+ * Given a sheet ID with NO organization, fetch everyone with direct
+ * access via sheet_members (plus the owner) and return them in the
+ * same shape as getSheetOrgMembers, so the UI can render avatars
+ * identically for org and non-org sheets.
+ */
+export async function getSheetDirectMembers(
+  sheetId: string
+): Promise<SheetOrgData | null> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  // Query sheet using the user client to verify they have access to this sheet
+  const { data: sheet, error: sheetError } = await supabase
+    .from("sheets")
+    .select("id, title, owner_id, organization_id")
+    .eq("id", sheetId)
+    .single();
+
+  if (sheetError) throw new Error(sheetError.message);
+  if (!sheet || sheet.organization_id) return null;
+
+  // Use the admin/service role client to fetch all direct members of this sheet, bypassing RLS
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: members, error: membersError } = await admin
+    .from("sheet_members")
+    .select(`
+      role,
+      user_id,
+      profiles (
+        id,
+        name,
+        email,
+        avatar_url
+      )
+    `)
+    .eq("sheet_id", sheetId);
+
+  if (membersError) throw new Error(membersError.message);
+
+  const mapped: OrgMember[] = (members ?? [])
+    .filter((m: any) => m.profiles)
+    .map((m: any) => ({
+      id: m.profiles.id,
+      name: m.profiles.name ?? "Unknown",
+      email: m.profiles.email ?? "",
+      avatar_url: m.profiles.avatar_url ?? null,
+      role: m.role ?? "viewer",
+      status: "online",
+      last_active_at: null,
+    }));
+
+  if (sheet.owner_id && !mapped.some((member) => member.id === sheet.owner_id)) {
+    const { data: ownerProfile } = await admin
+      .from("profiles")
+      .select("id, name, email, avatar_url")
+      .eq("id", sheet.owner_id)
+      .maybeSingle();
+    if (ownerProfile) {
+      mapped.unshift({
+        id: ownerProfile.id,
+        name: ownerProfile.name ?? "Unknown",
+        email: ownerProfile.email ?? "",
+        avatar_url: ownerProfile.avatar_url ?? null,
+        role: "owner",
+        status: "online",
+        last_active_at: null,
+      });
+    }
+  }
+
+  return {
+    orgId: "",
+    orgName: sheet.title ?? "Sheet",
+    members: mapped,
+  };
+}

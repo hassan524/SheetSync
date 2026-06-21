@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { IconBtn } from "./sheet-ui-helpers";
 import {
   Tooltip,
   TooltipTrigger,
@@ -105,8 +106,7 @@ const PRESET_COLORS = [
   "#d0e0e3", "#c9daf8", "#cfe2f3", "#d9d2e9", "#ead1dc",
 ];
 
-const TOOL_GROUP_CLASS =
-  "flex items-center rounded-md border border-border/60 bg-background/70 p-0.5 gap-0.5 shrink-0 shadow-sm";
+const TOOL_GROUP_CLASS = "sheet-tool-group";
 
 export default function FormattingToolbar({
   currentFormat = {},
@@ -121,136 +121,83 @@ export default function FormattingToolbar({
     <div className="flex items-center gap-1.5">
       {/* Group 1: Text Styling */}
       <div className={TOOL_GROUP_CLASS}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={currentFormat.bold ? "secondary" : "ghost"}
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() => onFormatChange({ bold: !currentFormat.bold })}
-              disabled={disabled}
-            >
-              <Bold className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Bold (Ctrl+B)</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={Bold}
+          tooltip="Bold"
+          shortcut="Ctrl+B"
+          onClick={() => onFormatChange({ bold: !currentFormat.bold })}
+          active={currentFormat.bold}
+          disabled={disabled}
+        />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={currentFormat.italic ? "secondary" : "ghost"}
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() => onFormatChange({ italic: !currentFormat.italic })}
-              disabled={disabled}
-            >
-              <Italic className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Italic (Ctrl+I)</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={Italic}
+          tooltip="Italic"
+          shortcut="Ctrl+I"
+          onClick={() => onFormatChange({ italic: !currentFormat.italic })}
+          active={currentFormat.italic}
+          disabled={disabled}
+        />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={currentFormat.underline ? "secondary" : "ghost"}
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() =>
-                onFormatChange({ underline: !currentFormat.underline })
-              }
-              disabled={disabled}
-            >
-              <Underline className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Underline (Ctrl+U)</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={Underline}
+          tooltip="Underline"
+          shortcut="Ctrl+U"
+          onClick={() => onFormatChange({ underline: !currentFormat.underline })}
+          active={currentFormat.underline}
+          disabled={disabled}
+        />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={currentFormat.strikethrough ? "secondary" : "ghost"}
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() =>
-                onFormatChange({ strikethrough: !currentFormat.strikethrough })
-              }
-              disabled={disabled}
-            >
-              <Strikethrough className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Strikethrough</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={Strikethrough}
+          tooltip="Strikethrough"
+          onClick={() => onFormatChange({ strikethrough: !currentFormat.strikethrough })}
+          active={currentFormat.strikethrough}
+          disabled={disabled}
+        />
       </div>
 
       {/* Group 2: Font Size & Clear Formatting */}
       <div className={TOOL_GROUP_CLASS}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() =>
-                onFormatChange({
-                  fontSize: Math.min(72, (currentFormat.fontSize ?? 12) + 1),
-                })
-              }
-              disabled={disabled}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Increase Font Size</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={Plus}
+          tooltip="Increase Font Size"
+          onClick={() =>
+            onFormatChange({
+              fontSize: Math.min(72, (currentFormat.fontSize ?? 12) + 1),
+            })
+          }
+          disabled={disabled}
+        />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() =>
-                onFormatChange({
-                  fontSize: Math.max(8, (currentFormat.fontSize ?? 12) - 1),
-                })
-              }
-              disabled={disabled}
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Decrease Font Size</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={Minus}
+          tooltip="Decrease Font Size"
+          onClick={() =>
+            onFormatChange({
+              fontSize: Math.max(8, (currentFormat.fontSize ?? 12) - 1),
+            })
+          }
+          disabled={disabled}
+        />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() =>
-                onFormatChange({
-                  bold: false,
-                  italic: false,
-                  underline: false,
-                  strikethrough: false,
-                  textColor: "#000000",
-                  bgColor: "#ffffff",
-                  align: "left",
-                  borderStyle: "none",
-                })
-              }
-              disabled={disabled}
-            >
-              <Paintbrush className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Clear Formatting</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={Paintbrush}
+          tooltip="Clear Formatting"
+          onClick={() =>
+            onFormatChange({
+              bold: false,
+              italic: false,
+              underline: false,
+              strikethrough: false,
+              textColor: "#000000",
+              bgColor: "#ffffff",
+              align: "left",
+              borderStyle: "none",
+            })
+          }
+          disabled={disabled}
+        />
       </div>
 
       {/* Group 3: Colors & Borders */}
@@ -258,18 +205,16 @@ export default function FormattingToolbar({
         {/* Borders */}
         <Popover open={borderOpen} onOpenChange={setBorderOpen}>
           <PopoverTrigger asChild>
-            <Button
-              variant={
-                currentFormat.borderStyle && currentFormat.borderStyle !== "none"
-                  ? "secondary"
-                  : "ghost"
-              }
-              size="icon"
-              className="h-7 w-7 rounded p-0"
+            <button
               disabled={disabled}
+              className={`sheet-icon-btn h-7 w-7 rounded-md transition-all duration-100 flex-shrink-0 ${
+                currentFormat.borderStyle && currentFormat.borderStyle !== "none"
+                  ? "sheet-icon-btn--active"
+                  : ""
+              }`}
             >
               <Square className="h-3.5 w-3.5" />
-            </Button>
+            </button>
           </PopoverTrigger>
           <PopoverContent className="w-48 p-2.5" align="start">
             <div className="space-y-2.5">
@@ -380,18 +325,16 @@ export default function FormattingToolbar({
         {/* Text Color */}
         <Popover open={textColorOpen} onOpenChange={setTextColorOpen}>
           <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 rounded p-0 relative"
+            <button
               disabled={disabled}
+              className="sheet-icon-btn h-7 w-7 rounded-md relative transition-all duration-100 flex-shrink-0"
             >
               <Type className="h-3.5 w-3.5" />
               <div
                 className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-4 h-0.5"
                 style={{ backgroundColor: currentFormat.textColor || "#000000" }}
               />
-            </Button>
+            </button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-3" align="start">
             <div className="space-y-2">
@@ -422,18 +365,16 @@ export default function FormattingToolbar({
         {/* Background Color */}
         <Popover open={bgColorOpen} onOpenChange={setBgColorOpen}>
           <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 rounded p-0 relative"
+            <button
               disabled={disabled}
+              className="sheet-icon-btn h-7 w-7 rounded-md relative transition-all duration-100 flex-shrink-0"
             >
               <Palette className="h-3.5 w-3.5" />
               <div
                 className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-4 h-0.5"
                 style={{ backgroundColor: currentFormat.bgColor || "#ffffff" }}
               />
-            </Button>
+            </button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-3" align="start">
             <div className="space-y-2">
@@ -472,50 +413,29 @@ export default function FormattingToolbar({
 
       {/* Group 4: Alignment */}
       <div className={TOOL_GROUP_CLASS}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={currentFormat.align === "left" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() => onFormatChange({ align: "left" })}
-              disabled={disabled}
-            >
-              <AlignLeft className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Align Left</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={AlignLeft}
+          tooltip="Align Left"
+          onClick={() => onFormatChange({ align: "left" })}
+          active={currentFormat.align === "left"}
+          disabled={disabled}
+        />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={currentFormat.align === "center" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() => onFormatChange({ align: "center" })}
-              disabled={disabled}
-            >
-              <AlignCenter className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Align Center</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={AlignCenter}
+          tooltip="Align Center"
+          onClick={() => onFormatChange({ align: "center" })}
+          active={currentFormat.align === "center"}
+          disabled={disabled}
+        />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={currentFormat.align === "right" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-7 w-7 rounded"
-              onClick={() => onFormatChange({ align: "right" })}
-              disabled={disabled}
-            >
-              <AlignRight className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Align Right</TooltipContent>
-        </Tooltip>
+        <IconBtn
+          icon={AlignRight}
+          tooltip="Align Right"
+          onClick={() => onFormatChange({ align: "right" })}
+          active={currentFormat.align === "right"}
+          disabled={disabled}
+        />
       </div>
     </div>
   );
