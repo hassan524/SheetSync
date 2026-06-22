@@ -4692,9 +4692,76 @@ export default function SheetClient() {
     onFillStart: any;
   }
 
-  const contextRef = useMemo(() => ({} as GridContext), []);
+  const contextRef = useRef({
+    rows,
+    selectedRows,
+    selectedCell,
+    selectionRange,
+    formulas,
+    comments,
+    activeCursors,
+    textWrap,
+    cellTypes,
+    protection,
+    sheetColOps,
+    sheetRowOps,
+    colOps,
+    persistence,
+    rowHeights,
+    gridRows,
+    filteredRows,
+    mentionState,
+    mentionableMembers,
+    cellSelectOptions,
+    mergeByCell,
+    autoOverflowByCell,
+    canEditSheet,
+    showViewerEditMessage,
+    broadcastSheetSnapshot,
+    setSelectedRows,
+    setSelectedCell,
+    setSelectionRange,
+    setSheetState,
+    setFocusedColumnKey,
+    setRightPanel,
+    setActiveCell,
+    saveAllRows,
+    saveAllColumns,
+    saveFormula,
+    deleteFormula,
+    setMentionState,
+    beginRowResize,
+    onRowResizeMove,
+    endRowResize,
+    beginColResize,
+    formatting,
+    timeTravelState,
+    isDark,
+    selectMergeBlock,
+    setActiveCommentCell,
+    getEffectiveCellStyle,
+    onFillStart,
+    selectedColumnKey,
+    handleTextWrapToggle,
+    handleApplyFormulaToColumn,
+    handleRemoveColumnFormula,
+    handleApplyColumnFormat,
+    handleToggleFreezeColumn,
+    handleFillColumnNumbers,
+    handleFillColumnHashNumbers,
+    columnsHistory,
+    isOrgSheet,
+    orgMembers,
+    rightPanel,
+    markSaving,
+    markSaved,
+    setSaveStatus,
+    setSelectSetupDialog,
+    sheetId,
+    columns,
+  } as GridContext);
   useEffect(() => {
-    Object.assign(contextRef, {
+    Object.assign(contextRef.current as GridContext, {
       rows,
       selectedRows,
       selectedCell,
@@ -4706,6 +4773,7 @@ export default function SheetClient() {
       cellTypes,
       protection,
       sheetColOps,
+      sheetRowOps,
       colOps,
       persistence,
       rowHeights,
@@ -4742,6 +4810,24 @@ export default function SheetClient() {
       setActiveCommentCell,
       getEffectiveCellStyle,
       onFillStart,
+      selectedColumnKey,
+      handleTextWrapToggle,
+      handleApplyFormulaToColumn,
+      handleRemoveColumnFormula,
+      handleApplyColumnFormat,
+      handleToggleFreezeColumn,
+      handleFillColumnNumbers,
+      handleFillColumnHashNumbers,
+      columnsHistory,
+      isOrgSheet,
+      orgMembers,
+      rightPanel,
+      markSaving,
+      markSaved,
+      setSaveStatus,
+      setSelectSetupDialog,
+      sheetId,
+      columns,
     });
   });
 
@@ -4755,7 +4841,7 @@ export default function SheetClient() {
       frozen: true,
       resizable: false,
       renderHeaderCell() {
-        const { rows, selectedRows, setSelectedRows, setSelectedCell, setSelectionRange, timeTravelState } = contextRef;
+        const { rows, selectedRows, setSelectedRows, setSelectedCell, setSelectionRange, timeTravelState } = contextRef.current as GridContext;
         const activeRows = timeTravelState.previewRows || rows;
         const allSelected = activeRows.length > 0 && selectedRows.size === activeRows.length;
         const handleSelectAll = (checked: boolean) => {
@@ -4796,7 +4882,7 @@ export default function SheetClient() {
         );
       },
       renderCell(props: RenderCellProps<SheetRow, SheetRow>) {
-        const { rows, selectedRows, setSelectedRows, setSelectedCell, setSelectionRange, protection, timeTravelState, beginRowResize, onRowResizeMove, endRowResize } = contextRef;
+        const { rows, selectedRows, setSelectedRows, setSelectedCell, setSelectionRange, protection, timeTravelState, beginRowResize, onRowResizeMove, endRowResize } = contextRef.current;
         const activeRows = timeTravelState.previewRows || rows;
         const rowIdx = activeRows.findIndex((r: any) => r.id === props.row.id);
         const isSel = selectedRows.has(props.row.id);
@@ -4852,7 +4938,7 @@ export default function SheetClient() {
         );
       },
       renderSummaryCell(props: any) {
-        const { filteredRows } = contextRef;
+        const { filteredRows } = contextRef.current;;
         const displayIdx = filteredRows.findIndex((r) => r.id === props.row.id);
         return (
           <div className="h-full w-full flex items-center justify-center sheet-row-num sheet-row-num--selected border-r">
@@ -4875,7 +4961,7 @@ export default function SheetClient() {
         // Double-clicking them is intercepted by onCellDoubleClick which
         // redirects to the master cell. This prevents ghost editors.
         editable: (row: SheetRow) => {
-          const { canEditSheet, rows, mergeByCell } = contextRef;
+          const { canEditSheet, rows, mergeByCell } = contextRef.current;;
           if (!canEditSheet) return false;
           const rowIdx = rows.findIndex((r) => r.id === row.id);
           const mi = mergeByCell.get(`${rowIdx}-${col.key}`);
@@ -4889,7 +4975,7 @@ export default function SheetClient() {
             handleTextWrapToggle, handleApplyFormulaToColumn, handleRemoveColumnFormula, handleApplyColumnFormat,
             handleToggleFreezeColumn, canEditSheet, showViewerEditMessage, setSelectedColumnKey, setSelectedCell,
             setSelectionRange, setFocusedColumnKey, setRightPanel, columnsHistory
-          } = contextRef;
+          } = contextRef.current;;
           if (col.isExtra) {
             return <div className="h-full w-full border-r" style={{ background: 'var(--rdg-header-background-color)' }} />;
           }
@@ -5061,7 +5147,7 @@ export default function SheetClient() {
             comments, activeCursors, isDark, selectedCell, selectionRange, canEditSheet, showViewerEditMessage,
             setRightPanel, setActiveCommentCell, setSelectedColumnKey, setSelectedCell, selectMergeBlock,
             gridRows, getEffectiveCellStyle, onFillStart, formatting
-          } = contextRef
+          } = contextRef.current;
           const rowIdx = rows.findIndex((r) => r.id === props.row.id);
           const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
           const autoOverflowInfo = autoOverflowByCell.get(`${rowIdx}-${col.key}`);
@@ -5323,7 +5409,7 @@ export default function SheetClient() {
         },
 
         renderSummaryCell(props: any) {
-          const { rows, mergeByCell, formatting, cellTypes, formulas, filteredRows, getEffectiveCellStyle } = contextRef
+          const { rows, mergeByCell, formatting, cellTypes, formulas, filteredRows, getEffectiveCellStyle } = contextRef.current;
           const rowIdx = rows.findIndex((r) => r.id === props.row.id);
           const mergeInfo = mergeByCell.get(`${rowIdx}-${col.key}`);
           if (mergeInfo?.hidden)
@@ -5361,7 +5447,7 @@ export default function SheetClient() {
             persistence, broadcastSheetSnapshot, setSelectSetupDialog, orgMembers, isOrgSheet,
             mentionState, mentionableMembers, setMentionState, cellSelectOptions, rowHeights,
             gridRows, setActiveCell, selectMergeBlock, getEffectiveCellStyle
-          } = contextRef
+          } = contextRef.current;
           const { row, column, onRowChange } = props;
           const rowIdx = rows.findIndex((r) => r.id === row.id);
           const mergeInfo = mergeByCell.get(`${rowIdx}-${column.key}`);
