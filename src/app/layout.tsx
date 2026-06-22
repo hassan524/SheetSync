@@ -3,32 +3,29 @@ import "./app.css";
 import "./index.css";
 import { Providers } from "@/layout/providers";
 import { Toaster } from "sonner";
-
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sheetsync.app";
-
 export const viewport: Viewport = {
   themeColor: "#0d7c5f",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
 };
-
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: "SheetSync — Real-Time Collaborative Spreadsheets",
+    default: "SheetSync — Spreadsheets Made Simple",
     template: "%s | SheetSync",
   },
   description:
-    "SheetSync is a cloud spreadsheet platform with real-time collaboration, 100+ formulas, templates, team organizations, and full import/export — all in one workspace.",
+    "SheetSync is a spreadsheet application with easy PDF export, 10+ ready-made templates, and powerful formulas — everything you need in one place.",
   keywords: [
     "spreadsheet",
-    "collaborative spreadsheet",
-    "real-time collaboration",
+    "pdf export",
+    "spreadsheet templates",
     "google sheets alternative",
     "online spreadsheet",
-    "team spreadsheet",
     "formula spreadsheet",
+    "easy spreadsheet",
   ],
   authors: [{ name: "SheetSync" }],
   creator: "SheetSync",
@@ -43,23 +40,23 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: APP_URL,
     siteName: "SheetSync",
-    title: "SheetSync — Real-Time Collaborative Spreadsheets",
+    title: "SheetSync — Spreadsheets Made Simple",
     description:
-      "Real-time collaboration, 100+ formulas, templates, and team workspaces. The smarter spreadsheet for modern teams.",
+      "Easy PDF export, 10+ templates, and powerful formulas. The spreadsheet app that just works.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "SheetSync — Collaborative Spreadsheets",
+        alt: "SheetSync — Spreadsheets Made Simple",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SheetSync — Real-Time Collaborative Spreadsheets",
+    title: "SheetSync — Spreadsheets Made Simple",
     description:
-      "Real-time collaboration, 100+ formulas, templates, and team workspaces.",
+      "Easy PDF export, 10+ templates, and powerful formulas.",
     images: ["/og-image.png"],
   },
   manifest: "/manifest.json",
@@ -73,7 +70,6 @@ export const metadata: Metadata = {
     title: "SheetSync",
   },
 };
-
 export default function RootLayout({
   children,
 }: Readonly<{
